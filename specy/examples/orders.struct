@@ -1,0 +1,196 @@
+domain "Orders"
+
+// =============================================================================
+// Enums
+// =============================================================================
+
+enum OrderStatus {
+  draft
+  confirmed
+  shipped
+  delivered
+  cancelled
+}
+
+enum PaymentStatus {
+  pending
+  captured
+  failed
+  refunded
+}
+
+enum PaymentMethod {
+  creditCard
+  bankTransfer
+  paypal
+}
+
+enum CustomerStatus {
+  active
+  suspended
+  closed
+}
+
+// =============================================================================
+// Value Objects
+// =============================================================================
+
+value Address {
+  street : string
+  city : string
+  zipCode : string maxLength(10)
+  country : string
+}
+
+value Money {
+  amount : decimal min(0)
+  currency : string default("EUR") maxLength(3)
+}
+
+value EmailAddress {
+  value : string pattern("^[^@]+@[^@]+\\.[^@]+$")
+}
+
+// =============================================================================
+// Entities
+// =============================================================================
+
+entity Customer {
+  id : uuid unique immutable
+  name : string minLength(1) maxLength(100)
+  email : EmailAddress unique
+  status : CustomerStatus default("active")
+  birthDate : date optional past
+  shippingAddress : Address optional
+  createdAt : datetime immutable pastOrPresent
+}
+
+entity Product {
+  id : uuid unique immutable
+  name : string minLength(1) maxLength(200)
+  description : string optional maxLength(2000)
+  price : Money
+  tags : set<string> optional
+  rating : int optional range(1, 5)
+  available : boolean default("true")
+}
+
+entity OrderLine {
+  id : uuid unique immutable
+  product : Product
+  quantity : int required min(1) max(1000)
+  unitPrice : Money
+  lineTotal : Money
+}
+
+entity Order {
+  id : uuid unique immutable
+  customer : Customer
+  lines : list<OrderLine>
+  status : OrderStatus default("draft")
+  totalAmount : Money
+  shippingAddress : Address
+  estimatedDelivery : date optional futureOrPresent
+  requiredDeliveryBy : date optional future
+  placedAt : datetime optional pastOrPresent
+  confirmedAt : datetime optional pastOrPresent
+  shippedAt : datetime optional pastOrPresent
+  cancelledAt : datetime optional pastOrPresent
+  createdAt : datetime immutable pastOrPresent
+}
+
+entity Payment {
+  id : uuid unique immutable
+  order : Order
+  amount : Money
+  method : PaymentMethod
+  status : PaymentStatus default("pending")
+  processedAt : datetime optional pastOrPresent
+  failureReason : string optional maxLength(500)
+  createdAt : datetime immutable pastOrPresent
+}
+
+// =============================================================================
+// Commands
+// =============================================================================
+
+command PlaceOrder {
+  customerId : uuid
+  lines : list<OrderLine>
+  shippingAddress : Address
+}
+
+command ConfirmOrder {
+  orderId : uuid
+}
+
+command CancelOrder {
+  orderId : uuid
+  reason : string optional maxLength(500)
+}
+
+command ProcessPayment {
+  orderId : uuid
+  method : PaymentMethod
+}
+
+command RefundPayment {
+  paymentId : uuid
+  reason : string optional maxLength(500)
+}
+
+command ShipOrder {
+  orderId : uuid
+  trackingNumber : string optional maxLength(100)
+}
+
+// =============================================================================
+// Events
+// =============================================================================
+
+event OrderPlaced {
+  orderId : uuid
+  customerId : uuid
+  totalAmount : Money
+  placedAt : datetime
+}
+
+event OrderConfirmed {
+  orderId : uuid
+  confirmedAt : datetime
+}
+
+event OrderCancelled {
+  orderId : uuid
+  reason : string optional
+  cancelledAt : datetime
+}
+
+event OrderShipped {
+  orderId : uuid
+  shippedAt : datetime
+  trackingNumber : string optional
+}
+
+event PaymentProcessed {
+  paymentId : uuid
+  orderId : uuid
+  amount : Money
+  method : PaymentMethod
+  processedAt : datetime
+}
+
+event PaymentFailed {
+  paymentId : uuid
+  orderId : uuid
+  reason : string
+  failedAt : datetime
+}
+
+event PaymentRefunded {
+  paymentId : uuid
+  orderId : uuid
+  amount : Money
+  reason : string optional
+  refundedAt : datetime
+}

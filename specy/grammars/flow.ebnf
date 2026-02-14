@@ -1,0 +1,186 @@
+// =============================================================================
+// Specy — Interaction Model Grammar (.flow)
+// EBNF (ISO 14977 style)
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// Top-level structure
+// -----------------------------------------------------------------------------
+
+flowFile         = { comment | domainDecl | usesDecl | block } ;
+
+domainDecl       = "domain" , stringLiteral ;
+
+usesDecl         = "uses" , stringLiteral ;
+
+block            = interactionDef
+                 | reactionDef
+                 | policyDef
+                 | invariantDef ;
+
+// -----------------------------------------------------------------------------
+// Interaction — triggered by a command
+// -----------------------------------------------------------------------------
+
+interactionDef   = "interaction" , identifier , "{"
+                 ,   "on" , typeName
+                 , { resolvesClause }
+                 , { createsClause }
+                 , { failsClause }
+                 , { setsClause }
+                 , { emitsClause }
+                 , "}" ;
+
+resolvesClause   = "resolves" , typeName , "from" , dotPath ;
+
+createsClause    = "creates" , typeName ;
+
+emitsClause      = "emits" , typeName ;
+
+setsClause       = "sets" , dotPath , "to" , valueExpr ;
+
+failsClause      = "fails" , stringLiteral , "when" , "{" , expression , "}" ;
+
+// -----------------------------------------------------------------------------
+// Reaction — triggered by an event
+// -----------------------------------------------------------------------------
+
+reactionDef      = "reaction" , identifier , "{"
+                 ,   "on" , typeName
+                 , { thenClause }
+                 , { emitsClause }
+                 , { setsClause }
+                 , "}" ;
+
+thenClause       = "then" , stringLiteral ;
+
+// -----------------------------------------------------------------------------
+// Policy — domain-wide rule
+// -----------------------------------------------------------------------------
+
+policyDef        = "policy" , identifier , "{"
+                 ,   "when" , "{" , expression , "}"
+                 ,   "then" , stringLiteral
+                 , "}" ;
+
+// -----------------------------------------------------------------------------
+// Invariant — structural constraint on an entity
+// -----------------------------------------------------------------------------
+
+invariantDef     = "invariant" , identifier , "{"
+                 ,   "on" , typeName
+                 ,   "must" , "{" , expression , "}"
+                 ,   "message" , stringLiteral
+                 , "}" ;
+
+// -----------------------------------------------------------------------------
+// Expressions
+// -----------------------------------------------------------------------------
+
+expression       = orExpr ;
+
+orExpr           = andExpr , { "or" , andExpr } ;
+
+andExpr          = notExpr , { "and" , notExpr } ;
+
+notExpr          = [ "not" ] , comparison ;
+
+comparison       = addExpr , [ compOp , addExpr ] ;
+
+compOp           = "=" | "!=" | ">" | "<" | ">=" | "<=" ;
+
+addExpr          = mulExpr , { ( "+" | "-" ) , mulExpr } ;
+
+mulExpr          = unaryExpr , { ( "*" | "/" ) , unaryExpr } ;
+
+unaryExpr        = dotPath , "is" , "defined"
+                 | dotPath , "is" , "not" , "defined"
+                 | dotPath , "in" , "{" , valueList , "}"
+                 | dotPath , "not" , "in" , "{" , valueList , "}"
+                 | functionCall
+                 | dotPath
+                 | literal
+                 | "(" , expression , ")" ;
+
+// -----------------------------------------------------------------------------
+// Dot-path: references to fields across the model
+// -----------------------------------------------------------------------------
+
+dotPath          = identifier , { "." , identifier } ;
+
+// -----------------------------------------------------------------------------
+// Value expressions (right-hand side of sets...to, comparisons, etc.)
+// -----------------------------------------------------------------------------
+
+valueExpr        = functionCall
+                 | dotPath
+                 | literal ;
+
+valueList        = valueExpr , { "," , valueExpr } ;
+
+// -----------------------------------------------------------------------------
+// Built-in functions
+// -----------------------------------------------------------------------------
+
+functionCall     = functionName , "(" , [ argList ] , ")" ;
+
+argList          = expression , { "," , expression } ;
+
+functionName     = "count"
+                 | "sum"
+                 | "now"
+                 | "today"
+                 | "size"
+                 | "isEmpty"
+                 | "isNotEmpty" ;
+
+// -----------------------------------------------------------------------------
+// Literals
+// -----------------------------------------------------------------------------
+
+literal          = stringLiteral | number | "true" | "false" ;
+
+stringLiteral    = '"' , { character } , '"' ;
+
+number           = [ "-" ] , digit , { digit } , [ "." , digit , { digit } ] ;
+
+// -----------------------------------------------------------------------------
+// Identifiers
+// -----------------------------------------------------------------------------
+
+typeName         = pascalCaseId ;
+
+identifier       = camelCaseId | pascalCaseId ;
+
+pascalCaseId     = upperLetter , { letter | digit } ;
+
+camelCaseId      = lowerLetter , { letter | digit } ;
+
+// -----------------------------------------------------------------------------
+// Comments
+// -----------------------------------------------------------------------------
+
+comment          = "//" , { character } , newline ;
+
+// -----------------------------------------------------------------------------
+// Character classes
+// -----------------------------------------------------------------------------
+
+upperLetter      = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I"
+                 | "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R"
+                 | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" ;
+
+lowerLetter      = "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i"
+                 | "j" | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r"
+                 | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" ;
+
+letter           = upperLetter | lowerLetter ;
+
+digit            = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+
+character        = letter | digit | " " | "!" | "@" | "#" | "$" | "%" | "^"
+                 | "&" | "*" | "(" | ")" | "-" | "_" | "=" | "+" | "["
+                 | "]" | "{" | "}" | "|" | "\\" | ":" | ";" | "'" | ","
+                 | "." | "<" | ">" | "/" | "?" | "~" | "`" ;
+
+newline          = "\n" ;
