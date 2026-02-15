@@ -187,7 +187,7 @@ For each bounded context:
    resolves User from ChangePassword.currentPassword
    ```
    If the entity is resolved from a field that is not in the command (e.g. only available in the session), add that field to the command first (see Phase 2 rule on command fields), then use it in `resolves`.
-   - `sets` → field mutations on resolved/created entities
+   - `sets` → field mutations on resolved/created entities. **Every entity referenced in a `sets` clause must appear in a `resolves` or `creates` clause of the same interaction.** If the code updates entities that are not directly resolved (e.g. bulk updates on related records), do not emit a `sets` clause — use a `// NOTE:` comment to describe the side effect instead.
    - `emits` → events published/dispatched
 3. **For each event listener** → create a `reaction` block:
    - `on` → the event typeName
@@ -197,6 +197,31 @@ For each bounded context:
 4. **Cross-cutting rules** → create `policy` blocks:
    - Domain rules that span multiple operations or guard multiple commands
    - Express the condition with `when { ... }` and the consequence with `then "..."`
+   - **The `when` condition must be a real, evaluable boolean expression — the same tautology prohibition as `fails` applies here.** If the policy's real condition is unexpressible (datetime arithmetic, cross-context queries, external lookups), do NOT emit a `policy` block with a placeholder `when` clause. Instead, write a standalone `// UNCLEAR:` comment describing the rule:
+     ```
+     // UNCLEAR: policy not expressible — posts can only be edited within 5 minutes of creation (datetime arithmetic)
+     // UNCLEAR: policy not expressible — users must have an accepted connection to exchange messages (cross-context query)
+     ```
+   - Common tautological traps in policies:
+     ```
+     // WRONG — createdAt is immutable pastOrPresent, always defined
+     policy MessageExpiration {
+       when { Message.createdAt is defined }
+       then "Messages expire after 3 months"
+     }
+
+     // WRONG — updatedAt being defined does not capture the 5-minute window
+     policy PostEditWindow {
+       when { Post.updatedAt is defined }
+       then "Posts can only be edited within 5 minutes"
+     }
+
+     // WRONG — condition is a self-connection check, not the actual cross-context rule
+     policy ConnectionRequired {
+       when { Conversation.participant1Id != Conversation.participant2Id }
+       then "Users must have an accepted connection to message"
+     }
+     ```
 5. **Structural constraints** → create `invariant` blocks:
    - Conditions that must always be true for an **entity** (never a command, event, or value)
    - Express with `on EntityType`, `must { ... }`, and `message "..."`
@@ -218,8 +243,10 @@ For each bounded context:
 2. For every `dotPath` in the `.flow`, verify the field chain resolves in the `.struct`.
 3. For every enum value referenced in a `.flow` expression, verify it exists in the corresponding enum definition.
 4. For every `resolves` clause, verify the target entity has the referenced field in its `from` dotPath.
-5. Fix any obvious errors (typos, mismatched casing). For ambiguous cases, add `// UNCLEAR: ...`.
-6. Present a final summary:
+5. For every `sets` clause, verify the entity being set appears in a `resolves` or `creates` clause of the same interaction. If it does not, either add the missing `resolves` clause or replace the `sets` with a `// NOTE:` comment.
+6. Fix any obvious errors (typos, mismatched casing). For ambiguous cases, add `// UNCLEAR: ...`.
+7. For every `policy` block, verify the `when` condition is not tautological (see Quality Rule 6). If it is, remove the `policy` block and replace with a `// UNCLEAR:` comment.
+8. Present a final summary:
    ```
    ## Validation Summary
    - Types resolved: {n}/{total}
@@ -851,7 +878,7 @@ These files demonstrate the expected naming conventions, formatting, level of de
 6. **Expressions must be valid — no tautologies, no bogus dotPaths.** Every `when { ... }` and `must { ... }` block must contain a real boolean expression that evaluates correctly given the types in the `.struct`. Specific rules:
    - Never compare a `string` field directly to a number — use `size(field)` for string length checks.
    - Never use `count()` on a `string` field — `count()` is for `list<T>` / `set<T>` only.
-   - Never write `field is defined` on a `required` field as a stand-in for a condition you cannot express. A required field is always defined — this is a tautology. Use `// UNCLEAR:` instead.
+   - Never write `field is defined` on a `required` or `immutable` field as a stand-in for a condition you cannot express. A required/immutable field is always defined — this is a tautology. Use `// UNCLEAR:` instead. This applies to both `fails` clauses and `policy` `when` clauses.
    - Never subtract datetimes and compare to a bare number (`now() - Post.createdAt > 5`) — the unit is ambiguous. Use `// UNCLEAR:` with a note about the time window.
    - Never write a `resolves Entity from Command.someField` where `someField` has no relation to the entity's identity. If the field you need is not in the command, add it to the command first (see Phase 2).
    - **Try to express conditions before resorting to `// UNCLEAR`.** Self-reference checks, ownership checks, status checks, not-found checks, and existence/duplicate checks are all expressible with Specy operators. Reserve `// UNCLEAR` for conditions that truly cannot be modeled: password strength, rate limiting, regex matching, external API calls, algorithmic checks.
@@ -862,10 +889,15 @@ These files demonstrate the expected naming conventions, formatting, level of de
 11. **Preserve source vocabulary.** Use the same names as the code: if the code says `Order`, write `Order`, not `PurchaseOrder`. If the code says `cancel`, write `cancel`, not `abort`.
 12. **Naming convention: interaction = command name.** The interaction identifier matches the command name: `command PlaceOrder` → `interaction PlaceOrder`.
 13. **Naming convention: reaction = On + event name.** The reaction identifier is the event name prefixed with `On`: `event OrderPlaced` → `reaction OnOrderPlaced`.
-14. **No technical artifacts.** Do not include framework-specific types, infrastructure code, or ORM metadata in the output. Extract only domain concepts.
+14. **No technical artifacts.** Do not include framework-specific types, infrastructure code, or ORM metadata in the output. Extract only domain concepts. Specifically exclude:
+    - **OAuth/auth infrastructure:** entities storing client IDs, client secrets, access tokens, refresh tokens (e.g. `MastodonApp { clientId, clientSecret }`). If federation/OAuth is a domain concept, model the *connection* (user linked to external service) but omit the token storage details.
+    - **Monitoring/analytics entities:** access counters, IP tracking, usage metrics (e.g. `RssMetrics { accessCount, lastAccessIp }`).
+    - **Technical token fields on domain entities:** fields like `accessToken`, `refreshJwt`, `accessJwt` on a `User` entity are infrastructure concerns. Omit them. Keep the *domain-meaningful* fields (e.g. `mastodonHandle`, `blueskyDid`) that represent the business relationship.
 15. **Field ordering.** Within an entity or value, order fields: identity fields first (id, uuid), then required fields, then optional fields. Within each group, keep the order from the source code.
 16. **Section separators.** Use `// ===` comment blocks to separate sections (enums, values, entities, commands, events in `.struct`; interactions, reactions, policies, invariants in `.flow`), matching the style in the canonical examples.
 17. **Minimal output.** Do not add fields, constraints, or blocks that are not evidenced by the code. When in doubt, omit rather than invent.
+18. **Query-only entities.** If an entity defined in the `.struct` has no corresponding write interaction in the `.flow` (it is only read, never created or mutated by a command handler), annotate it in the `.struct` with `// NOTE: query-only — no write interaction found`. This signals a deliberate observation, not an omission. Common examples: visit/view tracking entities, read-only projections, entities managed by external systems.
+19. **Enums without flow references.** If an enum is defined in the `.struct` but never referenced in any `.flow` expression (no `fails`, `sets`, `policy`, or `invariant` uses it), annotate it with `// NOTE: not referenced in flow — used for queries/UI only`. Do not omit it from the struct (it is still part of the domain vocabulary), but flag it.
 
 ---
 
