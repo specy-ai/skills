@@ -25,7 +25,7 @@ On distribue Specy sous forme de skills (Claude Code, Cursor, etc.) plutôt que 
 
 1. **`distill`** — Reverse-engineer le code en `.struct` + `.flow`. C'est le point d'entrée : on part de l'existant.
 2. **`dialogue`** — Explorer et questionner le domaine en langage naturel, en s'appuyant sur les modèles extraits. Le métier peut enfin interroger la logique sans lire du code.
-3. **`spec`** — Aider à spécifier de nouvelles fonctionnalités en les confrontant aux modèles existants. Détecte contradictions, trous, et impacts avant l'implémentation.
+3. **`spec`** — Formaliser des spécifications métier en les confrontant aux modèles existants. Produit un fichier `.spec` structuré qui capture l'analyse (contradictions, trous, impacts) et les modifications projetées — sans jamais toucher aux `.struct` / `.flow` qui restent la source de vérité du code.
 
 ### Grammaires
 
@@ -41,13 +41,17 @@ specy/
 ├── examples/
 │   ├── orders.struct         # Exemple de référence
 │   └── orders.flow           # Exemple de référence
+├── specs/                    # Fichiers .spec produits par le skill spec
+│   ├── 001_deliver-order.spec
+│   └── done/                 # Specs réalisées (archivées après distill)
+│       └── 000_initial-setup.spec
 └── skills/
     ├── distill/
     │   └── SKILL.md          # Reverse engineering code → .struct + .flow
     ├── dialogue/
     │   └── SKILL.md          # Dialogue exploratoire avec le domaine
     └── spec/
-        └── SKILL.md          # Aide à la spécification / validation
+        └── SKILL.md          # Formalisation de specs → .spec
 ```
 
 ## Étapes
@@ -114,25 +118,37 @@ Le SKILL.md doit contenir :
 
 ### Étape 4 — Skill `spec`
 
-Objectif : aider à rédiger/valider des spécifications en confrontant prose métier aux modèles.
+Objectif : formaliser des spécifications métier en les confrontant aux modèles existants, et produire un fichier `.spec` structuré.
+
+**Principe fondamental :** `spec` ne modifie jamais les `.struct` / `.flow`. Ces fichiers sont la source de vérité du code, maintenue par `distill`. Le résultat de `spec` est un fichier `.spec` — un artefact de spécification qui capture l'analyse et les modifications projetées. La boucle est : `spec` produit le `.spec` → le dev implémente le code → `distill` met à jour les modèles.
 
 Le SKILL.md doit contenir :
 
-1. **Rôle** — "Tu es un analyste qui aide à formaliser des spécifications métier et les valide contre les modèles existants"
-2. **Workflow** :
-    - Input : une user story, un besoin métier, ou une règle en prose
+1. **Rôle** — "Tu es un analyste qui formalise des spécifications métier et les valide contre les modèles existants"
+2. **Workflow en 5 phases** :
     - Étape 1 — Décomposition : identifier les concepts (entités, commandes, events) impliqués
-    - Étape 2 — Ancrage : mapper chaque concept vers le .struct existant. Signaler les concepts manquants
-    - Étape 3 — Confrontation : vérifier la cohérence avec le .flow existant. Signaler contradictions
-    - Étape 4 — Proposition : générer les modifications .struct et .flow nécessaires en diff
-    - Étape 5 — Confirmation : attendre validation avant d'écrire
-3. **Types de validation** :
+    - Étape 2 — Ancrage : mapper chaque concept vers le modèle existant (`[existing]`, `[new]`, `[ambiguous]`)
+    - Étape 3 — Confrontation : vérifier la cohérence (`compatible`, `contradiction`, `impact`, `gap`, `coverage`)
+    - Étape 4 — Proposition : générer le fichier `.spec` avec les modifications projetées en syntaxe Specy native (`add`, `modify`, `remove`)
+    - Étape 5 — Confirmation : attendre validation avant d'écrire le `.spec`
+3. **Format `.spec` structuré** avec les blocs :
+    - `spec` + `against` (nom, version du modèle via `gitSha` + `lastRun` de `.meta.json`)
+    - `narrative` — l'exigence d'origine en prose
+    - `concepts` — inventaire des concepts impliqués avec leur ancrage
+    - `confrontation` — résultats de la vérification
+    - `changes` — modifications projetées en syntaxe Specy native
+    - `impact` — analyse d'impact sur les constructs existants
+4. **Types de validation** :
     - Complétude : la spec couvre-t-elle tous les cas (happy path + erreurs) ?
     - Cohérence : la spec contredit-elle des règles existantes ?
     - Couverture : les events émis sont-ils consommés quelque part ?
     - Nommage : les termes utilisés sont-ils cohérents avec le vocabulaire existant ?
-4. **Output** : diff proposé sur les fichiers .struct et .flow, avec justification pour chaque changement
-5. **Règle clé** : toujours montrer l'impact sur les interactions existantes quand on modifie le .struct
+    - Typage : chaque typeName, dotPath et field résout dans le .struct ?
+5. **Conventions de fichier** :
+    - Dossier : `specy/specs/`
+    - Nommage : `{NNN}_{kebab-case-name}.spec` (numéro auto-incrémenté sur 3 digits)
+    - Cycle de vie : active → réalisée (ajout d'une ligne `realized version "..." at "..."` + déplacement dans `specy/specs/done/`)
+6. **Règle clé** : ne jamais toucher aux `.struct` / `.flow` — toujours montrer l'impact sur les interactions existantes quand on modifie le .struct dans les `changes` projetés
 
 ### Étape 5 — Test end-to-end
 
