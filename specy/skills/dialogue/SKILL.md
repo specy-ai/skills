@@ -26,6 +26,7 @@ At the start of the conversation:
    - Entities: {count}
    - Commands: {count}
    - Events: {count}
+   - Services: {count}
    - Interactions: {count}
    - Reactions: {count}
    - Policies: {count}
@@ -69,8 +70,9 @@ Synthesize domain knowledge from `.struct` + `.flow` in business language.
 1. **Entities and their roles** — what each entity represents, its key fields and types.
 2. **Lifecycle** — statuses (from enums) and transitions (from interactions that `sets` the status field).
 3. **Commands available** — what actions can be triggered, with their inputs.
-4. **Events emitted** — what happens as a result, and what reactions are triggered.
-5. **Policies and invariants** — rules that constrain the domain.
+4. **Services available** — domain services and their role, with the operations they expose (including `accepts` and `returns`).
+5. **Events emitted** — what happens as a result, and what reactions are triggered.
+6. **Policies and invariants** — rules that constrain the domain.
 
 **Rules:**
 
@@ -97,11 +99,12 @@ Answer "what if?" questions by tracing paths through the `.flow`.
 
 **Algorithm:**
 
-1. **Identify the concept(s)** mentioned in the question (entity, command, status, field).
+1. **Identify the concept(s)** mentioned in the question (entity, command, status, field, service).
 2. **Find the relevant interactions** — those that `resolves`, `creates`, or `sets` the concept.
 3. **Evaluate `fails` conditions** — does the scenario match a failure condition?
-4. **Determine `sets` and `emits`** — what state changes and events result?
-5. **Check `policy` and `invariant`** — are any domain-wide rules triggered?
+4. **Trace `delegates` clauses** — when an interaction delegates to a service, follow the service operation to understand the full execution path (what it `accepts`, what it `returns`, whether it can `fails` or `emits`).
+5. **Determine `sets` and `emits`** — what state changes and events result?
+6. **Check `policy` and `invariant`** — are any domain-wide rules triggered?
 
 **Response rules:**
 
@@ -210,6 +213,9 @@ Perform a structural analysis of gaps in the model.
 | Unresolved `// NOTE` | NOTE markers that may need attention |
 | Enums not referenced in `.flow` | Enums defined in `.struct` but never used in any `.flow` expression |
 | Reactions without `sets` or `emits` | Reactions that describe side effects in `then` but have no `sets` or `emits` — the side effect is informal only |
+| Services declared but never delegated | Services defined in `.flow` but never referenced by any `delegates` clause in an interaction or reaction |
+| Service operations without `then` or `fails` | Operations with no description or error handling — the operation body is empty |
+| `delegates` to non-existent service/operation | A `delegates` clause referencing a service or operation that does not exist in the `.flow` |
 
 **Response format:**
 
@@ -384,11 +390,23 @@ event TypeName {
 domain "Name"
 uses "name.struct"
 
+service TypeName {
+  operation identifier {
+    accepts fieldName : fieldType       // 0..n
+    returns fieldName : fieldType       // 0..1
+    fails "message" when { expression } // 0..n
+    then "description"                  // 0..n
+    sets dotPath to valueExpr           // 0..n
+    emits EventType                     // 0..n
+  }
+}
+
 interaction Identifier {
   on CommandType
   resolves EntityType from dotPath      // 0..n
   creates EntityType                    // 0..n
   fails "message" when { expression }   // 0..n
+  delegates Service.operation           // 0..n
   sets dotPath to valueExpr             // 0..n
   emits EventType                       // 0..n
 }
@@ -396,6 +414,7 @@ interaction Identifier {
 reaction Identifier {
   on EventType
   then "description"                    // 1..n
+  delegates Service.operation           // 0..n
   emits EventType                       // 0..n
   sets dotPath to valueExpr             // 0..n
 }

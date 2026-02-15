@@ -16,7 +16,8 @@ usesDecl         = "uses" , stringLiteral ;
 block            = interactionDef
                  | reactionDef
                  | policyDef
-                 | invariantDef ;
+                 | invariantDef
+                 | serviceDef ;
 
 // -----------------------------------------------------------------------------
 // Interaction — triggered by a command
@@ -27,6 +28,7 @@ interactionDef   = "interaction" , identifier , "{"
                  , { resolvesClause }
                  , { createsClause }
                  , { failsClause }
+                 , { delegatesClause }
                  , { setsClause }
                  , { emitsClause }
                  , "}" ;
@@ -41,6 +43,8 @@ setsClause       = "sets" , dotPath , "to" , valueExpr ;
 
 failsClause      = "fails" , stringLiteral , "when" , "{" , expression , "}" ;
 
+delegatesClause  = "delegates" , dotPath ;
+
 // -----------------------------------------------------------------------------
 // Reaction — triggered by an event
 // -----------------------------------------------------------------------------
@@ -48,11 +52,39 @@ failsClause      = "fails" , stringLiteral , "when" , "{" , expression , "}" ;
 reactionDef      = "reaction" , identifier , "{"
                  ,   "on" , typeName
                  , { thenClause }
+                 , { delegatesClause }
                  , { emitsClause }
                  , { setsClause }
                  , "}" ;
 
 thenClause       = "then" , stringLiteral ;
+
+// -----------------------------------------------------------------------------
+// Service — stateless domain logic
+// -----------------------------------------------------------------------------
+
+serviceDef       = "service" , typeName , "{" , { comment | operationDef } , "}" ;
+
+operationDef     = "operation" , identifier , "{"
+                 , { acceptsClause }
+                 , [ returnsClause ]
+                 , { failsClause }
+                 , { thenClause }
+                 , { setsClause }
+                 , { emitsClause }
+                 , "}" ;
+
+acceptsClause    = "accepts" , identifier , ":" , fieldType ;
+
+returnsClause    = "returns" , identifier , ":" , fieldType ;
+
+fieldType        = primitiveType
+                 | typeName
+                 | collectionType ;
+
+primitiveType    = "string" | "int" | "decimal" | "boolean" | "date" | "datetime" | "uuid" ;
+
+collectionType   = ( "list" | "set" ) , "<" , fieldType , ">" ;
 
 // -----------------------------------------------------------------------------
 // Policy — domain-wide rule

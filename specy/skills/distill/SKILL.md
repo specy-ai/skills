@@ -33,7 +33,7 @@ You are an expert Domain-Driven Design practitioner who reverse-engineers existi
   }
   ```
 - **Order within `.struct`:** enums, then value objects, then entities, then commands, then events. Within each section, alphabetical or dependency order.
-- **Order within `.flow`:** interactions, then reactions, then policies, then invariants.
+- **Order within `.flow`:** services, then interactions, then reactions, then policies, then invariants.
 
 ---
 
@@ -79,6 +79,7 @@ For each bounded context:
    - `enum` — fixed set of named constants
    - `command` — input DTO triggering a write operation. **Include every parameter from the handler/service method signature**, even if the value originates from authentication context (JWT, session). If the service method takes `(userId, targetUserId, message)`, the command must have all three fields. Annotate session-sourced fields with `// from authenticated session`.
    - `event` — record of something that happened
+   - `service` — interface or class that is stateless with business logic, without identity or persisted state. Do not confuse with repositories (data access) or controllers (infrastructure). Services are behavioral → they produce `service` blocks in the `.flow`, not in the `.struct`.
 3. **Map fields:**
    - Map native types to Specy primitives using the type mapping table.
    - Map collections to `list<T>` or `set<T>`.
@@ -226,12 +227,24 @@ For each bounded context:
    ```
    - `sets` → field mutations on resolved/created entities. **Every entity referenced in a `sets` clause must appear in a `resolves` or `creates` clause of the same interaction.** If the code updates entities that are not directly resolved (e.g. bulk updates on related records), do not emit a `sets` clause — use a `// NOTE:` comment to describe the side effect instead.
    - `emits` → events published/dispatched
-3. **For each event listener** → create a `reaction` block:
+3. **For each service identified in Phase 2** → create a `service` block in the `.flow`:
+   - One `service` block per service class/interface.
+   - For each public method with business logic → create an `operation` inside the service block.
+   - `accepts` → parameters of the method (map types using the type mapping table).
+   - `returns` → the return type of the method (if not void).
+   - `fails` → error conditions thrown by the service method (same rules as interaction `fails`).
+   - `then` → describe the business logic in natural language when it cannot be expressed structurally.
+   - `emits` → events published by the service method.
+4. **For each call to a service in a command handler** → add a `delegates ServiceName.operationName` clause in the corresponding `interaction` block:
+   - Place `delegates` after `fails` and before `sets`.
+   - If the result of the service call is assigned to a field of a resolved/created entity, express it with `sets Entity.field to ServiceName.operationName`.
+5. **For each event listener** → create a `reaction` block:
    - `on` → the event typeName
    - `then` → describe the side effect in business language
+   - `delegates` → if the reaction calls a service, add a `delegates` clause
    - `sets` → any field mutations
    - `emits` → any chained events
-4. **Cross-cutting rules** → create `policy` blocks:
+6. **Cross-cutting rules** → create `policy` blocks:
    - Domain rules that span multiple operations or guard multiple commands
    - Express the condition with `when { ... }` and the consequence with `then "..."`
    - **The `when` condition must be a real, evaluable boolean expression — the same tautology prohibition as `fails` applies here.** If the policy's real condition is unexpressible (datetime arithmetic, cross-context queries, external lookups), do NOT emit a `policy` block with a placeholder `when` clause. Instead, write a standalone `// UNCLEAR:` comment describing the rule:
@@ -259,14 +272,15 @@ For each bounded context:
        then "A captured payment is required before shipping"
      }
      ```
-5. **Structural constraints** → create `invariant` blocks:
+7. **Structural constraints** → create `invariant` blocks:
    - Conditions that must always be true for an **entity** (never a command, event, or value)
    - Express with `on EntityType`, `must { ... }`, and `message "..."`
    - Validation rules on command inputs belong in `fails` clauses of the corresponding `interaction`, not in invariants
-6. Write the `.flow` file following the output conventions.
-7. Print a summary:
+8. Write the `.flow` file following the output conventions.
+9. Print a summary:
    ```
    ## Flow Extraction Summary — {domain}
+   - Services: {count}
    - Interactions: {count}
    - Reactions: {count}
    - Policies: {count}
@@ -281,9 +295,11 @@ For each bounded context:
 3. For every enum value referenced in a `.flow` expression, verify it exists in the corresponding enum definition.
 4. For every `resolves` clause, verify the target entity has the referenced field in its `from` dotPath.
 5. For every `sets` clause, verify the entity being set appears in a `resolves` or `creates` clause of the same interaction. If it does not, either add the missing `resolves` clause or replace the `sets` with a `// NOTE:` comment.
-6. Fix any obvious errors (typos, mismatched casing). For ambiguous cases, add `// UNCLEAR: ...`.
-7. For every `policy` block, verify the `when` condition is not tautological (see Quality Rule 6). If it is, remove the `policy` block and replace with a `// UNCLEAR:` comment.
-8. Present a final summary:
+6. For every `delegates` clause, verify the dot-path resolves to a `service` + `operation` that exists in the `.flow`.
+7. For every `accepts` and `returns` clause in a service operation, verify the types resolve in the `.struct` (primitives are always valid).
+8. Fix any obvious errors (typos, mismatched casing). For ambiguous cases, add `// UNCLEAR: ...`.
+9. For every `policy` block, verify the `when` condition is not tautological (see Quality Rule 6). If it is, remove the `policy` block and replace with a `// UNCLEAR:` comment.
+10. Present a final summary:
    ```
    ## Validation Summary
    - Types resolved: {n}/{total}
@@ -325,6 +341,7 @@ The meta file `specy/.meta.json` tracks the state of the last distill run. It is
     "src/commands/PlaceOrder.java": ["command PlaceOrder"],
     "src/events/OrderPlaced.java": ["event OrderPlaced"],
     "src/services/OrderService.java": ["interaction PlaceOrder", "policy MaxOrderAmount"],
+    "src/services/PricingService.java": ["service PricingCalculator"],
     "src/services/AuthService.java": ["interaction Register", "interaction Login"],
     "src/listeners/AuthListener.java": ["reaction OnUserRegistered"],
     "src/models/Order.java#invariants": ["invariant OrderMustHaveLines"]
@@ -755,6 +772,23 @@ When the project does not match a specific framework above, apply these general 
 | Class/module named `*Command`, `*Request` with imperative name | Likely a `command` |
 | CRUD-only code with no explicit events | Add `// UNCLEAR: no event emitted — infer events or omit?` |
 
+### 6.6 Services
+
+**Identification heuristics:**
+
+| Source Pattern | Specy Construct |
+|---|---|
+| Interface or class without state, with business calculation method(s) | `service` block |
+| Constructor injection of a non-repository interface | potential `service` |
+| Call to a service method inside a command handler | `delegates` clause |
+| Service result assigned to an entity field | `sets Entity.field to Service.operation` |
+
+**What to model as a service:**
+
+- **Model:** business calculations (scoring, pricing, weight), business checks (eligibility, time window), external integrations with business scope (federation, notification)
+- **Do not model** (use `// NOTE` instead): pure technical processing (image resize, password hash, compression), infrastructure (logging, cache, rate limiting)
+- **Decision criterion:** if the result affects an entity field via `sets` or conditions the flow via `fails`, it is a business service
+
 ---
 
 ## Syntax Reference: .struct
@@ -884,6 +918,21 @@ uses "name.struct"
 
 ### Block Types
 
+**Service** — stateless domain logic:
+
+```
+service TypeName {
+  operation identifier {
+    accepts fieldName : fieldType       // 0..n
+    returns fieldName : fieldType       // 0..1
+    fails "message" when { expression } // 0..n
+    then "description"                  // 0..n
+    sets dotPath to valueExpr           // 0..n
+    emits EventType                     // 0..n
+  }
+}
+```
+
 **Interaction** — triggered by a command:
 
 ```
@@ -892,6 +941,7 @@ interaction Identifier {
   resolves EntityType from dotPath      // 0..n
   creates EntityType                    // 0..n
   fails "message" when { expression }   // 0..n
+  delegates Service.operation           // 0..n
   sets dotPath to valueExpr             // 0..n
   emits EventType                       // 0..n
 }
@@ -903,6 +953,7 @@ interaction Identifier {
 reaction Identifier {
   on EventType
   then "description of side effect"     // 1..n
+  delegates Service.operation           // 0..n
   emits EventType                       // 0..n
   sets dotPath to valueExpr             // 0..n
 }
@@ -1075,6 +1126,8 @@ These files demonstrate the expected naming conventions, formatting, level of de
 17. **Minimal output.** Do not add fields, constraints, or blocks that are not evidenced by the code. When in doubt, omit rather than invent.
 18. **Query-only entities.** If an entity defined in the `.struct` has no corresponding write interaction in the `.flow` (it is only read, never created or mutated by a command handler), annotate it in the `.struct` with `// NOTE: query-only — no write interaction found`. This signals a deliberate observation, not an omission. Common examples: visit/view tracking entities, read-only projections, entities managed by external systems.
 19. **Enums without flow references.** If an enum is defined in the `.struct` but never referenced in any `.flow` expression (no `fails`, `sets`, `policy`, or `invariant` uses it), annotate it with `// NOTE: not referenced in flow — used for queries/UI only`. Do not omit it from the struct (it is still part of the domain vocabulary), but flag it.
+20. **Service operations use `then` for unexpressible logic.** When a service operation's business logic cannot be captured structurally, describe it with a `then` clause. Use `fails` in operations only when the error condition is formally expressible.
+21. **No service for pure infrastructure.** Do not create `service` blocks for image processing, password hashing, logging, caching, rate limiting, or other purely technical concerns. These are infrastructure, not domain logic. Use `// NOTE:` comments instead.
 
 ---
 
