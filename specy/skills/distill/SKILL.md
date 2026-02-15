@@ -33,7 +33,7 @@ You are an expert Domain-Driven Design practitioner who reverse-engineers existi
   }
   ```
 - **Order within `.struct`:** enums, then value objects, then entities, then commands, then events. Within each section, alphabetical or dependency order.
-- **Order within `.flow`:** services, then interactions, then reactions, then policies, then invariants.
+- **Order within `.flow`:** repositories, then services, then interactions, then reactions, then policies, then invariants.
 
 ---
 
@@ -80,6 +80,7 @@ For each bounded context:
    - `command` — input DTO triggering a write operation. **Include every parameter from the handler/service method signature**, even if the value originates from authentication context (JWT, session). If the service method takes `(userId, targetUserId, message)`, the command must have all three fields. Annotate session-sourced fields with `// from authenticated session`.
    - `event` — record of something that happened
    - `service` — interface or class that is stateless with business logic, without identity or persisted state. Do not confuse with repositories (data access) or controllers (infrastructure). Services are behavioral → they produce `service` blocks in the `.flow`, not in the `.struct`.
+   - `repository` — interface of persistence for an aggregate root. Contains data access operations (find, save, delete, exists). Does NOT contain business logic. Repositories are behavioral → they produce `repository` blocks in the `.flow`, not in the `.struct`.
 3. **Map fields:**
    - Map native types to Specy primitives using the type mapping table.
    - Map collections to `list<T>` or `set<T>`.
@@ -110,13 +111,16 @@ For each bounded context:
 1. Read every handler, service, listener, saga, and policy file identified in Phase 1.
 2. **For each command handler** → create an `interaction` block:
    - `on` → the command typeName
-   - `resolves` → entities loaded/fetched (from repository calls, `.findById`, etc.). The `from` dotPath must point to a field that identifies the entity. This includes **indirect resolution** — when an entity is loaded via a field of another already-resolved entity. In that case, use a dotPath through the resolved entity:
+   - `resolves` → entities loaded/fetched (from repository calls, `.findById`, etc.). The `from` dotPath must point to a field that identifies the entity. When a repository is declared in the `.flow` and the code calls a specific repository operation, add a `via Repository.operation` clause to trace the data access path. The `via` is optional for retrocompatibility. This includes **indirect resolution** — when an entity is loaded via a field of another already-resolved entity. In that case, use a dotPath through the resolved entity:
      ```
-     // Direct resolution — entity loaded from a command field:
+     // Direct resolution with via — entity loaded from a command field through a repository:
+     resolves User via UserRepository.findById from UpdateProfile.userId
+
+     // Direct resolution without via — retrocompatible form:
      resolves Order from CancelOrder.orderId
 
      // Indirect resolution — entity loaded via a field of another resolved entity:
-     resolves Order from ShipOrder.orderId
+     resolves Order via OrderRepository.findById from ShipOrder.orderId
      resolves Payment from Order.paymentId
 
      // Indirect resolution — chained through a token:
@@ -238,13 +242,21 @@ For each bounded context:
 4. **For each call to a service in a command handler** → add a `delegates ServiceName.operationName` clause in the corresponding `interaction` block:
    - Place `delegates` after `fails` and before `sets`.
    - If the result of the service call is assigned to a field of a resolved/created entity, express it with `sets Entity.field to ServiceName.operationName`.
-5. **For each event listener** → create a `reaction` block:
+5. **For each repository interface identified in Phase 2** → create a `repository` block in the `.flow`:
+   - One `repository` block per repository interface/class.
+   - `for` → the entity type the repository manages (the aggregate root).
+   - For each method used in the extracted interactions/reactions → create an `operation` inside the repository block.
+   - `accepts` → parameters of the method (map types using the type mapping table).
+   - `returns` → the return type of the method (if not void).
+   - **Only model operations that are referenced by at least one `resolves ... via` clause or used in an extracted interaction.** Do not model query-only methods (pagination, search, aggregation for UI/dashboard). Heuristic: if an operation is not referenced by any `resolves ... via` in the `.flow`, it does not need to be declared. Annotate omissions with `// NOTE: query-only — not modeled`.
+6. **For each `repository.findBy*()` call in a command handler** → add `via Repository.operation` in the corresponding `resolves` clause of the `interaction` block.
+7. **For each event listener** → create a `reaction` block:
    - `on` → the event typeName
    - `then` → describe the side effect in business language
    - `delegates` → if the reaction calls a service, add a `delegates` clause
    - `sets` → any field mutations
    - `emits` → any chained events
-6. **Cross-cutting rules** → create `policy` blocks:
+8. **Cross-cutting rules** → create `policy` blocks:
    - Domain rules that span multiple operations or guard multiple commands
    - Express the condition with `when { ... }` and the consequence with `then "..."`
    - **The `when` condition must be a real, evaluable boolean expression — the same tautology prohibition as `fails` applies here.** If the policy's real condition is unexpressible (datetime arithmetic, cross-context queries, external lookups), do NOT emit a `policy` block with a placeholder `when` clause. Instead, write a standalone `// UNCLEAR:` comment describing the rule:
@@ -272,14 +284,15 @@ For each bounded context:
        then "A captured payment is required before shipping"
      }
      ```
-7. **Structural constraints** → create `invariant` blocks:
+9. **Structural constraints** → create `invariant` blocks:
    - Conditions that must always be true for an **entity** (never a command, event, or value)
    - Express with `on EntityType`, `must { ... }`, and `message "..."`
    - Validation rules on command inputs belong in `fails` clauses of the corresponding `interaction`, not in invariants
-8. Write the `.flow` file following the output conventions.
-9. Print a summary:
+10. Write the `.flow` file following the output conventions.
+11. Print a summary:
    ```
    ## Flow Extraction Summary — {domain}
+   - Repositories: {count}
    - Services: {count}
    - Interactions: {count}
    - Reactions: {count}
@@ -296,10 +309,11 @@ For each bounded context:
 4. For every `resolves` clause, verify the target entity has the referenced field in its `from` dotPath.
 5. For every `sets` clause, verify the entity being set appears in a `resolves` or `creates` clause of the same interaction. If it does not, either add the missing `resolves` clause or replace the `sets` with a `// NOTE:` comment.
 6. For every `delegates` clause, verify the dot-path resolves to a `service` + `operation` that exists in the `.flow`.
-7. For every `accepts` and `returns` clause in a service operation, verify the types resolve in the `.struct` (primitives are always valid).
-8. Fix any obvious errors (typos, mismatched casing). For ambiguous cases, add `// UNCLEAR: ...`.
-9. For every `policy` block, verify the `when` condition is not tautological (see Quality Rule 6). If it is, remove the `policy` block and replace with a `// UNCLEAR:` comment.
-10. Present a final summary:
+7. For every `resolves ... via Repository.operation` clause, verify the `repository` + `operation` exists in the `.flow`. The `for` entity of the repository must match the type being resolved.
+8. For every `accepts` and `returns` clause in a service or repository operation, verify the types resolve in the `.struct` (primitives are always valid).
+9. Fix any obvious errors (typos, mismatched casing). For ambiguous cases, add `// UNCLEAR: ...`.
+10. For every `policy` block, verify the `when` condition is not tautological (see Quality Rule 6). If it is, remove the `policy` block and replace with a `// UNCLEAR:` comment.
+11. Present a final summary:
    ```
    ## Validation Summary
    - Types resolved: {n}/{total}
@@ -342,6 +356,7 @@ The meta file `specy/.meta.json` tracks the state of the last distill run. It is
     "src/events/OrderPlaced.java": ["event OrderPlaced"],
     "src/services/OrderService.java": ["interaction PlaceOrder", "policy MaxOrderAmount"],
     "src/services/PricingService.java": ["service PricingCalculator"],
+    "src/repositories/OrderRepository.java": ["repository OrderRepository"],
     "src/services/AuthService.java": ["interaction Register", "interaction Login"],
     "src/listeners/AuthListener.java": ["reaction OnUserRegistered"],
     "src/models/Order.java#invariants": ["invariant OrderMustHaveLines"]
@@ -789,6 +804,27 @@ When the project does not match a specific framework above, apply these general 
 - **Do not model** (use `// NOTE` instead): pure technical processing (image resize, password hash, compression), infrastructure (logging, cache, rate limiting)
 - **Decision criterion:** if the result affects an entity field via `sets` or conditions the flow via `fails`, it is a business service
 
+### 6.7 Repositories
+
+**Identification heuristics:**
+
+| Source Pattern | Specy Construct |
+|---|---|
+| Interface `I*Repository` / class `*Repository` | `repository` block |
+| Method `findById(id)` | `operation findById` |
+| Method `findBy*(field)` | `operation findBy*` |
+| Method `exists*(field)` / `existsBy*(field)` | `operation exists*` |
+| Method `save(entity)` / `create(input)` | `operation save` |
+| Method `delete(id)` / `remove(id)` | `operation delete` |
+| `repository.findById(cmd.id)` in a handler | `resolves Entity via Repository.findById from Command.field` |
+| `repository.findBy*(cmd.field)` in a handler | `resolves Entity via Repository.findBy* from Command.field` |
+
+**Filtering heuristic:**
+
+- **Model**: findById, findByField (used in `resolves`), save, delete, existsBy (used in a guard/check)
+- **Do not model** (`// NOTE: query-only`): search, pagination, count for dashboards, aggregations for UI
+- **Criterion**: if the operation is called in a use case that produces an `interaction`, it deserves a declaration
+
 ---
 
 ## Syntax Reference: .struct
@@ -918,6 +954,18 @@ uses "name.struct"
 
 ### Block Types
 
+**Repository** — data access contract for an entity:
+
+```
+repository TypeName {
+  for EntityType
+  operation identifier {
+    accepts fieldName : fieldType       // 0..n
+    returns fieldName : fieldType       // 0..1
+  }
+}
+```
+
 **Service** — stateless domain logic:
 
 ```
@@ -938,7 +986,7 @@ service TypeName {
 ```
 interaction Identifier {
   on CommandType
-  resolves EntityType from dotPath      // 0..n
+  resolves EntityType [via Repository.operation] from dotPath  // 0..n
   creates EntityType                    // 0..n
   fails "message" when { expression }   // 0..n
   delegates Service.operation           // 0..n
@@ -1033,11 +1081,21 @@ There is no `null` literal. To represent clearing a field, use `// NOTE: sets fi
 domain "Orders"
 uses "orders.struct"
 
+// source: src/repositories/CustomerRepository.java
+repository CustomerRepository {
+  for Customer
+
+  operation findById {
+    accepts id : uuid
+    returns customer : Customer
+  }
+}
+
 // source: src/services/OrderService.java
 interaction PlaceOrder {
   on PlaceOrder
 
-  resolves Customer from PlaceOrder.customerId
+  resolves Customer via CustomerRepository.findById from PlaceOrder.customerId
   creates Order
 
   fails "Customer not found or inactive" when {
@@ -1128,6 +1186,9 @@ These files demonstrate the expected naming conventions, formatting, level of de
 19. **Enums without flow references.** If an enum is defined in the `.struct` but never referenced in any `.flow` expression (no `fails`, `sets`, `policy`, or `invariant` uses it), annotate it with `// NOTE: not referenced in flow — used for queries/UI only`. Do not omit it from the struct (it is still part of the domain vocabulary), but flag it.
 20. **Service operations use `then` for unexpressible logic.** When a service operation's business logic cannot be captured structurally, describe it with a `then` clause. Use `fails` in operations only when the error condition is formally expressible.
 21. **No service for pure infrastructure.** Do not create `service` blocks for image processing, password hashing, logging, caching, rate limiting, or other purely technical concerns. These are infrastructure, not domain logic. Use `// NOTE:` comments instead.
+22. **Repository operations are pure data access.** Repository operations contain only `accepts` and `returns` — never `then`, `fails`, `sets`, or `emits`. Business logic belongs in interactions and services, not repositories.
+23. **Repository `for` must be an aggregate root.** The `for` clause of a repository must reference an entity (aggregate root), not a value object or an enum.
+24. **No repository for technical types.** Do not create `repository` blocks for audit logs, session tokens, or other purely technical persistence concerns — unless they are used in domain interactions.
 
 ---
 

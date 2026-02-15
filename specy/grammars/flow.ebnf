@@ -17,7 +17,8 @@ block            = interactionDef
                  | reactionDef
                  | policyDef
                  | invariantDef
-                 | serviceDef ;
+                 | serviceDef
+                 | repositoryDef ;
 
 // -----------------------------------------------------------------------------
 // Interaction — triggered by a command
@@ -33,7 +34,7 @@ interactionDef   = "interaction" , identifier , "{"
                  , { emitsClause }
                  , "}" ;
 
-resolvesClause   = "resolves" , typeName , "from" , dotPath ;
+resolvesClause   = "resolves" , typeName , [ "via" , dotPath ] , "from" , dotPath ;
 
 createsClause    = "creates" , typeName ;
 
@@ -85,6 +86,20 @@ fieldType        = primitiveType
 primitiveType    = "string" | "int" | "decimal" | "boolean" | "date" | "datetime" | "uuid" ;
 
 collectionType   = ( "list" | "set" ) , "<" , fieldType , ">" ;
+
+// -----------------------------------------------------------------------------
+// Repository — data access contract for an entity
+// -----------------------------------------------------------------------------
+
+repositoryDef    = "repository" , typeName , "{"
+                 ,   "for" , typeName
+                 , { comment | repositoryOpDef }
+                 , "}" ;
+
+repositoryOpDef  = "operation" , identifier , "{"
+                 , { acceptsClause }
+                 , [ returnsClause ]
+                 , "}" ;
 
 // -----------------------------------------------------------------------------
 // Policy — domain-wide rule

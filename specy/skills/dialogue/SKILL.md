@@ -26,6 +26,7 @@ At the start of the conversation:
    - Entities: {count}
    - Commands: {count}
    - Events: {count}
+   - Repositories: {count}
    - Services: {count}
    - Interactions: {count}
    - Reactions: {count}
@@ -70,9 +71,10 @@ Synthesize domain knowledge from `.struct` + `.flow` in business language.
 1. **Entities and their roles** — what each entity represents, its key fields and types.
 2. **Lifecycle** — statuses (from enums) and transitions (from interactions that `sets` the status field).
 3. **Commands available** — what actions can be triggered, with their inputs.
-4. **Services available** — domain services and their role, with the operations they expose (including `accepts` and `returns`).
-5. **Events emitted** — what happens as a result, and what reactions are triggered.
-6. **Policies and invariants** — rules that constrain the domain.
+4. **Repositories available** — which entity each repository manages (`for`), what operations are declared (with their `accepts` and `returns`), and which interactions use them (trace `resolves ... via`).
+5. **Services available** — domain services and their role, with the operations they expose (including `accepts` and `returns`).
+6. **Events emitted** — what happens as a result, and what reactions are triggered.
+7. **Policies and invariants** — rules that constrain the domain.
 
 **Rules:**
 
@@ -99,12 +101,13 @@ Answer "what if?" questions by tracing paths through the `.flow`.
 
 **Algorithm:**
 
-1. **Identify the concept(s)** mentioned in the question (entity, command, status, field, service).
+1. **Identify the concept(s)** mentioned in the question (entity, command, status, field, service, repository).
 2. **Find the relevant interactions** — those that `resolves`, `creates`, or `sets` the concept.
 3. **Evaluate `fails` conditions** — does the scenario match a failure condition?
-4. **Trace `delegates` clauses** — when an interaction delegates to a service, follow the service operation to understand the full execution path (what it `accepts`, what it `returns`, whether it can `fails` or `emits`).
-5. **Determine `sets` and `emits`** — what state changes and events result?
-6. **Check `policy` and `invariant`** — are any domain-wide rules triggered?
+4. **Trace `resolves ... via` clauses** — when an interaction uses `resolves ... via Repository.operation`, mention which repository operation is used to load the entity. This shows the data access path.
+5. **Trace `delegates` clauses** — when an interaction delegates to a service, follow the service operation to understand the full execution path (what it `accepts`, what it `returns`, whether it can `fails` or `emits`).
+6. **Determine `sets` and `emits`** — what state changes and events result?
+7. **Check `policy` and `invariant`** — are any domain-wide rules triggered?
 
 **Response rules:**
 
@@ -216,6 +219,10 @@ Perform a structural analysis of gaps in the model.
 | Services declared but never delegated | Services defined in `.flow` but never referenced by any `delegates` clause in an interaction or reaction |
 | Service operations without `then` or `fails` | Operations with no description or error handling — the operation body is empty |
 | `delegates` to non-existent service/operation | A `delegates` clause referencing a service or operation that does not exist in the `.flow` |
+| Repositories declared but never referenced | Repositories defined in `.flow` but never referenced by any `resolves ... via` clause |
+| Repository operations never used | Operations declared in a repository but never referenced by a `resolves ... via` clause — potentially query-only operations that should not have been modeled |
+| `resolves ... via` pointing to non-existent repository/operation | A `via` clause referencing a repository or operation that does not exist in the `.flow` |
+| Entities in `resolves` without repository | Entities resolved without a `via` clause when a corresponding repository exists in the `.flow` — the data access path is not traced |
 
 **Response format:**
 
@@ -390,6 +397,14 @@ event TypeName {
 domain "Name"
 uses "name.struct"
 
+repository TypeName {
+  for EntityType
+  operation identifier {
+    accepts fieldName : fieldType       // 0..n
+    returns fieldName : fieldType       // 0..1
+  }
+}
+
 service TypeName {
   operation identifier {
     accepts fieldName : fieldType       // 0..n
@@ -403,7 +418,7 @@ service TypeName {
 
 interaction Identifier {
   on CommandType
-  resolves EntityType from dotPath      // 0..n
+  resolves EntityType [via Repository.operation] from dotPath  // 0..n
   creates EntityType                    // 0..n
   fails "message" when { expression }   // 0..n
   delegates Service.operation           // 0..n
