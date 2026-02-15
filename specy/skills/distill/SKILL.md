@@ -62,7 +62,7 @@ The distill process has four sequential phases. Do not skip phases. Print a summ
    - Events found: {count} ({list of files})
    - Mode: {creation | update}
    ```
-6. If `specy/*.struct` files already exist, switch to **update mode** (see below).
+6. If `specy/*.struct` files already exist, switch to **update mode** (see below). If the user invoked the skill with the `--full` flag, use **full update mode** unconditionally. Otherwise, if `specy/.meta.json` exists and the saved `gitSha` is reachable in the git history, use **incremental update mode**; otherwise use **full update mode**.
 7. Wait for user confirmation before proceeding to Phase 2.
 
 ### Phase 2 — Extraction: struct
@@ -240,15 +240,154 @@ When no `specy/*.struct` files exist:
 2. Execute Phases 1–4 as described above.
 3. Write the generated `.struct` and `.flow` files.
 4. Display the final validation summary.
+5. Write the `specy/.meta.json` meta file (see Meta File section) with the current HEAD SHA and the filemap of all definitions produced.
+
+---
+
+## Meta File
+
+The meta file `specy/.meta.json` tracks the state of the last distill run. It is written at the end of every run (creation or update) and enables incremental updates.
+
+### Format
+
+```json
+{
+  "version": 1,
+  "lastRun": "2025-01-15T10:30:00Z",
+  "gitSha": "abc1234def5678",
+  "filemap": {
+    "src/models/User.java": ["entity User", "enum UserStatus"],
+    "src/models/Order.java": ["entity Order", "entity OrderLine", "enum OrderStatus", "value Money"],
+    "src/commands/PlaceOrder.java": ["command PlaceOrder"],
+    "src/events/OrderPlaced.java": ["event OrderPlaced"],
+    "src/services/OrderService.java": ["interaction PlaceOrder", "policy MaxOrderAmount"],
+    "src/services/AuthService.java": ["interaction Register", "interaction Login"],
+    "src/listeners/AuthListener.java": ["reaction OnUserRegistered"],
+    "src/models/Order.java#invariants": ["invariant OrderMustHaveLines"]
+  }
+}
+```
+
+- **`version`**: schema version (currently `1`)
+- **`lastRun`**: ISO 8601 timestamp of the last run
+- **`gitSha`**: the SHA of the HEAD commit at the time of the last run
+- **`filemap`**: mapping from source file (project-relative path) to the list of Specy definitions extracted from it. Each entry uses the format `"type Name"` (e.g. `"entity Order"`, `"interaction PlaceOrder"`). Struct and flow definitions are mixed together.
+
+### When to write
+
+- **Creation mode:** at the end of the run, after writing `.struct` and `.flow` files.
+- **Update mode (incremental or full):** at the end of the run, after applying changes.
+
+### .gitignore
+
+`specy/.meta.json` can be committed to the repository (useful for teams sharing incremental state) or added to `.gitignore` (each developer rebuilds their own baseline). Mention this choice to the user on first creation.
 
 ---
 
 ## Update Mode
 
-When `specy/*.struct` files already exist:
+When `specy/*.struct` files already exist, the update mode applies. There are two sub-modes: **incremental** (efficient, delta-based) and **full** (fallback).
+
+**Option `--full`:** when the user invokes `distill --full`, always use full update mode regardless of whether `specy/.meta.json` exists. This is useful to force a complete re-extraction after changing the skill itself or to rebuild specs from scratch without deleting existing files.
+
+### Incremental Update Mode
+
+Applies when `specy/.meta.json` exists AND the saved `gitSha` is reachable in the git history (`git cat-file -t <gitSha>` succeeds).
+
+#### Phase 1 — Differential Reconnaissance
+
+1. **Do not re-read the examples** (`specy/examples/orders.struct`, `specy/examples/orders.flow`) — the style is already established from the initial creation run.
+2. Read `specy/.meta.json` and retrieve the saved `gitSha`.
+3. Run `git diff --name-only <gitSha>..HEAD` to get the list of changed files (modified, added, deleted).
+4. Cross-reference with the `filemap`:
+   - **Modified files** (present in filemap) → to re-extract; the impacted definitions are known from the filemap.
+   - **New files** (absent from filemap) → to analyze for potential new definitions.
+   - **Deleted files** (present in filemap but no longer on disk) → definitions to mark for deletion.
+   - **Non-pertinent files** (not business code: tests, config, CI, docs, migrations, generated code) → ignore.
+5. If no pertinent file has changed → display `No changes detected since last run (commit <gitSha>).` and stop.
+6. Display a targeted summary:
+   ```
+   ## Incremental Reconnaissance
+   - Last run: commit <savedSha> (<lastRun date>)
+   - Current: commit <currentSha>
+   - Modified source files: {count} ({list})
+   - New source files: {count} ({list})
+   - Deleted source files: {count} ({list})
+   - Affected definitions: ~{count}
+   - Unchanged definitions: {count} (kept as-is from existing specs)
+   ```
+7. Wait for user validation before proceeding.
+
+#### Phases 2–3 — Targeted Extraction
+
+1. Load the existing `.struct` and `.flow` files as the working base.
+2. **Read only the changed and new files** — do not re-read unchanged files.
+3. Re-extract only the impacted definitions:
+   - **Modified file** (e.g. `User.java`) → re-extract only the definitions listed in the filemap for that file (e.g. `entity User`, `enum UserStatus`). Replace the old definitions in the working base with the new extractions.
+   - **New file** (e.g. `Shipping.java`) → extract all new definitions. Add them to the working base.
+   - **Deleted file** → propose removal of the corresponding definitions. Ask for explicit confirmation per removal — the code may have moved, not disappeared.
+4. Merge the re-extracted definitions with the unchanged definitions to produce the updated specs.
+5. **Cascade dependencies:** if an `entity` changes and an unchanged `interaction` references it, **signal** the potential dependency but do not re-read the handler unless the fields referenced in the flow have actually changed. Display:
+   ```
+   ## Cascade Warning
+   - entity Order changed → interaction PlaceOrder references Order (unchanged handler — verify manually if needed)
+   ```
+6. Present the changes to the user in diff format:
+   ```
+   ## Proposed Changes — {domain}.struct
+   ### Added
+   - entity Shipment { ... }
+   ### Modified
+   - entity User: field email constraint changed from maxLength(50) to maxLength(100)
+   - enum UserStatus: added value "suspended"
+   ### Removed (pending confirmation)
+   - entity TempOrder (source file deleted)
+   ```
+7. **For additions and modifications:** apply after user confirms.
+8. **For removals:** apply only after explicit user confirmation per removal.
+
+#### Phase 4 — Targeted Validation
+
+1. Run cross-validation **only on definitions that changed or were added**, plus any definitions that reference them.
+2. Do not re-validate definitions that are strictly unchanged and have no references to changed definitions.
+3. Present a validation summary scoped to the delta:
+   ```
+   ## Validation Summary (incremental)
+   - Definitions validated: {n} (of {total})
+   - Types resolved: {n}/{n}
+   - Dot-paths resolved: {n}/{n}
+   - Issues corrected: {n}
+   - UNCLEAR markers: {n}
+   - Files updated: {list}
+   ```
+
+#### End of Run — Meta Update
+
+Write `specy/.meta.json` with:
+- `gitSha` set to the current HEAD SHA
+- `lastRun` set to the current timestamp
+- `filemap` updated: modified entries replaced, new entries added, deleted entries removed
+
+### Full Update Mode (Fallback)
+
+Applies when:
+- the user invoked `distill --full`, OR
+- `specy/.meta.json` does not exist, OR
+- the saved `gitSha` is not reachable in the git history.
+
+Display:
+```
+Full update mode — re-extracting all definitions from source code.
+```
+If not triggered by `--full`, also display the reason:
+```
+Meta file absent or git history unavailable — falling back to full update mode.
+```
+
+Then proceed with the full update workflow:
 
 1. Read all existing `.struct` and `.flow` files.
-2. Execute Phases 1–3, producing updated versions in memory.
+2. Execute Phases 1–3 as described in the main workflow, producing updated versions in memory.
 3. Compute diffs between existing and new versions:
    - **Added:** new types, fields, blocks, clauses
    - **Modified:** changed constraints, renamed fields, altered logic
@@ -268,6 +407,7 @@ When `specy/*.struct` files already exist:
 5. **For additions and modifications:** apply after user confirms.
 6. **For removals:** ask for explicit confirmation per removal — the code may have moved, not disappeared.
 7. Run Phase 4 (cross-validation) on the final result.
+8. Write the `specy/.meta.json` meta file with the current HEAD SHA and the full filemap, enabling incremental mode for the next run.
 
 ---
 
