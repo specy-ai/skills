@@ -62,7 +62,10 @@ The distill process has four sequential phases. Do not skip phases. Print a summ
    - Events found: {count} ({list of files})
    - Mode: {creation | update}
    ```
-6. If `specy/*.struct` files already exist, switch to **update mode** (see below). If the user invoked the skill with the `--full` flag, use **full update mode** unconditionally. Otherwise, if `specy/.meta.json` exists and the saved `gitSha` is reachable in the git history, use **incremental update mode**; otherwise use **full update mode**.
+6. If `specy/*.struct` files already exist, determine the mode:
+   - If the user specified a definition name (e.g. `distill User`, `distill PlaceOrder`) → switch to **targeted mode** (see Targeted Mode section). Skip the rest of this phase and follow the targeted workflow.
+   - If the user invoked the skill with the `--full` flag → use **full update mode** unconditionally.
+   - Otherwise, if `specy/.meta.json` exists and the saved `gitSha` is reachable in the git history → use **incremental update mode**; otherwise use **full update mode**.
 7. Wait for user confirmation before proceeding to Phase 2.
 
 ### Phase 2 — Extraction: struct
@@ -106,7 +109,20 @@ For each bounded context:
 1. Read every handler, service, listener, saga, and policy file identified in Phase 1.
 2. **For each command handler** → create an `interaction` block:
    - `on` → the command typeName
-   - `resolves` → entities loaded/fetched (from repository calls, `.findById`, etc.)
+   - `resolves` → entities loaded/fetched (from repository calls, `.findById`, etc.). The `from` dotPath must point to a field that identifies the entity. This includes **indirect resolution** — when an entity is loaded via a field of another already-resolved entity. In that case, use a dotPath through the resolved entity:
+     ```
+     // Direct resolution — entity loaded from a command field:
+     resolves Order from CancelOrder.orderId
+
+     // Indirect resolution — entity loaded via a field of another resolved entity:
+     resolves Order from ShipOrder.orderId
+     resolves Payment from Order.paymentId
+
+     // Indirect resolution — chained through a token:
+     resolves PasswordResetToken from ResetPassword.token
+     resolves Customer from PasswordResetToken.customerId
+     ```
+     **Every entity you `sets` or reference in a `fails` expression must be explicitly resolved or created.** A `// NOTE: resolved indirectly` comment is NOT a substitute for a `resolves` clause — if the code loads the entity, model it with `resolves`.
    - `creates` → entities instantiated (`new Entity`, `.save()` on new objects)
    - `fails` → error conditions: `if (...) throw`, guard clauses, validation failures. Use a business-language message, not the technical exception name. **Critical: the `when { expression }` must be a real, evaluable boolean condition — never a tautology.** See the rules below for handling unexpressible conditions.
 
@@ -122,19 +138,19 @@ For each bounded context:
      isEmpty(Order.lines)
    }
 
-   // String length — Code: if (name.length > 100) throw ...
-   fails "Name exceeds 100 characters" when {
-     size(UpdateProfile.name) > 100
+   // String length — Code: if (name.length > 200) throw ...
+   fails "Product name exceeds 200 characters" when {
+     size(CreateProduct.name) > 200
    }
 
    // Self-reference guard — Code: if (userId === targetUserId) throw ...
-   fails "Cannot connect to yourself" when {
-     SendConnectionRequest.userId = SendConnectionRequest.targetUserId
+   fails "Cannot transfer to yourself" when {
+     TransferFunds.sourceAccountId = TransferFunds.targetAccountId
    }
 
-   // Ownership check — Code: if (entity.userId !== userId) throw ...
-   fails "Not authorized to update this experience" when {
-     Experience.userId != UpdateExperience.userId
+   // Ownership check — Code: if (entity.ownerId !== userId) throw ...
+   fails "Not authorized to cancel this order" when {
+     Order.customer.id != CancelOrder.customerId
    }
 
    // Entity not found — Code: if (!entity) throw ...
@@ -144,9 +160,9 @@ For each bounded context:
 
    // Existence / duplicate check — Code: if (await repo.exists(a, b)) throw ...
    // Model with resolves + "is defined":
-   resolves Connection from SendConnectionRequest.targetUserId
-   fails "A connection already exists with this user" when {
-     Connection is defined
+   resolves Payment from ProcessPayment.orderId
+   fails "A payment already exists for this order" when {
+     Payment is defined
    }
    ```
 
@@ -180,13 +196,34 @@ For each bounded context:
 
    **Anti-pattern — bogus `resolves from` dotPath:**
    ```
-   // ❌ WRONG — User is not resolved from an image field
-   resolves User from UploadAvatar.image
+   // ❌ WRONG — Customer is not resolved from a payment method
+   resolves Customer from ProcessPayment.method
 
-   // ❌ WRONG — User is not resolved from a password field
-   resolves User from ChangePassword.currentPassword
+   // ❌ WRONG — Order is not resolved from a reason text
+   resolves Order from CancelOrder.reason
    ```
    If the entity is resolved from a field that is not in the command (e.g. only available in the session), add that field to the command first (see Phase 2 rule on command fields), then use it in `resolves`.
+
+   **Anti-pattern — missing indirect resolution:**
+   ```
+   // ❌ WRONG — sets Customer fields but Customer is not resolved
+   interaction ResetPassword {
+     on ResetPassword
+     resolves PasswordResetToken from ResetPassword.token
+     // NOTE: Customer resolved indirectly via token  ← NOT ENOUGH
+     sets Customer.password to ResetPassword.newPassword  // ← Customer not in resolves/creates
+     sets PasswordResetToken.usedAt to now()
+   }
+
+   // ✅ CORRECT — Customer explicitly resolved via indirect dotPath
+   interaction ResetPassword {
+     on ResetPassword
+     resolves PasswordResetToken from ResetPassword.token
+     resolves Customer from PasswordResetToken.customerId
+     sets PasswordResetToken.usedAt to now()
+     // NOTE: Customer.password is set to hashed value of ResetPassword.newPassword
+   }
+   ```
    - `sets` → field mutations on resolved/created entities. **Every entity referenced in a `sets` clause must appear in a `resolves` or `creates` clause of the same interaction.** If the code updates entities that are not directly resolved (e.g. bulk updates on related records), do not emit a `sets` clause — use a `// NOTE:` comment to describe the side effect instead.
    - `emits` → events published/dispatched
 3. **For each event listener** → create a `reaction` block:
@@ -199,27 +236,27 @@ For each bounded context:
    - Express the condition with `when { ... }` and the consequence with `then "..."`
    - **The `when` condition must be a real, evaluable boolean expression — the same tautology prohibition as `fails` applies here.** If the policy's real condition is unexpressible (datetime arithmetic, cross-context queries, external lookups), do NOT emit a `policy` block with a placeholder `when` clause. Instead, write a standalone `// UNCLEAR:` comment describing the rule:
      ```
-     // UNCLEAR: policy not expressible — posts can only be edited within 5 minutes of creation (datetime arithmetic)
-     // UNCLEAR: policy not expressible — users must have an accepted connection to exchange messages (cross-context query)
+     // UNCLEAR: policy not expressible — orders can only be modified within 24 hours of placement (datetime arithmetic)
+     // UNCLEAR: policy not expressible — payment gateway must confirm card validity before capture (external service call)
      ```
    - Common tautological traps in policies:
      ```
      // WRONG — createdAt is immutable pastOrPresent, always defined
-     policy MessageExpiration {
-       when { Message.createdAt is defined }
-       then "Messages expire after 3 months"
+     policy OrderModificationWindow {
+       when { Order.createdAt is defined }
+       then "Orders can only be modified within 24 hours of placement"
      }
 
-     // WRONG — updatedAt being defined does not capture the 5-minute window
-     policy PostEditWindow {
-       when { Post.updatedAt is defined }
-       then "Posts can only be edited within 5 minutes"
+     // WRONG — updatedAt being defined does not capture the time window
+     policy OrderEditDeadline {
+       when { Order.updatedAt is defined }
+       then "Orders can only be edited within 1 hour"
      }
 
-     // WRONG — condition is a self-connection check, not the actual cross-context rule
-     policy ConnectionRequired {
-       when { Conversation.participant1Id != Conversation.participant2Id }
-       then "Users must have an accepted connection to message"
+     // WRONG — condition is a status check, not the actual cross-aggregate rule
+     policy PaymentRequiredForShipping {
+       when { Order.status = confirmed }
+       then "A captured payment is required before shipping"
      }
      ```
 5. **Structural constraints** → create `invariant` blocks:
@@ -313,7 +350,7 @@ The meta file `specy/.meta.json` tracks the state of the last distill run. It is
 
 ## Update Mode
 
-When `specy/*.struct` files already exist, the update mode applies. There are two sub-modes: **incremental** (efficient, delta-based) and **full** (fallback).
+When `specy/*.struct` files already exist and the user did NOT specify a definition name, the update mode applies. There are two sub-modes: **incremental** (efficient, delta-based) and **full** (fallback). If the user specified a definition name (e.g. `distill User`), see **Targeted Mode** instead.
 
 **Option `--full`:** when the user invokes `distill --full`, always use full update mode regardless of whether `specy/.meta.json` exists. This is useful to force a complete re-extraction after changing the skill itself or to rebuild specs from scratch without deleting existing files.
 
@@ -435,6 +472,146 @@ Then proceed with the full update workflow:
 6. **For removals:** ask for explicit confirmation per removal — the code may have moved, not disappeared.
 7. Run Phase 4 (cross-validation) on the final result.
 8. Write the `specy/.meta.json` meta file with the current HEAD SHA and the full filemap, enabling incremental mode for the next run.
+
+---
+
+## Targeted Mode
+
+When `specy/*.struct` and `specy/*.flow` files already exist and the user specifies a definition to re-extract by name. This mode re-extracts a single definition (or a coherent unit of definitions) from the source code without touching anything else.
+
+**Invocation:** `distill <DefinitionName>` — where `DefinitionName` is the name of an entity, interaction, command, event, enum, value, reaction, policy, or invariant.
+
+**Pre-condition:** existing `.struct` / `.flow` files must be present. If they are not, refuse and ask the user to run a full distill first.
+
+### Phase 1 — Target Resolution
+
+1. Search all existing `specy/*.struct` and `specy/*.flow` files for a definition matching `DefinitionName`.
+2. **If found** — identify:
+   - The definition type (entity, interaction, command, etc.)
+   - The domain / file pair it belongs to (`{domain}.struct` or `{domain}.flow`)
+   - The source file from the `// source:` comment preceding the definition
+   - If `specy/.meta.json` exists, cross-reference with the `filemap` for additional source files
+3. **If not found** — the definition is new. Search the codebase for a matching class, handler, or type:
+   - Look for files matching `*{DefinitionName}*` in the project
+   - Apply the extraction heuristics (section 6) to identify what type of definition it should be
+   - Identify the bounded context it belongs to from the surrounding code structure
+   - If nothing is found, inform the user and stop
+4. Determine the **extraction unit** based on the definition type (see below).
+5. Display a summary and wait for user confirmation:
+   ```
+   ## Targeted Extraction
+   - Target: {type} {DefinitionName}
+   - Source file(s): {list}
+   - Extraction unit: {list of definitions to re-extract}
+   - Status: {existing — will be updated | new — will be added}
+   ```
+
+### Extraction Units
+
+The extraction unit defines what gets re-extracted together. The goal is to maintain internal consistency without re-extracting everything.
+
+**Targeting an entity:**
+```
+distill User
+```
+- Re-extract: `entity User`
+- Also re-extract: any `enum` or `value` defined in the **same source file** as the entity (they often co-evolve)
+- Do NOT re-extract: interactions, commands, events, or definitions from other source files
+- Cascade warning: list interactions that `resolves` or `creates` this entity — the user may want to re-extract them too
+
+**Targeting an interaction:**
+```
+distill PlaceOrder
+```
+- Re-extract: `interaction PlaceOrder`
+- Also re-extract: `command PlaceOrder` (1:1 coupling — the command is the interaction's input contract)
+- Also re-extract: every `event` emitted by the interaction (listed in `emits` clauses)
+- Do NOT re-extract: resolved entities (they have their own source of truth)
+- Cascade warning: list reactions triggered by the emitted events
+
+**Targeting a command:**
+```
+distill PlaceOrder
+```
+- If a matching interaction exists, treat as "targeting an interaction" (same extraction unit)
+- If no matching interaction exists (orphan command), re-extract just the command
+
+**Targeting an event:**
+```
+distill OrderPlaced
+```
+- Re-extract: `event OrderPlaced`
+- Cascade warning: list interactions that emit it and reactions that listen to it
+
+**Targeting a reaction:**
+```
+distill OnOrderPlaced
+```
+- Re-extract: `reaction OnOrderPlaced`
+- Do NOT re-extract: the triggering event (it has its own source of truth)
+
+**Targeting an enum or value:**
+```
+distill OrderStatus
+```
+- Re-extract: `enum OrderStatus` (or `value Money`)
+- Cascade warning: list entities and interactions that reference it
+
+**Targeting a policy or invariant:**
+```
+distill MaxOrderAmount
+```
+- Re-extract: `policy MaxOrderAmount` (or `invariant OrderMustHaveLines`)
+
+### Phases 2–3 — Scoped Extraction
+
+1. Load the existing `.struct` and `.flow` files as the working base.
+2. Read **only** the source file(s) identified in Phase 1 — do not read other source files.
+3. Re-extract only the definitions in the extraction unit, following the same rules as the main workflow (Phase 2 for struct, Phase 3 for flow).
+4. Compare old vs new for each re-extracted definition:
+   - **Modified:** show the diff (field added/removed/changed, constraint changed, clause added/removed)
+   - **Unchanged:** report "no changes detected" and stop (do not rewrite the file)
+   - **New:** show the full definition to be added
+5. Present the changes:
+   ```
+   ## Proposed Changes — {domain}.struct
+   ### Modified
+   - entity Order: added field "trackingNumber : string optional maxLength(100)"
+   - entity Order: field "totalAmount" type changed from int to Money
+
+   ## Proposed Changes — {domain}.flow
+   ### Modified
+   - interaction ShipOrder: added sets clause "Order.trackingNumber"
+   - interaction ShipOrder: added fails clause "Tracking number already assigned"
+
+   ## Cascade Warning
+   - entity Order changed → interaction PlaceOrder, interaction ConfirmOrder reference Order (not re-extracted — verify if needed)
+   ```
+6. Apply after user confirms.
+
+### Phase 4 — Scoped Validation
+
+1. Run cross-validation **only on the re-extracted definitions**, plus any existing definitions that directly reference them.
+2. Verify:
+   - All `typeName` references resolve
+   - All `dotPath` chains resolve
+   - All enum values exist
+   - All `sets` clauses reference resolved/created entities
+   - No tautological conditions
+3. Present a scoped validation summary:
+   ```
+   ## Validation Summary (targeted)
+   - Target: {type} {DefinitionName}
+   - Definitions validated: {n}
+   - Types resolved: {n}/{n}
+   - Dot-paths resolved: {n}/{n}
+   - Issues corrected: {n}
+   - Files updated: {list}
+   ```
+
+### End of Run — Meta Update
+
+If `specy/.meta.json` exists, update only the filemap entries corresponding to the re-extracted definitions. Do not change `gitSha` or `lastRun` — targeted mode is a surgical edit, not a full sync.
 
 ---
 
@@ -780,7 +957,7 @@ dotPath not in {value1, value2, ...}
 | `sum(dotPath)` | Sum of numeric values in a collection | `sum(Order.lines.lineTotal.amount)` |
 | `size(dotPath)` | Length of a string, or size of a collection | `size(Customer.name) >= 2` |
 | `isEmpty(dotPath)` | True if collection is empty or string is blank | `isEmpty(Order.lines)` |
-| `isNotEmpty(dotPath)` | True if collection has elements or string is non-blank | `isNotEmpty(Post.content)` |
+| `isNotEmpty(dotPath)` | True if collection has elements or string is non-blank | `isNotEmpty(Order.lines)` |
 | `now()` | Current datetime | `sets Order.placedAt to now()` |
 | `today()` | Current date | `Order.estimatedDelivery <= today()` |
 
@@ -879,7 +1056,7 @@ These files demonstrate the expected naming conventions, formatting, level of de
    - Never compare a `string` field directly to a number — use `size(field)` for string length checks.
    - Never use `count()` on a `string` field — `count()` is for `list<T>` / `set<T>` only.
    - Never write `field is defined` on a `required` or `immutable` field as a stand-in for a condition you cannot express. A required/immutable field is always defined — this is a tautology. Use `// UNCLEAR:` instead. This applies to both `fails` clauses and `policy` `when` clauses.
-   - Never subtract datetimes and compare to a bare number (`now() - Post.createdAt > 5`) — the unit is ambiguous. Use `// UNCLEAR:` with a note about the time window.
+   - Never subtract datetimes and compare to a bare number (`now() - Order.placedAt > 5`) — the unit is ambiguous. Use `// UNCLEAR:` with a note about the time window.
    - Never write a `resolves Entity from Command.someField` where `someField` has no relation to the entity's identity. If the field you need is not in the command, add it to the command first (see Phase 2).
    - **Try to express conditions before resorting to `// UNCLEAR`.** Self-reference checks, ownership checks, status checks, not-found checks, and existence/duplicate checks are all expressible with Specy operators. Reserve `// UNCLEAR` for conditions that truly cannot be modeled: password strength, rate limiting, regex matching, external API calls, algorithmic checks.
 7. **No `null` literal.** The grammar has no `null` value. If the code sets a field to null, express it with a `// NOTE:` comment instead of `sets ... to null`.
@@ -890,9 +1067,9 @@ These files demonstrate the expected naming conventions, formatting, level of de
 12. **Naming convention: interaction = command name.** The interaction identifier matches the command name: `command PlaceOrder` → `interaction PlaceOrder`.
 13. **Naming convention: reaction = On + event name.** The reaction identifier is the event name prefixed with `On`: `event OrderPlaced` → `reaction OnOrderPlaced`.
 14. **No technical artifacts.** Do not include framework-specific types, infrastructure code, or ORM metadata in the output. Extract only domain concepts. Specifically exclude:
-    - **OAuth/auth infrastructure:** entities storing client IDs, client secrets, access tokens, refresh tokens (e.g. `MastodonApp { clientId, clientSecret }`). If federation/OAuth is a domain concept, model the *connection* (user linked to external service) but omit the token storage details.
-    - **Monitoring/analytics entities:** access counters, IP tracking, usage metrics (e.g. `RssMetrics { accessCount, lastAccessIp }`).
-    - **Technical token fields on domain entities:** fields like `accessToken`, `refreshJwt`, `accessJwt` on a `User` entity are infrastructure concerns. Omit them. Keep the *domain-meaningful* fields (e.g. `mastodonHandle`, `blueskyDid`) that represent the business relationship.
+    - **OAuth/auth infrastructure:** entities storing client IDs, client secrets, access tokens, refresh tokens (e.g. `OAuthApp { clientId, clientSecret }`). If OAuth/federation is a domain concept, model the *connection* (user linked to external service) but omit the token storage details.
+    - **Monitoring/analytics entities:** access counters, IP tracking, usage metrics (e.g. `ApiMetrics { requestCount, lastRequestIp }`).
+    - **Technical token fields on domain entities:** fields like `accessToken`, `refreshToken`, `sessionJwt` on a domain entity are infrastructure concerns. Omit them. Keep the *domain-meaningful* fields (e.g. `externalHandle`, `externalId`) that represent the business relationship.
 15. **Field ordering.** Within an entity or value, order fields: identity fields first (id, uuid), then required fields, then optional fields. Within each group, keep the order from the source code.
 16. **Section separators.** Use `// ===` comment blocks to separate sections (enums, values, entities, commands, events in `.struct`; interactions, reactions, policies, invariants in `.flow`), matching the style in the canonical examples.
 17. **Minimal output.** Do not add fields, constraints, or blocks that are not evidenced by the code. When in doubt, omit rather than invent.
