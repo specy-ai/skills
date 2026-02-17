@@ -154,11 +154,11 @@ No contradiction, no blocked invariant, no unhandled impact.
 
 ### Phase 4 — Proposition
 
-Generate the projected changes using the `.spec` format (see `.spec` File Format section). The output must conform to `specy/grammars/spec.ebnf`. Present the full `.spec` file content to the user for review.
+Generate the projected changes using the `.spec` format (see `.spec` File Format section). The output must conform to `grammars/spec.ebnf`. Present the full `.spec` file content to the user for review.
 
 **Rules for this phase:**
 
-- The `.spec` file structure must follow the grammar defined in `specy/grammars/spec.ebnf`.
+- The `.spec` file structure must follow the grammar defined in `grammars/spec.ebnf`.
 - Every addition must follow the Specy grammar and the conventions of `distill`.
 - The `changes` blocks contain native Specy syntax with `add`, `modify`, or `remove` operators.
 - `modify` shows the complete block as it should be after modification — not a partial diff. Annotate the changed lines with `// was: ...` comments.
@@ -200,7 +200,7 @@ After writing, run a quick cross-validation on the projected changes:
 
 ## .spec File Format
 
-The `.spec` file is a structured artifact that captures the full analysis and projected changes for a business specification. The formal grammar is defined in `specy/grammars/spec.ebnf`. The `changes` blocks reuse the grammars from `specy/grammars/struct.ebnf` and `specy/grammars/flow.ebnf` — no new syntax is invented for the projected modifications.
+The `.spec` file is a structured artifact that captures the full analysis and projected changes for a business specification. The formal grammar is defined in `grammars/spec.ebnf`. The `changes` blocks reuse the grammars from `grammars/struct.ebnf` and `grammars/flow.ebnf` — no new syntax is invented for the projected modifications.
 
 ### Header
 
@@ -580,15 +580,15 @@ When the user wants to re-validate an existing `.spec` file after models have be
 
 Read the formal grammars before producing output:
 
-- `specy/grammars/spec.ebnf` — specification file (.spec files)
-- `specy/grammars/struct.ebnf` — structural model (.struct files, used inside `changes` blocks)
-- `specy/grammars/flow.ebnf` — behavioral model (.flow files, used inside `changes` blocks)
+- `grammars/spec.ebnf` — specification file (.spec files)
+- `grammars/struct.ebnf` — structural model (.struct files, used inside `changes` blocks)
+- `grammars/flow.ebnf` — behavioral model (.flow files, used inside `changes` blocks)
 
 ---
 
 ## Canonical Examples
 
-The examples below use the Orders domain defined in `specy/examples/orders.struct` and `specy/examples/orders.flow`.
+The examples below use the Orders domain defined in `examples/orders.struct` and `examples/orders.flow`.
 
 ### Example 1 — Compatible Addition: "Deliver an order"
 

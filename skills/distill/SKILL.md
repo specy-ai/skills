@@ -43,7 +43,7 @@ The distill process has four sequential phases. Do not skip phases. Print a summ
 
 ### Phase 1 — Reconnaissance
 
-1. Read `specy/examples/orders.struct` and `specy/examples/orders.flow` to calibrate your output style and conventions.
+1. Read `examples/orders.struct` and `examples/orders.flow` to calibrate your output style and conventions.
 2. Explore the project tree. Identify languages, frameworks, build system, and project layout.
 3. Locate the key code areas:
    - **Models / Entities:** ORM models, domain classes, data classes, records
@@ -85,7 +85,7 @@ For each bounded context:
    - Map native types to Specy primitives using the type mapping table.
    - Map collections to `list<T>` or `set<T>`.
    - Map references to other domain types by their Specy typeName.
-4. **Extract constraints** from annotations, decorators, validation rules, or code guards (See Constraints section in `specy/grammars/struct.ebnf`)
+4. **Extract constraints** from annotations, decorators, validation rules, or code guards (See Constraints section in `grammars/struct.ebnf`)
 5. **Detect relations:** foreign keys, nested objects, `List<Entity>`.
 6. Write the `.struct` file following the output conventions.
 7. Print a summary:
@@ -217,7 +217,7 @@ Applies when `specy/.meta.json` exists AND the saved `gitSha` is reachable in th
 
 #### Phase 1 — Differential Reconnaissance
 
-1. **Do not re-read the examples** (`specy/examples/orders.struct`, `specy/examples/orders.flow`) — the style is already established from the initial creation run.
+1. **Do not re-read the examples** (`examples/orders.struct`, `examples/orders.flow`) — the style is already established from the initial creation run.
 2. Read `specy/.meta.json` and retrieve the saved `gitSha`.
 3. Run `git diff --name-only <gitSha>..HEAD` to get the list of changed files (modified, added, deleted).
 4. Cross-reference with the `filemap`:
@@ -486,13 +486,13 @@ During Phase 3, read `constructs/INDEX.md` and load the relevant construct files
 
 Read the formal grammars before producing output:
 
-- `specy/grammars/struct.ebnf` — structural model (.struct files)
-- `specy/grammars/flow.ebnf` — behavioral model (.flow files)
+- `grammars/struct.ebnf` — structural model (.struct files)
+- `grammars/flow.ebnf` — behavioral model (.flow files)
 
 Read the canonical examples to calibrate output style:
 
-- `specy/examples/orders.struct` — complete structural model
-- `specy/examples/orders.flow` — complete behavioral model
+- `examples/orders.struct` — complete structural model
+- `examples/orders.flow` — complete behavioral model
 
 ---
 

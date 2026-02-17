@@ -14,18 +14,17 @@ Specy is a Domain-Driven Design toolkit that provides AI-assisted skills for rev
 
 ```
 specy-skill/
-└── specy/
-    ├── grammars/          # EBNF grammars for .struct, .flow, .spec
-    ├── examples/          # Example domain files (orders.struct, orders.flow)
-    └── skills/
-        ├── distill/
-        │   ├── SKILL.md
-        │   ├── constructs/   # Flow construct references (interaction, service, etc.)
-        │   └── heuristics/   # Stack-specific extraction patterns (Java, TS, Clojure)
-        ├── dialogue/
-        │   └── SKILL.md
-        └── spec/
-            └── SKILL.md
+├── grammars/              # EBNF grammars for .struct, .flow, .spec
+├── examples/              # Example domain files (orders.struct, orders.flow)
+└── skills/
+    ├── distill/
+    │   ├── SKILL.md
+    │   ├── constructs/    # Flow construct references (interaction, service, etc.)
+    │   └── heuristics/    # Stack-specific extraction patterns (Java, TS, Clojure)
+    ├── dialogue/
+    │   └── SKILL.md
+    └── spec/
+        └── SKILL.md
 ```
 
 ## Prerequisites
@@ -49,9 +48,9 @@ mkdir -p ~/.claude/skills/dialogue
 mkdir -p ~/.claude/skills/spec
 
 # Symlink SKILL.md for each skill
-ln -sf /path/to/specy-skill/specy/skills/distill/SKILL.md ~/.claude/skills/distill/SKILL.md
-ln -sf /path/to/specy-skill/specy/skills/dialogue/SKILL.md ~/.claude/skills/dialogue/SKILL.md
-ln -sf /path/to/specy-skill/specy/skills/spec/SKILL.md ~/.claude/skills/spec/SKILL.md
+ln -sf /path/to/specy-skill/skills/distill/SKILL.md ~/.claude/skills/distill/SKILL.md
+ln -sf /path/to/specy-skill/skills/dialogue/SKILL.md ~/.claude/skills/dialogue/SKILL.md
+ln -sf /path/to/specy-skill/skills/spec/SKILL.md ~/.claude/skills/spec/SKILL.md
 ```
 
 Replace `/path/to/specy-skill` with the absolute path to your clone of this repository.
@@ -69,14 +68,14 @@ Since the skills live outside the target project, copy or symlink the entire ski
 mkdir -p .github/skills
 
 # Option A: Symlink (keeps skills in sync with upstream)
-ln -sf /path/to/specy-skill/specy/skills/distill .github/skills/distill
-ln -sf /path/to/specy-skill/specy/skills/dialogue .github/skills/dialogue
-ln -sf /path/to/specy-skill/specy/skills/spec .github/skills/spec
+ln -sf /path/to/specy-skill/skills/distill .github/skills/distill
+ln -sf /path/to/specy-skill/skills/dialogue .github/skills/dialogue
+ln -sf /path/to/specy-skill/skills/spec .github/skills/spec
 
 # Option B: Copy (standalone, no dependency on specy-skill)
-cp -r /path/to/specy-skill/specy/skills/distill .github/skills/distill
-cp -r /path/to/specy-skill/specy/skills/dialogue .github/skills/dialogue
-cp -r /path/to/specy-skill/specy/skills/spec .github/skills/spec
+cp -r /path/to/specy-skill/skills/distill .github/skills/distill
+cp -r /path/to/specy-skill/skills/dialogue .github/skills/dialogue
+cp -r /path/to/specy-skill/skills/spec .github/skills/spec
 ```
 
 Each `SKILL.md` must include YAML frontmatter for Copilot to register it:
@@ -100,9 +99,9 @@ Vibe loads skills from `~/.vibe/skills/` (global) or `.vibe/skills/` (project-lo
 # Global install
 mkdir -p ~/.vibe/skills
 
-ln -sf /path/to/specy-skill/specy/skills/distill ~/.vibe/skills/distill
-ln -sf /path/to/specy-skill/specy/skills/dialogue ~/.vibe/skills/dialogue
-ln -sf /path/to/specy-skill/specy/skills/spec ~/.vibe/skills/spec
+ln -sf /path/to/specy-skill/skills/distill ~/.vibe/skills/distill
+ln -sf /path/to/specy-skill/skills/dialogue ~/.vibe/skills/dialogue
+ln -sf /path/to/specy-skill/skills/spec ~/.vibe/skills/spec
 ```
 
 Or project-local:
@@ -111,9 +110,9 @@ Or project-local:
 # From your target project root
 mkdir -p .vibe/skills
 
-ln -sf /path/to/specy-skill/specy/skills/distill .vibe/skills/distill
-ln -sf /path/to/specy-skill/specy/skills/dialogue .vibe/skills/dialogue
-ln -sf /path/to/specy-skill/specy/skills/spec .vibe/skills/spec
+ln -sf /path/to/specy-skill/skills/distill .vibe/skills/distill
+ln -sf /path/to/specy-skill/skills/dialogue .vibe/skills/dialogue
+ln -sf /path/to/specy-skill/skills/spec .vibe/skills/spec
 ```
 
 Optional `config.toml` for fine-tuning (in `~/.vibe/` or `.vibe/`):
