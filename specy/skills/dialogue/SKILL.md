@@ -112,17 +112,17 @@ Answer "what if?" questions by tracing paths through the `.flow`.
 **Response rules:**
 
 - **If the model covers the case** → answer with citations.
-  Label the answer with **[MODELE]**.
+  Label the answer with **[IN MODEL]**.
 - **If the model does not cover the case** → say so explicitly.
-  Label with **[HORS MODELE]** and explain what the model *does* cover nearby.
+  Label with **[OUT OF MODEL]** and explain what the model *does* cover nearby.
 - **If the question touches a `// UNCLEAR` zone** → mention the uncertainty.
-  Label with **[INCERTAIN]** and quote the marker.
+  Label with **[UNCERTAIN]** and quote the marker.
 
 **Example:**
 
 > **Q:** "What happens if a suspended customer tries to place an order?"
 >
-> **[MODELE]** The `PlaceOrder` interaction resolves the customer via `resolves Customer from PlaceOrder.customerId` and checks their status:
+> **[IN MODEL]** The `PlaceOrder` interaction resolves the customer via `resolves Customer from PlaceOrder.customerId` and checks their status:
 >
 > ```
 > fails "Customer not found or inactive" when {
@@ -289,11 +289,11 @@ Perform a structural analysis of gaps in the model.
 
 Use these labels to make the source of each assertion explicit:
 
-| Label | Meaning |
-|---|---|
-| **[MODELE]** | The assertion comes directly from the `.struct` or `.flow` files. |
-| **[HORS MODELE]** | The model does not cover this case — there is no relevant construct. |
-| **[INCERTAIN]** | The question touches a zone annotated with `// UNCLEAR` or `// NOTE`. |
+| Label              | Meaning |
+|--------------------|---|
+| **[IN MODEL]**     | The assertion comes directly from the `.struct` or `.flow` files. |
+| **[OUT OF MODEL]** | The model does not cover this case — there is no relevant construct. |
+| **[UNCERTAIN]**    | The question touches a zone annotated with `// UNCLEAR` or `// NOTE`. |
 
 ### Multi-Context
 
@@ -308,8 +308,8 @@ When the project has multiple bounded contexts (multiple `.struct` / `.flow` pai
 ## Quality Rules
 
 1. **No invention.** Every assertion must be traceable to a `.struct` or `.flow` construct. If you cannot cite it, do not say it.
-2. **[HORS MODELE] is mandatory.** When the model does not cover a case, say so with the [HORS MODELE] label. Never fill gaps with assumptions.
-3. **[INCERTAIN] for annotated zones.** When a `// UNCLEAR` or `// NOTE` marker is relevant, surface it with the [INCERTAIN] label and quote the marker text.
+2. **[OUT OF MODEL] is mandatory.** When the model does not cover a case, say so with the [OUT OF MODEL] label. Never fill gaps with assumptions.
+3. **[UNCERTAIN] for annotated zones.** When a `// UNCLEAR` or `// NOTE` marker is relevant, surface it with the [UNCERTAIN] label and quote the marker text.
 4. **No implementation assumptions.** Do not speculate about databases, APIs, frameworks, or technical architecture. The models describe *what*, not *how*.
 5. **Respond in the user's language.** Match the language of the question.
 6. **Read-only — never suggest file edits.** The dialogue skill does not modify files. When a gap, contradiction, or improvement is identified, direct the user to the `spec` skill to formalize changes.
@@ -335,9 +335,9 @@ If the same name appears in multiple bounded contexts (e.g., `Order` in both `or
 
 ### Questions Outside the Domain
 
-If the user asks about a concept that does not exist in any loaded model, respond with [HORS MODELE]:
+If the user asks about a concept that does not exist in any loaded model, respond with [OUT OF MODEL]:
 ```
-[HORS MODELE] The model does not contain any reference to "{concept}". This may be
+[OUT OF MODEL] The model does not contain any reference to "{concept}". This may be
 outside the scope of the modeled domain(s), or it may not have been extracted yet.
 ```
 
@@ -372,7 +372,7 @@ The examples below use the Orders domain defined in `specy/examples/orders.struc
 
 ### Explorer — "Explain the Order lifecycle"
 
-> **[MODELE]** The **Order** entity tracks a purchase through five statuses defined in `OrderStatus`: `draft`, `confirmed`, `shipped`, `delivered`, `cancelled`.
+> **[IN MODEL]** The **Order** entity tracks a purchase through five statuses defined in `OrderStatus`: `draft`, `confirmed`, `shipped`, `delivered`, `cancelled`.
 >
 > **Creation:** The `PlaceOrder` interaction creates an Order and sets `Order.status to draft` and `Order.placedAt to now()`. It requires an active customer — `fails "Customer not found or inactive" when { Customer.status != active }` — and at least one line — `fails "Order has no lines" when { isEmpty(PlaceOrder.lines) }`. It emits `OrderPlaced`.
 >
@@ -382,7 +382,7 @@ The examples below use the Orders domain defined in `specy/examples/orders.struc
 >
 > **Cancellation:** The `CancelOrder` interaction sets `Order.status to cancelled`. It is only allowed when `Order.status not in {draft, confirmed}` would fail — meaning cancellation is restricted to `draft` and `confirmed` orders. It emits `OrderCancelled`, which triggers `OnOrderCancelled`: "Notify customer that order is cancelled" and "Restore product stock for each order line".
 >
-> **[HORS MODELE]** The model defines a `delivered` status in `OrderStatus` but no interaction transitions an Order to `delivered`. This transition is not modeled.
+> **[OUT OF MODEL]** The model defines a `delivered` status in `OrderStatus` but no interaction transitions an Order to `delivered`. This transition is not modeled.
 >
 > **Policies that apply:**
 > - `MaxOrderAmount`: orders above 10000 require manual approval — `Order.totalAmount.amount > 10000`
@@ -395,7 +395,7 @@ The examples below use the Orders domain defined in `specy/examples/orders.struc
 
 ### Questionner — "What happens if a payment fails after the order is placed?"
 
-> **[MODELE]** When a payment is processed via the `ProcessPayment` interaction, it creates a `Payment` entity and `sets Payment.status to captured`. The interaction emits `PaymentProcessed` on success.
+> **[IN MODEL]** When a payment is processed via the `ProcessPayment` interaction, it creates a `Payment` entity and `sets Payment.status to captured`. The interaction emits `PaymentProcessed` on success.
 >
 > If the payment fails, the model handles it through the `OnPaymentFailed` reaction:
 >
@@ -412,7 +412,7 @@ The examples below use the Orders domain defined in `specy/examples/orders.struc
 >
 > Meanwhile, the Order remains in `draft` status — the `ConfirmOrder` interaction requires `Payment.status != captured` to pass, so confirmation is blocked until a successful payment is made.
 >
-> **[HORS MODELE]** The model does not specify a maximum number of payment retries or a timeout after which the draft order would be automatically cancelled.
+> **[OUT OF MODEL]** The model does not specify a maximum number of payment retries or a timeout after which the draft order would be automatically cancelled.
 
 ### Confronter — "We should allow orders without a shipping address"
 
@@ -432,7 +432,7 @@ The examples below use the Orders domain defined in `specy/examples/orders.struc
 > - But it could never be *shipped* until the address is provided.
 > - The model currently has no interaction to *update* a shipping address after placement.
 >
-> **[HORS MODELE]** The model does not include an `UpdateOrder` or `SetShippingAddress` command. There is no way to add an address after order creation.
+> **[OUT OF MODEL]** The model does not include an `UpdateOrder` or `SetShippingAddress` command. There is no way to add an address after order creation.
 >
 > **To go further:** Use the `spec` skill to formalize a `SetShippingAddress` command and interaction, and to decide whether `shippingAddress` should be `optional` on the `Order` entity or on the `PlaceOrder` command.
 
