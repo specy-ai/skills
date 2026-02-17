@@ -154,10 +154,11 @@ No contradiction, no blocked invariant, no unhandled impact.
 
 ### Phase 4 — Proposition
 
-Generate the projected changes using the `.spec` format (see `.spec` File Format section). Present the full `.spec` file content to the user for review.
+Generate the projected changes using the `.spec` format (see `.spec` File Format section). The output must conform to `specy/grammars/spec.ebnf`. Present the full `.spec` file content to the user for review.
 
 **Rules for this phase:**
 
+- The `.spec` file structure must follow the grammar defined in `specy/grammars/spec.ebnf`.
 - Every addition must follow the Specy grammar and the conventions of `distill`.
 - The `changes` blocks contain native Specy syntax with `add`, `modify`, or `remove` operators.
 - `modify` shows the complete block as it should be after modification — not a partial diff. Annotate the changed lines with `// was: ...` comments.
@@ -199,7 +200,7 @@ After writing, run a quick cross-validation on the projected changes:
 
 ## .spec File Format
 
-The `.spec` file is a structured artifact that captures the full analysis and projected changes for a business specification.
+The `.spec` file is a structured artifact that captures the full analysis and projected changes for a business specification. The formal grammar is defined in `specy/grammars/spec.ebnf`. The `changes` blocks reuse the grammars from `specy/grammars/struct.ebnf` and `specy/grammars/flow.ebnf` — no new syntax is invented for the projected modifications.
 
 ### Header
 
@@ -577,7 +578,52 @@ When the user wants to re-validate an existing `.spec` file after models have be
 
 ## Syntax Reference
 
-This is a compact aide-memoire for writing `.struct` and `.flow` constructs inside `changes` blocks. For the full formal grammar, see `specy/grammars/struct.ebnf` and `specy/grammars/flow.ebnf`.
+This is a compact aide-memoire for the `.spec` file structure and for writing `.struct` and `.flow` constructs inside `changes` blocks. For the full formal grammars, see `specy/grammars/spec.ebnf`, `specy/grammars/struct.ebnf`, and `specy/grammars/flow.ebnf`.
+
+### .spec — Specification File
+
+```
+spec "Name"
+against "domain" version "gitSha" at "ISO 8601 timestamp"
+realized version "gitSha" at "ISO 8601 timestamp"   // optional — when implemented
+uses "domain.struct"
+uses "domain.flow"
+
+narrative {
+  "Original requirement in prose."
+}
+
+concepts {
+  entity Name [existing]       // comment
+  command Name [new]
+  field Name [ambiguous]
+}
+
+confrontation {
+  compatible "description" { "detail" }
+  contradiction "description" { "detail" }
+  impact "description" { "detail" }
+  gap "description" { "detail" }
+  coverage "description" { "detail" }
+}
+
+changes "domain.struct" {
+  add definition { ... }
+  modify definition { ... }
+  remove kind Name
+}
+
+changes "domain.flow" {
+  add block { ... }
+  modify block { ... }
+  remove kind Name
+}
+
+impact {
+  kind Name -> none "reason"
+  kind Name -> affected "reason"
+}
+```
 
 ### .struct — Structural Model
 
