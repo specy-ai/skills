@@ -85,13 +85,8 @@ For each bounded context:
    - Map native types to Specy primitives using the type mapping table.
    - Map collections to `list<T>` or `set<T>`.
    - Map references to other domain types by their Specy typeName.
-4. **Extract constraints** from annotations, decorators, validation rules, or code guards:
-   - `required`, `optional`, `unique`, `immutable`
-   - `min(n)`, `max(n)`, `range(n, m)`
-   - `minLength(n)`, `maxLength(n)`, `pattern("...")`
-   - `past`, `future`, `pastOrPresent`, `futureOrPresent`
-   - `default("value")`
-5. **Detect relations:** foreign keys, `@ManyToOne`, nested objects, `List<Entity>`.
+4. **Extract constraints** from annotations, decorators, validation rules, or code guards (See Constraints section in `specy/grammars/struct.ebnf`)
+5. **Detect relations:** foreign keys, nested objects, `List<Entity>`.
 6. Write the `.struct` file following the output conventions.
 7. Print a summary:
    ```
