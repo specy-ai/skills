@@ -103,188 +103,18 @@ For each bounded context:
 
 For each bounded context:
 
-1. Read every handler, service, listener, saga, and policy file identified in Phase 1.
-2. **For each command handler** → create an `interaction` block:
-   - `on` → the command typeName
-   - `resolves` → entities loaded/fetched (from repository calls, `.findById`, etc.). The `from` dotPath must point to a field that identifies the entity. When a repository is declared in the `.flow` and the code calls a specific repository operation, add a `via Repository.operation` clause to trace the data access path. The `via` is optional for retrocompatibility. This includes **indirect resolution** — when an entity is loaded via a field of another already-resolved entity. In that case, use a dotPath through the resolved entity:
-     ```
-     // Direct resolution with via — entity loaded from a command field through a repository:
-     resolves User via UserRepository.findById from UpdateProfile.userId
-
-     // Direct resolution without via — retrocompatible form:
-     resolves Order from CancelOrder.orderId
-
-     // Indirect resolution — entity loaded via a field of another resolved entity:
-     resolves Order via OrderRepository.findById from ShipOrder.orderId
-     resolves Payment from Order.paymentId
-
-     // Indirect resolution — chained through a token:
-     resolves PasswordResetToken from ResetPassword.token
-     resolves Customer from PasswordResetToken.customerId
-     ```
-     **Every entity you `sets` or reference in a `fails` expression must be explicitly resolved or created.** A `// NOTE: resolved indirectly` comment is NOT a substitute for a `resolves` clause — if the code loads the entity, model it with `resolves`.
-   - `creates` → entities instantiated (`new Entity`, `.save()` on new objects)
-   - `fails` → error conditions: `if (...) throw`, guard clauses, validation failures. Use a business-language message, not the technical exception name. **Critical: the `when { expression }` must be a real, evaluable boolean condition — never a tautology.** See the rules below for handling unexpressible conditions.
-
-   **Expressible conditions** — the check can be written with Specy operators. Emit a `fails` clause. Most conditions fall into this category — try to express them before resorting to `// UNCLEAR`:
-   ```
-   // Status check — Code: if (order.status != "DRAFT") throw ...
-   fails "Order is not in draft status" when {
-     Order.status != draft
-   }
-
-   // Empty collection — Code: if (items.length === 0) throw ...
-   fails "Order has no lines" when {
-     isEmpty(Order.lines)
-   }
-
-   // String length — Code: if (name.length > 200) throw ...
-   fails "Product name exceeds 200 characters" when {
-     size(CreateProduct.name) > 200
-   }
-
-   // Self-reference guard — Code: if (userId === targetUserId) throw ...
-   fails "Cannot transfer to yourself" when {
-     TransferFunds.sourceAccountId = TransferFunds.targetAccountId
-   }
-
-   // Ownership check — Code: if (entity.ownerId !== userId) throw ...
-   fails "Not authorized to cancel this order" when {
-     Order.customer.id != CancelOrder.customerId
-   }
-
-   // Entity not found — Code: if (!entity) throw ...
-   fails "Order not found" when {
-     Order is not defined
-   }
-
-   // Existence / duplicate check — Code: if (await repo.exists(a, b)) throw ...
-   // Model with resolves + "is defined":
-   resolves Payment from ProcessPayment.orderId
-   fails "A payment already exists for this order" when {
-     Payment is defined
-   }
-   ```
-
-   **Unexpressible conditions** — the check involves something the grammar truly cannot represent: complex business logic with no structural equivalent, external service calls, or algorithmic checks. **Do NOT emit a `fails` clause with a fake expression.** Instead, drop the `fails` clause entirely and write a `// UNCLEAR:` comment:
-   ```
-   // Code: if (isCommonPassword(pw)) throw "Too common"
-   // UNCLEAR: condition not expressible — checks password against common passwords list
-
-   // Code: if (rateLimiter.isExceeded(userId)) throw "Rate limit"
-   // UNCLEAR: condition not expressible — per-user rate limiting (max N per hour)
-
-   // Code: if (bannedWords.match(text)) throw "Banned content"
-   // UNCLEAR: condition not expressible — checks text against forbidden words list with leetspeak detection
-   ```
-
-   **Before using `// UNCLEAR`, ask yourself:** can this condition be modeled with the available operators (`=`, `!=`, `>`, `<`, `is defined`, `is not defined`, `in`, `not in`, `size()`, `count()`, `isEmpty()`)? If yes, express it. Common patterns that ARE expressible:
-   - **Self-reference:** `Command.userId = Command.targetId` → expressible
-   - **Ownership:** `Entity.userId != Command.userId` → expressible (if `userId` is in the command)
-   - **Status check:** `Entity.status != someValue` → expressible
-   - **Duplicate/existence:** `resolves` + `fails when { Entity is defined }` → expressible
-   - **Not found:** `fails when { Entity is not defined }` → expressible
-   - **Length check:** `size(field) > n` → expressible
-
-   **Anti-pattern — tautological expression as placeholder:**
-   ```
-   // ❌ WRONG — email is required, so this is always true
-   fails "Email already in use" when {
-     Register.email is defined
-   }
-   ```
-
-   **Anti-pattern — bogus `resolves from` dotPath:**
-   ```
-   // ❌ WRONG — Customer is not resolved from a payment method
-   resolves Customer from ProcessPayment.method
-
-   // ❌ WRONG — Order is not resolved from a reason text
-   resolves Order from CancelOrder.reason
-   ```
-   If the entity is resolved from a field that is not in the command (e.g. only available in the session), add that field to the command first (see Phase 2 rule on command fields), then use it in `resolves`.
-
-   **Anti-pattern — missing indirect resolution:**
-   ```
-   // ❌ WRONG — sets Customer fields but Customer is not resolved
-   interaction ResetPassword {
-     on ResetPassword
-     resolves PasswordResetToken from ResetPassword.token
-     // NOTE: Customer resolved indirectly via token  ← NOT ENOUGH
-     sets Customer.password to ResetPassword.newPassword  // ← Customer not in resolves/creates
-     sets PasswordResetToken.usedAt to now()
-   }
-
-   // ✅ CORRECT — Customer explicitly resolved via indirect dotPath
-   interaction ResetPassword {
-     on ResetPassword
-     resolves PasswordResetToken from ResetPassword.token
-     resolves Customer from PasswordResetToken.customerId
-     sets PasswordResetToken.usedAt to now()
-     // NOTE: Customer.password is set to hashed value of ResetPassword.newPassword
-   }
-   ```
-   - `sets` → field mutations on resolved/created entities. **Every entity referenced in a `sets` clause must appear in a `resolves` or `creates` clause of the same interaction.** If the code updates entities that are not directly resolved (e.g. bulk updates on related records), do not emit a `sets` clause — use a `// NOTE:` comment to describe the side effect instead.
-   - `emits` → events published/dispatched
-3. **For each service identified in Phase 2** → create a `service` block in the `.flow`:
-   - One `service` block per service class/interface.
-   - For each public method with business logic → create an `operation` inside the service block.
-   - `accepts` → parameters of the method (map types using the type mapping table).
-   - `returns` → the return type of the method (if not void).
-   - `fails` → error conditions thrown by the service method (same rules as interaction `fails`).
-   - `then` → describe the business logic in natural language when it cannot be expressed structurally.
-   - `emits` → events published by the service method.
-4. **For each call to a service in a command handler** → add a `delegates ServiceName.operationName` clause in the corresponding `interaction` block:
-   - Place `delegates` after `fails` and before `sets`.
-   - If the result of the service call is assigned to a field of a resolved/created entity, express it with `sets Entity.field to ServiceName.operationName`.
-5. **For each repository interface identified in Phase 2** → create a `repository` block in the `.flow`:
-   - One `repository` block per repository interface/class.
-   - `for` → the entity type the repository manages (the aggregate root).
-   - For each method used in the extracted interactions/reactions → create an `operation` inside the repository block.
-   - `accepts` → parameters of the method (map types using the type mapping table).
-   - `returns` → the return type of the method (if not void).
-   - **Only model operations that are referenced by at least one `resolves ... via` clause or used in an extracted interaction.** Do not model query-only methods (pagination, search, aggregation for UI/dashboard). Heuristic: if an operation is not referenced by any `resolves ... via` in the `.flow`, it does not need to be declared. Annotate omissions with `// NOTE: query-only — not modeled`.
-6. **For each `repository.findBy*()` call in a command handler** → add `via Repository.operation` in the corresponding `resolves` clause of the `interaction` block.
-7. **For each event listener** → create a `reaction` block:
-   - `on` → the event typeName
-   - `then` → describe the side effect in business language
-   - `delegates` → if the reaction calls a service, add a `delegates` clause
-   - `sets` → any field mutations
-   - `emits` → any chained events
-8. **Cross-cutting rules** → create `policy` blocks:
-   - Domain rules that span multiple operations or guard multiple commands
-   - Express the condition with `when { ... }` and the consequence with `then "..."`
-   - **The `when` condition must be a real, evaluable boolean expression — the same tautology prohibition as `fails` applies here.** If the policy's real condition is unexpressible (datetime arithmetic, cross-context queries, external lookups), do NOT emit a `policy` block with a placeholder `when` clause. Instead, write a standalone `// UNCLEAR:` comment describing the rule:
-     ```
-     // UNCLEAR: policy not expressible — orders can only be modified within 24 hours of placement (datetime arithmetic)
-     // UNCLEAR: policy not expressible — payment gateway must confirm card validity before capture (external service call)
-     ```
-   - Common tautological traps in policies:
-     ```
-     // WRONG — createdAt is immutable pastOrPresent, always defined
-     policy OrderModificationWindow {
-       when { Order.createdAt is defined }
-       then "Orders can only be modified within 24 hours of placement"
-     }
-
-     // WRONG — updatedAt being defined does not capture the time window
-     policy OrderEditDeadline {
-       when { Order.updatedAt is defined }
-       then "Orders can only be edited within 1 hour"
-     }
-
-     // WRONG — condition is a status check, not the actual cross-aggregate rule
-     policy PaymentRequiredForShipping {
-       when { Order.status = confirmed }
-       then "A captured payment is required before shipping"
-     }
-     ```
-9. **Structural constraints** → create `invariant` blocks:
-   - Conditions that must always be true for an **entity** (never a command, event, or value)
-   - Express with `on EntityType`, `must { ... }`, and `message "..."`
-   - Validation rules on command inputs belong in `fails` clauses of the corresponding `interaction`, not in invariants
-10. Write the `.flow` file following the output conventions.
-11. Print a summary:
+1. Read `constructs/INDEX.md` and load `constructs/expressions.md` (transverse expression rules).
+2. Read every handler, service, listener, saga, and policy file identified in Phase 1.
+3. **For each command handler** → create an `interaction` block. See `constructs/interaction.md` for clause rules, examples, and anti-patterns.
+4. **For each service identified in Phase 2** → create a `service` block. See `constructs/service.md` for rules and anti-patterns.
+5. **For each call to a service in a command handler** → add a `delegates` clause in the corresponding `interaction` block (see `constructs/interaction.md`).
+6. **For each repository interface identified in Phase 2** → create a `repository` block. See `constructs/repository.md` for rules and filtering guidance.
+7. **For each `repository.findBy*()` call in a command handler** → add `via Repository.operation` in the corresponding `resolves` clause (see `constructs/interaction.md`).
+8. **For each event listener** → create a `reaction` block. See `constructs/reaction.md` for rules and examples.
+9. **Cross-cutting rules** → create `policy` blocks. See `constructs/policy.md` for rules and tautology traps.
+10. **Structural constraints** → create `invariant` blocks. See `constructs/invariant.md` for rules (entities only).
+11. Write the `.flow` file following the output conventions.
+12. Print a summary:
    ```
    ## Flow Extraction Summary — {domain}
    - Repositories: {count}
@@ -646,6 +476,10 @@ If `specy/.meta.json` exists, update only the filemap entries corresponding to t
 
 During Phase 1, read `heuristics/INDEX.md` and load the relevant heuristic files based on the detected stack. Always load `generic.md` (naming patterns, type mapping, services, repositories). Load the stack-specific file (e.g. `java-spring.md`) when the framework is identified.
 
+## Flow Constructs
+
+During Phase 3, read `constructs/INDEX.md` and load the relevant construct files for rules, examples, and anti-patterns. Always load `constructs/expressions.md` (transverse expression rules). Load each construct file as needed (`interaction.md`, `service.md`, `repository.md`, `reaction.md`, `policy.md`, `invariant.md`).
+
 ---
 
 ## Syntax Reference
@@ -664,39 +498,36 @@ Read the canonical examples to calibrate output style:
 
 ## Quality Rules
 
+### General
+
 1. **No invention.** Every element in the output must be traceable to source code. If you cannot find it in the code, do not write it. Use `// UNCLEAR: ...` for ambiguous cases.
-2. **One interaction per command.** Each command type gets exactly one `interaction` block. Do not merge multiple commands into one interaction.
-3. **Enum values in camelCase.** Every enum value must be a valid `camelCaseId` (starts with a lowercase letter, no underscores). Convert `UPPER_SNAKE_CASE` from source code: `ACCOUNT_CREATED` → `accountCreated`, `PENDING` → `pending`.
-4. **Enum values verified.** Every enum value used in a `.flow` expression (e.g. `Order.status != draft`) must exist in the corresponding `enum` definition in the `.struct`.
-5. **Dot-paths resolved.** Every `dotPath` in the `.flow` must chain through fields that exist in the `.struct`. `Order.totalAmount.amount` requires `Order` to have a `totalAmount` field of type `Money`, and `Money` to have an `amount` field.
-6. **Expressions must be valid — no tautologies, no bogus dotPaths.** Every `when { ... }` and `must { ... }` block must contain a real boolean expression that evaluates correctly given the types in the `.struct`. Specific rules:
-   - Never compare a `string` field directly to a number — use `size(field)` for string length checks.
-   - Never use `count()` on a `string` field — `count()` is for `list<T>` / `set<T>` only.
-   - Never write `field is defined` on a `required` or `immutable` field as a stand-in for a condition you cannot express. A required/immutable field is always defined — this is a tautology. Use `// UNCLEAR:` instead. This applies to both `fails` clauses and `policy` `when` clauses.
-   - Never subtract datetimes and compare to a bare number (`now() - Order.placedAt > 5`) — the unit is ambiguous. Use `// UNCLEAR:` with a note about the time window.
-   - Never write a `resolves Entity from Command.someField` where `someField` has no relation to the entity's identity. If the field you need is not in the command, add it to the command first (see Phase 2).
-   - **Try to express conditions before resorting to `// UNCLEAR`.** Self-reference checks, ownership checks, status checks, not-found checks, and existence/duplicate checks are all expressible with Specy operators. Reserve `// UNCLEAR` for conditions that truly cannot be modeled: password strength, rate limiting, regex matching, external API calls, algorithmic checks.
-7. **No `null` literal.** The grammar has no `null` value. If the code sets a field to null, express it with a `// NOTE:` comment instead of `sets ... to null`.
-8. **Invariants on entities only.** The `on` clause of an `invariant` must reference an `entity` type, never a `command`, `event`, or `value`. Input validation rules belong in `fails` clauses of the corresponding `interaction`.
-9. **`creates` must list all created entities.** If an interaction creates a new entity instance, it must appear in a `creates` clause — do not omit the primary entity being created.
-10. **Business-language messages.** Failure messages, policy consequences, and invariant messages must use domain vocabulary, not technical jargon. Write `"Customer not found or inactive"`, not `"EntityNotFoundException"`.
-11. **Preserve source vocabulary.** Use the same names as the code: if the code says `Order`, write `Order`, not `PurchaseOrder`. If the code says `cancel`, write `cancel`, not `abort`.
-12. **Naming convention: interaction = command name.** The interaction identifier matches the command name: `command PlaceOrder` → `interaction PlaceOrder`.
-13. **Naming convention: reaction = On + event name.** The reaction identifier is the event name prefixed with `On`: `event OrderPlaced` → `reaction OnOrderPlaced`.
-14. **No technical artifacts.** Do not include framework-specific types, infrastructure code, or ORM metadata in the output. Extract only domain concepts. Specifically exclude:
+2. **Enum values in camelCase.** Every enum value must be a valid `camelCaseId` (starts with a lowercase letter, no underscores). Convert `UPPER_SNAKE_CASE` from source code: `ACCOUNT_CREATED` → `accountCreated`, `PENDING` → `pending`.
+3. **Enum values verified.** Every enum value used in a `.flow` expression (e.g. `Order.status != draft`) must exist in the corresponding `enum` definition in the `.struct`.
+4. **Dot-paths resolved.** Every `dotPath` in the `.flow` must chain through fields that exist in the `.struct`. `Order.totalAmount.amount` requires `Order` to have a `totalAmount` field of type `Money`, and `Money` to have an `amount` field.
+5. **Expressions must be valid.** See `constructs/expressions.md` for the complete rules on `when`/`must` expressions, tautology prohibition, and operator usage.
+6. **No `null` literal.** The grammar has no `null` value. If the code sets a field to null, express it with a `// NOTE:` comment instead of `sets ... to null`.
+7. **Business-language messages.** Failure messages, policy consequences, and invariant messages must use domain vocabulary, not technical jargon. Write `"Customer not found or inactive"`, not `"EntityNotFoundException"`.
+8. **Preserve source vocabulary.** Use the same names as the code: if the code says `Order`, write `Order`, not `PurchaseOrder`. If the code says `cancel`, write `cancel`, not `abort`.
+9. **No technical artifacts.** Do not include framework-specific types, infrastructure code, or ORM metadata in the output. Extract only domain concepts. Specifically exclude:
     - **OAuth/auth infrastructure:** entities storing client IDs, client secrets, access tokens, refresh tokens (e.g. `OAuthApp { clientId, clientSecret }`). If OAuth/federation is a domain concept, model the *connection* (user linked to external service) but omit the token storage details.
     - **Monitoring/analytics entities:** access counters, IP tracking, usage metrics (e.g. `ApiMetrics { requestCount, lastRequestIp }`).
     - **Technical token fields on domain entities:** fields like `accessToken`, `refreshToken`, `sessionJwt` on a domain entity are infrastructure concerns. Omit them. Keep the *domain-meaningful* fields (e.g. `externalHandle`, `externalId`) that represent the business relationship.
-15. **Field ordering.** Within an entity or value, order fields: identity fields first (id, uuid), then required fields, then optional fields. Within each group, keep the order from the source code.
-16. **Section separators.** Use `// ===` comment blocks to separate sections (enums, values, entities, commands, events in `.struct`; interactions, reactions, policies, invariants in `.flow`), matching the style in the canonical examples.
-17. **Minimal output.** Do not add fields, constraints, or blocks that are not evidenced by the code. When in doubt, omit rather than invent.
-18. **Query-only entities.** If an entity defined in the `.struct` has no corresponding write interaction in the `.flow` (it is only read, never created or mutated by a command handler), annotate it in the `.struct` with `// NOTE: query-only — no write interaction found`. This signals a deliberate observation, not an omission. Common examples: visit/view tracking entities, read-only projections, entities managed by external systems.
-19. **Enums without flow references.** If an enum is defined in the `.struct` but never referenced in any `.flow` expression (no `fails`, `sets`, `policy`, or `invariant` uses it), annotate it with `// NOTE: not referenced in flow — used for queries/UI only`. Do not omit it from the struct (it is still part of the domain vocabulary), but flag it.
-20. **Service operations use `then` for unexpressible logic.** When a service operation's business logic cannot be captured structurally, describe it with a `then` clause. Use `fails` in operations only when the error condition is formally expressible.
-21. **No service for pure infrastructure.** Do not create `service` blocks for image processing, password hashing, logging, caching, rate limiting, or other purely technical concerns. These are infrastructure, not domain logic. Use `// NOTE:` comments instead.
-22. **Repository operations are pure data access.** Repository operations contain only `accepts` and `returns` — never `then`, `fails`, `sets`, or `emits`. Business logic belongs in interactions and services, not repositories.
-23. **Repository `for` must be an aggregate root.** The `for` clause of a repository must reference an entity (aggregate root), not a value object or an enum.
-24. **No repository for technical types.** Do not create `repository` blocks for audit logs, session tokens, or other purely technical persistence concerns — unless they are used in domain interactions.
+10. **Field ordering.** Within an entity or value, order fields: identity fields first (id, uuid), then required fields, then optional fields. Within each group, keep the order from the source code.
+11. **Section separators.** Use `// ===` comment blocks to separate sections (enums, values, entities, commands, events in `.struct`; interactions, reactions, policies, invariants in `.flow`), matching the style in the canonical examples.
+12. **Minimal output.** Do not add fields, constraints, or blocks that are not evidenced by the code. When in doubt, omit rather than invent.
+13. **Query-only entities.** If an entity defined in the `.struct` has no corresponding write interaction in the `.flow` (it is only read, never created or mutated by a command handler), annotate it in the `.struct` with `// NOTE: query-only — no write interaction found`. This signals a deliberate observation, not an omission.
+14. **Enums without flow references.** If an enum is defined in the `.struct` but never referenced in any `.flow` expression, annotate it with `// NOTE: not referenced in flow — used for queries/UI only`. Do not omit it from the struct (it is still part of the domain vocabulary), but flag it.
+
+### Construct-specific
+
+Rules specific to each flow construct are documented in the corresponding file under `constructs/`. Key rules per construct:
+
+- **Interaction:** one per command, `creates` must list all created entities, naming = command name. See `constructs/interaction.md`.
+- **Reaction:** naming = `On` + event name. See `constructs/reaction.md`.
+- **Service:** use `then` for unexpressible logic, no service for pure infrastructure. See `constructs/service.md`.
+- **Repository:** pure data access only (no `then`/`fails`/`sets`/`emits`), `for` must be aggregate root, no repository for technical types. See `constructs/repository.md`.
+- **Policy:** real `when` condition required, no tautologies. See `constructs/policy.md`.
+- **Invariant:** `on` entities only, never commands/events/values. See `constructs/invariant.md`.
 
 ---
 
@@ -723,23 +554,8 @@ If the project has more than ~50 model classes or ~30 service classes, ask the u
 ### Missing Events
 When a command handler mutates state but does not publish an event, annotate with `// UNCLEAR: no event emitted — consider adding {SuggestedEventName}`. Do not invent the event.
 
-### Unexpressible Conditions (uniqueness, external calls, regex, rate limits)
-Many real-world guard conditions cannot be expressed with Specy operators. Common examples:
-- **Uniqueness checks** (`if (await repo.existsByEmail(email))`)
-- **Password strength** (common password lists, entropy checks)
-- **Rate limiting** (in-memory or Redis-based throttling)
-- **External API validation** (OAuth token verification, payment gateway)
-- **Complex regex matching** (email format, URL validation, banned word lists with leetspeak)
-- **Cross-entity lookups** (checking existence in another aggregate)
-
-For all of these: **do not emit a `fails` clause with a placeholder expression**. Instead, replace with a comment:
-```
-// UNCLEAR: condition not expressible — checks email uniqueness against database
-// UNCLEAR: condition not expressible — validates password against common passwords list (NIST SP 800-63B)
-// UNCLEAR: condition not expressible — per-user rate limiting (max N requests per hour)
-```
-
-The `fails` clause requires a `when { expression }` that is a real evaluable condition. If you cannot write one, the `fails` clause must be omitted entirely. A `// UNCLEAR:` comment preserves the information without producing invalid output.
+### Unexpressible Conditions
+See `constructs/expressions.md` for the full list of unexpressible condition categories and the correct handling pattern (use `// UNCLEAR:` comments, never emit a `fails` clause with a placeholder expression).
 
 ### Inheritance and Polymorphism
 When entities use inheritance (e.g. `Payment` → `CreditCardPayment`, `BankTransferPayment`):
