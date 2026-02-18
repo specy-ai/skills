@@ -79,10 +79,6 @@ interaction ProcessPayment {
     Order.status != draft
   }
 
-  fails "Payment method not accepted" when {
-    ProcessPayment.method not in {creditCard, bankTransfer, paypal}
-  }
-
   sets Payment.status to captured
   sets Payment.processedAt to now()
   sets Payment.method to ProcessPayment.method

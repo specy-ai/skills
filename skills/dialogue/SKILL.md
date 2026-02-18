@@ -448,8 +448,6 @@ The examples below use the Orders domain defined in `examples/orders.struct` and
 >
 > 3. **Reactions with informal-only side effects:** `OnOrderConfirmed`, `OnOrderCancelled`, and `OnPaymentRefunded` describe their effects only in `then` text clauses with no `sets` or `emits`. These side effects are not formally traceable.
 >
-> 4. **Tautological `fails` clause:** In `ProcessPayment`, the clause `fails "Payment method not accepted" when { ProcessPayment.method not in {creditCard, bankTransfer, paypal} }` lists all values of `PaymentMethod`. Any value of type `PaymentMethod` will always be in this set — the check can never fail. The model does not differentiate behavior by payment method.
->
 > ### No Gaps
 >
 > - **Commands without interaction:** all 6 commands (`PlaceOrder`, `ConfirmOrder`, `CancelOrder`, `ProcessPayment`, `RefundPayment`, `ShipOrder`) have a matching interaction.
@@ -466,4 +464,3 @@ The examples below use the Orders domain defined in `examples/orders.struct` and
 > - For gap #1, use the `spec` skill to formalize a `reaction OnOrderShipped`.
 > - For gap #2, use the `spec` skill to define a `DeliverOrder` command and interaction.
 > - For gap #3, consider whether the side effects should be formalized with `sets` / `emits` clauses.
-> - For gap #4, consider removing the tautological `fails` clause or differentiating behavior by payment method.
