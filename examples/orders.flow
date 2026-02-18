@@ -34,7 +34,7 @@ interaction "Confirm an order after payment" {
   on ConfirmOrder
 
   resolves Order from ConfirmOrder.orderId
-  resolves Payment from Order
+  resolves Payment via Payment.order from Order
 
   fails "Order is not in draft status" when {
     Order.status != draft
@@ -109,7 +109,7 @@ interaction "Ship a confirmed order" {
   on ShipOrder
 
   resolves Order from ShipOrder.orderId
-  resolves Payment from Order
+  resolves Payment via Payment.order from Order
 
   fails "Shipping address is missing" when {
     not (Order.shippingAddress is defined)

@@ -58,23 +58,68 @@ The string literal after `interaction` describes the business intent in plain la
 
 ### `resolves` — entities loaded/fetched
 
-The `from` dotPath must point to a field that identifies the entity. When a repository is declared in the `.flow` and the code calls a specific repository operation, add a `via Repository.operation` clause.
+There are three resolution patterns. The `from` dotPath identifies the source; the optional `via` clause specifies how the resolution is performed.
+
+#### Pattern 1 — Direct resolution
+
+The `from` dotPath points to a field on the command or event that carries the entity's identity.
 
 ```
-// Direct resolution with via — entity loaded from a command field through a repository:
-resolves User via UserRepository.findById from UpdateProfile.userId
-
-// Direct resolution without via:
+// Direct — lookup by identity field:
 resolves Order from CancelOrder.orderId
 
-// Indirect resolution — entity loaded via a field of another resolved entity:
+// Direct with repository — same lookup, explicit infrastructure path:
+resolves User via UserRepository.findById from UpdateProfile.userId
+```
+
+#### Pattern 2 — Indirect resolution (forward ref)
+
+The `from` dotPath points to a field on an already-resolved entity. That field carries the identity of the entity to resolve.
+
+```
+// The resolved Order has a field that identifies the Payment:
 resolves Order via OrderRepository.findById from ShipOrder.orderId
 resolves Payment from Order.paymentId
 
-// Indirect resolution — chained through a token:
+// Chained through a token — each step uses a field from the previous entity:
 resolves PasswordResetToken from ResetPassword.token
 resolves Customer from PasswordResetToken.customerId
 ```
+
+#### Pattern 3 — Indirect resolution (reverse ref)
+
+The resolved entity has a field that references the `from` entity. Use `via Entity.field` to name the relationship field explicitly.
+
+```
+// Payment has a field `order : Order` — navigate the reverse relationship:
+resolves Order from ConfirmOrder.orderId
+resolves Payment via Payment.order from Order
+
+// Subscription has a field `customer : Customer` — reverse lookup:
+resolves Customer from DeactivateSubscription.customerId
+resolves Subscription via Subscription.customer from Customer
+
+// Invoice has a field `order : Order` — reverse lookup:
+resolves Order from CloseOrder.orderId
+resolves Invoice via Invoice.order from Order
+```
+
+#### Decision rule
+
+| Situation | Pattern | Example |
+|---|---|---|
+| Command/event carries the entity's ID | Direct | `resolves Order from PlaceOrder.orderId` |
+| An already-resolved entity carries the ID | Indirect (forward) | `resolves Payment from Order.paymentId` |
+| The entity to resolve has a field pointing back to an already-resolved entity | Indirect (reverse) | `resolves Payment via Payment.order from Order` |
+
+#### `via` clause — two uses
+
+The optional `via` clause serves two purposes depending on the dotPath shape:
+
+- **Repository operation:** `via Repository.operation` — specifies the infrastructure method used to load the entity.
+- **Relationship field:** `via Entity.field` — specifies the field on the resolved entity that references the `from` entity (reverse-ref pattern).
+
+The two are distinguishable: a repository `via` references a `Repository.operation`, while a relationship `via` references `ResolvedEntity.field` where the entity name matches the `resolves` typeName.
 
 **Every entity you `sets` or reference in a `fails` expression must be explicitly resolved or created.** A `// NOTE: resolved indirectly` comment is NOT a substitute for a `resolves` clause — if the code loads the entity, model it with `resolves`.
 

@@ -40,6 +40,17 @@ interactionDef   = "interaction" , stringLiteral , "{"
                  , { emitsClause }
                  , "}" ;
 
+// resolves has three resolution patterns:
+//   Direct:              resolves Entity from command.fieldId
+//                        → lookup by identity field
+//   Indirect (forward):  resolves Entity from ResolvedEntity.fieldId
+//                        → lookup using a field from an already-resolved entity
+//   Indirect (reverse):  resolves Entity via Entity.field from ResolvedEntity
+//                        → navigate reverse relationship (Entity.field references ResolvedEntity)
+//
+// The optional `via` clause has two uses:
+//   Repository operation: via Repository.operation (infrastructure path)
+//   Relationship field:   via Entity.field         (domain relationship)
 resolvesClause   = "resolves" , typeName , [ "via" , dotPath ] , "from" , dotPath ;
 
 createsClause    = "creates" , typeName ;
