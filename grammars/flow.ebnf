@@ -24,7 +24,7 @@ block            = interactionDef
 // Interaction — triggered by a command
 // -----------------------------------------------------------------------------
 
-interactionDef   = "interaction" , identifier , "{"
+interactionDef   = "interaction" , typeName , "{"
                  ,   "on" , typeName
                  , { resolvesClause }
                  , { createsClause }
@@ -50,7 +50,7 @@ delegatesClause  = "delegates" , dotPath ;
 // Reaction — triggered by an event
 // -----------------------------------------------------------------------------
 
-reactionDef      = "reaction" , identifier , "{"
+reactionDef      = "reaction" , typeName , "{"
                  ,   "on" , typeName
                  , { thenClause }
                  , { delegatesClause }
@@ -105,7 +105,7 @@ repositoryOpDef  = "operation" , identifier , "{"
 // Policy — domain-wide rule
 // -----------------------------------------------------------------------------
 
-policyDef        = "policy" , identifier , "{"
+policyDef        = "policy" , typeName , "{"
                  ,   "when" , "{" , expression , "}"
                  ,   "then" , stringLiteral
                  , "}" ;
@@ -114,7 +114,7 @@ policyDef        = "policy" , identifier , "{"
 // Invariant — structural constraint on an entity
 // -----------------------------------------------------------------------------
 
-invariantDef     = "invariant" , identifier , "{"
+invariantDef     = "invariant" , typeName , "{"
                  ,   "on" , typeName
                  ,   "must" , "{" , expression , "}"
                  ,   "message" , stringLiteral
