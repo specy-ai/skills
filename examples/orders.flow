@@ -125,6 +125,21 @@ interaction "Ship a confirmed order" {
   emits OrderShipped
 }
 
+interaction "Deliver a shipped order" {
+  on DeliverOrder
+
+  resolves Order from DeliverOrder.orderId
+
+  fails "Order is not shipped" when {
+    Order.status != shipped
+  }
+
+  sets Order.status to delivered
+  sets Order.deliveredAt to now()
+
+  emits OrderDelivered
+}
+
 // =============================================================================
 // Interactions — event-triggered (reactive)
 // =============================================================================
@@ -158,6 +173,13 @@ interaction "Notify customer of refund" {
   on PaymentRefunded
 
   then "Notify customer that refund has been processed"
+}
+
+interaction "Notify customer of delivery" {
+  on OrderDelivered
+
+  then "Notify customer that order has been delivered"
+  then "Close order lifecycle"
 }
 
 // =============================================================================

@@ -95,6 +95,7 @@ entity Order {
   placedAt : datetime optional pastOrPresent
   confirmedAt : datetime optional pastOrPresent
   shippedAt : datetime optional pastOrPresent
+  deliveredAt : datetime optional pastOrPresent
   cancelledAt : datetime optional pastOrPresent
   createdAt : datetime immutable pastOrPresent
 }
@@ -144,6 +145,10 @@ command ShipOrder {
   trackingNumber : string optional maxLength(100)
 }
 
+command DeliverOrder {
+  orderId : uuid
+}
+
 // =============================================================================
 // Events
 // =============================================================================
@@ -170,6 +175,11 @@ event OrderShipped {
   orderId : uuid
   shippedAt : datetime
   trackingNumber : string optional
+}
+
+event OrderDelivered {
+  orderId : uuid
+  deliveredAt : datetime
 }
 
 event PaymentProcessed {

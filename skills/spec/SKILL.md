@@ -590,9 +590,9 @@ Read the formal grammars before producing output:
 
 The examples below use the Orders domain defined in `examples/orders.struct` and `examples/orders.flow`.
 
-### Example 1 — Compatible Addition: "Deliver an order"
+### Example 1 — Compatible Addition: "React when an order is shipped"
 
-**Input:** "A delivery driver must be able to mark an order as delivered."
+**Input:** "When an order is shipped, the system should notify the customer and start delivery tracking."
 
 ---
 
@@ -601,12 +601,12 @@ The examples below use the Orders domain defined in `examples/orders.struct` and
 ```
 ## Decomposition
 
-**Input:** "A delivery driver must be able to mark an order as delivered."
+**Input:** "When an order is shipped, the system should notify the customer and start delivery tracking."
 
 **Concepts identified:**
-- Entities: Order (status transition to delivered)
-- Commands: DeliverOrder (new — mark an order as delivered)
-- Events: OrderDelivered (new — signal that delivery happened)
+- Entities: Order (already shipped via ShipOrder interaction)
+- Commands: none implied (this is a reactive behavior)
+- Events: OrderShipped (existing — emitted by "Ship a confirmed order" interaction)
 - Policies/Invariants: none implied
 - Services/Repositories: none implied
 
@@ -620,10 +620,9 @@ Does this decomposition look correct? (yes/no/corrections)
 
 | Concept | Label | Reference |
 |---|---|---|
-| Order | [EXISTANT] | `entity Order` in orders.struct — has `status : OrderStatus` with value `delivered` defined in enum |
-| OrderStatus.delivered | [EXISTANT] | `enum OrderStatus { draft confirmed shipped delivered cancelled }` — the value exists but no interaction currently transitions to it |
-| DeliverOrder | [NOUVEAU] | No matching command. Proposed: `command DeliverOrder { orderId : uuid }` |
-| OrderDelivered | [NOUVEAU] | No matching event. Proposed: `event OrderDelivered { orderId : uuid, deliveredAt : datetime }` |
+| Order | [EXISTANT] | `entity Order` in orders.struct — has `status : OrderStatus`, `shippedAt : datetime optional pastOrPresent` |
+| OrderShipped | [EXISTANT] | `event OrderShipped { orderId : uuid, shippedAt : datetime, trackingNumber : string optional }` — emitted by "Ship a confirmed order" but no event-triggered interaction listens to it |
+| OnOrderShipped | [NOUVEAU] | No event-triggered interaction exists for `OrderShipped`. Proposed: event-triggered interaction with notification and tracking side effects |
 
 Does this mapping look correct? (yes/no/corrections)
 ```
@@ -636,15 +635,11 @@ The proposed specification is fully compatible with the existing model.
 No contradiction, no blocked invariant, no unhandled impact.
 
 **Details:**
-- The `delivered` status already exists in `OrderStatus` but no interaction sets it — this spec fills a known gap.
-- The `CancelOrder` interaction restricts cancellation to `Order.status not in {draft, confirmed}` — `delivered` is already excluded from the cancelable set.
-- No existing `fails`, `policy`, or `invariant` blocks this transition.
+- The `OrderShipped` event is already emitted by the "Ship a confirmed order" interaction but has no event-triggered interaction — this spec fills a known gap.
+- No existing `fails`, `policy`, or `invariant` blocks this addition.
 
-### [TROU] — Pre-condition on order status
-The spec does not state which status an order must be in to be delivered. Based on the domain lifecycle (`draft → confirmed → shipped → delivered`), the order should be in `shipped` status. Adding `fails "Order is not shipped" when { Order.status != shipped }`.
-
-### [COUVERTURE] — Event without interaction
-The new `OrderDelivered` event has no event-triggered interaction. Consider whether delivery should trigger side effects (customer notification, analytics, etc.).
+### [TROU] — Tracking details not modeled
+The spec mentions "start delivery tracking" but no tracking entity or service exists in the model. The side effect will be expressed as a `then` clause (informal) since the tracking system is outside the Orders bounded context.
 ```
 
 #### Phase 4 — Proposition
@@ -652,73 +647,47 @@ The new `OrderDelivered` event has no event-triggered interaction. Consider whet
 The following `.spec` file is proposed:
 
 ```
-spec "Deliver an order"
+spec "React when an order is shipped"
 against "orders" version "a1b2c3d" at "2025-01-15T10:30:00Z"
 uses "orders.struct"
 uses "orders.flow"
 
 narrative {
-  "A delivery driver must be able to mark an order as delivered."
+  "When an order is shipped, the system should notify the customer"
+  "and start delivery tracking."
 }
 
 concepts {
-  entity Order [existing]                // entity Order in orders.struct
-  enum OrderStatus.delivered [existing]  // value exists, no transition modeled
-  command DeliverOrder [new]
-  event OrderDelivered [new]
+  entity Order [existing]              // entity Order in orders.struct
+  event OrderShipped [existing]        // emitted by ShipOrder, no reaction modeled
+  interaction OnOrderShipped [new]     // event-triggered reaction
 }
 
 confrontation {
   compatible "Fully compatible with the existing model"
 
-  gap "Pre-condition on order status" {
-    "The spec does not state which status an order must be in to be delivered."
-    "Based on the lifecycle (draft > confirmed > shipped > delivered),"
-    "the order should be in shipped status."
-  }
-
-  coverage "OrderDelivered has no event-triggered interaction" {
-    "The new event has no event-triggered interaction."
-    "Consider adding side effects (customer notification, analytics)."
-  }
-}
-
-changes "orders.struct" {
-  add command DeliverOrder {
-    orderId : uuid
-  }
-
-  add event OrderDelivered {
-    orderId : uuid
-    deliveredAt : datetime
+  gap "Tracking details not modeled" {
+    "The spec mentions delivery tracking but no tracking entity or"
+    "service exists in the Orders domain. The side effect is expressed"
+    "as a then clause since tracking is outside this bounded context."
   }
 }
 
 changes "orders.flow" {
-  add interaction "Mark an order as delivered" {
-    on DeliverOrder
-    resolves Order from DeliverOrder.orderId
-    fails "Order is not shipped" when {
-      Order.status != shipped
-    }
-    sets Order.status to delivered
-    emits OrderDelivered
+  add interaction "Handle order shipment" {
+    on OrderShipped
+    then "Notify customer that order has been shipped with tracking information"
+    then "Start delivery tracking for the shipment"
   }
 }
 
 impact {
-  interaction PlaceOrder -> none
-    "creates Order with status draft — unrelated"
-  interaction ConfirmOrder -> none
-    "transitions draft to confirmed — unrelated"
-  interaction CancelOrder -> none
-    "restricts to not in {draft, confirmed} — delivered already excluded"
   interaction ShipOrder -> none
-    "transitions confirmed to shipped — unrelated"
-  policy MaxOrderAmount -> none
-    "references Order.totalAmount, not Order.status"
-  invariant OrderMustHaveLines -> none
-    "references Order.lines, not Order.status"
+    "emits OrderShipped — the emitter is unchanged"
+  interaction DeliverOrder -> none
+    "transitions shipped to delivered — unrelated"
+  policy LateDeliveryAlert -> none
+    "references Order.estimatedDelivery — unrelated to shipment notification"
 }
 ```
 
@@ -728,18 +697,18 @@ impact {
 ## Recap
 
 ### .struct changes
-- 2 additions (command DeliverOrder, event OrderDelivered), 0 modifications, 0 deletions
+- 0 additions, 0 modifications, 0 deletions
 
 ### .flow changes
-- 1 addition (interaction DeliverOrder), 0 modifications, 0 deletions
+- 1 addition (interaction on OrderShipped), 0 modifications, 0 deletions
 
 ### Impact
 - 0 existing constructs affected
 
 ### Open items
-- [COUVERTURE] OrderDelivered has no event-triggered interaction — add one if delivery should trigger side effects
+- [TROU] Delivery tracking is outside the Orders bounded context — consider a separate Shipping context if tracking becomes complex
 
-Write spec file to specy/specs/001_deliver-order.spec? (yes / no / corrections)
+Write spec file to specy/specs/001_react-on-order-shipped.spec? (yes / no / corrections)
 ```
 
 ---

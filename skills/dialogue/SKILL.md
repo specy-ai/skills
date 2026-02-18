@@ -380,9 +380,9 @@ The examples below use the Orders domain defined in `examples/orders.struct` and
 >
 > **Shipping:** The `ShipOrder` interaction transitions from confirmed to shipped — `sets Order.status to shipped`. It requires a shipping address (`not (Order.shippingAddress is defined)` triggers failure) and that the order is confirmed with payment captured. It emits `OrderShipped`.
 >
-> **Cancellation:** The `CancelOrder` interaction sets `Order.status to cancelled`. It is only allowed when `Order.status not in {draft, confirmed}` would fail — meaning cancellation is restricted to `draft` and `confirmed` orders. It emits `OrderCancelled`, which triggers `OnOrderCancelled`: "Notify customer that order is cancelled" and "Restore product stock for each order line".
+> **Delivery:** The "Deliver a shipped order" interaction transitions from shipped to delivered — `sets Order.status to delivered` and `sets Order.deliveredAt to now()`. It requires the order to be in shipped status — `fails "Order is not shipped" when { Order.status != shipped }`. It emits `OrderDelivered`, which triggers the "Notify customer of delivery" interaction: "Notify customer that order has been delivered" and "Close order lifecycle".
 >
-> **[OUT OF MODEL]** The model defines a `delivered` status in `OrderStatus` but no interaction transitions an Order to `delivered`. This transition is not modeled.
+> **Cancellation:** The `CancelOrder` interaction sets `Order.status to cancelled`. It is only allowed when `Order.status not in {draft, confirmed}` would fail — meaning cancellation is restricted to `draft` and `confirmed` orders. It emits `OrderCancelled`, which triggers "Handle order cancellation side effects": "Notify customer that order is cancelled" and "Restore product stock for each order line".
 >
 > **Policies that apply:**
 > - `MaxOrderAmount`: orders above 10000 require manual approval — `Order.totalAmount.amount > 10000`
@@ -443,17 +443,16 @@ The examples below use the Orders domain defined in `examples/orders.struct` and
 >
 > ### Gaps Found
 >
-> 1. **Event without interaction:** `OrderShipped` is emitted by the "Ship a confirmed order" interaction but no event-triggered interaction listens to it. No automated action is triggered when an order is shipped.
+> 1. **Event without interaction:** `OrderShipped` is emitted by the "Ship a confirmed order" interaction but no event-triggered interaction listens to it. No automated action is triggered when an order is shipped (e.g., customer notification, delivery tracking).
 >
-> 2. **Status without transition:** `OrderStatus` defines `delivered` but no interaction sets `Order.status to delivered`. The delivery transition is not modeled.
->
-> 3. **Event-triggered interactions with informal-only side effects:** "Notify customer when order is confirmed" (on `OrderConfirmed`), "Handle order cancellation side effects" (on `OrderCancelled`), and "Notify customer of refund" (on `PaymentRefunded`) describe their effects only in `then` text clauses with no `sets` or `emits`. These side effects are not formally traceable.
+> 2. **Event-triggered interactions with informal-only side effects:** "Notify customer when order is confirmed" (on `OrderConfirmed`), "Handle order cancellation side effects" (on `OrderCancelled`), "Notify customer of refund" (on `PaymentRefunded`), and "Notify customer of delivery" (on `OrderDelivered`) describe their effects only in `then` text clauses with no `sets` or `emits`. These side effects are not formally traceable.
 >
 > ### No Gaps
 >
-> - **Commands without interaction:** all 6 commands (`PlaceOrder`, `ConfirmOrder`, `CancelOrder`, `ProcessPayment`, `RefundPayment`, `ShipOrder`) have a matching interaction.
+> - **Commands without interaction:** all 7 commands (`PlaceOrder`, `ConfirmOrder`, `CancelOrder`, `ProcessPayment`, `RefundPayment`, `ShipOrder`, `DeliverOrder`) have a matching interaction.
 > - **Entities without interaction:** all entities participate in at least one interaction.
-> - **Interactions without `emits`:** all 6 interactions emit at least one event.
+> - **Interactions without `emits`:** all 7 command-triggered interactions emit at least one event.
+> - **Status without transition:** all `OrderStatus` values (`draft`, `confirmed`, `shipped`, `delivered`, `cancelled`) have a corresponding interaction that sets the status.
 >
 > ### Markers
 >
@@ -463,5 +462,4 @@ The examples below use the Orders domain defined in `examples/orders.struct` and
 > ### Suggestions
 >
 > - For gap #1, use the `spec` skill to formalize an event-triggered interaction on `OrderShipped`.
-> - For gap #2, use the `spec` skill to define a `DeliverOrder` command and interaction.
-> - For gap #3, consider whether the side effects should be formalized with `sets` / `emits` clauses.
+> - For gap #2, consider whether the side effects should be formalized with `sets` / `emits` clauses.
