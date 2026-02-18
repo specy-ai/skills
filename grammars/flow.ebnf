@@ -14,22 +14,28 @@ domainDecl       = "domain" , stringLiteral ;
 usesDecl         = "uses" , stringLiteral ;
 
 block            = interactionDef
-                 | reactionDef
                  | policyDef
                  | invariantDef
                  | serviceDef
                  | repositoryDef ;
 
 // -----------------------------------------------------------------------------
-// Interaction — triggered by a command
+// Interaction — triggered by a command (intentional) or an event (reactive)
+//
+// The trigger type is determined by the typeName in the `on` clause:
+//   - If it resolves to a `command` in the .struct → intentional (1:1)
+//   - If it resolves to an `event` in the .struct  → reactive (1:N allowed)
+//
+// The string literal is a human-readable label describing the intent.
 // -----------------------------------------------------------------------------
 
-interactionDef   = "interaction" , typeName , "{"
+interactionDef   = "interaction" , stringLiteral , "{"
                  ,   "on" , typeName
                  , { resolvesClause }
                  , { createsClause }
                  , { failsClause }
                  , { delegatesClause }
+                 , { thenClause }
                  , { setsClause }
                  , { emitsClause }
                  , "}" ;
@@ -45,18 +51,6 @@ setsClause       = "sets" , dotPath , "to" , valueExpr ;
 failsClause      = "fails" , stringLiteral , "when" , "{" , expression , "}" ;
 
 delegatesClause  = "delegates" , dotPath ;
-
-// -----------------------------------------------------------------------------
-// Reaction — triggered by an event
-// -----------------------------------------------------------------------------
-
-reactionDef      = "reaction" , typeName , "{"
-                 ,   "on" , typeName
-                 , { thenClause }
-                 , { delegatesClause }
-                 , { emitsClause }
-                 , { setsClause }
-                 , "}" ;
 
 thenClause       = "then" , stringLiteral ;
 

@@ -8,7 +8,7 @@ Always load this file. It provides language-agnostic patterns used as a base for
 |---|---|
 | Class/module named `*Service`, `*Handler`, `*UseCase`, `*Interactor` | Likely contains `interaction` logic |
 | Class/module named `*Repository`, `*Store`, `*Dao` | The generic type it manages is likely an `entity` |
-| Class/module named `*Saga`, `*Listener`, `*Subscriber`, `*Consumer` | Likely contains `reaction` logic |
+| Class/module named `*Saga`, `*Listener`, `*Subscriber`, `*Consumer` | Likely contains event-triggered `interaction` logic |
 | Class/module named `*Policy`, `*Validator`, `*Guard`, `*Rule`, `*Specification` | Likely contains `policy` or `invariant` logic |
 | Class/module named `*Event`, `*Message` with past-tense name | Likely an `event` |
 | Class/module named `*Command`, `*Request` with imperative name | Likely a `command` |

@@ -29,7 +29,7 @@
 | Source Pattern | Specy Construct |
 |---|---|
 | `@CommandHandler(Command)` / method in `CommandHandler` | `interaction` block |
-| `@OnEvent("EventName")` / `@EventPattern(...)` | `reaction` block |
+| `@OnEvent("EventName")` / `@EventPattern(...)` | event-triggered `interaction` block |
 | `this.repository.findOne(...)` | `resolves Entity from dotPath` |
 | `this.repository.save(new Entity(...))` | `creates Entity` |
 | `throw new BadRequestException(msg)` / guard condition | `fails "msg" when { condition }` |

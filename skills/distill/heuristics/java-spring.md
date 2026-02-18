@@ -35,7 +35,7 @@
 | Source Pattern | Specy Construct |
 |---|---|
 | `@Service` / `@CommandHandler` method | `interaction` block |
-| `@EventListener` / `@TransactionalEventListener` method | `reaction` block |
+| `@EventListener` / `@TransactionalEventListener` method | event-triggered `interaction` block |
 | `repository.findById(...)` / `repository.findBy*(...)` | `resolves Entity from dotPath` |
 | `new Entity(...)` / `repository.save(newEntity)` | `creates Entity` |
 | `if (condition) throw new ...Exception(msg)` | `fails "msg" when { condition }` |

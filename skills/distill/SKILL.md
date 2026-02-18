@@ -20,7 +20,7 @@ You are an expert Domain-Driven Design practitioner who reverse-engineers existi
 - **Multiple bounded contexts:** produce one `.struct` / `.flow` pair per context, each with its own domain name.
 - **Encoding:** UTF-8, LF line endings, no trailing whitespace.
 - **Enum values:** always `camelCase` — the grammar only allows `camelCaseId` or `pascalCaseId` identifiers. If the source code uses `UPPER_SNAKE_CASE` (e.g. `PENDING`, `ACCOUNT_CREATED`), convert to camelCase: `pending`, `accountCreated`. Never emit UPPER_SNAKE_CASE or kebab-case in enum values.
-- **Source traceability:** every definition in `.struct` (entity, value, enum, command, event) and every block in `.flow` (interaction, reaction, policy, invariant) must be preceded by a `// source: path/to/file.ext` comment indicating the source file it was extracted from. Use the project-relative path. For `.flow` interactions, if the logic spans multiple files (e.g. controller + service), reference the file containing the business logic (service/handler). Examples:
+- **Source traceability:** every definition in `.struct` (entity, value, enum, command, event) and every block in `.flow` (interaction, policy, invariant) must be preceded by a `// source: path/to/file.ext` comment indicating the source file it was extracted from. Use the project-relative path. For `.flow` interactions, if the logic spans multiple files (e.g. controller + service), reference the file containing the business logic (service/handler). Examples:
   ```
   // source: src/models/Order.ts
   entity Order {
@@ -28,12 +28,13 @@ You are an expert Domain-Driven Design practitioner who reverse-engineers existi
   }
 
   // source: src/services/OrderService.ts
-  interaction PlaceOrder {
+  interaction "Place a new order" {
+    on PlaceOrder
     ...
   }
   ```
 - **Order within `.struct`:** enums, then value objects, then entities, then commands, then events. Within each section, alphabetical or dependency order.
-- **Order within `.flow`:** repositories, then services, then interactions, then reactions, then policies, then invariants.
+- **Order within `.flow`:** repositories, then services, then command-triggered interactions, then event-triggered interactions, then policies, then invariants.
 
 ---
 
@@ -110,7 +111,7 @@ For each bounded context:
 5. **For each call to a service in a command handler** → add a `delegates` clause in the corresponding `interaction` block (see `constructs/interaction.md`).
 6. **For each repository interface identified in Phase 2** → create a `repository` block. See `constructs/repository.md` for rules and filtering guidance.
 7. **For each `repository.findBy*()` call in a command handler** → add `via Repository.operation` in the corresponding `resolves` clause (see `constructs/interaction.md`).
-8. **For each event listener** → create a `reaction` block. See `constructs/reaction.md` for rules and examples.
+8. **For each event listener** → create an event-triggered `interaction` block. See `constructs/interaction.md` for rules, examples, and anti-patterns.
 9. **Cross-cutting rules** → create `policy` blocks. See `constructs/policy.md` for rules and tautology traps.
 10. **Structural constraints** → create `invariant` blocks. See `constructs/invariant.md` for rules (entities only).
 11. Write the `.flow` file following the output conventions.
@@ -119,8 +120,8 @@ For each bounded context:
    ## Flow Extraction Summary — {domain}
    - Repositories: {count}
    - Services: {count}
-   - Interactions: {count}
-   - Reactions: {count}
+   - Interactions (command-triggered): {count}
+   - Interactions (event-triggered): {count}
    - Policies: {count}
    - Invariants: {count}
    - Uncertain items: {count} (see // UNCLEAR comments)
@@ -183,7 +184,7 @@ The meta file `specy/.meta.json` tracks the state of the last distill run. It is
     "src/services/PricingService.java": ["service PricingCalculator"],
     "src/repositories/OrderRepository.java": ["repository OrderRepository"],
     "src/services/AuthService.java": ["interaction Register", "interaction Login"],
-    "src/listeners/AuthListener.java": ["reaction OnUserRegistered"],
+    "src/listeners/AuthListener.java": ["interaction OnUserRegistered"],
     "src/models/Order.java#invariants": ["invariant OrderMustHaveLines"]
   }
 }
@@ -336,7 +337,7 @@ Then proceed with the full update workflow:
 
 When `specy/*.struct` and `specy/*.flow` files already exist and the user specifies a definition to re-extract by name. This mode re-extracts a single definition (or a coherent unit of definitions) from the source code without touching anything else.
 
-**Invocation:** `distill <DefinitionName>` — where `DefinitionName` is the name of an entity, interaction, command, event, enum, value, reaction, policy, or invariant.
+**Invocation:** `distill <DefinitionName>` — where `DefinitionName` is the name of an entity, interaction, command, event, enum, value, policy, or invariant. For event-triggered interactions, use the event name (e.g. `distill OrderConfirmed`).
 
 **Pre-condition:** existing `.struct` / `.flow` files must be present. If they are not, refuse and ask the user to run a full distill first.
 
@@ -384,7 +385,7 @@ distill PlaceOrder
 - Also re-extract: `command PlaceOrder` (1:1 coupling — the command is the interaction's input contract)
 - Also re-extract: every `event` emitted by the interaction (listed in `emits` clauses)
 - Do NOT re-extract: resolved entities (they have their own source of truth)
-- Cascade warning: list reactions triggered by the emitted events
+- Cascade warning: list event-triggered interactions triggered by the emitted events
 
 **Targeting a command:**
 ```
@@ -398,13 +399,13 @@ distill PlaceOrder
 distill OrderPlaced
 ```
 - Re-extract: `event OrderPlaced`
-- Cascade warning: list interactions that emit it and reactions that listen to it
+- Cascade warning: list interactions that emit it and event-triggered interactions that listen to it
 
-**Targeting a reaction:**
+**Targeting an event-triggered interaction:**
 ```
-distill OnOrderPlaced
+distill OrderPlaced
 ```
-- Re-extract: `reaction OnOrderPlaced`
+- If an event-triggered interaction exists with `on OrderPlaced`, re-extract it
 - Do NOT re-extract: the triggering event (it has its own source of truth)
 
 **Targeting an enum or value:**
@@ -478,7 +479,7 @@ During Phase 1, read `heuristics/INDEX.md` and load the relevant heuristic files
 
 ## Flow Constructs
 
-During Phase 3, read `constructs/INDEX.md` and load the relevant construct files for rules, examples, and anti-patterns. Always load `constructs/expressions.md` (transverse expression rules). Load each construct file as needed (`interaction.md`, `service.md`, `repository.md`, `reaction.md`, `policy.md`, `invariant.md`).
+During Phase 3, read `constructs/INDEX.md` and load the relevant construct files for rules, examples, and anti-patterns. Always load `constructs/expressions.md` (transverse expression rules). Load each construct file as needed (`interaction.md`, `service.md`, `repository.md`, `policy.md`, `invariant.md`).
 
 ---
 
@@ -513,7 +514,7 @@ Read the canonical examples to calibrate output style:
     - **Monitoring/analytics entities:** access counters, IP tracking, usage metrics (e.g. `ApiMetrics { requestCount, lastRequestIp }`).
     - **Technical token fields on domain entities:** fields like `accessToken`, `refreshToken`, `sessionJwt` on a domain entity are infrastructure concerns. Omit them. Keep the *domain-meaningful* fields (e.g. `externalHandle`, `externalId`) that represent the business relationship.
 10. **Field ordering.** Within an entity or value, order fields: identity fields first (id, uuid), then required fields, then optional fields. Within each group, keep the order from the source code.
-11. **Section separators.** Use `// ===` comment blocks to separate sections (enums, values, entities, commands, events in `.struct`; interactions, reactions, policies, invariants in `.flow`), matching the style in the canonical examples.
+11. **Section separators.** Use `// ===` comment blocks to separate sections (enums, values, entities, commands, events in `.struct`; command-triggered interactions, event-triggered interactions, policies, invariants in `.flow`), matching the style in the canonical examples.
 12. **Minimal output.** Do not add fields, constraints, or blocks that are not evidenced by the code. When in doubt, omit rather than invent.
 13. **Query-only entities.** If an entity defined in the `.struct` has no corresponding write interaction in the `.flow` (it is only read, never created or mutated by a command handler), annotate it in the `.struct` with `// NOTE: query-only — no write interaction found`. This signals a deliberate observation, not an omission.
 14. **Enums without flow references.** If an enum is defined in the `.struct` but never referenced in any `.flow` expression, annotate it with `// NOTE: not referenced in flow — used for queries/UI only`. Do not omit it from the struct (it is still part of the domain vocabulary), but flag it.
@@ -522,8 +523,8 @@ Read the canonical examples to calibrate output style:
 
 Rules specific to each flow construct are documented in the corresponding file under `constructs/`. Key rules per construct:
 
-- **Interaction:** one per command, `creates` must list all created entities, naming = command name. See `constructs/interaction.md`.
-- **Reaction:** naming = `On` + event name. See `constructs/reaction.md`.
+- **Interaction (command-triggered):** one per command, `creates` must list all created entities, label describes intent. See `constructs/interaction.md`.
+- **Interaction (event-triggered):** 0 to N per event, label describes intent. See `constructs/interaction.md`.
 - **Service:** use `then` for unexpressible logic, no service for pure infrastructure. See `constructs/service.md`.
 - **Repository:** pure data access only (no `then`/`fails`/`sets`/`emits`), `for` must be aggregate root, no repository for technical types. See `constructs/repository.md`.
 - **Policy:** real `when` condition required, no tautologies. See `constructs/policy.md`.

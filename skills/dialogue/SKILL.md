@@ -29,7 +29,7 @@ At the start of the conversation:
    - Repositories: {count}
    - Services: {count}
    - Interactions: {count}
-   - Reactions: {count}
+   - Interactions (event-triggered): {count}
    - Policies: {count}
    - Invariants: {count}
    - UNCLEAR markers: {count}
@@ -73,7 +73,7 @@ Synthesize domain knowledge from `.struct` + `.flow` in business language.
 3. **Commands available** — what actions can be triggered, with their inputs.
 4. **Repositories available** — which entity each repository manages (`for`), what operations are declared (with their `accepts` and `returns`), and which interactions use them (trace `resolves ... via`).
 5. **Services available** — domain services and their role, with the operations they expose (including `accepts` and `returns`).
-6. **Events emitted** — what happens as a result, and what reactions are triggered.
+6. **Events emitted** — what happens as a result, and what event-triggered interactions follow.
 7. **Policies and invariants** — rules that constrain the domain.
 
 **Rules:**
@@ -151,7 +151,7 @@ Analyze a user's proposition against the existing model.
 1. **Parse the proposition** — what change or behavior is being proposed?
 2. **Identify contradictions** with existing `fails`, `policy`, or `invariant` blocks.
 3. **Identify missing pre-conditions** — what would need to change to allow this?
-4. **Identify cascade impacts** — which other interactions, reactions, or invariants would be affected?
+4. **Identify cascade impacts** — which other interactions or invariants would be affected?
 
 **Response format:**
 
@@ -192,7 +192,7 @@ If no contradiction exists, say so — and still suggest using `spec` to formali
 >
 > **Analysis:** The current model explicitly restricts cancellation to orders in `draft` or `confirmed` status. An order with status `shipped` would trigger the failure condition. Allowing cancellation after shipping would also need to address:
 > - The `ShipOrder` interaction has already set `Order.status to shipped` and emitted `OrderShipped`.
-> - The `OnOrderCancelled` reaction triggers "Restore product stock for each order line" — but shipped products may no longer be in stock.
+> - The "Handle order cancellation side effects" interaction (on `OrderCancelled`) triggers "Restore product stock for each order line" — but shipped products may no longer be in stock.
 > - The `RefundPayment` interaction requires `Payment.order.status != cancelled` — the refund flow would need sequencing with the new cancellation.
 >
 > **To go further:** Use the `spec` skill to formalize this change and see its full impact on the models.
@@ -208,15 +208,15 @@ Perform a structural analysis of gaps in the model.
 | Check | What to look for |
 |---|---|
 | Commands without interaction | Commands defined in `.struct` with no matching `interaction` block in `.flow` |
-| Events without reaction | Events defined in `.struct` with no matching `reaction` block in `.flow` |
+| Events without interaction | Events defined in `.struct` with no event-triggered `interaction` block in `.flow` |
 | Entities without interaction | Entities that appear in no `resolves`, `creates`, or `sets` clause |
 | Interactions without `fails` | Interactions that have no failure condition (happy path only) |
 | Interactions without `emits` | Interactions that produce no event |
 | Unresolved `// UNCLEAR` | UNCLEAR markers still present in the models |
 | Unresolved `// NOTE` | NOTE markers that may need attention |
 | Enums not referenced in `.flow` | Enums defined in `.struct` but never used in any `.flow` expression |
-| Reactions without `sets` or `emits` | Reactions that describe side effects in `then` but have no `sets` or `emits` — the side effect is informal only |
-| Services declared but never delegated | Services defined in `.flow` but never referenced by any `delegates` clause in an interaction or reaction |
+| Event-triggered interactions without `sets` or `emits` | Event-triggered interactions that describe side effects in `then` but have no `sets` or `emits` — the side effect is informal only |
+| Services declared but never delegated | Services defined in `.flow` but never referenced by any `delegates` clause in an interaction |
 | Service operations without `then` or `fails` | Operations with no description or error handling — the operation body is empty |
 | `delegates` to non-existent service/operation | A `delegates` clause referencing a service or operation that does not exist in the `.flow` |
 | Repositories declared but never referenced | Repositories defined in `.flow` but never referenced by any `resolves ... via` clause |
@@ -254,9 +254,9 @@ Perform a structural analysis of gaps in the model.
 >
 > ### Gaps Found
 >
-> 1. **Events without reaction:** `OrderShipped` has no `reaction` block. No automated action is triggered when an order is shipped (e.g., customer notification, delivery tracking).
+> 1. **Event without interaction:** `OrderShipped` is emitted by the `ShipOrder` interaction but has no event-triggered interaction. No automated action is triggered when an order is shipped (e.g., customer notification, delivery tracking).
 >
-> 2. **Reactions without formal side effects:** `OnOrderConfirmed`, `OnOrderCancelled`, and `OnPaymentRefunded` describe side effects in `then` clauses but have no `sets` or `emits` — their effects are informal and not traceable in the model.
+> 2. **Event-triggered interactions with informal-only side effects:** "Notify customer when order is confirmed" (on `OrderConfirmed`), "Handle order cancellation side effects" (on `OrderCancelled`), and "Notify customer of refund" (on `PaymentRefunded`) describe their effects only in `then` text clauses with no `sets` or `emits`. These side effects are not formally traceable.
 >
 > 3. **Enums not referenced in `.flow`:** `PaymentMethod` is defined in the struct and used in `ProcessPayment.method`, but the `fails` clause `ProcessPayment.method not in {creditCard, bankTransfer, paypal}` is a tautology (it lists all enum values). The model does not differentiate behavior by payment method.
 >
@@ -273,7 +273,7 @@ Perform a structural analysis of gaps in the model.
 >
 > ### Suggestions
 >
-> - To address gap #1, use the `spec` skill to formalize a `reaction OnOrderShipped` with the desired side effects.
+> - To address gap #1, use the `spec` skill to formalize an event-triggered interaction on `OrderShipped`.
 
 ---
 
@@ -326,7 +326,7 @@ If `.struct` exists but `.flow` is missing (or vice versa), load what is availab
 ```
 Models partially loaded — {domain}.struct found but {domain}.flow is missing.
 I can answer questions about the structure, but behavioral questions (interactions,
-reactions, policies) cannot be answered. Run `distill` to generate the missing file.
+event-triggered interactions, policies) cannot be answered. Run `distill` to generate the missing file.
 ```
 
 ### Ambiguous Names
@@ -376,7 +376,7 @@ The examples below use the Orders domain defined in `examples/orders.struct` and
 >
 > **Creation:** The `PlaceOrder` interaction creates an Order and sets `Order.status to draft` and `Order.placedAt to now()`. It requires an active customer — `fails "Customer not found or inactive" when { Customer.status != active }` — and at least one line — `fails "Order has no lines" when { isEmpty(PlaceOrder.lines) }`. It emits `OrderPlaced`.
 >
-> **Confirmation:** The `ConfirmOrder` interaction transitions the order from draft to confirmed — `sets Order.status to confirmed`. It requires `Order.status != draft` to fail, that the order has been placed (`Order.placedAt is not defined` triggers failure), and that payment is captured (`Payment.status != captured`). It emits `OrderConfirmed`, which triggers the `OnOrderConfirmed` reaction: "Notify customer that order is confirmed" and "Trigger shipment preparation".
+> **Confirmation:** The "Confirm an order after payment" interaction transitions the order from draft to confirmed — `sets Order.status to confirmed`. It requires `Order.status != draft` to fail, that the order has been placed (`Order.placedAt is not defined` triggers failure), and that payment is captured (`Payment.status != captured`). It emits `OrderConfirmed`, which triggers the "Notify customer when order is confirmed" interaction: "Notify customer that order is confirmed" and "Trigger shipment preparation".
 >
 > **Shipping:** The `ShipOrder` interaction transitions from confirmed to shipped — `sets Order.status to shipped`. It requires a shipping address (`not (Order.shippingAddress is defined)` triggers failure) and that the order is confirmed with payment captured. It emits `OrderShipped`.
 >
@@ -397,11 +397,12 @@ The examples below use the Orders domain defined in `examples/orders.struct` and
 
 > **[IN MODEL]** When a payment is processed via the `ProcessPayment` interaction, it creates a `Payment` entity and `sets Payment.status to captured`. The interaction emits `PaymentProcessed` on success.
 >
-> If the payment fails, the model handles it through the `OnPaymentFailed` reaction:
+> If the payment fails, the model handles it through the "Handle payment failure" interaction:
 >
 > ```
-> reaction OnPaymentFailed {
+> interaction "Handle payment failure" {
 >   on PaymentFailed
+>   resolves Payment from PaymentFailed.paymentId
 >   then "Notify customer of payment failure"
 >   then "Allow retry with a different payment method"
 >   sets Payment.status to failed
@@ -442,11 +443,11 @@ The examples below use the Orders domain defined in `examples/orders.struct` and
 >
 > ### Gaps Found
 >
-> 1. **Event without reaction:** `OrderShipped` is emitted by the `ShipOrder` interaction but has no `reaction` block. No automated action is triggered when an order is shipped.
+> 1. **Event without interaction:** `OrderShipped` is emitted by the "Ship a confirmed order" interaction but no event-triggered interaction listens to it. No automated action is triggered when an order is shipped.
 >
 > 2. **Status without transition:** `OrderStatus` defines `delivered` but no interaction sets `Order.status to delivered`. The delivery transition is not modeled.
 >
-> 3. **Reactions with informal-only side effects:** `OnOrderConfirmed`, `OnOrderCancelled`, and `OnPaymentRefunded` describe their effects only in `then` text clauses with no `sets` or `emits`. These side effects are not formally traceable.
+> 3. **Event-triggered interactions with informal-only side effects:** "Notify customer when order is confirmed" (on `OrderConfirmed`), "Handle order cancellation side effects" (on `OrderCancelled`), and "Notify customer of refund" (on `PaymentRefunded`) describe their effects only in `then` text clauses with no `sets` or `emits`. These side effects are not formally traceable.
 >
 > ### No Gaps
 >
@@ -461,6 +462,6 @@ The examples below use the Orders domain defined in `examples/orders.struct` and
 >
 > ### Suggestions
 >
-> - For gap #1, use the `spec` skill to formalize a `reaction OnOrderShipped`.
+> - For gap #1, use the `spec` skill to formalize an event-triggered interaction on `OrderShipped`.
 > - For gap #2, use the `spec` skill to define a `DeliverOrder` command and interaction.
 > - For gap #3, consider whether the side effects should be formalized with `sets` / `emits` clauses.

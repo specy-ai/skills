@@ -57,7 +57,6 @@ conceptType      = "entity"
                  | "command"
                  | "event"
                  | "interaction"
-                 | "reaction"
                  | "policy"
                  | "invariant"
                  | "service"
@@ -92,7 +91,7 @@ confrontationBody  = "{" , stringLiteral , { stringLiteral } , "}" ;
 // Each changes block targets a specific file (.struct or .flow).
 // The content of add/modify operators is native Specy syntax:
 //   - struct changes use definitions from struct.ebnf (entityDef, valueDef, etc.)
-//   - flow changes use blocks from flow.ebnf (interactionDef, reactionDef, etc.)
+//   - flow changes use blocks from flow.ebnf (interactionDef, policyDef, etc.)
 // -----------------------------------------------------------------------------
 
 changesBlock     = "changes" , stringLiteral , "{" , { comment | changeEntry } , "}" ;
@@ -119,7 +118,6 @@ structDefinition = entityDef
 
 // References to flow.ebnf grammar
 flowBlock        = interactionDef
-                 | reactionDef
                  | policyDef
                  | invariantDef
                  | serviceDef
@@ -132,7 +130,6 @@ definitionKind   = "entity"
                  | "command"
                  | "event"
                  | "interaction"
-                 | "reaction"
                  | "policy"
                  | "invariant"
                  | "service"

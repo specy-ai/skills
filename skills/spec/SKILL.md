@@ -9,7 +9,7 @@ You are an expert Domain-Driven Design analyst who formalizes business specifica
 ## Cardinal Rules
 
 1. **Always anchor in the existing models.** Every assertion, every reference, must cite the corresponding `.struct` or `.flow` construct. Never propose a modification without showing what exists today.
-2. **Always show the impact on existing interactions when modifying the `.struct`.** A struct change is never isolated — trace every interaction, reaction, policy, and invariant that references the modified construct.
+2. **Always show the impact on existing interactions when modifying the `.struct`.** A struct change is never isolated — trace every interaction, policy, and invariant that references the modified construct.
 3. **Never modify `.struct` or `.flow` files.** The output of `spec` is always a `.spec` file. The `.struct` and `.flow` files reflect the code — only `distill` writes to them.
 
 ---
@@ -33,7 +33,7 @@ At the start of the conversation:
    - Repositories: {count}
    - Services: {count}
    - Interactions: {count}
-   - Reactions: {count}
+   - Interactions (event-triggered): {count}
    - Policies: {count}
    - Invariants: {count}
    - UNCLEAR markers: {count}
@@ -125,7 +125,7 @@ Verify the coherence of the spec against the existing model. For each issue foun
 | **[CONTRADICTION]** | An existing `fails`, `policy`, or `invariant` blocks the proposed behavior. |
 | **[IMPACT]** | A modification to the `.struct` affects existing interactions in the `.flow`. |
 | **[TROU]** | The spec does not cover an error case or edge case that is detectable from the model. |
-| **[COUVERTURE]** | An emitted event has no reaction, or a concept is orphaned (created but never used). |
+| **[COUVERTURE]** | An emitted event has no event-triggered interaction, or a concept is orphaned (created but never used). |
 | **[COMPATIBLE]** | The spec is fully compatible with the existing model — no contradiction, no impact. |
 
 **Response format for each issue:**
@@ -306,7 +306,7 @@ changes "{domain}.flow" {
     emits OrderDelivered
   }
 
-  modify interaction CancelOrder {
+  modify interaction "Cancel an order" {
     on CancelOrder
     resolves Order from CancelOrder.orderId
     fails "Order cannot be cancelled" when {
@@ -421,7 +421,7 @@ This checklist is executed automatically during Phase 3. Every item must be veri
 |---|---|
 | **Completeness** | Does the spec cover the happy path AND error cases? Are there implicit failure conditions not stated? |
 | **Coherence** | Does the spec contradict any existing `fails`, `policy`, or `invariant` block? |
-| **Coverage** | Are all emitted events consumed by a reaction? Are all created/resolved entities actually used? |
+| **Coverage** | Are all emitted events consumed by an event-triggered interaction? Are all created/resolved entities actually used? |
 | **Naming** | Are the terms consistent with the existing domain vocabulary? Does the spec reuse existing names or introduce synonyms? |
 | **Typing** | Does every `typeName`, `dotPath`, and field reference resolve in the `.struct`? |
 
@@ -462,7 +462,7 @@ Labels used during the conversation to communicate analysis results:
 7. **Dot-paths must resolve.** Every `dotPath` in a proposed `changes` block must chain through fields that exist (or are being added) in the `.struct`. `Order.deliveredAt` requires `Order` to have a `deliveredAt` field.
 8. **Expressions must be valid — no tautologies.** Every `when { ... }` and `must { ... }` block must contain a real boolean expression. The same tautology prohibition as distill applies: no `field is defined` on required fields, no `now() - date > 5` with ambiguous units.
 9. **One interaction per command.** Each command type gets exactly one `interaction` block. If the spec implies a new command, propose a new interaction.
-10. **Reaction naming convention.** New reactions follow the `On + EventName` pattern: `event OrderDelivered` → `reaction OnOrderDelivered`.
+10. **Event-triggered interaction labels.** New event-triggered interactions must have a descriptive string label. The `on` clause references the event.
 11. **Interaction naming convention.** New interactions match their command name: `command DeliverOrder` → `interaction DeliverOrder`.
 12. **No technical artifacts.** Proposals must stay at the domain level. Do not include database schemas, API endpoints, or framework-specific concepts. If the spec mentions technical details, extract the business intent and formalize that.
 13. **`modify` shows the complete block.** When modifying an existing construct, the `modify` operator contains the full block as it should be after the change — not a partial diff. Annotate changed lines with `// was: ...` comments so the reader can see what changed.
@@ -492,9 +492,9 @@ When the spec only adds a field to an existing entity (e.g., "add a phone number
 
 ### Spec Touching Only the `.flow`
 
-When the spec only adds a new reaction or modifies an existing interaction (e.g., "send a notification when an order is shipped"):
+When the spec only adds a new event-triggered interaction or modifies an existing interaction (e.g., "send a notification when an order is shipped"):
 
-1. Phase 1 — decomposition identifies the event and reaction.
+1. Phase 1 — decomposition identifies the event and interaction.
 2. Phase 2 — anchor the event (must exist in `.struct`).
 3. Phase 3 — verify the event is emitted by at least one interaction. Flag `[COUVERTURE]` if not.
 4. Phase 4 — produce a `.spec` with `changes` for `.flow` only, no `.struct` changes.
@@ -537,7 +537,7 @@ When the spec describes something that already exists in the model:
 ### [EXISTANT] — The specified behavior already exists
 
 **The model says:**
-> {citation of the existing interaction/reaction/policy}
+> {citation of the existing interaction/policy}
 
 **Your spec:**
 > {restatement}
@@ -643,8 +643,8 @@ No contradiction, no blocked invariant, no unhandled impact.
 ### [TROU] — Pre-condition on order status
 The spec does not state which status an order must be in to be delivered. Based on the domain lifecycle (`draft → confirmed → shipped → delivered`), the order should be in `shipped` status. Adding `fails "Order is not shipped" when { Order.status != shipped }`.
 
-### [COUVERTURE] — Event without reaction
-The new `OrderDelivered` event has no reaction. Consider whether delivery should trigger side effects (customer notification, analytics, etc.).
+### [COUVERTURE] — Event without interaction
+The new `OrderDelivered` event has no event-triggered interaction. Consider whether delivery should trigger side effects (customer notification, analytics, etc.).
 ```
 
 #### Phase 4 — Proposition
@@ -677,8 +677,8 @@ confrontation {
     "the order should be in shipped status."
   }
 
-  coverage "OrderDelivered has no reaction" {
-    "The new event has no reaction."
+  coverage "OrderDelivered has no event-triggered interaction" {
+    "The new event has no event-triggered interaction."
     "Consider adding side effects (customer notification, analytics)."
   }
 }
@@ -695,7 +695,7 @@ changes "orders.struct" {
 }
 
 changes "orders.flow" {
-  add interaction DeliverOrder {
+  add interaction "Mark an order as delivered" {
     on DeliverOrder
     resolves Order from DeliverOrder.orderId
     fails "Order is not shipped" when {
@@ -737,7 +737,7 @@ impact {
 - 0 existing constructs affected
 
 ### Open items
-- [COUVERTURE] OrderDelivered has no reaction — add one if delivery should trigger side effects
+- [COUVERTURE] OrderDelivered has no event-triggered interaction — add one if delivery should trigger side effects
 
 Write spec file to specy/specs/001_deliver-order.spec? (yes / no / corrections)
 ```
@@ -778,7 +778,7 @@ Does this decomposition look correct? (yes/no/corrections)
 | CancelOrder | [EXISTANT] | `command CancelOrder { orderId : uuid, reason : string optional maxLength(500) }` |
 | interaction CancelOrder | [EXISTANT] | Defined in orders.flow — `fails "Order cannot be cancelled" when { Order.status not in {draft, confirmed} }` |
 | OrderCancelled | [EXISTANT] | `event OrderCancelled { orderId : uuid, reason : string optional, cancelledAt : datetime }` |
-| OnOrderCancelled | [EXISTANT] | `reaction OnOrderCancelled` — "Notify customer" + "Restore product stock for each order line" |
+| interaction on OrderCancelled | [EXISTANT] | "Handle order cancellation side effects" — "Notify customer" + "Restore product stock" |
 
 Does this mapping look correct? (yes/no/corrections)
 ```
@@ -798,10 +798,10 @@ Does this mapping look correct? (yes/no/corrections)
 
 **Analysis:** The current `CancelOrder` interaction explicitly restricts cancellation to orders in `draft` or `confirmed` status. An order with `status = shipped` would trigger the failure condition. To allow cancellation after shipping, the `not in` set must be extended to include `shipped`.
 
-### [IMPACT] — OnOrderCancelled reaction assumes products are in stock
+### [IMPACT] — "Handle order cancellation side effects" assumes products are in stock
 
 **The model says:**
-> reaction OnOrderCancelled {
+> interaction "Handle order cancellation side effects" {
 >   on OrderCancelled
 >   then "Notify customer that order is cancelled"
 >   then "Restore product stock for each order line"
@@ -810,7 +810,7 @@ Does this mapping look correct? (yes/no/corrections)
 **The spec says:**
 > Cancel after shipping.
 
-**Analysis:** The existing reaction restores product stock, which makes sense for `draft` and `confirmed` orders (products reserved but not shipped). For a `shipped` order, the products are physically in transit — stock restoration requires a physical return process, not just an inventory adjustment.
+**Analysis:** The existing interaction restores product stock, which makes sense for `draft` and `confirmed` orders (products reserved but not shipped). For a `shipped` order, the products are physically in transit — stock restoration requires a physical return process, not just an inventory adjustment.
 
 ### [TROU] — No return process modeled
 
@@ -843,7 +843,7 @@ concepts {
   command CancelOrder [existing]         // command CancelOrder in orders.struct
   interaction CancelOrder [existing]     // fails when Order.status not in {draft, confirmed}
   event OrderCancelled [existing]        // event OrderCancelled in orders.struct
-  reaction OnOrderCancelled [existing]   // restores stock, notifies customer
+  interaction OrderCancelled [existing]   // "Handle order cancellation side effects" — restores stock, notifies customer
 }
 
 confrontation {
@@ -854,7 +854,7 @@ confrontation {
   }
 
   impact "OnOrderCancelled assumes products are in stock" {
-    "The reaction restores product stock, which assumes products are still"
+    "The interaction restores product stock, which assumes products are still"
     "in the warehouse. For shipped orders, a physical return is needed."
   }
 
@@ -871,7 +871,7 @@ confrontation {
 }
 
 changes "orders.flow" {
-  modify interaction CancelOrder {
+  modify interaction "Cancel an order" {
     on CancelOrder
     resolves Order from CancelOrder.orderId
     fails "Order cannot be cancelled" when {
@@ -882,7 +882,7 @@ changes "orders.flow" {
     emits OrderCancelled
   }
 
-  modify reaction OnOrderCancelled {
+  modify interaction "Handle order cancellation side effects" {
     on OrderCancelled
     then "Notify customer that order is cancelled"
     then "Restore product stock for each order line"
@@ -893,7 +893,7 @@ changes "orders.flow" {
 impact {
   interaction CancelOrder -> affected
     "not in set extended from {draft, confirmed} to {draft, confirmed, shipped}"
-  reaction OnOrderCancelled -> affected
+  interaction OrderCancelled -> affected
     "added return process side effect for shipped orders"
   interaction RefundPayment -> affected
     "depends on Payment.order.status — verify refund sequencing"
@@ -913,12 +913,12 @@ impact {
 - 0 additions, 0 modifications, 0 deletions
 
 ### .flow changes
-- 0 additions, 2 modifications (interaction CancelOrder, reaction OnOrderCancelled), 0 deletions
+- 0 additions, 2 modifications (interaction on CancelOrder, interaction on OrderCancelled), 0 deletions
 
 ### Impact
 - 3 existing constructs affected:
   - interaction CancelOrder (modified)
-  - reaction OnOrderCancelled (modified)
+  - interaction on OrderCancelled (modified)
   - interaction RefundPayment (verify refund sequencing)
 
 ### Open items

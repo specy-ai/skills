@@ -2,10 +2,10 @@ domain "Orders"
 uses "orders.struct"
 
 // =============================================================================
-// Interactions — one per command
+// Interactions — command-triggered (intentional)
 // =============================================================================
 
-interaction PlaceOrder {
+interaction "Place a new order" {
   on PlaceOrder
 
   resolves Customer from PlaceOrder.customerId
@@ -30,7 +30,7 @@ interaction PlaceOrder {
   emits OrderPlaced
 }
 
-interaction ConfirmOrder {
+interaction "Confirm an order after payment" {
   on ConfirmOrder
 
   resolves Order from ConfirmOrder.orderId
@@ -54,7 +54,7 @@ interaction ConfirmOrder {
   emits OrderConfirmed
 }
 
-interaction CancelOrder {
+interaction "Cancel an order" {
   on CancelOrder
 
   resolves Order from CancelOrder.orderId
@@ -69,7 +69,7 @@ interaction CancelOrder {
   emits OrderCancelled
 }
 
-interaction ProcessPayment {
+interaction "Process payment for an order" {
   on ProcessPayment
 
   resolves Order from ProcessPayment.orderId
@@ -87,7 +87,7 @@ interaction ProcessPayment {
   emits PaymentProcessed
 }
 
-interaction RefundPayment {
+interaction "Refund a captured payment" {
   on RefundPayment
 
   resolves Payment from RefundPayment.paymentId
@@ -105,7 +105,7 @@ interaction RefundPayment {
   emits PaymentRefunded
 }
 
-interaction ShipOrder {
+interaction "Ship a confirmed order" {
   on ShipOrder
 
   resolves Order from ShipOrder.orderId
@@ -126,18 +126,20 @@ interaction ShipOrder {
 }
 
 // =============================================================================
-// Reactions — triggered by events
+// Interactions — event-triggered (reactive)
 // =============================================================================
 
-reaction OnOrderConfirmed {
+interaction "Notify customer when order is confirmed" {
   on OrderConfirmed
 
   then "Notify customer that order is confirmed"
   then "Trigger shipment preparation"
 }
 
-reaction OnPaymentFailed {
+interaction "Handle payment failure" {
   on PaymentFailed
+
+  resolves Payment from PaymentFailed.paymentId
 
   then "Notify customer of payment failure"
   then "Allow retry with a different payment method"
@@ -145,14 +147,14 @@ reaction OnPaymentFailed {
   sets Payment.status to failed
 }
 
-reaction OnOrderCancelled {
+interaction "Handle order cancellation side effects" {
   on OrderCancelled
 
   then "Notify customer that order is cancelled"
   then "Restore product stock for each order line"
 }
 
-reaction OnPaymentRefunded {
+interaction "Notify customer of refund" {
   on PaymentRefunded
 
   then "Notify customer that refund has been processed"

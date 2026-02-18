@@ -18,7 +18,7 @@
 | Source Pattern | Specy Construct |
 |---|---|
 | `defmulti` / `defmethod` dispatching on command type | `interaction` block |
-| `defmulti` / `defmethod` dispatching on event type | `reaction` block |
+| `defmulti` / `defmethod` dispatching on event type | event-triggered `interaction` block |
 | `(get-by-id db ...)` / query function | `resolves Entity from dotPath` |
 | `(create! db ...)` / `(save! db ...)` | `creates Entity` |
 | `(when (not ...) (throw ...))` | `fails "msg" when { condition }` |

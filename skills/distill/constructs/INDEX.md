@@ -15,6 +15,5 @@ During Phase 3 (Extraction: flow), load the relevant construct files for rules, 
 | `interaction` | `constructs/interaction.md` |
 | `service`     | `constructs/service.md`     |
 | `repository`  | `constructs/repository.md`  |
-| `reaction`    | `constructs/reaction.md`    |
 | `policy`      | `constructs/policy.md`      |
 | `invariant`   | `constructs/invariant.md`   |
