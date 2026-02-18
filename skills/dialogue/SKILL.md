@@ -361,14 +361,14 @@ If a question leads to a circular reference in the model (e.g., entity A referen
 
 Read the formal grammars to understand `.struct` and `.flow` constructs:
 
-- `../grammars/struct.ebnf` — structural model (.struct files)
-- `../grammars/flow.ebnf` — behavioral model (.flow files)
+- `grammars/struct.ebnf` — structural model (.struct files)
+- `grammars/flow.ebnf` — behavioral model (.flow files)
 
 ---
 
 ## Canonical Example
 
-The examples below use the Orders domain defined in `../examples/orders.struct` and `../examples/orders.flow`.
+The examples below use the Orders domain defined in `examples/orders.struct` and `examples/orders.flow`.
 
 ### Explorer — "Explain the Order lifecycle"
 
