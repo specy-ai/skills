@@ -14,9 +14,12 @@ Specy is a Domain-Driven Design toolkit that provides AI-assisted skills for rev
 
 ```
 specy-skill/
-├── grammars/              # EBNF grammars for .struct, .flow, .spec
-├── examples/              # Example domain files (orders.struct, orders.flow)
+├── proposals/             # Design proposals for grammar evolution
+├── REVIEW.md              # Design review process
+├── TEAM.md                # Review panel definitions
 └── skills/
+    ├── grammars/          # EBNF grammars for .struct, .flow, .spec
+    ├── examples/          # Example domain files (orders.struct, orders.flow)
     ├── distill/
     │   ├── SKILL.md
     │   ├── constructs/    # Flow construct references (interaction, service, etc.)
@@ -55,7 +58,7 @@ ln -sf /path/to/specy-skill/skills/spec/SKILL.md ~/.claude/skills/spec/SKILL.md
 
 Replace `/path/to/specy-skill` with the absolute path to your clone of this repository.
 
-> **Note on `distill` sub-directories:** The `distill` skill references `constructs/` and `heuristics/` files using relative paths from within `SKILL.md`. Since the symlink points to the original file, Claude Code resolves these paths from the source directory — no need to symlink the sub-directories.
+> **Note on relative paths:** All skills reference `grammars/`, `examples/`, `constructs/`, and `heuristics/` using relative paths from within `SKILL.md`. Since the symlink points to the original file, Claude Code resolves these paths from the source directory — no need to symlink sub-directories.
 
 ### GitHub Copilot
 
@@ -89,7 +92,7 @@ description: "Reverse-engineer source code into Specy domain models"
 
 Invoke with `/distill`, `/dialogue`, or `/spec` in Copilot Chat.
 
-> **Note on `distill`:** Because Copilot skills are project-local, you must copy or symlink the entire `distill/` directory (including `constructs/` and `heuristics/`) so that relative paths resolve correctly.
+> **Note on relative paths:** Because Copilot skills are project-local, you must copy or symlink the entire `skills/` directory (including `grammars/`, `examples/`, and `distill/constructs/` and `heuristics/`) so that relative paths resolve correctly.
 
 ### Vibe (Mistral)
 
@@ -123,7 +126,7 @@ skill_paths = ["~/.vibe/skills"]
 enabled_skills = ["distill", "dialogue", "spec"]
 ```
 
-> **Note on relative paths:** Like Claude Code, Vibe resolves relative paths from the symlink target. Symlinking the `distill/` directory ensures `constructs/` and `heuristics/` are accessible.
+> **Note on relative paths:** Like Claude Code, Vibe resolves relative paths from the symlink target. Symlinking the `skills/` directory (or individual skill directories alongside `grammars/` and `examples/`) ensures all referenced files are accessible.
 
 ## Usage
 
@@ -149,4 +152,4 @@ Run in a project with existing domain models. Give it a user story, business rul
 - Confrontation analysis (contradictions, impacts, gaps)
 - Projected changes to `.struct` and `.flow`
 
-> **Important:** The `grammars/` and `examples/` directories in this repository are reference material for the skills. In your target project, the skills expect to find (or create) `specy/` at the project root — this is where your domain-specific `.struct`, `.flow`, and `.spec` files live.
+> **Important:** The `skills/grammars/` and `skills/examples/` directories in this repository are reference material for the skills. In your target project, the skills expect to find (or create) `specy/` at the project root — this is where your domain-specific `.struct`, `.flow`, and `.spec` files live.
