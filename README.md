@@ -17,17 +17,27 @@ specy-skill/
 ├── proposals/             # Design proposals for grammar evolution
 ├── REVIEW.md              # Design review process
 ├── TEAM.md                # Review panel definitions
+├── hooks/                 # Git hooks (see Contributing section)
 └── skills/
-    ├── grammars/          # EBNF grammars for .struct, .flow, .spec
-    ├── examples/          # Example domain files (orders.struct, orders.flow)
+    ├── src/               # Editable sources (humans edit here)
+    │   ├── build.sh       # Assembles SKILL.md from templates
+    │   ├── grammars/      # EBNF grammars for .struct, .flow, .spec
+    │   ├── examples/      # Canonical examples (orders.struct, orders.flow)
+    │   ├── distill/
+    │   │   ├── main.md    # Template with <!-- include: --> markers
+    │   │   ├── constructs/
+    │   │   └── heuristics/
+    │   ├── dialogue/
+    │   │   └── main.md
+    │   └── spec/
+    │       └── main.md
     ├── distill/
-    │   ├── SKILL.md
-    │   ├── constructs/    # Flow construct references (interaction, service, etc.)
-    │   └── heuristics/    # Stack-specific extraction patterns (Java, TS, Clojure)
+    │   ├── SKILL.md       # Generated — do not edit
+    │   └── heuristics/    # Stack-specific (loaded conditionally at runtime)
     ├── dialogue/
-    │   └── SKILL.md
+    │   └── SKILL.md       # Generated — do not edit
     └── spec/
-        └── SKILL.md
+        └── SKILL.md       # Generated — do not edit
 ```
 
 ## Prerequisites
@@ -58,7 +68,7 @@ ln -sf /path/to/specy-skill/skills/spec/SKILL.md ~/.claude/skills/spec/SKILL.md
 
 Replace `/path/to/specy-skill` with the absolute path to your clone of this repository.
 
-> **Note on relative paths:** All skills reference `grammars/`, `examples/`, `constructs/`, and `heuristics/` using relative paths from within `SKILL.md`. Since the symlink points to the original file, Claude Code resolves these paths from the source directory — no need to symlink sub-directories.
+> **Note:** The `SKILL.md` files are self-contained (grammars, examples, and construct rules are inlined at build time). Only `distill` keeps external `heuristics/` files for conditional loading by stack.
 
 ### GitHub Copilot
 
@@ -92,7 +102,7 @@ description: "Reverse-engineer source code into Specy domain models"
 
 Invoke with `/distill`, `/dialogue`, or `/spec` in Copilot Chat.
 
-> **Note on relative paths:** Because Copilot skills are project-local, you must copy or symlink the entire `skills/` directory (including `grammars/`, `examples/`, and `distill/constructs/` and `heuristics/`) so that relative paths resolve correctly.
+> **Note:** The `SKILL.md` files are self-contained. For `distill`, also include the `heuristics/` directory (stack-specific patterns loaded at runtime).
 
 ### Vibe (Mistral)
 
@@ -126,7 +136,7 @@ skill_paths = ["~/.vibe/skills"]
 enabled_skills = ["distill", "dialogue", "spec"]
 ```
 
-> **Note on relative paths:** Like Claude Code, Vibe resolves relative paths from the symlink target. Symlinking the `skills/` directory (or individual skill directories alongside `grammars/` and `examples/`) ensures all referenced files are accessible.
+> **Note:** Same as Claude Code — `SKILL.md` files are self-contained. Include `distill/heuristics/` for stack-specific patterns.
 
 ## Usage
 
@@ -152,4 +162,36 @@ Run in a project with existing domain models. Give it a user story, business rul
 - Confrontation analysis (contradictions, impacts, gaps)
 - Projected changes to `.struct` and `.flow`
 
-> **Important:** The `skills/grammars/` and `skills/examples/` directories in this repository are reference material for the skills. In your target project, the skills expect to find (or create) `specy/` at the project root — this is where your domain-specific `.struct`, `.flow`, and `.spec` files live.
+> **Important:** The `skills/src/` directory contains source material for the skills. In your target project, the skills expect to find (or create) `specy/` at the project root — this is where your domain-specific `.struct`, `.flow`, and `.spec` files live.
+
+---
+
+## Contributing
+
+### Setup
+
+After cloning the repository, configure the git hooks:
+
+```bash
+git config core.hooksPath hooks/
+```
+
+This enables the pre-commit hook that ensures generated `SKILL.md` files stay in sync with their sources in `skills/src/`.
+
+### Editing skills
+
+Always edit files in `skills/src/`, never the generated `SKILL.md` files directly.
+
+- **Grammars** — `skills/src/grammars/*.ebnf`
+- **Canonical examples** — `skills/src/examples/orders.*`
+- **Skill templates** — `skills/src/{skill}/main.md`
+- **Constructs** (distill) — `skills/src/distill/constructs/*.md`
+- **Heuristics** (distill) — `skills/src/distill/heuristics/*.md`
+
+After editing, regenerate the `SKILL.md` files:
+
+```bash
+skills/src/build.sh
+```
+
+The pre-commit hook will block commits if the generated files are out of date.

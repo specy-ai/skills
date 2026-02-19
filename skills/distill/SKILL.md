@@ -1,3 +1,6 @@
+<!-- GENERATED FILE — DO NOT EDIT. Source: src/distill/main.md — Run src/build.sh to regenerate. -->
+
+
 # Skill: distill
 
 ## Role
@@ -44,7 +47,7 @@ The distill process has four sequential phases. Do not skip phases. Print a summ
 
 ### Phase 1 — Reconnaissance
 
-1. Read `examples/orders.struct` and `examples/orders.flow` to calibrate your output style and conventions.
+1. Study the canonical examples (orders.struct and orders.flow) in the Canonical Examples section below to calibrate your output style and conventions.
 2. Explore the project tree. Identify languages, frameworks, build system, and project layout.
 3. Locate the key code areas:
    - **Models / Entities:** ORM models, domain classes, data classes, records
@@ -74,7 +77,7 @@ The distill process has four sequential phases. Do not skip phases. Print a summ
 For each bounded context:
 
 1. Read every model/entity/data class file identified in Phase 1.
-2. **Classify each type** using the heuristics in section 6:
+2. **Classify each type** using the extraction heuristics (see Extraction Heuristics section below):
    - `entity` — has identity (id/primary key), mutable lifecycle
    - `value` — no identity, immutable, equality by content
    - `enum` — fixed set of named constants
@@ -86,7 +89,7 @@ For each bounded context:
    - Map native types to Specy primitives using the type mapping table.
    - Map collections to `list<T>` or `set<T>`.
    - Map references to other domain types by their Specy typeName.
-4. **Extract constraints** from annotations, decorators, validation rules, or code guards (See Constraints section in `grammars/struct.ebnf`)
+4. **Extract constraints** from annotations, decorators, validation rules, or code guards (see Constraints section in the Struct Grammar below).
 5. **Detect relations:** foreign keys, nested objects, `List<Entity>`.
 6. Write the `.struct` file following the output conventions.
 7. Print a summary:
@@ -104,16 +107,16 @@ For each bounded context:
 
 For each bounded context:
 
-1. Read `constructs/INDEX.md` and load `constructs/expressions.md` (transverse expression rules).
+1. Apply the transverse expression rules (see Expression Rules section below) and the construct rules for each flow construct type.
 2. Read every handler, service, listener, saga, and policy file identified in Phase 1.
-3. **For each command handler** → create an `interaction` block. See `constructs/interaction.md` for clause rules, examples, and anti-patterns.
-4. **For each service identified in Phase 2** → create a `service` block. See `constructs/service.md` for rules and anti-patterns.
-5. **For each call to a service in a command handler** → add a `delegates` clause in the corresponding `interaction` block (see `constructs/interaction.md`).
-6. **For each repository interface identified in Phase 2** → create a `repository` block. See `constructs/repository.md` for rules and filtering guidance.
-7. **For each `repository.findBy*()` call in a command handler** → add `via Repository.operation` in the corresponding `resolves` clause (see `constructs/interaction.md`).
-8. **For each event listener** → create an event-triggered `interaction` block. See `constructs/interaction.md` for rules, examples, and anti-patterns.
-9. **Cross-cutting rules** → create `policy` blocks. See `constructs/policy.md` for rules and tautology traps.
-10. **Structural constraints** → create `invariant` blocks. See `constructs/invariant.md` for rules (entities only).
+3. **For each command handler** → create an `interaction` block. See the Interaction section below for clause rules, examples, and anti-patterns.
+4. **For each service identified in Phase 2** → create a `service` block. See the Service section below for rules and anti-patterns.
+5. **For each call to a service in a command handler** → add a `delegates` clause in the corresponding `interaction` block (see the Interaction section below).
+6. **For each repository interface identified in Phase 2** → create a `repository` block. See the Repository section below for rules and filtering guidance.
+7. **For each `repository.findBy*()` call in a command handler** → add `via Repository.operation` in the corresponding `resolves` clause (see the Interaction section below).
+8. **For each event listener** → create an event-triggered `interaction` block. See the Interaction section below for rules, examples, and anti-patterns.
+9. **Cross-cutting rules** → create `policy` blocks. See the Policy section below for rules and tautology traps.
+10. **Structural constraints** → create `invariant` blocks. See the Invariant section below for rules (entities only).
 11. Write the `.flow` file following the output conventions.
 12. Print a summary:
    ```
@@ -218,7 +221,7 @@ Applies when `specy/.meta.json` exists AND the saved `gitSha` is reachable in th
 
 #### Phase 1 — Differential Reconnaissance
 
-1. **Do not re-read the examples** (`examples/orders.struct`, `examples/orders.flow`) — the style is already established from the initial creation run.
+1. **Do not re-read the examples** — the style is already established from the initial creation run.
 2. Read `specy/.meta.json` and retrieve the saved `gitSha`.
 3. Run `git diff --name-only <gitSha>..HEAD` to get the list of changed files (modified, added, deleted).
 4. Cross-reference with the `filemap`:
@@ -351,7 +354,7 @@ When `specy/*.struct` and `specy/*.flow` files already exist and the user specif
    - If `specy/.meta.json` exists, cross-reference with the `filemap` for additional source files
 3. **If not found** — the definition is new. Search the codebase for a matching class, handler, or type:
    - Look for files matching `*{DefinitionName}*` in the project
-   - Apply the extraction heuristics (section 6) to identify what type of definition it should be
+   - Apply the extraction heuristics to identify what type of definition it should be
    - Identify the bounded context it belongs to from the surrounding code structure
    - If nothing is found, inform the user and stop
 4. Determine the **extraction unit** based on the definition type (see below).
@@ -475,25 +478,1928 @@ If `specy/.meta.json` exists, update only the filemap entries corresponding to t
 
 ## Extraction Heuristics
 
-During Phase 1, read `heuristics/INDEX.md` and load the relevant heuristic files based on the detected stack. Always load `generic.md` (naming patterns, type mapping, services, repositories). Load the stack-specific file (e.g. `java-spring.md`) when the framework is identified.
+During Phase 1, identify the project's language and framework, then load the relevant heuristic file based on the detected stack.
+
+### Generic Heuristics (always applied)
+
+# Generic Heuristics (any language/framework)
+
+Always load this file. It provides language-agnostic patterns used as a base for all stacks.
+
+## Naming Patterns
+
+| Source Pattern | Inference |
+|---|---|
+| Class/module named `*Service`, `*Handler`, `*UseCase`, `*Interactor` | Likely contains `interaction` logic |
+| Class/module named `*Repository`, `*Store`, `*Dao` | The generic type it manages is likely an `entity` |
+| Class/module named `*Saga`, `*Listener`, `*Subscriber`, `*Consumer` | Likely contains event-triggered `interaction` logic |
+| Class/module named `*Policy`, `*Validator`, `*Guard`, `*Rule`, `*Specification` | Likely contains `policy` or `invariant` logic |
+| Class/module named `*Event`, `*Message` with past-tense name | Likely an `event` |
+| Class/module named `*Command`, `*Request` with imperative name | Likely a `command` |
+| CRUD-only code with no explicit events | Add `// UNCLEAR: no event emitted — infer events or omit?` |
+
+## Type Mapping
+
+| Source Type | Specy Primitive |
+|---|---|
+| `String`, `string`, `str`, `TEXT`, `VARCHAR` | `string` |
+| `int`, `Integer`, `Long`, `long`, `Int`, `Short` | `int` |
+| `BigDecimal`, `double`, `Double`, `float`, `Float`, `Decimal`, `Number` | `decimal` |
+| `boolean`, `Boolean`, `bool`, `Bool` | `boolean` |
+| `LocalDate`, `Date`, `date`, `NaiveDate` | `date` |
+| `LocalDateTime`, `DateTime`, `Instant`, `Timestamp`, `ZonedDateTime`, `OffsetDateTime` | `datetime` |
+| `UUID`, `uuid`, `Uuid`, `GUID` | `uuid` |
+| `List<T>`, `ArrayList<T>`, `T[]`, `Array<T>`, `Vec<T>`, `vector`, `[]T` | `list<T>` |
+| `Set<T>`, `HashSet<T>`, `TreeSet<T>`, `LinkedHashSet<T>` | `set<T>` |
+
+When a source type does not map to a primitive, check if it corresponds to another domain type (entity, value, enum). If it does, use the Specy typeName. If it is a technical type with no domain meaning (e.g. `HttpRequest`, `Logger`), omit it.
+
+## Services
+
+### Identification
+
+| Source Pattern | Specy Construct |
+|---|---|
+| Interface or class without state, with business calculation method(s) | `service` block |
+| Constructor injection of a non-repository interface | potential `service` |
+| Call to a service method inside a command handler | `delegates` clause |
+| Service result assigned to an entity field | `sets Entity.field to Service.operation` |
+
+### What to model
+
+- **Model:** business calculations (scoring, pricing, weight), business checks (eligibility, time window), external integrations with business scope (federation, notification)
+- **Do not model** (use `// NOTE` instead): pure technical processing (image resize, password hash, compression), infrastructure (logging, cache, rate limiting)
+- **Decision criterion:** if the result affects an entity field via `sets` or conditions the flow via `fails`, it is a business service
+
+## Repositories
+
+### Identification
+
+| Source Pattern | Specy Construct |
+|---|---|
+| Interface `I*Repository` / class `*Repository` | `repository` block |
+| Method `findById(id)` | `operation findById` |
+| Method `findBy*(field)` | `operation findBy*` |
+| Method `exists*(field)` / `existsBy*(field)` | `operation exists*` |
+| Method `save(entity)` / `create(input)` | `operation save` |
+| Method `delete(id)` / `remove(id)` | `operation delete` |
+| `repository.findById(cmd.id)` in a handler | `resolves Entity via Repository.findById from Command.field` |
+| `repository.findBy*(cmd.field)` in a handler | `resolves Entity via Repository.findBy* from Command.field` |
+
+### Filtering
+
+- **Model**: findById, findByField (used in `resolves`), save, delete, existsBy (used in a guard/check)
+- **Do not model** (`// NOTE: query-only`): search, pagination, count for dashboards, aggregations for UI
+- **Criterion**: if the operation is called in a use case that produces an `interaction`, it deserves a declaration
+
+### Stack-specific Heuristics
+
+Load the heuristic file matching the detected stack:
+
+| Detection signal | File |
+|---|---|
+| `.java`, `pom.xml`, `build.gradle`, `@SpringBootApplication`, `@Entity` | Read `heuristics/java-spring.md` |
+| `.ts`, `.tsx`, `package.json` + `@nestjs/*`, `tsconfig.json` | Read `heuristics/typescript-nestjs.md` |
+| `.clj`, `.cljs`, `deps.edn`, `project.clj`, `lein` | Read `heuristics/clojure.md` |
+
+If no specific stack is detected, rely on the generic heuristics only.
+
+If the project uses a stack not listed here, apply the generic patterns and adapt based on the framework's conventions. Annotate non-obvious mappings with `// NOTE: inferred from {pattern}`.
+
+---
 
 ## Flow Constructs
 
-During Phase 3, read `constructs/INDEX.md` and load the relevant construct files for rules, examples, and anti-patterns. Always load `constructs/expressions.md` (transverse expression rules). Load each construct file as needed (`interaction.md`, `service.md`, `repository.md`, `policy.md`, `invariant.md`).
+### Expression Rules
+
+# Expressions — Rules, Examples & Anti-Patterns
+
+Transverse rules for all `when { ... }` and `must { ... }` blocks across `fails` clauses, `policy`, and `invariant` constructs.
+
+## Available Operators
+
+`=`, `!=`, `>`, `<`, `>=`, `<=`, `is defined`, `is not defined`, `in`, `not in`, `size()`, `count()`, `isEmpty()`
+
+## Expressible Conditions
+
+Most conditions fall into this category — try to express them **before** resorting to `// UNCLEAR`.
+
+### Status check
+
+```
+// Code: if (order.status != "DRAFT") throw ...
+fails "Order is not in draft status" when {
+  Order.status != draft
+}
+```
+
+### Empty collection
+
+```
+// Code: if (items.length === 0) throw ...
+fails "Order has no lines" when {
+  isEmpty(Order.lines)
+}
+```
+
+### String length
+
+```
+// Code: if (name.length > 200) throw ...
+fails "Product name exceeds 200 characters" when {
+  size(CreateProduct.name) > 200
+}
+```
+
+### Self-reference guard
+
+```
+// Code: if (userId === targetUserId) throw ...
+fails "Cannot transfer to yourself" when {
+  TransferFunds.sourceAccountId = TransferFunds.targetAccountId
+}
+```
+
+### Ownership check
+
+```
+// Code: if (entity.ownerId !== userId) throw ...
+fails "Not authorized to cancel this order" when {
+  Order.customer.id != CancelOrder.customerId
+}
+```
+
+### Entity not found
+
+```
+// Code: if (!entity) throw ...
+fails "Order not found" when {
+  Order is not defined
+}
+```
+
+### Existence / duplicate check
+
+```
+// Code: if (await repo.exists(a, b)) throw ...
+// Model with resolves + "is defined":
+resolves Payment from ProcessPayment.orderId
+fails "A payment already exists for this order" when {
+  Payment is defined
+}
+```
+
+## Quick Reference — Expressible Patterns
+
+| Pattern | Expression |
+|---|---|
+| Self-reference | `Command.fieldA = Command.fieldB` |
+| Ownership | `Entity.userId != Command.userId` |
+| Status check | `Entity.status != someValue` |
+| Duplicate/existence | `resolves` + `fails when { Entity is defined }` |
+| Not found | `fails when { Entity is not defined }` |
+| Length check | `size(field) > n` |
+| Empty collection | `isEmpty(Entity.collection)` |
+
+## Unexpressible Conditions
+
+The check involves something the grammar truly cannot represent: complex business logic with no structural equivalent, external service calls, or algorithmic checks. **Do NOT emit a `fails` clause with a fake expression.** Drop the clause entirely and write a `// UNCLEAR:` comment.
+
+```
+// Code: if (isCommonPassword(pw)) throw "Too common"
+// UNCLEAR: condition not expressible — checks password against common passwords list
+
+// Code: if (rateLimiter.isExceeded(userId)) throw "Rate limit"
+// UNCLEAR: condition not expressible — per-user rate limiting (max N per hour)
+
+// Code: if (bannedWords.match(text)) throw "Banned content"
+// UNCLEAR: condition not expressible — checks text against forbidden words list with leetspeak detection
+```
+
+### Common Unexpressible Categories
+
+- **Uniqueness checks** (`if (await repo.existsByEmail(email))`)
+- **Password strength** (common password lists, entropy checks)
+- **Rate limiting** (in-memory or Redis-based throttling)
+- **External API validation** (OAuth token verification, payment gateway)
+- **Complex regex matching** (email format, URL validation, banned word lists with leetspeak)
+- **Cross-entity lookups** (checking existence in another aggregate)
+- **Datetime arithmetic** (`now() - Order.placedAt > 24h` — unit is ambiguous)
+
+For all of these: do not emit a `fails` clause with a placeholder expression. A `// UNCLEAR:` comment preserves the information without producing invalid output.
+
+## Anti-Patterns
+
+### Tautological expression as placeholder
+
+```
+// BAD — email is required, so this is always true
+fails "Email already in use" when {
+  Register.email is defined
+}
+```
+
+Never write `field is defined` on a `required` or `immutable` field as a stand-in for a condition you cannot express. A required/immutable field is always defined — this is a tautology. Use `// UNCLEAR:` instead.
+
+### Datetime subtraction with bare number
+
+```
+// BAD — the unit is ambiguous
+policy OrderModificationWindow {
+  when { now() - Order.placedAt > 5 }
+  then "Orders can only be modified within 24 hours"
+}
+```
+
+Use `// UNCLEAR:` with a note about the time window instead.
+
+### Wrong operator for the type
+
+- Never compare a `string` field directly to a number — use `size(field)` for string length checks.
+- Never use `count()` on a `string` field — `count()` is for `list<T>` / `set<T>` only.
+
+### Interaction
+
+# Interaction — Rules, Examples & Anti-Patterns
+
+An `interaction` block models a handler triggered by a command (intentional) or an event (reactive). The trigger type is determined by the `on` clause: if it references a `command` defined in the `.struct`, it is intentional; if it references an `event`, it is reactive.
+
+The interaction name is a **string literal** describing the business intent in plain language.
+
+## Structure
+
+### Command-triggered (intentional)
+
+```
+interaction "Place a new order" {
+  on PlaceOrder
+  resolves Customer via CustomerRepository.findById from PlaceOrder.customerId
+  creates Order
+  fails "Customer is inactive" when {
+    Customer.status = inactive
+  }
+  delegates PricingCalculator.computeTotal
+  sets Order.totalAmount to PricingCalculator.computeTotal
+  sets Order.status to pending
+  emits OrderPlaced
+}
+```
+
+### Event-triggered (reactive)
+
+```
+interaction "Handle payment failure" {
+  on PaymentFailed
+  resolves Payment from PaymentFailed.paymentId
+  then "Notify customer of payment failure"
+  then "Allow retry with a different payment method"
+  sets Payment.status to failed
+}
+```
+
+## Clause Rules
+
+### `on` — the trigger typeName
+
+The `on` clause references a `command` or `event` defined in the `.struct`.
+
+**Cardinality:**
+- **Command trigger:** exactly one interaction per command (1:1). Never merge multiple commands into one interaction.
+- **Event trigger:** zero to many interactions per event (1:N). Multiple handlers for the same event are allowed.
+
+### String label — the interaction name
+
+The string literal after `interaction` describes the business intent in plain language. It is a human-readable label, not a formal identifier. The formal identity of an interaction is its trigger (the `on` typeName).
+
+**Label generation rules for `distill`:**
+- Use the method name, javadoc, or class-level comment from the source code when available.
+- If nothing meaningful is available, use a default pattern:
+  - Command trigger: `"Handle {CommandName}"` (e.g. `"Handle PlaceOrder"`)
+  - Event trigger: `"React to {EventName}"` (e.g. `"React to OrderConfirmed"`)
+- Labels must be in business language, not technical jargon.
+
+### `resolves` — entities loaded/fetched
+
+There are three resolution patterns. The `from` dotPath identifies the source; the optional `via` clause specifies how the resolution is performed.
+
+#### Pattern 1 — Direct resolution
+
+The `from` dotPath points to a field on the command or event that carries the entity's identity.
+
+```
+// Direct — lookup by identity field:
+resolves Order from CancelOrder.orderId
+
+// Direct with repository — same lookup, explicit infrastructure path:
+resolves User via UserRepository.findById from UpdateProfile.userId
+```
+
+#### Pattern 2 — Indirect resolution (forward ref)
+
+The `from` dotPath points to a field on an already-resolved entity. That field carries the identity of the entity to resolve.
+
+```
+// The resolved Order has a field that identifies the Payment:
+resolves Order via OrderRepository.findById from ShipOrder.orderId
+resolves Payment from Order.paymentId
+
+// Chained through a token — each step uses a field from the previous entity:
+resolves PasswordResetToken from ResetPassword.token
+resolves Customer from PasswordResetToken.customerId
+```
+
+#### Pattern 3 — Indirect resolution (reverse ref)
+
+The resolved entity has a field that references the `from` entity. Use `via Entity.field` to name the relationship field explicitly.
+
+```
+// Payment has a field `order : Order` — navigate the reverse relationship:
+resolves Order from ConfirmOrder.orderId
+resolves Payment via Payment.order from Order
+
+// Subscription has a field `customer : Customer` — reverse lookup:
+resolves Customer from DeactivateSubscription.customerId
+resolves Subscription via Subscription.customer from Customer
+
+// Invoice has a field `order : Order` — reverse lookup:
+resolves Order from CloseOrder.orderId
+resolves Invoice via Invoice.order from Order
+```
+
+#### Decision rule
+
+| Situation | Pattern | Example |
+|---|---|---|
+| Command/event carries the entity's ID | Direct | `resolves Order from PlaceOrder.orderId` |
+| An already-resolved entity carries the ID | Indirect (forward) | `resolves Payment from Order.paymentId` |
+| The entity to resolve has a field pointing back to an already-resolved entity | Indirect (reverse) | `resolves Payment via Payment.order from Order` |
+
+#### `via` clause — two uses
+
+The optional `via` clause serves two purposes depending on the dotPath shape:
+
+- **Repository operation:** `via Repository.operation` — specifies the infrastructure method used to load the entity.
+- **Relationship field:** `via Entity.field` — specifies the field on the resolved entity that references the `from` entity (reverse-ref pattern).
+
+The two are distinguishable: a repository `via` references a `Repository.operation`, while a relationship `via` references `ResolvedEntity.field` where the entity name matches the `resolves` typeName.
+
+**Every entity you `sets` or reference in a `fails` expression must be explicitly resolved or created.** A `// NOTE: resolved indirectly` comment is NOT a substitute for a `resolves` clause — if the code loads the entity, model it with `resolves`.
+
+This rule applies equally to command-triggered and event-triggered interactions. An event-triggered interaction that `sets Payment.status to failed` must `resolves Payment from PaymentFailed.paymentId`.
+
+### `creates` — entities instantiated
+
+Entities instantiated via `new Entity`, `.save()` on new objects. Every interaction that creates a new entity instance must list it in a `creates` clause — do not omit the primary entity being created.
+
+### `fails` — error conditions
+
+Guard clauses, validation failures, `if (...) throw`. Use a business-language message, not the technical exception name. The `when { expression }` must be a real, evaluable boolean condition — never a tautology.
+
+**Event-triggered interactions can also `fails`.** A reactive handler may fail to process an event (entity not found, condition not met). This reflects the reality of process managers and sagas.
+
+See `constructs/expressions.md` for full expression rules and examples.
+
+### `delegates` — service calls
+
+Place `delegates` after `fails` and before `then`/`sets`. If the result of the service call is assigned to a field, express it with `sets Entity.field to ServiceName.operationName`.
+
+### `then` — informal side effects
+
+Describe the side effect in business language when it cannot be expressed structurally with `sets`/`emits`. Available for both command-triggered and event-triggered interactions.
+
+```
+interaction "Notify customer when order is confirmed" {
+  on OrderConfirmed
+  then "Notify customer that order is confirmed"
+  then "Trigger shipment preparation"
+}
+```
+
+### `sets` — field mutations
+
+Every entity referenced in a `sets` clause must appear in a `resolves` or `creates` clause of the same interaction. If the code updates entities that are not directly resolved (e.g. bulk updates on related records), do not emit a `sets` clause — use a `// NOTE:` comment to describe the side effect instead.
+
+### `emits` — events published/dispatched
+
+List all events published by the handler.
+
+## Clause Ordering
+
+Within an interaction block, clauses follow this order:
+
+1. `on`
+2. `resolves`
+3. `creates`
+4. `fails`
+5. `delegates`
+6. `then`
+7. `sets`
+8. `emits`
+
+## Examples
+
+### Command-triggered — full interaction
+
+```
+interaction "Place a new order" {
+  on PlaceOrder
+  resolves Customer from PlaceOrder.customerId
+  creates Order
+  fails "Customer not found or inactive" when {
+    Customer.status != active
+  }
+  fails "Order has no lines" when {
+    isEmpty(PlaceOrder.lines)
+  }
+  sets Order.status to draft
+  sets Order.placedAt to now()
+  sets Order.totalAmount to sum(Order.lines.lineTotal)
+  emits OrderPlaced
+}
+```
+
+### Event-triggered — simple notification
+
+```
+interaction "Notify customer when order is confirmed" {
+  on OrderConfirmed
+  then "Notify customer that order is confirmed"
+  then "Trigger shipment preparation"
+}
+```
+
+### Event-triggered — with state mutation
+
+```
+interaction "Handle payment failure" {
+  on PaymentFailed
+  resolves Payment from PaymentFailed.paymentId
+  then "Notify customer of payment failure"
+  then "Allow retry with a different payment method"
+  sets Payment.status to failed
+}
+```
+
+### Event-triggered — with delegation and chained event
+
+```
+interaction "Send shipping notification" {
+  on OrderShipped
+  resolves Customer from OrderShipped.customerId
+  delegates NotificationService.sendShippingNotification
+  emits ShippingNotificationSent
+}
+```
+
+## Anti-Patterns
+
+### Bogus `resolves from` dotPath
+
+```
+// BAD — Customer is not resolved from a payment method
+resolves Customer from ProcessPayment.method
+
+// BAD — Order is not resolved from a reason text
+resolves Order from CancelOrder.reason
+```
+
+If the entity is resolved from a field that is not in the command (e.g. only available in the session), add that field to the command first (see Phase 2 rule on command fields), then use it in `resolves`.
+
+### Missing indirect resolution
+
+```
+// BAD — sets Customer fields but Customer is not resolved
+interaction "Reset user password" {
+  on ResetPassword
+  resolves PasswordResetToken from ResetPassword.token
+  // NOTE: Customer resolved indirectly via token  <- NOT ENOUGH
+  sets Customer.password to ResetPassword.newPassword  // <- Customer not in resolves/creates
+  sets PasswordResetToken.usedAt to now()
+}
+
+// GOOD — Customer explicitly resolved via indirect dotPath
+interaction "Reset user password" {
+  on ResetPassword
+  resolves PasswordResetToken from ResetPassword.token
+  resolves Customer from PasswordResetToken.customerId
+  sets PasswordResetToken.usedAt to now()
+  // NOTE: Customer.password is set to hashed value of ResetPassword.newPassword
+}
+```
+
+### Merging multiple commands into one interaction
+
+Each command type gets exactly one `interaction` block. Never merge `PlaceOrder` and `ConfirmOrder` into a single interaction.
+
+### Inventing logic not in source code
+
+Every `resolves`, `fails`, `sets`, and `emits` clause must trace to something explicit in the source handler. If you cannot find evidence, do not emit it.
+
+### Event-triggered interaction without an event source
+
+Every event-triggered interaction must have an `on` clause pointing to an existing event in the `.struct`. If the source code does not have an event listener, do not create an interaction. Annotate the missing event pattern with `// UNCLEAR: no event listener found`.
+
+### Technical listeners as interactions
+
+Do not model technical listeners (logging, metrics, cache invalidation) as interactions. Use `// NOTE:` comments instead.
+
+```
+// BAD — infrastructure concern
+interaction "Log order metrics" {
+  on OrderPlaced
+  then "Increments order counter in Prometheus"
+}
+
+// GOOD — use a comment
+// NOTE: OrderPlaced triggers metric recording (infrastructure — not modeled)
+```
+
+### Service
+
+# Service — Rules, Examples & Anti-Patterns
+
+A `service` block models a stateless class/interface with business logic. Services are behavioral — they produce blocks in the `.flow`, not in the `.struct`.
+
+## Structure
+
+```
+service PricingCalculator {
+  operation computeTotal {
+    accepts lines : list<OrderLine>
+    accepts discountCode : string optional
+    returns decimal
+    fails "Discount code expired" when {
+      Discount.status = expired
+    }
+    then "Applies volume discounts, coupon reductions, and tax calculations"
+  }
+
+  operation evaluateShippingCost {
+    accepts weight : decimal
+    accepts destination : Address
+    returns decimal
+    then "Calculates shipping cost based on weight tiers and destination zone"
+  }
+}
+```
+
+## Rules
+
+### One service block per service class/interface
+
+Do not merge multiple service classes into a single block.
+
+### One operation per public method with business logic
+
+For each public method with business logic, create an `operation` inside the service block.
+
+### Clause rules
+
+- `accepts` — parameters of the method (map types using the type mapping table).
+- `returns` — return type of the method (if not void).
+- `fails` — error conditions thrown by the service method. Same expression rules as interaction `fails` (see `constructs/expressions.md`).
+- `then` — describe the business logic in natural language when it cannot be expressed structurally. This is the primary way to document service logic.
+- `emits` — events published by the service method.
+
+### Use `then` for unexpressible logic
+
+When a service operation's business logic cannot be captured structurally, describe it with a `then` clause. Use `fails` in operations only when the error condition is formally expressible.
+
+```
+// GOOD — logic described in then clause
+operation calculateScore {
+  accepts applicant : Applicant
+  returns int
+  then "Computes credit score based on income, debt ratio, and payment history"
+}
+
+// BAD — trying to express algorithmic logic structurally
+operation calculateScore {
+  accepts applicant : Applicant
+  returns int
+  fails "Score below threshold" when {
+    Applicant.income is defined  // <- tautology, not the real condition
+  }
+}
+```
+
+### Service calls in handlers
+
+When a command handler calls a service, add a `delegates ServiceName.operationName` clause in the corresponding `interaction` block. Place `delegates` after `fails` and before `sets`.
+
+If the result of the service call is assigned to a field of an entity, express it with:
+```
+sets Entity.field to ServiceName.operationName
+```
+
+## Anti-Patterns
+
+### Service for pure infrastructure
+
+Do not create `service` blocks for image processing, password hashing, logging, caching, rate limiting, or other purely technical concerns. These are infrastructure, not domain logic. Use `// NOTE:` comments instead.
+
+```
+// BAD — infrastructure, not domain logic
+service PasswordHasher {
+  operation hash {
+    accepts password : string
+    returns string
+  }
+}
+
+// GOOD — use a NOTE comment instead
+// NOTE: password is hashed using bcrypt before storage
+```
+
+### Decision criterion
+
+If the result affects an entity field via `sets` or conditions the flow via `fails`, it is a business service. Otherwise, it is likely infrastructure.
+
+**Model:** business calculations (scoring, pricing, weight), business checks (eligibility, time window), external integrations with business scope (federation, notification).
+
+**Do not model** (use `// NOTE` instead): pure technical processing (image resize, password hash, compression), infrastructure (logging, cache, rate limiting).
+
+### Repository
+
+# Repository — Rules, Examples & Anti-Patterns
+
+A `repository` block models a persistence interface for an aggregate root. Repositories are behavioral — they produce blocks in the `.flow`, not in the `.struct`.
+
+## Structure
+
+```
+repository OrderRepository {
+  for Order
+
+  operation findById {
+    accepts id : uuid
+    returns Order
+  }
+
+  operation findByCustomerId {
+    accepts customerId : uuid
+    returns list<Order>
+  }
+
+  operation save {
+    accepts order : Order
+  }
+
+  // NOTE: query-only — not modeled
+  // operation searchByDateRange — pagination for dashboard
+  // operation countByStatus — aggregation for analytics
+}
+```
+
+## Rules
+
+### One repository block per repository interface/class
+
+### `for` — the aggregate root
+
+The `for` clause must reference an entity (aggregate root), not a value object or an enum.
+
+```
+// GOOD
+repository OrderRepository {
+  for Order
+}
+
+// BAD — Money is a value, not an aggregate root
+repository MoneyRepository {
+  for Money
+}
+```
+
+### Operations are pure data access
+
+Repository operations contain only `accepts` and `returns` — never `then`, `fails`, `sets`, or `emits`. Business logic belongs in interactions and services, not repositories.
+
+```
+// BAD — business logic in a repository
+repository OrderRepository {
+  for Order
+  operation findById {
+    accepts id : uuid
+    returns Order
+    fails "Order not found" when { Order is not defined }  // <- belongs in interaction
+  }
+}
+```
+
+### Only model operations referenced by interactions
+
+Only model operations that are referenced by at least one `resolves ... via` clause or used in an extracted interaction. Do not model query-only methods (pagination, search, aggregation for UI/dashboard).
+
+**Heuristic:** if an operation is not referenced by any `resolves ... via` in the `.flow`, it does not need to be declared. Annotate omissions with `// NOTE: query-only — not modeled`.
+
+### Linking to interactions via `resolves ... via`
+
+For each `repository.findBy*()` call in a command handler, add `via Repository.operation` in the corresponding `resolves` clause:
+
+```
+// In the interaction:
+resolves Order via OrderRepository.findById from CancelOrder.orderId
+
+// In the repository:
+repository OrderRepository {
+  for Order
+  operation findById {
+    accepts id : uuid
+    returns Order
+  }
+}
+```
+
+### Filtering guide
+
+| Operation type | Model? |
+|---|---|
+| `findById`, `findByField` (used in `resolves`) | Yes |
+| `save`, `delete` (used in interactions) | Yes |
+| `existsBy*` (used in a guard/check) | Yes |
+| `search`, `pagination`, `count` (for dashboards) | No — `// NOTE: query-only` |
+| `aggregations` (for UI/analytics) | No — `// NOTE: query-only` |
+
+## Anti-Patterns
+
+### Repository for technical types
+
+Do not create `repository` blocks for audit logs, session tokens, or other purely technical persistence concerns — unless they are used in domain interactions.
+
+```
+// BAD — technical persistence
+repository SessionTokenRepository {
+  for SessionToken
+}
+
+// BAD — audit infrastructure
+repository AuditLogRepository {
+  for AuditLog
+}
+```
+
+### Business logic inside repository
+
+```
+// BAD
+repository UserRepository {
+  for User
+  operation deactivate {
+    accepts id : uuid
+    then "Sets user status to inactive and revokes tokens"  // <- belongs in interaction
+  }
+}
+```
+
+### Policy
+
+# Policy — Rules, Examples & Anti-Patterns
+
+A `policy` block models a cross-cutting domain rule that spans multiple operations or guards multiple commands.
+
+## Structure
+
+```
+policy MaxOrderAmount {
+  when { Order.totalAmount > 10000 }
+  then "Orders exceeding 10,000 require manager approval"
+}
+```
+
+## Rules
+
+### `when` — evaluable boolean expression
+
+The `when` condition must be a real, evaluable boolean expression — the same tautology prohibition as `fails` applies here. See `constructs/expressions.md` for full expression rules.
+
+If the policy's real condition is unexpressible (datetime arithmetic, cross-context queries, external lookups), do NOT emit a `policy` block with a placeholder `when` clause. Instead, write a standalone `// UNCLEAR:` comment:
+
+```
+// UNCLEAR: policy not expressible — orders can only be modified within 24 hours of placement (datetime arithmetic)
+// UNCLEAR: policy not expressible — payment gateway must confirm card validity before capture (external service call)
+```
+
+### `then` — consequence in business language
+
+Use domain vocabulary, not technical jargon.
+
+### Scope
+
+Policies are for rules that:
+- Span multiple operations (not tied to a single interaction)
+- Guard multiple commands with the same condition
+- Express domain-wide constraints that don't fit in a single `fails` clause
+
+If a rule only applies to one command handler, it should be a `fails` clause in the corresponding `interaction`, not a policy.
+
+## Examples
+
+### Amount threshold policy
+
+```
+policy MaxOrderAmount {
+  when { Order.totalAmount > 10000 }
+  then "Orders exceeding 10,000 require manager approval"
+}
+```
+
+### Membership restriction
+
+```
+policy PremiumContentAccess {
+  when { Customer.membershipLevel = free }
+  then "Free members cannot access premium content"
+}
+```
+
+### Status-based restriction
+
+```
+policy SuspendedAccountRestriction {
+  when { Account.status = suspended }
+  then "Suspended accounts cannot initiate transactions"
+}
+```
+
+## Anti-Patterns
+
+### Tautological `when` clause — field always defined
+
+```
+// BAD — createdAt is immutable pastOrPresent, always defined
+policy OrderModificationWindow {
+  when { Order.createdAt is defined }
+  then "Orders can only be modified within 24 hours of placement"
+}
+```
+
+The real condition is datetime arithmetic (`now() - createdAt < 24h`) which is unexpressible. Use `// UNCLEAR:` instead.
+
+### Tautological `when` clause — always-true field
+
+```
+// BAD — updatedAt being defined does not capture the time window
+policy OrderEditDeadline {
+  when { Order.updatedAt is defined }
+  then "Orders can only be edited within 1 hour"
+}
+```
+
+### Status check masking a cross-aggregate rule
+
+```
+// BAD — condition is a status check, not the actual cross-aggregate rule
+policy PaymentRequiredForShipping {
+  when { Order.status = confirmed }
+  then "A captured payment is required before shipping"
+}
+```
+
+The real rule involves checking the Payment aggregate, not just Order status. If it requires a cross-aggregate lookup, use `// UNCLEAR:`.
+
+### Placeholder expression for complex conditions
+
+```
+// BAD — the real condition involves an external API call
+policy FraudDetection {
+  when { Order.totalAmount > 0 }
+  then "Orders must pass fraud screening"
+}
+```
+
+Use `// UNCLEAR: policy not expressible — fraud screening via external API` instead.
+
+### Invariant
+
+# Invariant — Rules, Examples & Anti-Patterns
+
+An `invariant` block models a structural constraint that must always be true for an entity.
+
+## Structure
+
+```
+invariant OrderMustHaveLines {
+  on Order
+  must { !isEmpty(Order.lines) }
+  message "An order must contain at least one line"
+}
+```
+
+## Rules
+
+### `on` — entities only
+
+The `on` clause must reference an `entity` type, never a `command`, `event`, or `value`. Validation rules on command inputs belong in `fails` clauses of the corresponding `interaction`, not in invariants.
+
+```
+// GOOD — invariant on an entity
+invariant OrderMustHaveLines {
+  on Order
+  must { !isEmpty(Order.lines) }
+  message "An order must contain at least one line"
+}
+
+// BAD — invariant on a command
+invariant PlaceOrderMustHaveLines {
+  on PlaceOrder
+  must { !isEmpty(PlaceOrder.lines) }
+  message "Must provide at least one line"
+}
+```
+
+### `must` — always-true condition
+
+The `must` expression must be a real, evaluable boolean condition that makes sense as a structural guarantee. See `constructs/expressions.md` for expression rules.
+
+### `message` — domain language
+
+Use business vocabulary, not technical jargon.
+
+## Examples
+
+### Non-empty collection
+
+```
+invariant OrderMustHaveLines {
+  on Order
+  must { !isEmpty(Order.lines) }
+  message "An order must contain at least one line"
+}
+```
+
+### Positive amount
+
+```
+invariant OrderTotalMustBePositive {
+  on Order
+  must { Order.totalAmount > 0 }
+  message "Order total must be a positive amount"
+}
+```
+
+### Status consistency
+
+```
+invariant ShippedOrderMustHaveTrackingNumber {
+  on Order
+  must { Order.status != shipped || Order.trackingNumber is defined }
+  message "A shipped order must have a tracking number"
+}
+```
+
+### Balance constraint
+
+```
+invariant AccountBalanceNonNegative {
+  on Account
+  must { Account.balance >= 0 }
+  message "Account balance cannot be negative"
+}
+```
+
+## Anti-Patterns
+
+### Invariant on a command
+
+```
+// BAD — input validation belongs in fails clause of the interaction
+invariant CreateProductNameRequired {
+  on CreateProduct
+  must { CreateProduct.name is defined }
+  message "Product name is required"
+}
+```
+
+This should be a `fails` clause in `interaction CreateProduct` instead.
+
+### Invariant on a value object
+
+```
+// BAD — value objects are immutable, constraints belong in the struct definition
+invariant MoneyMustBePositive {
+  on Money
+  must { Money.amount > 0 }
+  message "Amount must be positive"
+}
+```
+
+Use a `min(0)` constraint on the field in the `.struct` instead.
+
+### Tautological must clause
+
+```
+// BAD — id is a required field, always defined
+invariant OrderMustHaveId {
+  on Order
+  must { Order.id is defined }
+  message "Order must have an identifier"
+}
+```
+
+### Unexpressible invariant
+
+If the invariant's condition cannot be expressed with available operators, do not create an `invariant` block. Use `// UNCLEAR:` instead.
+
+```
+// BAD — regex validation cannot be modeled
+invariant ValidEmailFormat {
+  on Customer
+  must { Customer.email is defined }  // <- tautology, not the real check
+  message "Email must be valid"
+}
+
+// GOOD
+// UNCLEAR: invariant not expressible — email must match RFC 5322 format
+```
 
 ---
 
 ## Syntax Reference
 
-Read the formal grammars before producing output:
+### Struct Grammar (.struct files)
 
-- `grammars/struct.ebnf` — structural model (.struct files)
-- `grammars/flow.ebnf` — behavioral model (.flow files)
+```ebnf
+// =============================================================================
+// Specy — Structural Model Grammar (.struct)
+// EBNF (ISO 14977 style)
+// =============================================================================
 
-Read the canonical examples to calibrate output style:
+// -----------------------------------------------------------------------------
+// Top-level structure
+// -----------------------------------------------------------------------------
 
-- `examples/orders.struct` — complete structural model
-- `examples/orders.flow` — complete behavioral model
+structFile       = { comment | domainDecl | definition } ;
+
+domainDecl       = "domain" , stringLiteral ;
+
+definition       = entityDef
+                 | valueDef
+                 | enumDef
+                 | commandDef
+                 | eventDef ;
+
+// -----------------------------------------------------------------------------
+// Entity
+// -----------------------------------------------------------------------------
+
+entityDef        = "entity" , typeName , "{" , { comment | fieldDecl } , "}" ;
+
+// -----------------------------------------------------------------------------
+// Value Object
+// -----------------------------------------------------------------------------
+
+valueDef         = "value" , typeName , "{" , { comment | fieldDecl } , "}" ;
+
+// -----------------------------------------------------------------------------
+// Enum
+// -----------------------------------------------------------------------------
+
+enumDef          = "enum" , typeName , "{" , enumValue , { enumValue } , "}" ;
+
+enumValue        = identifier ;
+
+// -----------------------------------------------------------------------------
+// Command
+// -----------------------------------------------------------------------------
+
+commandDef       = "command" , typeName , "{" , { comment | fieldDecl } , "}" ;
+
+// -----------------------------------------------------------------------------
+// Event
+// -----------------------------------------------------------------------------
+
+eventDef         = "event" , typeName , "{" , { comment | fieldDecl } , "}" ;
+
+// -----------------------------------------------------------------------------
+// Fields
+// -----------------------------------------------------------------------------
+
+fieldDecl        = fieldName , ":" , fieldType , { constraint } ;
+
+fieldName        = identifier ;
+
+fieldType        = primitiveType
+                 | collectionType
+                 | typeName ;
+
+primitiveType    = "string"
+                 | "int"
+                 | "decimal"
+                 | "boolean"
+                 | "date"
+                 | "datetime"
+                 | "uuid" ;
+
+collectionType   = ( "list" | "set" ) , "<" , fieldType , ">" ;
+
+// A typeName that is not a primitiveType is a reference to another definition
+// (entity, value, enum).
+typeName         = pascalCaseId ;
+
+// -----------------------------------------------------------------------------
+// Constraints
+// -----------------------------------------------------------------------------
+
+constraint       = "required"
+                 | "optional"
+                 | "unique"
+                 | "immutable"
+                 | "default" , "(" , literalValue , ")"
+                 | "min" , "(" , number , ")"
+                 | "max" , "(" , number , ")"
+                 | "range" , "(" , number , "," , number , ")"
+                 | "minLength" , "(" , integer , ")"
+                 | "maxLength" , "(" , integer , ")"
+                 | "pattern" , "(" , stringLiteral , ")"
+                 | "past"
+                 | "future"
+                 | "pastOrPresent"
+                 | "futureOrPresent" ;
+
+// -----------------------------------------------------------------------------
+// Literals and identifiers
+// -----------------------------------------------------------------------------
+
+literalValue     = stringLiteral | number | "true" | "false" ;
+
+stringLiteral    = '"' , { character } , '"' ;
+
+number           = [ "-" ] , digit , { digit } , [ "." , digit , { digit } ] ;
+
+integer          = [ "-" ] , digit , { digit } ;
+
+pascalCaseId     = upperLetter , { letter | digit } ;
+
+identifier       = camelCaseId | pascalCaseId ;
+
+camelCaseId      = lowerLetter , { letter | digit } ;
+
+// -----------------------------------------------------------------------------
+// Comments
+// -----------------------------------------------------------------------------
+
+comment          = "//" , { character } , newline ;
+
+// -----------------------------------------------------------------------------
+// Character classes
+// -----------------------------------------------------------------------------
+
+upperLetter      = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I"
+                 | "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R"
+                 | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" ;
+
+lowerLetter      = "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i"
+                 | "j" | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r"
+                 | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" ;
+
+letter           = upperLetter | lowerLetter ;
+
+digit            = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+
+character        = letter | digit | " " | "!" | "@" | "#" | "$" | "%" | "^"
+                 | "&" | "*" | "(" | ")" | "-" | "_" | "=" | "+" | "["
+                 | "]" | "{" | "}" | "|" | "\\" | ":" | ";" | "'" | ","
+                 | "." | "<" | ">" | "/" | "?" | "~" | "`" ;
+
+newline          = "\n" ;
+```
+
+### Flow Grammar (.flow files)
+
+```ebnf
+// =============================================================================
+// Specy — Interaction Model Grammar (.flow)
+// EBNF (ISO 14977 style)
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// Top-level structure
+// -----------------------------------------------------------------------------
+
+flowFile         = { comment | domainDecl | usesDecl | block } ;
+
+domainDecl       = "domain" , stringLiteral ;
+
+usesDecl         = "uses" , stringLiteral ;
+
+block            = interactionDef
+                 | policyDef
+                 | invariantDef
+                 | serviceDef
+                 | repositoryDef ;
+
+// -----------------------------------------------------------------------------
+// Interaction — triggered by a command (intentional) or an event (reactive)
+//
+// The trigger type is determined by the typeName in the `on` clause:
+//   - If it resolves to a `command` in the .struct → intentional (1:1)
+//   - If it resolves to an `event` in the .struct  → reactive (1:N allowed)
+//
+// The string literal is a human-readable label describing the intent.
+// -----------------------------------------------------------------------------
+
+interactionDef   = "interaction" , stringLiteral , "{"
+                 ,   "on" , typeName
+                 , { resolvesClause }
+                 , { createsClause }
+                 , { failsClause }
+                 , { delegatesClause }
+                 , { thenClause }
+                 , { setsClause }
+                 , { emitsClause }
+                 , "}" ;
+
+// resolves has three resolution patterns:
+//   Direct:              resolves Entity from command.fieldId
+//                        → lookup by identity field
+//   Indirect (forward):  resolves Entity from ResolvedEntity.fieldId
+//                        → lookup using a field from an already-resolved entity
+//   Indirect (reverse):  resolves Entity via Entity.field from ResolvedEntity
+//                        → navigate reverse relationship (Entity.field references ResolvedEntity)
+//
+// The optional `via` clause has two uses:
+//   Repository operation: via Repository.operation (infrastructure path)
+//   Relationship field:   via Entity.field         (domain relationship)
+resolvesClause   = "resolves" , typeName , [ "via" , dotPath ] , "from" , dotPath ;
+
+createsClause    = "creates" , typeName ;
+
+emitsClause      = "emits" , typeName ;
+
+setsClause       = "sets" , dotPath , "to" , valueExpr ;
+
+failsClause      = "fails" , stringLiteral , "when" , "{" , expression , "}" ;
+
+delegatesClause  = "delegates" , dotPath ;
+
+thenClause       = "then" , stringLiteral ;
+
+// -----------------------------------------------------------------------------
+// Service — stateless domain logic
+// -----------------------------------------------------------------------------
+
+serviceDef       = "service" , typeName , "{" , { comment | operationDef } , "}" ;
+
+operationDef     = "operation" , identifier , "{"
+                 , { acceptsClause }
+                 , [ returnsClause ]
+                 , { failsClause }
+                 , { thenClause }
+                 , { setsClause }
+                 , { emitsClause }
+                 , "}" ;
+
+acceptsClause    = "accepts" , identifier , ":" , fieldType ;
+
+returnsClause    = "returns" , identifier , ":" , fieldType ;
+
+fieldType        = primitiveType
+                 | typeName
+                 | collectionType ;
+
+primitiveType    = "string" | "int" | "decimal" | "boolean" | "date" | "datetime" | "uuid" ;
+
+collectionType   = ( "list" | "set" ) , "<" , fieldType , ">" ;
+
+// -----------------------------------------------------------------------------
+// Repository — data access contract for an entity
+// -----------------------------------------------------------------------------
+
+repositoryDef    = "repository" , typeName , "{"
+                 ,   "for" , typeName
+                 , { comment | repositoryOpDef }
+                 , "}" ;
+
+repositoryOpDef  = "operation" , identifier , "{"
+                 , { acceptsClause }
+                 , [ returnsClause ]
+                 , "}" ;
+
+// -----------------------------------------------------------------------------
+// Policy — domain-wide rule
+// -----------------------------------------------------------------------------
+
+policyDef        = "policy" , typeName , "{"
+                 ,   "when" , "{" , expression , "}"
+                 ,   "then" , stringLiteral
+                 , "}" ;
+
+// -----------------------------------------------------------------------------
+// Invariant — structural constraint on an entity
+// -----------------------------------------------------------------------------
+
+invariantDef     = "invariant" , typeName , "{"
+                 ,   "on" , typeName
+                 ,   "must" , "{" , expression , "}"
+                 ,   "message" , stringLiteral
+                 , "}" ;
+
+// -----------------------------------------------------------------------------
+// Expressions
+// -----------------------------------------------------------------------------
+
+expression       = orExpr ;
+
+orExpr           = andExpr , { "or" , andExpr } ;
+
+andExpr          = notExpr , { "and" , notExpr } ;
+
+notExpr          = [ "not" ] , comparison ;
+
+comparison       = addExpr , [ compOp , addExpr ] ;
+
+compOp           = "=" | "!=" | ">" | "<" | ">=" | "<=" ;
+
+addExpr          = mulExpr , { ( "+" | "-" ) , mulExpr } ;
+
+mulExpr          = unaryExpr , { ( "*" | "/" ) , unaryExpr } ;
+
+unaryExpr        = dotPath , "is" , "defined"
+                 | dotPath , "is" , "not" , "defined"
+                 | dotPath , "in" , "{" , valueList , "}"
+                 | dotPath , "not" , "in" , "{" , valueList , "}"
+                 | functionCall
+                 | dotPath
+                 | literal
+                 | "(" , expression , ")" ;
+
+// -----------------------------------------------------------------------------
+// Dot-path: references to fields across the model
+// -----------------------------------------------------------------------------
+
+dotPath          = identifier , { "." , identifier } ;
+
+// -----------------------------------------------------------------------------
+// Value expressions (right-hand side of sets...to, comparisons, etc.)
+// -----------------------------------------------------------------------------
+
+valueExpr        = functionCall
+                 | dotPath
+                 | literal ;
+
+valueList        = valueExpr , { "," , valueExpr } ;
+
+// -----------------------------------------------------------------------------
+// Built-in functions
+// -----------------------------------------------------------------------------
+
+functionCall     = functionName , "(" , [ argList ] , ")" ;
+
+argList          = expression , { "," , expression } ;
+
+functionName     = "count"
+                 | "sum"
+                 | "now"
+                 | "today"
+                 | "size"
+                 | "isEmpty"
+                 | "isNotEmpty" ;
+
+// -----------------------------------------------------------------------------
+// Literals
+// -----------------------------------------------------------------------------
+
+literal          = stringLiteral | number | "true" | "false" ;
+
+stringLiteral    = '"' , { character } , '"' ;
+
+number           = [ "-" ] , digit , { digit } , [ "." , digit , { digit } ] ;
+
+// -----------------------------------------------------------------------------
+// Identifiers
+// -----------------------------------------------------------------------------
+
+typeName         = pascalCaseId ;
+
+identifier       = camelCaseId | pascalCaseId ;
+
+pascalCaseId     = upperLetter , { letter | digit } ;
+
+camelCaseId      = lowerLetter , { letter | digit } ;
+
+// -----------------------------------------------------------------------------
+// Comments
+// -----------------------------------------------------------------------------
+
+comment          = "//" , { character } , newline ;
+
+// -----------------------------------------------------------------------------
+// Character classes
+// -----------------------------------------------------------------------------
+
+upperLetter      = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I"
+                 | "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R"
+                 | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" ;
+
+lowerLetter      = "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i"
+                 | "j" | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r"
+                 | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" ;
+
+letter           = upperLetter | lowerLetter ;
+
+digit            = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+
+character        = letter | digit | " " | "!" | "@" | "#" | "$" | "%" | "^"
+                 | "&" | "*" | "(" | ")" | "-" | "_" | "=" | "+" | "["
+                 | "]" | "{" | "}" | "|" | "\\" | ":" | ";" | "'" | ","
+                 | "." | "<" | ">" | "/" | "?" | "~" | "`" ;
+
+newline          = "\n" ;
+```
+
+---
+
+## Canonical Examples
+
+### orders.struct
+
+```specy
+domain "Orders"
+
+// =============================================================================
+// Enums
+// =============================================================================
+
+enum OrderStatus {
+  draft
+  confirmed
+  shipped
+  delivered
+  cancelled
+}
+
+enum PaymentStatus {
+  pending
+  captured
+  failed
+  refunded
+}
+
+enum PaymentMethod {
+  creditCard
+  bankTransfer
+  paypal
+}
+
+enum CustomerStatus {
+  active
+  suspended
+  closed
+}
+
+// =============================================================================
+// Value Objects
+// =============================================================================
+
+value Address {
+  street : string
+  city : string
+  zipCode : string maxLength(10)
+  country : string
+}
+
+value Money {
+  amount : decimal min(0)
+  currency : string default("EUR") maxLength(3)
+}
+
+value EmailAddress {
+  value : string pattern("^[^@]+@[^@]+\\.[^@]+$")
+}
+
+// =============================================================================
+// Entities
+// =============================================================================
+
+entity Customer {
+  id : uuid unique immutable
+  name : string minLength(1) maxLength(100)
+  email : EmailAddress unique
+  status : CustomerStatus default("active")
+  birthDate : date optional past
+  shippingAddress : Address optional
+  createdAt : datetime immutable pastOrPresent
+}
+
+entity Product {
+  id : uuid unique immutable
+  name : string minLength(1) maxLength(200)
+  description : string optional maxLength(2000)
+  price : Money
+  tags : set<string> optional
+  rating : int optional range(1, 5)
+  available : boolean default("true")
+}
+
+entity OrderLine {
+  id : uuid unique immutable
+  product : Product
+  quantity : int required min(1) max(1000)
+  unitPrice : Money
+  lineTotal : Money
+}
+
+entity Order {
+  id : uuid unique immutable
+  customer : Customer
+  lines : list<OrderLine>
+  status : OrderStatus default("draft")
+  totalAmount : Money
+  shippingAddress : Address
+  estimatedDelivery : date optional futureOrPresent
+  requiredDeliveryBy : date optional future
+  placedAt : datetime optional pastOrPresent
+  confirmedAt : datetime optional pastOrPresent
+  shippedAt : datetime optional pastOrPresent
+  deliveredAt : datetime optional pastOrPresent
+  cancelledAt : datetime optional pastOrPresent
+  createdAt : datetime immutable pastOrPresent
+}
+
+entity Payment {
+  id : uuid unique immutable
+  order : Order
+  amount : Money
+  method : PaymentMethod
+  status : PaymentStatus default("pending")
+  processedAt : datetime optional pastOrPresent
+  failureReason : string optional maxLength(500)
+  createdAt : datetime immutable pastOrPresent
+}
+
+// =============================================================================
+// Commands
+// =============================================================================
+
+command PlaceOrder {
+  customerId : uuid
+  lines : list<OrderLine>
+  shippingAddress : Address
+}
+
+command ConfirmOrder {
+  orderId : uuid
+}
+
+command CancelOrder {
+  orderId : uuid
+  reason : string optional maxLength(500)
+}
+
+command ProcessPayment {
+  orderId : uuid
+  method : PaymentMethod
+}
+
+command RefundPayment {
+  paymentId : uuid
+  reason : string optional maxLength(500)
+}
+
+command ShipOrder {
+  orderId : uuid
+  trackingNumber : string optional maxLength(100)
+}
+
+command DeliverOrder {
+  orderId : uuid
+}
+
+// =============================================================================
+// Events
+// =============================================================================
+
+event OrderPlaced {
+  orderId : uuid
+  customerId : uuid
+  totalAmount : Money
+  placedAt : datetime
+}
+
+event OrderConfirmed {
+  orderId : uuid
+  confirmedAt : datetime
+}
+
+event OrderCancelled {
+  orderId : uuid
+  reason : string optional
+  cancelledAt : datetime
+}
+
+event OrderShipped {
+  orderId : uuid
+  shippedAt : datetime
+  trackingNumber : string optional
+}
+
+event OrderDelivered {
+  orderId : uuid
+  deliveredAt : datetime
+}
+
+event PaymentProcessed {
+  paymentId : uuid
+  orderId : uuid
+  amount : Money
+  method : PaymentMethod
+  processedAt : datetime
+}
+
+event PaymentFailed {
+  paymentId : uuid
+  orderId : uuid
+  reason : string
+  failedAt : datetime
+}
+
+event PaymentRefunded {
+  paymentId : uuid
+  orderId : uuid
+  amount : Money
+  reason : string optional
+  refundedAt : datetime
+}
+```
+
+### orders.flow
+
+```specy
+domain "Orders"
+uses "orders.struct"
+
+// =============================================================================
+// Interactions — command-triggered (intentional)
+// =============================================================================
+
+interaction "Place a new order" {
+  on PlaceOrder
+
+  resolves Customer from PlaceOrder.customerId
+  creates Order
+
+  fails "Customer not found or inactive" when {
+    Customer.status != active
+  }
+
+  fails "Order has no lines" when {
+    isEmpty(PlaceOrder.lines)
+  }
+
+  fails "Some products are unavailable" when {
+    PlaceOrder.lines.product.available != true
+  }
+
+  sets Order.status to draft
+  sets Order.placedAt to now()
+  sets Order.totalAmount to sum(Order.lines.lineTotal)
+
+  emits OrderPlaced
+}
+
+interaction "Confirm an order after payment" {
+  on ConfirmOrder
+
+  resolves Order from ConfirmOrder.orderId
+  resolves Payment via Payment.order from Order
+
+  fails "Order is not in draft status" when {
+    Order.status != draft
+  }
+
+  fails "Order has not been placed yet" when {
+    Order.placedAt is not defined
+  }
+
+  fails "Payment not yet captured" when {
+    Payment.status != captured
+  }
+
+  sets Order.status to confirmed
+  sets Order.confirmedAt to now()
+
+  emits OrderConfirmed
+}
+
+interaction "Cancel an order" {
+  on CancelOrder
+
+  resolves Order from CancelOrder.orderId
+
+  fails "Order cannot be cancelled" when {
+    Order.status not in {draft, confirmed}
+  }
+
+  sets Order.status to cancelled
+  sets Order.cancelledAt to now()
+
+  emits OrderCancelled
+}
+
+interaction "Process payment for an order" {
+  on ProcessPayment
+
+  resolves Order from ProcessPayment.orderId
+  creates Payment
+
+  fails "Order is not in draft status" when {
+    Order.status != draft
+  }
+
+  sets Payment.status to captured
+  sets Payment.processedAt to now()
+  sets Payment.method to ProcessPayment.method
+  sets Payment.amount to Order.totalAmount
+
+  emits PaymentProcessed
+}
+
+interaction "Refund a captured payment" {
+  on RefundPayment
+
+  resolves Payment from RefundPayment.paymentId
+
+  fails "Payment is not captured" when {
+    Payment.status != captured
+  }
+
+  fails "Order is not cancelled" when {
+    Payment.order.status != cancelled
+  }
+
+  sets Payment.status to refunded
+
+  emits PaymentRefunded
+}
+
+interaction "Ship a confirmed order" {
+  on ShipOrder
+
+  resolves Order from ShipOrder.orderId
+  resolves Payment via Payment.order from Order
+
+  fails "Shipping address is missing" when {
+    not (Order.shippingAddress is defined)
+  }
+
+  fails "Order is not confirmed or payment not captured" when {
+    (Order.status != confirmed) or (Payment.status != captured)
+  }
+
+  sets Order.status to shipped
+  sets Order.shippedAt to now()
+
+  emits OrderShipped
+}
+
+interaction "Deliver a shipped order" {
+  on DeliverOrder
+
+  resolves Order from DeliverOrder.orderId
+
+  fails "Order is not shipped" when {
+    Order.status != shipped
+  }
+
+  sets Order.status to delivered
+  sets Order.deliveredAt to now()
+
+  emits OrderDelivered
+}
+
+// =============================================================================
+// Interactions — event-triggered (reactive)
+// =============================================================================
+
+interaction "Notify customer when order is confirmed" {
+  on OrderConfirmed
+
+  then "Notify customer that order is confirmed"
+  then "Trigger shipment preparation"
+}
+
+interaction "Handle payment failure" {
+  on PaymentFailed
+
+  resolves Payment from PaymentFailed.paymentId
+
+  then "Notify customer of payment failure"
+  then "Allow retry with a different payment method"
+
+  sets Payment.status to failed
+}
+
+interaction "Handle order cancellation side effects" {
+  on OrderCancelled
+
+  then "Notify customer that order is cancelled"
+  then "Restore product stock for each order line"
+}
+
+interaction "Notify customer of refund" {
+  on PaymentRefunded
+
+  then "Notify customer that refund has been processed"
+}
+
+interaction "Notify customer of delivery" {
+  on OrderDelivered
+
+  then "Notify customer that order has been delivered"
+  then "Close order lifecycle"
+}
+
+// =============================================================================
+// Policies — domain-wide rules
+// =============================================================================
+
+policy MaxOrderAmount {
+  when {
+    Order.totalAmount.amount > 10000
+  }
+  then "Orders above 10000 require manual approval before confirmation"
+}
+
+policy InactiveCustomerBlocked {
+  when {
+    Customer.status = suspended or Customer.status = closed
+  }
+  then "Suspended or closed customers cannot place new orders"
+}
+
+policy MinimumOrderAmount {
+  when {
+    Order.totalAmount.amount < 1
+  }
+  then "Orders must have a total amount of at least 1"
+}
+
+policy UnavailableProductBlocked {
+  when {
+    Product.available = false
+  }
+  then "Unavailable products cannot be added to orders"
+}
+
+policy LateDeliveryAlert {
+  when {
+    (Order.status = confirmed or Order.status = shipped) and Order.estimatedDelivery <= today()
+  }
+  then "Orders past their estimated delivery date require attention"
+}
+
+policy MaxOrderLines {
+  when {
+    count(Order.lines) > 20
+  }
+  then "Orders with more than 20 lines require manual review"
+}
+
+// =============================================================================
+// Invariants — structural constraints on entities
+// =============================================================================
+
+invariant OrderMustHaveLines {
+  on Order
+  must {
+    isNotEmpty(Order.lines)
+  }
+  message "An order must contain at least one line"
+}
+
+invariant OrderTotalMustBePositive {
+  on Order
+  must {
+    Order.totalAmount.amount >= 0
+  }
+  message "Order total amount must not be negative"
+}
+
+invariant PaymentAmountMustMatchOrder {
+  on Payment
+  must {
+    Payment.amount.amount = Payment.order.totalAmount.amount
+  }
+  message "Payment amount must equal the order total"
+}
+
+invariant OrderLineMustHavePositiveQuantity {
+  on OrderLine
+  must {
+    OrderLine.quantity > 0
+  }
+  message "Order line quantity must be greater than zero"
+}
+
+invariant OrderLineTotal {
+  on OrderLine
+  must {
+    OrderLine.lineTotal.amount = OrderLine.unitPrice.amount * OrderLine.quantity
+  }
+  message "Line total must equal unit price multiplied by quantity"
+}
+```
 
 ---
 
@@ -505,7 +2411,7 @@ Read the canonical examples to calibrate output style:
 2. **Enum values in camelCase.** Every enum value must be a valid `camelCaseId` (starts with a lowercase letter, no underscores). Convert `UPPER_SNAKE_CASE` from source code: `ACCOUNT_CREATED` → `accountCreated`, `PENDING` → `pending`.
 3. **Enum values verified.** Every enum value used in a `.flow` expression (e.g. `Order.status != draft`) must exist in the corresponding `enum` definition in the `.struct`.
 4. **Dot-paths resolved.** Every `dotPath` in the `.flow` must chain through fields that exist in the `.struct`. `Order.totalAmount.amount` requires `Order` to have a `totalAmount` field of type `Money`, and `Money` to have an `amount` field.
-5. **Expressions must be valid.** See `constructs/expressions.md` for the complete rules on `when`/`must` expressions, tautology prohibition, and operator usage.
+5. **Expressions must be valid.** See the Expression Rules section above for the complete rules on `when`/`must` expressions, tautology prohibition, and operator usage.
 6. **No `null` literal.** The grammar has no `null` value. If the code sets a field to null, express it with a `// NOTE:` comment instead of `sets ... to null`.
 7. **Business-language messages.** Failure messages, policy consequences, and invariant messages must use domain vocabulary, not technical jargon. Write `"Customer not found or inactive"`, not `"EntityNotFoundException"`.
 8. **Preserve source vocabulary.** Use the same names as the code: if the code says `Order`, write `Order`, not `PurchaseOrder`. If the code says `cancel`, write `cancel`, not `abort`.
@@ -521,14 +2427,14 @@ Read the canonical examples to calibrate output style:
 
 ### Construct-specific
 
-Rules specific to each flow construct are documented in the corresponding file under `constructs/`. Key rules per construct:
+Rules specific to each flow construct are documented in the Flow Constructs section above. Key rules per construct:
 
-- **Interaction (command-triggered):** one per command, `creates` must list all created entities, label describes intent. See `constructs/interaction.md`.
-- **Interaction (event-triggered):** 0 to N per event, label describes intent. See `constructs/interaction.md`.
-- **Service:** use `then` for unexpressible logic, no service for pure infrastructure. See `constructs/service.md`.
-- **Repository:** pure data access only (no `then`/`fails`/`sets`/`emits`), `for` must be aggregate root, no repository for technical types. See `constructs/repository.md`.
-- **Policy:** real `when` condition required, no tautologies. See `constructs/policy.md`.
-- **Invariant:** `on` entities only, never commands/events/values. See `constructs/invariant.md`.
+- **Interaction (command-triggered):** one per command, `creates` must list all created entities, label describes intent. See the Interaction section.
+- **Interaction (event-triggered):** 0 to N per event, label describes intent. See the Interaction section.
+- **Service:** use `then` for unexpressible logic, no service for pure infrastructure. See the Service section.
+- **Repository:** pure data access only (no `then`/`fails`/`sets`/`emits`), `for` must be aggregate root, no repository for technical types. See the Repository section.
+- **Policy:** real `when` condition required, no tautologies. See the Policy section.
+- **Invariant:** `on` entities only, never commands/events/values. See the Invariant section.
 
 ---
 
@@ -556,7 +2462,7 @@ If the project has more than ~50 model classes or ~30 service classes, ask the u
 When a command handler mutates state but does not publish an event, annotate with `// UNCLEAR: no event emitted — consider adding {SuggestedEventName}`. Do not invent the event.
 
 ### Unexpressible Conditions
-See `constructs/expressions.md` for the full list of unexpressible condition categories and the correct handling pattern (use `// UNCLEAR:` comments, never emit a `fails` clause with a placeholder expression).
+See the Expression Rules section above for the full list of unexpressible condition categories and the correct handling pattern (use `// UNCLEAR:` comments, never emit a `fails` clause with a placeholder expression).
 
 ### Inheritance and Polymorphism
 When entities use inheritance (e.g. `Payment` → `CreditCardPayment`, `BankTransferPayment`):
