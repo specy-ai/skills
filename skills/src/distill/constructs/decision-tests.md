@@ -32,7 +32,7 @@ If the result affects an entity field via `sets` or conditions the flow via `fai
 
 | Trap | Why it fails | Action |
 |---|---|---|
-| `field is defined` on a required/immutable field | Always true → tautology | Use the real condition or `// UNCLEAR` |
+| `field is defined` on a required/immutable field (in `fails` or `must`) | Always true → tautology | Use the real condition or `// UNCLEAR` |
 | `now() - Entity.createdAt > 5` | No duration operator → ambiguous | `// UNCLEAR` with business rule |
 | Status check masking a cross-aggregate rule | Real condition involves another aggregate | Model the cross-aggregate lookup or `// UNCLEAR` |
 | Placeholder `when { totalAmount > 0 }` for fraud check | Real logic is an external API call | `// NOTE` (infrastructure) |

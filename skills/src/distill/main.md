@@ -303,6 +303,7 @@ Before writing final files, verify each item. If any fails, fix it.
 
 - [ ] Enum values in `camelCase` (no `UPPER_SNAKE_CASE`)
 - [ ] No `fails when { field is defined }` on a required/immutable field
+- [ ] No `invariant` with `must { field is defined }` on a required/immutable field (same tautology)
 - [ ] No `invariant` on command, event, or value (entities only)
 - [ ] No `policy` with a tautological `when`
 - [ ] No `service` for pure infrastructure
