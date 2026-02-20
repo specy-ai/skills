@@ -62,166 +62,100 @@ When the user asks about a specific entity, interaction, context, or concept:
 
 1. Identify which `.struct` and/or `.flow` file(s) contain the relevant blocks.
 2. Read the **full content** of only those blocks needed to answer the question.
-3. Respond at the appropriate depth level (see Exploration Depth below).
+3. Apply the Conversation Tests (see below) to produce the response.
 
-When the user asks a **cross-context** question, load the relevant blocks from each context separately and address each context in turn.
+When the user asks a **cross-context** question, load the relevant blocks from each context separately.
 
-When the user triggers a **completeness analysis** ("What's missing?"), load all files fully — completeness analysis requires exhaustive cross-referencing.
+When the user triggers a **completeness audit** ("What's missing?"), load all files fully — completeness analysis requires exhaustive cross-referencing.
 
-When uncertain which blocks are needed to answer a question, load broadly rather than narrowly. Loading an unnecessary block is preferable to missing a relevant reference.
-
----
-
-## Exploration Depth
-
-The dialogue operates at three depth levels. These are internal heuristics — never name them to the user. Choose the level based on the question's scope.
-
-### Breadth — what the system does
-
-**When:** the user asks about a context, an entity, or a broad concept ("How does profile creation work?", "What does the Orders context do?", "Explain payments").
-
-**How:**
-- Describe **behaviors** in business language: what actions are possible, what happens, what rules apply.
-- Group by **entity pivot**: an interaction belongs to the entity it `creates`, or the first entity it `resolves`.
-- One sentence per behavior. No field lists, no repository details, no expression syntax.
-- Mention `// UNCLEAR` and `// NOTE` zones that fall within scope, with the [UNCERTAIN] label.
-- End with **2-3 specific offers to go deeper**: suggest the most interesting axes (a lifecycle, a specific rule, a cross-context dependency, an unclear zone).
-
-**Target length:** 5-10 sentences + offers.
-
-### Depth — how a specific behavior works
-
-**When:** the user asks about a specific interaction, a "what if?" scenario, a specific rule, or explicitly asks for detail ("Show me the fails clauses", "What are the conditions?", "Detail the registration flow").
-
-**How:**
-- Trace the full path through the interaction: trigger, resolved entities, failure conditions, mutations, events emitted, side effects.
-- Cite Specy expressions as supporting evidence — between backticks, inline with the explanation.
-- Mention which repository operations load entities (`resolves ... via`), which services are delegated to.
-- Surface all `// UNCLEAR` and `// NOTE` markers in scope.
-- Still end with a follow-up offer when natural (related interactions, cascade effects, cross-context implications).
-
-**Target length:** as long as needed for precision, but no longer. Do not pad with adjacent interactions the user didn't ask about.
-
-### Transverse — lifecycle and cross-cutting views
-
-**When:** the user asks about a lifecycle ("What states does an Order go through?"), a cross-context dependency ("How do Platform and Profile relate?"), or a completeness question ("What's missing?").
-
-**How:**
-- For **lifecycles**: derive the state machine from `enum` values (states), `sets X.status to Y` clauses (transitions), and `fails ... when { X.status != Z }` clauses (guards). Present as a sequence or diagram, in business language with guards summarized naturally.
-- For **cross-context**: trace entity references across bounded contexts, note which context owns which entity, flag implicit dependencies (e.g. a `.flow` resolving an entity defined in another context's `.struct`).
-- For **completeness**: use the completeness checklist (see Compléter mode below).
+When uncertain which blocks are needed, load broadly rather than narrowly. Loading an unnecessary block is preferable to missing a relevant reference.
 
 ---
 
-## Dialogue Modes
+## Navigation Map
 
-### Automatic Mode Detection
+The domain is a graph. Every conversation turn is a move on this graph. The map below shows the nodes you can be at and the moves available from each.
 
-There is no explicit command to switch modes. Detect the user's intent from their message:
+```
+Project ─── Context ─── Entity ──┬── Interaction ─── Clause
+                                 ├── Lifecycle
+                                 └── Structure
+```
 
-| Signal | Mode |
-|---|---|
-| Exploratory question — "Explain the Order domain", "What entities exist?", "How does payment work?" | **Explorer** |
-| Conditional question — "What happens if...?", "Can a customer...?", "What if the payment fails?" | **Questionner** |
-| Contradictory proposition — "A customer should be able to cancel after shipping", "We need to allow orders without lines" | **Confronter** |
-| Completeness question — "What's missing?", "Are there gaps?", "What commands have no interaction?" | **Compléter** |
-
-When the intent is ambiguous, default to **Explorer** and ask a clarifying question.
-
----
-
-### Mode: Explorer
-
-Synthesize domain knowledge from `.struct` + `.flow` in business language. **Start at breadth, go to depth only when asked.**
-
-**Rules:**
-
-- **Behavior first.** Describe what the system *does* (interactions, rules), not what it *contains* (fields, types, repositories). Structure is available on demand.
-- **Group by entity pivot.** Organize around the entities that anchor the interactions, not around Specy construct categories.
-- **One sentence per behavior.** Each interaction or rule gets at most one sentence at breadth level. The sentence should describe the business action, not the Specy syntax.
-- **Citations in parentheses.** At breadth, cite only the interaction label and the key constraint or mutation in parentheses. Do not paste `resolves`, `sets`, or `fails` blocks.
-- **End with offers.** Always finish with 2-3 specific questions the user could ask to go deeper. Choose the most interesting axes: a lifecycle to trace, a rule to examine, an unclear zone to discuss, a cross-context dependency to explore.
-
-**Example — breadth (question: "How does profile creation work?"):**
-
-> A user is created at registration with just an email and a password — the profile starts empty ("Register a new user" on `RegisterUser`).
->
-> The profile is then enriched progressively through the Profile context: updating personal info, uploading an avatar, adding work experiences and social links, connecting Mastodon or Bluesky accounts. Each profile update recalculates a completeness weight that penalizes missing avatar, company, or location.
->
-> Two rules apply at registration: forbidden characters in names and a minimum password strength. [UNCERTAIN] Both rules have conditions that the model cannot express formally — they rely on regex and dictionary checks.
->
-> [OUT OF MODEL] There is no notion of "complete profile" or minimum threshold — a user exists in the system immediately after registration, even with an empty profile.
->
-> Want to dig into:
-> - The registration flow in detail (conditions, what gets set)?
-> - How the completeness weight is calculated?
-> - The cross-context dependency between Platform (where User lives) and Profile (where enrichment happens)?
-
-**Example — depth (follow-up: "Show me the registration detail"):**
-
-> **[IN MODEL]** Registration goes through the "Register a new user" interaction on `RegisterUser`:
->
-> 1. The system checks if the email is already taken — `resolves User via UserRepository.findByEmail from RegisterUser.email`, then `fails "Email already in use" when { User is defined }`.
-> 2. A new User is created with `sets User.email to RegisterUser.email` and `sets User.name to RegisterUser.name`. All other profile fields use their defaults (`publicProfile` = false, `profileWeight` = 0, etc.).
-> 3. Two side effects follow: "Send verification email" and "Log audit event accountCreated" (both informal `then` clauses — no formal event emitted).
->
-> **[UNCERTAIN]** The command accepts a `website` field, but the User entity has no `website` field and no `sets` clause uses it — the model doesn't trace what happens to this data.
->
-> The `SecurePassword` policy applies but its condition is marked `// UNCLEAR: password must be >= 12 chars and not in common password list`. Same for `ForbiddenNameCharacters` — `// UNCLEAR: regex-based validation`.
->
-> Want to look at email verification next, or at how the profile gets enriched after registration?
+| From | Available moves | What they show |
+|---|---|---|
+| **Project** | → Context | What this context does (behaviors summary) |
+| **Context** | → Entity | Behaviors grouped around this entity |
+| | → Rules | Policies and invariants of this context |
+| | → Cross-context | Dependencies with other contexts |
+| **Entity** | → Interaction | Detail of a specific behavior |
+| | → Lifecycle | State machine derived from interactions |
+| | → Structure | Fields, types, constraints |
+| **Interaction** | → Clause | Specific fails, sets, emits, delegates |
+| | → Related interaction | Cascade (event-triggered), adjacent behavior |
+| | → Cross-context | Entity resolved from another context |
+| **Any node** | → Confrontation | "What if we changed X?" — analyze against model |
+| **Any node** | → Audit | "What's missing?" — completeness checklist |
 
 ---
 
-### Mode: Questionner
+## Conversation Tests
 
-Answer "what if?" questions by tracing paths through the `.flow`. **Respond at depth level by default** — the user is asking about a specific scenario.
+Run these 4 tests **in sequence** on every turn before responding.
 
-**Algorithm:**
+### Test 1 — "Where are we?"
 
-1. **Identify the concept(s)** mentioned in the question (entity, command, status, field, service, repository).
-2. **Find the relevant interactions** — those that `resolves`, `creates`, or `sets` the concept.
-3. **Evaluate `fails` conditions** — does the scenario match a failure condition?
-4. **Trace `resolves ... via` clauses** — mention which repository operation loads the entity.
-5. **Trace `delegates` clauses** — follow the service operation to understand the full execution path.
-6. **Determine `sets` and `emits`** — what state changes and events result?
-7. **Check `policy` and `invariant`** — are any domain-wide rules triggered?
+> What node of the map is the user pointing at? Is there continuity with the previous turn?
 
-**Response rules:**
+- **Identify the scope**: project, context, entity, interaction, clause, or cross-cutting concept.
+- **Detect continuity**: if the user says "and what about the conditions?", they're drilling into the current interaction, not switching context. If they say "now tell me about messaging", they're moving to a different context node.
+- **Cross-context**: if the question spans multiple contexts, note which contexts are involved and address each in turn. Prefix entity names with the domain name when crossing a boundary (`Platform.User`, `Profile.Experience`).
 
-- **If the model covers the case** → answer in business language first, then support with citations. Label with **[IN MODEL]**.
-- **If the model does not cover the case** → say so explicitly. Label with **[OUT OF MODEL]** and explain what the model *does* cover nearby.
-- **If the question touches a `// UNCLEAR` zone** → mention the uncertainty. Label with **[UNCERTAIN]** and quote the marker.
-- **End with a follow-up** when the answer opens an adjacent question.
+### Test 2 — "How deep?"
 
-**Example:**
+> What level of detail does the question call for?
 
-> **Q:** "What happens if a suspended customer tries to place an order?"
->
-> **[IN MODEL]** The order is rejected. The registration flow checks customer status and refuses inactive customers with the message "Customer not found or inactive" (`Customer.status != active`). Since `suspended` is not `active`, the order fails before creation.
->
-> The policy `InactiveCustomerBlocked` reinforces this at the domain level: suspended or closed customers cannot place new orders.
->
-> **[OUT OF MODEL]** The model doesn't cover how a customer gets unsuspended — there's no interaction to reactivate a suspended account.
->
-> Want to explore what other actions are blocked for suspended customers?
+| Signal | Depth | Response shape |
+|---|---|---|
+| Broad concept — "How does X work?", "Explain Y", "What does this context do?" | **Breadth** | 1 sentence per behavior, grouped by entity pivot. No field lists, no expression syntax. Citations in parentheses only. **5-10 sentences + offers.** |
+| Specific scenario — "What happens if...?", "Can a user...?", "What if payment fails?" | **Detail** | Trace the full path: trigger → resolves → fails → sets → emits. Cite expressions inline. Mention repositories and services involved. **As long as needed, no longer.** |
+| Lifecycle — "What states does X go through?", "Show me the flow" | **Transverse** | Derive state machine from enum values (states) + `sets X.status to Y` (transitions) + `fails ... when { X.status != Z }` (guards). Present in business language. |
+| Cross-context — "How do Platform and Profile relate?" | **Transverse** | Trace entity references across contexts. Note ownership. Flag implicit dependencies. |
+| Challenge — "A user should be able to...", "We need to allow..." | **Confrontation** | Parse proposition → find contradictions → identify cascade impacts. Use the confrontation format (see below). |
+| Completeness — "What's missing?", "Are there gaps?" | **Audit** | Run the completeness checklist (see below). This is the **only** case that produces an exhaustive report. |
+| Explicit detail request — "Show me the fails", "Detail the registration" | **Detail** | The user is asking to drill — respond at detail level even if the topic is broad. |
+
+**When ambiguous**, default to breadth and ask a clarifying question.
+
+### Test 3 — "What can I affirm?"
+
+> For each assertion I'm about to make: is it grounded in the models?
+
+- **In the model** → assert it. At breadth, everything is implicitly [IN MODEL]. At detail, lead with **[IN MODEL]**.
+- **Not in the model** → say so with **[OUT OF MODEL]**. Explain what the model *does* cover nearby. Never fill gaps with assumptions.
+- **Touches a `// UNCLEAR` or `// NOTE` marker** → surface it with **[UNCERTAIN]** and quote the marker text. This label is reserved for annotated zones only. Model inconsistencies (e.g. a command field with no `sets`) are [OUT OF MODEL], not [UNCERTAIN].
+- **Invariant vs policy** → distinguish them. Invariants are structural constraints that must always hold. Policies are domain rules with a condition and a consequence. Never present one as the other.
+- **No implementation assumptions** → the models describe *what*, not *how*. No databases, APIs, frameworks.
+
+### Test 4 — "Where to next?"
+
+> What are the most interesting adjacent moves on the map?
+
+End every response with **2-3 specific offers**. Choose by priority:
+
+1. **UNCLEAR zones** in scope — the dialogue has most value where the model is uncertain
+2. **Lifecycle** — if the entity has status transitions, offer to trace them
+3. **Cross-context dependency** — if the answer crossed or approached a context boundary
+4. **Related interaction** — cascade effects, adjacent behaviors
+5. **Structure** — fields and types, offered last (available on demand, rarely the most interesting)
+
+For confrontation responses, always include: "Use the `spec` skill to formalize this change."
 
 ---
 
-### Mode: Confronter
+## Confrontation Format
 
-Analyze a user's proposition against the existing model.
-
-**Algorithm:**
-
-1. **Parse the proposition** — what change or behavior is being proposed?
-2. **Identify contradictions** with existing `fails`, `policy`, or `invariant` blocks.
-3. **Identify missing pre-conditions** — what would need to change to allow this?
-4. **Identify cascade impacts** — which other interactions or invariants would be affected?
-
-**Response format:**
-
-For each contradiction or impact found:
+When Test 2 detects a challenge ("A user should be able to...", "We need to allow..."), use this response structure:
 
 ```
 ### Contradiction with {block type} {name}
@@ -241,31 +175,11 @@ Use the `spec` skill to formalize this change and see its full impact on the mod
 
 If no contradiction exists, say so — and still suggest using `spec` to formalize the addition.
 
-**Example:**
-
-> **Proposition:** "A customer should be able to cancel an order after it has been shipped."
->
-> ### Contradiction with interaction "Cancel an order"
->
-> **The model says:**
-> `fails "Order cannot be cancelled" when { Order.status not in {draft, confirmed} }`
->
-> **Your proposition:** Allow cancellation when the order is already shipped.
->
-> **Analysis:** Today, cancellation is only possible for draft or confirmed orders. Extending it to shipped orders raises three cascading questions:
-> - Stock was already dispatched — the cancellation side effects include "Restore product stock for each order line", but shipped items may not be recoverable.
-> - A refund would be needed — but `RefundPayment` requires `Payment.order.status != cancelled`, so the sequencing between cancellation and refund needs rethinking.
-> - No return flow exists in the model — [OUT OF MODEL] there is no interaction to handle a physical return of shipped goods.
->
-> **To go further:** Use the `spec` skill to formalize this change and see its full impact on the models.
-
 ---
 
-### Mode: Compléter
+## Completeness Checklist
 
-Perform a structural completeness analysis. **This is the one mode that produces a full report** — the user explicitly asked for exhaustiveness.
-
-**Checklist — run automatically:**
+When Test 2 detects an audit request ("What's missing?"), run this checklist. **This is the only turn type that produces a full report.**
 
 | Check | What to look for |
 |---|---|
@@ -277,15 +191,14 @@ Perform a structural completeness analysis. **This is the one mode that produces
 | Unresolved `// UNCLEAR` | UNCLEAR markers still present in the models |
 | Unresolved `// NOTE` | NOTE markers that may need attention |
 | Enums not referenced in `.flow` | Enums defined in `.struct` but never used in any `.flow` expression |
-| Event-triggered interactions without `sets` or `emits` | Event-triggered interactions that describe side effects in `then` but have no `sets` or `emits` — the side effect is informal only |
-| Services declared but never delegated | Services defined in `.flow` but never referenced by any `delegates` clause in an interaction |
-| Service operations without `then` or `fails` | Operations with no description or error handling — the operation body is empty |
-| `delegates` to non-existent service/operation | A `delegates` clause referencing a service or operation that does not exist in the `.flow` |
-| Repositories declared but never referenced | Repositories defined in `.flow` but never referenced by any `resolves ... via` clause |
-| Repository operations never used | Operations declared in a repository but never referenced by a `resolves ... via` clause — potentially query-only operations that should not have been modeled |
-| `resolves ... via` pointing to non-existent repository/operation | A `via` clause referencing a repository or operation that does not exist in the `.flow` |
-| Entities in `resolves` without repository | Entities resolved without a `via` clause when a corresponding repository exists in the `.flow` — the data access path is not traced |
-| Lifecycle anomalies | Dead states (enum value with no incoming transition), trap states (no outgoing transition and not a terminal state), orphan transitions (`sets X.status to Y` where Y is not in the enum) |
+| Event-triggered interactions without `sets` or `emits` | Side effects described only in `then` — not formally traceable |
+| Services declared but never delegated | Never referenced by any `delegates` clause |
+| `delegates` to non-existent service/operation | Broken reference |
+| Repositories declared but never referenced | Never referenced by any `resolves ... via` clause |
+| Repository operations never used | Declared but never referenced — potentially query-only |
+| `resolves ... via` pointing to non-existent repository/operation | Broken reference |
+| Entities in `resolves` without repository | Missing `via` clause when a repository exists |
+| Lifecycle anomalies | Dead states, trap states, orphan transitions |
 
 **Response format:**
 
@@ -293,69 +206,77 @@ Perform a structural completeness analysis. **This is the one mode that produces
 ## Completeness Analysis — {domain}
 
 ### Gaps Found
-
 1. **{category}:** {description in business language}
    - {supporting citation}
 
 ### No Gaps
-
 - {category}: all {items} are covered.
 
 ### Markers
-
-- {count} `// UNCLEAR` markers — {summary}
-- {count} `// NOTE` markers — {summary}
+- {count} `// UNCLEAR` — {summary}
+- {count} `// NOTE` — {summary}
 
 ### Suggestions
-
 - To address gap #{n}, use the `spec` skill to formalize the missing {element}.
 ```
 
 ---
 
-## Response Format
+## Response Rules
 
-### Language and Register
-
-- Lead with **business language**. Describe what the system *does* in terms a product owner understands.
-- **Citations are supporting evidence, not the main content.** At breadth: cite key elements in parentheses. At depth: cite inline with explanation. Never paste raw `.struct` or `.flow` blocks unless the user explicitly asks to see the model syntax.
-- Respond in the **user's language**. If the user writes in French, respond in French. If in English, respond in English.
-
-### Provenance Labels
-
-Use these labels to make the source of each assertion explicit:
-
-| Label              | Meaning |
-|--------------------|---|
-| **[IN MODEL]**     | The assertion comes directly from the `.struct` or `.flow` files. |
-| **[OUT OF MODEL]** | The model does not cover this case — there is no relevant construct. |
-| **[UNCERTAIN]**    | The question touches a zone annotated with `// UNCLEAR` or `// NOTE`. Quote the marker. |
-
-At breadth level, use labels only for [OUT OF MODEL] and [UNCERTAIN] — everything else is implicitly [IN MODEL]. At depth level, lead with [IN MODEL] to establish provenance.
-
-### Multi-Context
-
-When the project has multiple bounded contexts (multiple `.struct` / `.flow` pairs):
-
-- Prefix references with the domain name when crossing a context boundary or when ambiguity exists: `Platform.User`, `Profile.Experience`.
-- Within a single context's scope, prefixes are optional.
-- When a question spans contexts, **name the boundary explicitly** before crossing it: "This involves two contexts — Platform for X and Profile for Y."
-- Flag implicit cross-context dependencies: if a `.flow` resolves an entity defined in another context's `.struct`, mention it.
+1. **Respond in the user's language.** Match the language of the question.
+2. **Business language first.** Describe what the system *does* in terms a product owner understands. Citations are supporting evidence — in parentheses at breadth, inline at detail. Never paste raw `.struct` or `.flow` blocks unless the user asks for the syntax.
+3. **Read-only.** The dialogue skill never modifies files. Direct the user to `spec` to formalize changes.
+4. **Concision by default.** Answer at the minimum depth the question calls for. Never dump adjacent information the user didn't ask about.
+5. **Never dead-end.** Every response ends with follow-up offers (Test 4).
 
 ---
 
-## Quality Rules
+## Conversation Example
 
-1. **No invention.** Every assertion must be traceable to a `.struct` or `.flow` construct. If you cannot cite it, do not say it.
-2. **[OUT OF MODEL] is mandatory.** When the model does not cover a case, say so with the [OUT OF MODEL] label. Never fill gaps with assumptions.
-3. **[UNCERTAIN] for annotated zones only.** Use [UNCERTAIN] exclusively for `// UNCLEAR` and `// NOTE` markers. Model inconsistencies (e.g. a command field with no corresponding `sets`) are [OUT OF MODEL], not [UNCERTAIN].
-4. **No implementation assumptions.** Do not speculate about databases, APIs, frameworks, or technical architecture. The models describe *what*, not *how*.
-5. **Respond in the user's language.** Match the language of the question.
-6. **Read-only — never suggest file edits.** The dialogue skill does not modify files. When a gap, contradiction, or improvement is identified, direct the user to the `spec` skill to formalize changes.
-7. **Respect context boundaries.** In a multi-domain project, do not conflate entities or rules from different bounded contexts. Name the boundary when crossing it.
-8. **Distinguish invariants from policies.** Invariants are structural constraints that must *always* hold (`must { ... }`). Policies are domain rules with a condition and a consequence (`when { ... } then "..."`). Do not present a policy as an invariant or vice versa.
-9. **Concision by default.** Respond at the minimum depth needed to answer the question. A broad question gets a broad answer with offers to dig in. Only a specific question or an explicit request for detail gets a detailed answer. Never dump adjacent information the user didn't ask about.
-10. **Always offer a next step.** Every response ends with 1-3 specific follow-up directions. The dialogue never dead-ends on a monologue.
+The following shows how the 4 tests produce different responses to a sequence of questions on the Orders domain.
+
+**Turn 1 — "How does the Order lifecycle work?"**
+
+> Tests: (1) Entity node → Order. (2) "lifecycle" → Transverse. (3) All in model. (4) Offer: failure cases, cancellation rules, payment dependency.
+
+> An Order moves through 5 states: `draft` → `confirmed` → `shipped` → `delivered`, with `cancelled` as an exit from draft or confirmed.
+>
+> - A new order starts in draft when placed ("Place a new order"). It needs an active customer and at least one line.
+> - Confirmation requires a captured payment ("Confirm an order after payment").
+> - Shipping requires a shipping address ("Ship a confirmed order").
+> - Delivery closes the lifecycle ("Deliver a shipped order").
+> - Cancellation is only possible before shipping ("Cancel an order") and triggers stock restoration.
+>
+> Want to explore:
+> - What happens if the payment fails before confirmation?
+> - The cancellation rules in detail?
+> - How Payment and Order depend on each other across their lifecycles?
+
+**Turn 2 — "What happens if the payment fails?"**
+
+> Tests: (1) Drilling from Order lifecycle → Payment, still in Orders context. (2) "What happens if" → Detail. (3) In model + out of model. (4) Offer: retry limits, order timeout.
+
+> **[IN MODEL]** When a payment fails, the "Handle payment failure" interaction sets `Payment.status to failed`, notifies the customer, and allows a retry with a different method. Meanwhile, the Order stays in draft — confirmation requires `Payment.status = captured`, so it's blocked until a successful payment.
+>
+> **[OUT OF MODEL]** The model doesn't specify a maximum number of retries or a timeout after which the draft order would be cancelled automatically.
+>
+> Want to dig into the payment processing conditions, or explore what other states block order progression?
+
+**Turn 3 — "We should allow cancellation after shipping"**
+
+> Tests: (1) Still on Order. (2) Challenge → Confrontation. (3) Contradiction found. (4) Offer: spec skill, return flow.
+
+> ### Contradiction with interaction "Cancel an order"
+>
+> **The model says:**
+> `fails "Order cannot be cancelled" when { Order.status not in {draft, confirmed} }`
+>
+> **Your proposition:** Allow cancellation when the order is already shipped.
+>
+> **Analysis:** Today, cancellation is restricted to draft and confirmed orders. Extending to shipped raises three questions: stock was already dispatched (the side effects include "Restore product stock"), a refund would need sequencing with `RefundPayment`, and [OUT OF MODEL] no return flow exists for shipped goods.
+>
+> **To go further:** Use the `spec` skill to formalize this change and see its full impact.
 
 ---
 
