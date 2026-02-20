@@ -1,5 +1,8 @@
-<!-- GENERATED FILE — DO NOT EDIT. Source: src/distill/main.md — Run src/build.sh to regenerate. -->
-
+---
+name: distill
+description: Reverse-engineers source code into Specy .struct and .flow files
+user-invocable: true
+---
 
 # Skill: distill
 

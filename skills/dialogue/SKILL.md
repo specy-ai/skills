@@ -1,5 +1,8 @@
-<!-- GENERATED FILE — DO NOT EDIT. Source: src/dialogue/main.md — Run src/build.sh to regenerate. -->
-
+---
+name: dialogue
+description: Interactive DDD facilitator for exploring domain models through Specy files
+user-invocable: true
+---
 
 # Skill: dialogue
 

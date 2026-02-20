@@ -1,5 +1,11 @@
 <!-- TEMPLATE — run build.sh to generate skills/spec/SKILL.md -->
 
+---
+name: spec
+description: Formalizes business specifications against existing Specy models
+user-invocable: true
+---
+
 # Skill: spec
 
 ## Role

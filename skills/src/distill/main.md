@@ -1,5 +1,11 @@
 <!-- TEMPLATE — run build.sh to generate skills/distill/SKILL.md -->
 
+---
+name: distill
+description: Reverse-engineers source code into Specy .struct and .flow files
+user-invocable: true
+---
+
 # Skill: distill
 
 ## Role

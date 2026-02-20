@@ -82,10 +82,9 @@ build_skill() {
 
   mkdir -p "$out_dir"
 
-  # Build the SKILL.md: header + resolved template (skip the template's own header comment)
+  # Build the SKILL.md: resolved template (skip the template's own header comment)
   {
-    printf "$HEADER\n\n" "$skill"
-    resolve_includes "$template" "$src_dir" | grep -v '^<!-- TEMPLATE'
+    resolve_includes "$template" "$src_dir" | grep -v '^<!-- TEMPLATE' | sed '/./,$!d'
   } > "$output"
 
   local lines

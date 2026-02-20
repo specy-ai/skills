@@ -1,5 +1,8 @@
-<!-- GENERATED FILE — DO NOT EDIT. Source: src/spec/main.md — Run src/build.sh to regenerate. -->
-
+---
+name: spec
+description: Formalizes business specifications against existing Specy models
+user-invocable: true
+---
 
 # Skill: spec
 

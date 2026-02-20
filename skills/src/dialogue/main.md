@@ -1,5 +1,11 @@
 <!-- TEMPLATE — run build.sh to generate skills/dialogue/SKILL.md -->
 
+---
+name: dialogue
+description: Interactive DDD facilitator for exploring domain models through Specy files
+user-invocable: true
+---
+
 # Skill: dialogue
 
 ## Role
