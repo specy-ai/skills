@@ -87,32 +87,37 @@ fails "A payment already exists for this order" when {
 | Length check | `size(field) > n` |
 | Empty collection | `isEmpty(Entity.collection)` |
 
-## Unexpressible Conditions
+## Non-obvious Conditions
 
-The check involves something the grammar truly cannot represent: complex business logic with no structural equivalent, external service calls, or algorithmic checks. **Do NOT emit a `fails` clause with a fake expression.** Drop the clause entirely and write a `// UNCLEAR:` comment.
+When a guard condition does not map directly to an expressible pattern, **run the deliberation panel** (see Deliberation Panel section in the main skill) instead of defaulting to `// UNCLEAR`. Many conditions that appear unexpressible can be modelled with the right approach.
 
-```
-// Code: if (isCommonPassword(pw)) throw "Too common"
-// UNCLEAR: condition not expressible — checks password against common passwords list
+### Conditions that CAN be modelled (common panel resolutions)
 
-// Code: if (rateLimiter.isExceeded(userId)) throw "Rate limit"
-// UNCLEAR: condition not expressible — per-user rate limiting (max N per hour)
+| Pattern | Modelling approach |
+|---|---|
+| Uniqueness check (`repo.existsByEmail`) | `resolves` existing entity via repository operation + `fails when { Entity is defined }` |
+| Cross-entity existence (`repo.existsByUserAndTarget`) | same pattern — `resolves` + `is defined` |
+| External business check (eligibility, scoring) | `delegates Service.operation` + `fails` on service result |
 
-// Code: if (bannedWords.match(text)) throw "Banned content"
-// UNCLEAR: condition not expressible — checks text against forbidden words list with leetspeak detection
-```
+### Conditions to omit (infrastructure)
 
-### Common Unexpressible Categories
+| Pattern | Handling |
+|---|---|
+| Password hashing / strength check | `// NOTE: password validated against strength rules (infrastructure)` |
+| Rate limiting | `// NOTE: rate-limited (infrastructure — max N per hour)` |
+| MIME type / file size validation | `// NOTE: file validated at upload (infrastructure)` |
+| Bot detection / honeypot | `// NOTE: bot detection (infrastructure)` |
 
-- **Uniqueness checks** (`if (await repo.existsByEmail(email))`)
-- **Password strength** (common password lists, entropy checks)
-- **Rate limiting** (in-memory or Redis-based throttling)
-- **External API validation** (OAuth token verification, payment gateway)
-- **Complex regex matching** (email format, URL validation, banned word lists with leetspeak)
-- **Cross-entity lookups** (checking existence in another aggregate)
-- **Datetime arithmetic** (`now() - Order.placedAt > 24h` — unit is ambiguous)
+### Conditions that remain UNCLEAR (grammar limitation + business-critical)
 
-For all of these: do not emit a `fails` clause with a placeholder expression. A `// UNCLEAR:` comment preserves the information without producing invalid output.
+| Pattern | Why |
+|---|---|
+| Datetime arithmetic (`now() - createdAt > 5min`) | No duration operator in grammar, but business rule is critical |
+| Complex regex with business meaning (banned words) | Algorithmic check with no structural equivalent |
+
+For these: the grammar truly cannot express them **and** the PO voice confirms the rule is too important to omit. Write `// UNCLEAR:` with the full business rule description.
+
+**Never** emit a `fails` clause with a tautological or placeholder expression. If the condition cannot be expressed faithfully, either omit with `// NOTE` (infrastructure) or mark `// UNCLEAR` (grammar gap + business-critical).
 
 ## Anti-Patterns
 

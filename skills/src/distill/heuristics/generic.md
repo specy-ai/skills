@@ -12,7 +12,7 @@ Always load this file. It provides language-agnostic patterns used as a base for
 | Class/module named `*Policy`, `*Validator`, `*Guard`, `*Rule`, `*Specification` | Likely contains `policy` or `invariant` logic |
 | Class/module named `*Event`, `*Message` with past-tense name | Likely an `event` |
 | Class/module named `*Command`, `*Request` with imperative name | Likely a `command` |
-| CRUD-only code with no explicit events | Add `// UNCLEAR: no event emitted — infer events or omit?` |
+| CRUD-only code with no explicit events | Run deliberation panel — PO decides if events matter; use `// NOTE` to signal the gap |
 
 ## Type Mapping
 

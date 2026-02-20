@@ -17,12 +17,10 @@ policy MaxOrderAmount {
 
 The `when` condition must be a real, evaluable boolean expression — the same tautology prohibition as `fails` applies here. See `constructs/expressions.md` for full expression rules.
 
-If the policy's real condition is unexpressible (datetime arithmetic, cross-context queries, external lookups), do NOT emit a `policy` block with a placeholder `when` clause. Instead, write a standalone `// UNCLEAR:` comment:
-
-```
-// UNCLEAR: policy not expressible — orders can only be modified within 24 hours of placement (datetime arithmetic)
-// UNCLEAR: policy not expressible — payment gateway must confirm card validity before capture (external service call)
-```
+If the policy's real condition is not directly expressible, **run the deliberation panel**:
+- If the condition is infrastructure (rate limiting, external API) → omit with `// NOTE`
+- If the condition involves a grammar gap but is business-critical (datetime arithmetic, cross-context) → `// UNCLEAR` with the full business rule
+- Never emit a `policy` block with a placeholder `when` clause
 
 ### `then` — consequence in business language
 
@@ -78,7 +76,7 @@ policy OrderModificationWindow {
 }
 ```
 
-The real condition is datetime arithmetic (`now() - createdAt < 24h`) which is unexpressible. Use `// UNCLEAR:` instead.
+The real condition is datetime arithmetic (`now() - createdAt < 24h`). Run the deliberation panel — this is a grammar gap on a business-critical rule → `// UNCLEAR` with the full description.
 
 ### Tautological `when` clause — always-true field
 
@@ -100,7 +98,7 @@ policy PaymentRequiredForShipping {
 }
 ```
 
-The real rule involves checking the Payment aggregate, not just Order status. If it requires a cross-aggregate lookup, use `// UNCLEAR:`.
+The real rule involves checking the Payment aggregate, not just Order status. Run the deliberation panel — if the cross-aggregate lookup can be modelled via `resolves`, do so; otherwise `// UNCLEAR`.
 
 ### Placeholder expression for complex conditions
 
@@ -112,4 +110,4 @@ policy FraudDetection {
 }
 ```
 
-Use `// UNCLEAR: policy not expressible — fraud screening via external API` instead.
+Run the deliberation panel: fraud screening is typically an infrastructure/external concern → `// NOTE: fraud screening via external API (infrastructure — not modelled)`.
