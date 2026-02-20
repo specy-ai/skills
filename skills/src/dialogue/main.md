@@ -390,15 +390,66 @@ If a question leads to a circular reference in the model (e.g., entity A referen
 
 ---
 
-## Syntax Reference
+## Syntax Quick Reference
 
-### Struct Grammar (.struct files)
+> This is a compact reference for reading `.struct` and `.flow` files. For the full formal grammar, see `skills/src/grammars/`.
 
-<!-- include-code: ebnf grammars/struct.ebnf -->
+### .struct blocks
 
-### Flow Grammar (.flow files)
+| Block | Contains |
+|-------|----------|
+| `entity Name { fields }` | Domain entity with typed fields and constraints |
+| `value Name { fields }` | Immutable value object |
+| `enum Name { value1 value2 ... }` | Enumeration (camelCase values) |
+| `command Name { fields }` | Intent to change state |
+| `event Name { fields }` | Notification that something happened |
 
-<!-- include-code: ebnf grammars/flow.ebnf -->
+**Fields:** `fieldName : fieldType constraints`
+- Types: `string`, `int`, `decimal`, `boolean`, `date`, `datetime`, `uuid`, `TypeName`, `list<T>`, `set<T>`
+- Constraints: `required`, `optional`, `unique`, `immutable`, `default(v)`, `min(n)`, `max(n)`, `range(a,b)`, `minLength(n)`, `maxLength(n)`, `pattern("...")`, `past`, `future`, `pastOrPresent`, `futureOrPresent`
+
+### .flow blocks
+
+**Interaction** — the core behavioral block:
+```
+interaction "human-readable label" {
+  on Command|Event
+  resolves Entity [via path] from dotPath
+  creates Entity
+  fails "message" when { expression }
+  delegates Service.operation
+  then "description of side effect"
+  sets dotPath to valueExpr
+  emits Event
+}
+```
+
+**Resolves patterns** (critical for tracing data access):
+- **Direct:** `resolves Entity from Command.fieldId` — lookup by identity
+- **Indirect forward:** `resolves Entity from ResolvedEntity.fieldId` — follow a field from an already-resolved entity
+- **Indirect reverse:** `resolves Entity via Entity.field from ResolvedEntity` — reverse relationship navigation
+
+**Via** has two distinct uses:
+- `via Repository.operation` — infrastructure path (which repo operation loads the entity)
+- `via Entity.field` — domain relationship (which field links the entities)
+
+**Other blocks:**
+- `policy Name { when { expr } then "consequence" }` — domain rule with condition
+- `invariant Name { on Entity must { expr } message "text" }` — structural constraint that must always hold
+- `service Name { operation name { accepts/returns/fails/then/sets/emits } }` — stateless domain logic
+- `repository Name { for Entity operation name { accepts/returns } }` — data access contract
+
+### Expressions
+
+**Precedence** (low to high): `or` < `and` < `not` < comparison (`=`, `!=`, `>`, `<`, `>=`, `<=`) < arithmetic (`+`, `-`, `*`, `/`)
+
+**Unary forms:**
+- `dotPath is defined` / `dotPath is not defined`
+- `dotPath in { value1, value2 }` / `dotPath not in { value1, value2 }`
+
+**Dot-paths:** `Entity.field.subfield` — references across the model
+
+**Built-in functions:** `count(expr)`, `sum(expr)`, `now()`, `today()`, `size(expr)`, `isEmpty(expr)`, `isNotEmpty(expr)`
 
 ---
 

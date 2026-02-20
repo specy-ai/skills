@@ -388,398 +388,66 @@ If a question leads to a circular reference in the model (e.g., entity A referen
 
 ---
 
-## Syntax Reference
+## Syntax Quick Reference
 
-### Struct Grammar (.struct files)
+> This is a compact reference for reading `.struct` and `.flow` files. For the full formal grammar, see `skills/src/grammars/`.
 
-```ebnf
-// =============================================================================
-// Specy — Structural Model Grammar (.struct)
-// EBNF (ISO 14977 style)
-// =============================================================================
+### .struct blocks
 
-// -----------------------------------------------------------------------------
-// Top-level structure
-// -----------------------------------------------------------------------------
+| Block | Contains |
+|-------|----------|
+| `entity Name { fields }` | Domain entity with typed fields and constraints |
+| `value Name { fields }` | Immutable value object |
+| `enum Name { value1 value2 ... }` | Enumeration (camelCase values) |
+| `command Name { fields }` | Intent to change state |
+| `event Name { fields }` | Notification that something happened |
 
-structFile       = { comment | domainDecl | definition } ;
+**Fields:** `fieldName : fieldType constraints`
+- Types: `string`, `int`, `decimal`, `boolean`, `date`, `datetime`, `uuid`, `TypeName`, `list<T>`, `set<T>`
+- Constraints: `required`, `optional`, `unique`, `immutable`, `default(v)`, `min(n)`, `max(n)`, `range(a,b)`, `minLength(n)`, `maxLength(n)`, `pattern("...")`, `past`, `future`, `pastOrPresent`, `futureOrPresent`
 
-domainDecl       = "domain" , stringLiteral ;
+### .flow blocks
 
-definition       = entityDef
-                 | valueDef
-                 | enumDef
-                 | commandDef
-                 | eventDef ;
-
-// -----------------------------------------------------------------------------
-// Entity
-// -----------------------------------------------------------------------------
-
-entityDef        = "entity" , typeName , "{" , { comment | fieldDecl } , "}" ;
-
-// -----------------------------------------------------------------------------
-// Value Object
-// -----------------------------------------------------------------------------
-
-valueDef         = "value" , typeName , "{" , { comment | fieldDecl } , "}" ;
-
-// -----------------------------------------------------------------------------
-// Enum
-// -----------------------------------------------------------------------------
-
-enumDef          = "enum" , typeName , "{" , enumValue , { enumValue } , "}" ;
-
-enumValue        = identifier ;
-
-// -----------------------------------------------------------------------------
-// Command
-// -----------------------------------------------------------------------------
-
-commandDef       = "command" , typeName , "{" , { comment | fieldDecl } , "}" ;
-
-// -----------------------------------------------------------------------------
-// Event
-// -----------------------------------------------------------------------------
-
-eventDef         = "event" , typeName , "{" , { comment | fieldDecl } , "}" ;
-
-// -----------------------------------------------------------------------------
-// Fields
-// -----------------------------------------------------------------------------
-
-fieldDecl        = fieldName , ":" , fieldType , { constraint } ;
-
-fieldName        = identifier ;
-
-fieldType        = primitiveType
-                 | collectionType
-                 | typeName ;
-
-primitiveType    = "string"
-                 | "int"
-                 | "decimal"
-                 | "boolean"
-                 | "date"
-                 | "datetime"
-                 | "uuid" ;
-
-collectionType   = ( "list" | "set" ) , "<" , fieldType , ">" ;
-
-// A typeName that is not a primitiveType is a reference to another definition
-// (entity, value, enum).
-typeName         = pascalCaseId ;
-
-// -----------------------------------------------------------------------------
-// Constraints
-// -----------------------------------------------------------------------------
-
-constraint       = "required"
-                 | "optional"
-                 | "unique"
-                 | "immutable"
-                 | "default" , "(" , literalValue , ")"
-                 | "min" , "(" , number , ")"
-                 | "max" , "(" , number , ")"
-                 | "range" , "(" , number , "," , number , ")"
-                 | "minLength" , "(" , integer , ")"
-                 | "maxLength" , "(" , integer , ")"
-                 | "pattern" , "(" , stringLiteral , ")"
-                 | "past"
-                 | "future"
-                 | "pastOrPresent"
-                 | "futureOrPresent" ;
-
-// -----------------------------------------------------------------------------
-// Literals and identifiers
-// -----------------------------------------------------------------------------
-
-literalValue     = stringLiteral | number | "true" | "false" ;
-
-stringLiteral    = '"' , { character } , '"' ;
-
-number           = [ "-" ] , digit , { digit } , [ "." , digit , { digit } ] ;
-
-integer          = [ "-" ] , digit , { digit } ;
-
-pascalCaseId     = upperLetter , { letter | digit } ;
-
-identifier       = camelCaseId | pascalCaseId ;
-
-camelCaseId      = lowerLetter , { letter | digit } ;
-
-// -----------------------------------------------------------------------------
-// Comments
-// -----------------------------------------------------------------------------
-
-comment          = "//" , { character } , newline ;
-
-// -----------------------------------------------------------------------------
-// Character classes
-// -----------------------------------------------------------------------------
-
-upperLetter      = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I"
-                 | "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R"
-                 | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" ;
-
-lowerLetter      = "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i"
-                 | "j" | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r"
-                 | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" ;
-
-letter           = upperLetter | lowerLetter ;
-
-digit            = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
-
-character        = letter | digit | " " | "!" | "@" | "#" | "$" | "%" | "^"
-                 | "&" | "*" | "(" | ")" | "-" | "_" | "=" | "+" | "["
-                 | "]" | "{" | "}" | "|" | "\\" | ":" | ";" | "'" | ","
-                 | "." | "<" | ">" | "/" | "?" | "~" | "`" ;
-
-newline          = "\n" ;
+**Interaction** — the core behavioral block:
+```
+interaction "human-readable label" {
+  on Command|Event
+  resolves Entity [via path] from dotPath
+  creates Entity
+  fails "message" when { expression }
+  delegates Service.operation
+  then "description of side effect"
+  sets dotPath to valueExpr
+  emits Event
+}
 ```
 
-### Flow Grammar (.flow files)
+**Resolves patterns** (critical for tracing data access):
+- **Direct:** `resolves Entity from Command.fieldId` — lookup by identity
+- **Indirect forward:** `resolves Entity from ResolvedEntity.fieldId` — follow a field from an already-resolved entity
+- **Indirect reverse:** `resolves Entity via Entity.field from ResolvedEntity` — reverse relationship navigation
 
-```ebnf
-// =============================================================================
-// Specy — Interaction Model Grammar (.flow)
-// EBNF (ISO 14977 style)
-// =============================================================================
+**Via** has two distinct uses:
+- `via Repository.operation` — infrastructure path (which repo operation loads the entity)
+- `via Entity.field` — domain relationship (which field links the entities)
 
-// -----------------------------------------------------------------------------
-// Top-level structure
-// -----------------------------------------------------------------------------
+**Other blocks:**
+- `policy Name { when { expr } then "consequence" }` — domain rule with condition
+- `invariant Name { on Entity must { expr } message "text" }` — structural constraint that must always hold
+- `service Name { operation name { accepts/returns/fails/then/sets/emits } }` — stateless domain logic
+- `repository Name { for Entity operation name { accepts/returns } }` — data access contract
 
-flowFile         = { comment | domainDecl | usesDecl | block } ;
+### Expressions
 
-domainDecl       = "domain" , stringLiteral ;
+**Precedence** (low to high): `or` < `and` < `not` < comparison (`=`, `!=`, `>`, `<`, `>=`, `<=`) < arithmetic (`+`, `-`, `*`, `/`)
 
-usesDecl         = "uses" , stringLiteral ;
+**Unary forms:**
+- `dotPath is defined` / `dotPath is not defined`
+- `dotPath in { value1, value2 }` / `dotPath not in { value1, value2 }`
 
-block            = interactionDef
-                 | policyDef
-                 | invariantDef
-                 | serviceDef
-                 | repositoryDef ;
+**Dot-paths:** `Entity.field.subfield` — references across the model
 
-// -----------------------------------------------------------------------------
-// Interaction — triggered by a command (intentional) or an event (reactive)
-//
-// The trigger type is determined by the typeName in the `on` clause:
-//   - If it resolves to a `command` in the .struct → intentional (1:1)
-//   - If it resolves to an `event` in the .struct  → reactive (1:N allowed)
-//
-// The string literal is a human-readable label describing the intent.
-// -----------------------------------------------------------------------------
-
-interactionDef   = "interaction" , stringLiteral , "{"
-                 ,   "on" , typeName
-                 , { resolvesClause }
-                 , { createsClause }
-                 , { failsClause }
-                 , { delegatesClause }
-                 , { thenClause }
-                 , { setsClause }
-                 , { emitsClause }
-                 , "}" ;
-
-// resolves has three resolution patterns:
-//   Direct:              resolves Entity from command.fieldId
-//                        → lookup by identity field
-//   Indirect (forward):  resolves Entity from ResolvedEntity.fieldId
-//                        → lookup using a field from an already-resolved entity
-//   Indirect (reverse):  resolves Entity via Entity.field from ResolvedEntity
-//                        → navigate reverse relationship (Entity.field references ResolvedEntity)
-//
-// The optional `via` clause has two uses:
-//   Repository operation: via Repository.operation (infrastructure path)
-//   Relationship field:   via Entity.field         (domain relationship)
-resolvesClause   = "resolves" , typeName , [ "via" , dotPath ] , "from" , dotPath ;
-
-createsClause    = "creates" , typeName ;
-
-emitsClause      = "emits" , typeName ;
-
-setsClause       = "sets" , dotPath , "to" , valueExpr ;
-
-failsClause      = "fails" , stringLiteral , "when" , "{" , expression , "}" ;
-
-delegatesClause  = "delegates" , dotPath ;
-
-thenClause       = "then" , stringLiteral ;
-
-// -----------------------------------------------------------------------------
-// Service — stateless domain logic
-// -----------------------------------------------------------------------------
-
-serviceDef       = "service" , typeName , "{" , { comment | operationDef } , "}" ;
-
-operationDef     = "operation" , identifier , "{"
-                 , { acceptsClause }
-                 , [ returnsClause ]
-                 , { failsClause }
-                 , { thenClause }
-                 , { setsClause }
-                 , { emitsClause }
-                 , "}" ;
-
-acceptsClause    = "accepts" , identifier , ":" , fieldType ;
-
-returnsClause    = "returns" , identifier , ":" , fieldType ;
-
-fieldType        = primitiveType
-                 | typeName
-                 | collectionType ;
-
-primitiveType    = "string" | "int" | "decimal" | "boolean" | "date" | "datetime" | "uuid" ;
-
-collectionType   = ( "list" | "set" ) , "<" , fieldType , ">" ;
-
-// -----------------------------------------------------------------------------
-// Repository — data access contract for an entity
-// -----------------------------------------------------------------------------
-
-repositoryDef    = "repository" , typeName , "{"
-                 ,   "for" , typeName
-                 , { comment | repositoryOpDef }
-                 , "}" ;
-
-repositoryOpDef  = "operation" , identifier , "{"
-                 , { acceptsClause }
-                 , [ returnsClause ]
-                 , "}" ;
-
-// -----------------------------------------------------------------------------
-// Policy — domain-wide rule
-// -----------------------------------------------------------------------------
-
-policyDef        = "policy" , typeName , "{"
-                 ,   "when" , "{" , expression , "}"
-                 ,   "then" , stringLiteral
-                 , "}" ;
-
-// -----------------------------------------------------------------------------
-// Invariant — structural constraint on an entity
-// -----------------------------------------------------------------------------
-
-invariantDef     = "invariant" , typeName , "{"
-                 ,   "on" , typeName
-                 ,   "must" , "{" , expression , "}"
-                 ,   "message" , stringLiteral
-                 , "}" ;
-
-// -----------------------------------------------------------------------------
-// Expressions
-// -----------------------------------------------------------------------------
-
-expression       = orExpr ;
-
-orExpr           = andExpr , { "or" , andExpr } ;
-
-andExpr          = notExpr , { "and" , notExpr } ;
-
-notExpr          = [ "not" ] , comparison ;
-
-comparison       = addExpr , [ compOp , addExpr ] ;
-
-compOp           = "=" | "!=" | ">" | "<" | ">=" | "<=" ;
-
-addExpr          = mulExpr , { ( "+" | "-" ) , mulExpr } ;
-
-mulExpr          = unaryExpr , { ( "*" | "/" ) , unaryExpr } ;
-
-unaryExpr        = dotPath , "is" , "defined"
-                 | dotPath , "is" , "not" , "defined"
-                 | dotPath , "in" , "{" , valueList , "}"
-                 | dotPath , "not" , "in" , "{" , valueList , "}"
-                 | functionCall
-                 | dotPath
-                 | literal
-                 | "(" , expression , ")" ;
-
-// -----------------------------------------------------------------------------
-// Dot-path: references to fields across the model
-// -----------------------------------------------------------------------------
-
-dotPath          = identifier , { "." , identifier } ;
-
-// -----------------------------------------------------------------------------
-// Value expressions (right-hand side of sets...to, comparisons, etc.)
-// -----------------------------------------------------------------------------
-
-valueExpr        = functionCall
-                 | dotPath
-                 | literal ;
-
-valueList        = valueExpr , { "," , valueExpr } ;
-
-// -----------------------------------------------------------------------------
-// Built-in functions
-// -----------------------------------------------------------------------------
-
-functionCall     = functionName , "(" , [ argList ] , ")" ;
-
-argList          = expression , { "," , expression } ;
-
-functionName     = "count"
-                 | "sum"
-                 | "now"
-                 | "today"
-                 | "size"
-                 | "isEmpty"
-                 | "isNotEmpty" ;
-
-// -----------------------------------------------------------------------------
-// Literals
-// -----------------------------------------------------------------------------
-
-literal          = stringLiteral | number | "true" | "false" ;
-
-stringLiteral    = '"' , { character } , '"' ;
-
-number           = [ "-" ] , digit , { digit } , [ "." , digit , { digit } ] ;
-
-// -----------------------------------------------------------------------------
-// Identifiers
-// -----------------------------------------------------------------------------
-
-typeName         = pascalCaseId ;
-
-identifier       = camelCaseId | pascalCaseId ;
-
-pascalCaseId     = upperLetter , { letter | digit } ;
-
-camelCaseId      = lowerLetter , { letter | digit } ;
-
-// -----------------------------------------------------------------------------
-// Comments
-// -----------------------------------------------------------------------------
-
-comment          = "//" , { character } , newline ;
-
-// -----------------------------------------------------------------------------
-// Character classes
-// -----------------------------------------------------------------------------
-
-upperLetter      = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I"
-                 | "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R"
-                 | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" ;
-
-lowerLetter      = "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i"
-                 | "j" | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r"
-                 | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" ;
-
-letter           = upperLetter | lowerLetter ;
-
-digit            = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
-
-character        = letter | digit | " " | "!" | "@" | "#" | "$" | "%" | "^"
-                 | "&" | "*" | "(" | ")" | "-" | "_" | "=" | "+" | "["
-                 | "]" | "{" | "}" | "|" | "\\" | ":" | ";" | "'" | ","
-                 | "." | "<" | ">" | "/" | "?" | "~" | "`" ;
-
-newline          = "\n" ;
-```
+**Built-in functions:** `count(expr)`, `sum(expr)`, `now()`, `today()`, `size(expr)`, `isEmpty(expr)`, `isNotEmpty(expr)`
 
 ---
 
