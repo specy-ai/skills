@@ -155,9 +155,9 @@ policy Name {
 
 ### Rules
 
-- `when` must be a real, evaluable boolean expression — never a tautology (apply Test 3).
+- `when` must be a real, evaluable boolean expression — never a tautology, never empty (apply Test 3).
+- **Never emit a policy block with an empty or commented-out `when`.** If the condition cannot be expressed, use an inline `// UNCLEAR` comment instead of a policy block.
 - If the rule applies to only one command handler, use `fails` in the interaction instead.
-- If the real condition is unexpressible and business-critical → `// UNCLEAR` (do not emit a policy with a placeholder `when`).
 - If the real condition is infrastructure → `// NOTE`.
 
 ---

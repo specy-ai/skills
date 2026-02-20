@@ -305,7 +305,7 @@ Before writing final files, verify each item. If any fails, fix it.
 - [ ] No `fails when { field is defined }` on a required/immutable field
 - [ ] No `invariant` with `must { field is defined }` on a required/immutable field (same tautology)
 - [ ] No `invariant` on command, event, or value (entities only)
-- [ ] No `policy` with a tautological `when`
+- [ ] No `policy` with a tautological or empty `when` — if the condition is unexpressible, use `// UNCLEAR` inline instead of emitting a policy block
 - [ ] No `service` for pure infrastructure
 - [ ] No `repository` for technical types (audit logs, session tokens)
 - [ ] Every `sets` entity appears in `resolves` or `creates` of the same interaction
