@@ -20,6 +20,10 @@ Run these 4 tests **in sequence** on every element you are about to emit. If any
 
 If the result affects an entity field via `sets` or conditions the flow via `fails`, it is domain. Otherwise it is likely infrastructure.
 
+### Separate the authorization mechanism from the protected action
+
+A role check (`user.isAdmin`, `requirePermission`) is an **authorization mechanism** — infrastructure. But the action it protects (freeze a user, delete content, manage tokens) may be a **domain operation** that changes entity state. Evaluate the action independently of its guard: if the action passes Test 2, model the interaction; annotate the role check with `// UNCLEAR: admin role authorization`.
+
 ## Test 3 — "Is it faithful?"
 
 > Does the expression I am about to write accurately reflect the actual condition in the code?
