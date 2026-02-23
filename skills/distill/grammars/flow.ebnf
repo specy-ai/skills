@@ -37,6 +37,7 @@ interactionDef   = "interaction" , stringLiteral , "{"
                  , { delegatesClause }
                  , { thenClause }
                  , { setsClause }
+                 , { foreachClause }
                  , { emitsClause }
                  , "}" ;
 
@@ -57,13 +58,23 @@ createsClause    = "creates" , typeName ;
 
 emitsClause      = "emits" , typeName ;
 
-setsClause       = "sets" , dotPath , "to" , valueExpr ;
+setsClause       = "sets" , dotPath , "to" , valueExpr , [ justification ] ;
 
 failsClause      = "fails" , stringLiteral , "when" , "{" , expression , "}" ;
 
 delegatesClause  = "delegates" , dotPath ;
 
 thenClause       = "then" , stringLiteral ;
+
+// foreach — iterates over a collection with per-item clauses.
+// The dotPath must resolve to a list<T> field. The identifier aliases one item.
+foreachClause    = "foreach" , dotPath , "as" , identifier , "{"
+                 , { setsClause | emitsClause | failsClause | thenClause }
+                 , "}" ;
+
+// :: — justification operator. Attaches a business reason to any clause.
+// Does not change semantics or verifiability. Carries the "why".
+justification    = "::" , stringLiteral ;
 
 // -----------------------------------------------------------------------------
 // Service — stateless domain logic
@@ -164,9 +175,7 @@ dotPath          = identifier , { "." , identifier } ;
 // Value expressions (right-hand side of sets...to, comparisons, etc.)
 // -----------------------------------------------------------------------------
 
-valueExpr        = functionCall
-                 | dotPath
-                 | literal ;
+valueExpr        = addExpr ;
 
 valueList        = valueExpr , { "," , valueExpr } ;
 

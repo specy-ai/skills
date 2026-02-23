@@ -204,3 +204,8 @@ event PaymentRefunded {
   reason : string optional
   refundedAt : datetime
 }
+
+event OrderStockRestored {
+  orderId : uuid
+  restoredAt : datetime
+}

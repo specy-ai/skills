@@ -34,3 +34,7 @@
 | `this.repository.save(new Entity(...))` | `creates Entity` |
 | `throw new BadRequestException(msg)` / guard condition | `fails "msg" when { condition }` |
 | `this.eventEmitter.emit(...)` / `this.eventBus.publish(...)` | `emits Event` |
+| `for (const item of entity.items)` / `entity.items.forEach(item => ...)` | `foreach Entity.items as item { ... }` |
+| `entity.items.map(item => ...)` with mutation side effects | `foreach Entity.items as item { ... }` |
+| Inside loop: `item.related.field = value` | `sets item.related.field to value` (cross-aggregate) |
+| `otherEntity.field = value` where otherEntity ≠ primary aggregate | `sets OtherEntity.field to value` (cross-aggregate, add `::`) |

@@ -75,3 +75,8 @@ event OrderCancelled {
   reason : string optional
   cancelledAt : datetime
 }
+
+event OrderStockRestored {
+  orderId : uuid
+  restoredAt : datetime
+}

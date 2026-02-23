@@ -76,8 +76,16 @@ interaction "Cancel an order" {
 interaction "Handle order cancellation side effects" {
   on OrderCancelled
 
+  resolves Order from OrderCancelled.orderId
+
+  foreach Order.lines as line {
+    sets line.product.stockQuantity to line.product.stockQuantity + line.quantity
+      :: "Restore stock for each cancelled line"
+  }
+
   then "Notify customer that order is cancelled"
-  then "Restore product stock for each order line"
+
+  emits OrderStockRestored
 }
 
 // =============================================================================

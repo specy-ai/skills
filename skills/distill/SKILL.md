@@ -354,6 +354,39 @@ When a source type does not map to a primitive, check if it corresponds to anoth
 - **Do not model** (use `// NOTE` instead): pure technical processing (image resize, password hash, compression), infrastructure (logging, cache, rate limiting)
 - **Decision criterion:** if the result affects an entity field via `sets` or conditions the flow via `fails`, it is a business service
 
+## Collection Iteration (`foreach`)
+
+### Identification
+
+| Source Pattern | Specy Construct |
+|---|---|
+| Loop over a collection field of a resolved entity with per-item mutation | `foreach Entity.collection as alias { sets alias.field to ... }` |
+| Loop over a collection field with per-item event emission | `foreach Entity.collection as alias { emits Event }` |
+| Loop over a collection field with per-item validation/guard | `foreach Entity.collection as alias { fails "msg" when { ... } }` |
+
+### Rules
+
+- The collection must be a `list<T>` field in the structural model.
+- The alias scopes dot-paths inside the body — `alias.field` navigates the item, not the collection.
+- If the loop body contains only a single `then` narrative, keep it as `then` inside the interaction (no `foreach` needed).
+- **Decision criterion:** if each iteration produces a verifiable mutation (`sets`) or emission (`emits`), use `foreach`. If the iteration effect is only describable as narrative, keep `then`.
+
+## Cross-Aggregate Mutation
+
+### Identification
+
+| Source Pattern | Specy Construct |
+|---|---|
+| Mutation on an entity not resolved as the primary aggregate | `sets OtherEntity.field to value` (cross-aggregate `sets`) |
+| Mutation via dot-path navigation through relationships | `sets Entity.relation.field to value` |
+| Mutation inside a loop on a related entity's field | `foreach ... as alias { sets alias.related.field to value }` |
+
+### Rules
+
+- The target dot-path must be reachable from a `resolves` or `creates` entity — either directly or via relationship navigation.
+- Add `:: "justification"` when the business reason for the cross-aggregate mutation is not obvious from the construct alone.
+- **Decision criterion:** if the code modifies a field on an entity other than the primary aggregate, it is a cross-aggregate mutation. If verifiable (the assignment is in the code), use `sets`. If not verifiable, use `then`.
+
 ## Repositories
 
 ### Identification
@@ -443,7 +476,11 @@ interaction "Business intent label" {
   fails "message" when { expression }
   delegates Service.operation
   then "side effect in business language"
-  sets Entity.field to value
+  sets Entity.field to value :: "business justification"
+  foreach Collection.path as alias {
+    sets alias.field to valueExpr :: "justification"
+    emits Event
+  }
   emits Event
 }
 ```
@@ -459,7 +496,9 @@ interaction "Business intent label" {
 | `fails` | Guard clauses / validation. Business-language message. Expression must pass Test 3. |
 | `delegates` | After `fails`, before `sets`. Result assigned → `sets Entity.field to Service.op`. |
 | `then` | Side effects not expressible with `sets`/`emits`. Available for both triggers. |
-| `sets` | Target entity must appear in `resolves` or `creates` of the same interaction. |
+| `sets` | Target dot-path must be reachable from an entity in `resolves` or `creates`. Cross-aggregate targets (via dot-path navigation) are allowed. Use `::` justification on cross-aggregate mutations where the business reason is not obvious. |
+| `foreach` | Iterates over a `list<T>` field. Body allows `sets`, `emits`, `fails`, `then`. The alias can be used as the root of dot-paths inside the body. |
+| `::` | Justification operator — attaches a business reason to a clause. Optional on `sets`. Does not change verifiability. |
 | `emits` | All events published by the handler. |
 
 ### Resolution patterns
@@ -505,6 +544,37 @@ resolves Payment via Payment.order from Order
 
 - **Repository operation:** `via Repository.operation` — infrastructure method.
 - **Relationship field:** `via Entity.field` — reverse-ref field (entity name matches `resolves` typeName).
+
+### `foreach` — collection iteration
+
+Use `foreach` when the code iterates over a collection and performs per-item mutations, emissions, or validations.
+
+```
+foreach Order.lines as line {
+  sets line.product.stockQuantity to line.product.stockQuantity + line.quantity
+    :: "Restore stock for each cancelled line"
+}
+```
+
+**Rules:**
+- The dot-path must resolve to a `list<T>` field in the structural model.
+- The alias (`line`) scopes all dot-paths inside the body — `line.product.stockQuantity` means "the stockQuantity of the product of this particular line".
+- Body allows: `sets`, `emits`, `fails`, `then` — same constructs as an interaction body (minus `resolves`, `creates`, `delegates`, `foreach`).
+- **Checker verification:** the code contains a loop over the collection with per-item mutations matching the declared `sets`.
+
+### `::` — justification operator
+
+Attaches a business reason to a clause. Does not change semantics or verifiability.
+
+```
+sets Order.status to cancelled
+  :: "Cancellation is immediate — no approval required for draft orders"
+```
+
+**Rules:**
+- Optional on `sets` clauses.
+- Use it when the *why* is not obvious from the construct alone — especially for cross-aggregate mutations.
+- The justification is not verifiable itself — it is the reason *why the verifiable proof exists*.
 
 ---
 
@@ -707,6 +777,11 @@ event OrderCancelled {
   reason : string optional
   cancelledAt : datetime
 }
+
+event OrderStockRestored {
+  orderId : uuid
+  restoredAt : datetime
+}
 ```
 
 ### orders-compact.flow
@@ -790,8 +865,16 @@ interaction "Cancel an order" {
 interaction "Handle order cancellation side effects" {
   on OrderCancelled
 
+  resolves Order from OrderCancelled.orderId
+
+  foreach Order.lines as line {
+    sets line.product.stockQuantity to line.product.stockQuantity + line.quantity
+      :: "Restore stock for each cancelled line"
+  }
+
   then "Notify customer that order is cancelled"
-  then "Restore product stock for each order line"
+
+  emits OrderStockRestored
 }
 
 // =============================================================================

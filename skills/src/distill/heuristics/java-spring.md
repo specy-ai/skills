@@ -41,3 +41,7 @@
 | `if (condition) throw new ...Exception(msg)` | `fails "msg" when { condition }` |
 | `entity.setField(value)` / `entity.field = value` | `sets Entity.field to value` |
 | `publisher.publishEvent(new Event(...))` / `eventBus.publish(...)` | `emits Event` |
+| `for (Item item : entity.getItems())` / `entity.getItems().forEach(item -> ...)` | `foreach Entity.items as item { ... }` |
+| `entity.getItems().stream().forEach(...)` / `.map(...)` with side effects | `foreach Entity.items as item { ... }` |
+| Inside loop: `item.getRelated().setField(value)` | `sets item.related.field to value` (cross-aggregate) |
+| `otherEntity.setField(value)` where otherEntity ≠ primary aggregate | `sets OtherEntity.field to value` (cross-aggregate, add `::`) |

@@ -47,6 +47,39 @@ When a source type does not map to a primitive, check if it corresponds to anoth
 - **Do not model** (use `// NOTE` instead): pure technical processing (image resize, password hash, compression), infrastructure (logging, cache, rate limiting)
 - **Decision criterion:** if the result affects an entity field via `sets` or conditions the flow via `fails`, it is a business service
 
+## Collection Iteration (`foreach`)
+
+### Identification
+
+| Source Pattern | Specy Construct |
+|---|---|
+| Loop over a collection field of a resolved entity with per-item mutation | `foreach Entity.collection as alias { sets alias.field to ... }` |
+| Loop over a collection field with per-item event emission | `foreach Entity.collection as alias { emits Event }` |
+| Loop over a collection field with per-item validation/guard | `foreach Entity.collection as alias { fails "msg" when { ... } }` |
+
+### Rules
+
+- The collection must be a `list<T>` field in the structural model.
+- The alias scopes dot-paths inside the body — `alias.field` navigates the item, not the collection.
+- If the loop body contains only a single `then` narrative, keep it as `then` inside the interaction (no `foreach` needed).
+- **Decision criterion:** if each iteration produces a verifiable mutation (`sets`) or emission (`emits`), use `foreach`. If the iteration effect is only describable as narrative, keep `then`.
+
+## Cross-Aggregate Mutation
+
+### Identification
+
+| Source Pattern | Specy Construct |
+|---|---|
+| Mutation on an entity not resolved as the primary aggregate | `sets OtherEntity.field to value` (cross-aggregate `sets`) |
+| Mutation via dot-path navigation through relationships | `sets Entity.relation.field to value` |
+| Mutation inside a loop on a related entity's field | `foreach ... as alias { sets alias.related.field to value }` |
+
+### Rules
+
+- The target dot-path must be reachable from a `resolves` or `creates` entity — either directly or via relationship navigation.
+- Add `:: "justification"` when the business reason for the cross-aggregate mutation is not obvious from the construct alone.
+- **Decision criterion:** if the code modifies a field on an entity other than the primary aggregate, it is a cross-aggregate mutation. If verifiable (the assignment is in the code), use `sets`. If not verifiable, use `then`.
+
 ## Repositories
 
 ### Identification
