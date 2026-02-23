@@ -972,6 +972,8 @@ interactionDef   = "interaction" , stringLiteral , "{"
                  , { thenClause }
                  , { setsClause }
                  , { foreachClause }
+                 , { triggersNotificationClause }
+                 , { triggersCommandClause }
                  , { emitsClause }
                  , "}" ;
 
@@ -1003,8 +1005,20 @@ thenClause       = "then" , stringLiteral ;
 // foreach — iterates over a collection with per-item clauses.
 // The dotPath must resolve to a list<T> field. The identifier aliases one item.
 foreachClause    = "foreach" , dotPath , "as" , identifier , "{"
-                 , { setsClause | emitsClause | failsClause | thenClause }
+                 , { setsClause | emitsClause | failsClause | thenClause
+                   | triggersNotificationClause | triggersCommandClause }
                  , "}" ;
+
+// triggers notification — out-of-domain side-effects (email, SMS, webhook, push).
+// The string literal describes the notification in business language.
+// Optional `on` narrows to a specific event; optional `::` adds justification.
+triggersNotificationClause = "triggers" , "notification" , stringLiteral
+                           , [ "on" , typeName ]
+                           , [ justification ] ;
+
+// triggers Context.Command — inter-bounded-context communication (saga, choreography, direct call).
+// The dotPath is ContextName.CommandName, resolved against another .struct via `uses`.
+triggersCommandClause = "triggers" , dotPath , [ justification ] ;
 
 // :: — justification operator. Attaches a business reason to any clause.
 // Does not change semantics or verifiability. Carries the "why".

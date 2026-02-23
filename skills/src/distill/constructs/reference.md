@@ -19,6 +19,8 @@ interaction "Business intent label" {
     sets alias.field to valueExpr :: "justification"
     emits Event
   }
+  triggers notification "description" [on Event] [:: "justification"]
+  triggers Context.Command [:: "justification"]
   emits Event
 }
 ```
@@ -33,10 +35,12 @@ interaction "Business intent label" {
 | `creates` | Every `new Entity()` / `.save()` on a new object. Never omit the primary entity. |
 | `fails` | Guard clauses / validation. Business-language message. Expression must pass Test 3. |
 | `delegates` | After `fails`, before `sets`. Result assigned → `sets Entity.field to Service.op`. |
-| `then` | Side effects not expressible with `sets`/`emits`. Available for both triggers. |
+| `then` | Irreducibly narrative side effects not expressible with `sets`/`emits`/`triggers`. |
 | `sets` | Target dot-path must be reachable from an entity in `resolves` or `creates`. Cross-aggregate targets (via dot-path navigation) are allowed. Use `::` justification on cross-aggregate mutations where the business reason is not obvious. |
-| `foreach` | Iterates over a `list<T>` field. Body allows `sets`, `emits`, `fails`, `then`. The alias can be used as the root of dot-paths inside the body. |
-| `::` | Justification operator — attaches a business reason to a clause. Optional on `sets`. Does not change verifiability. |
+| `foreach` | Iterates over a `list<T>` field. Body allows `sets`, `emits`, `fails`, `then`, `triggers notification`, `triggers Context.Command`. The alias can be used as the root of dot-paths inside the body. |
+| `triggers notification` | Out-of-domain side-effect (email, SMS, webhook). Business-language description. Optional `on Event` and `:: justification`. |
+| `triggers Context.Command` | Inter-bounded-context communication. `Context` matches a `domain` in another `.struct`; `Command` matches a `command` in that `.struct`. Optional `:: justification`. |
+| `::` | Justification operator — attaches a business reason to a clause. Optional on `sets`, `triggers notification`, `triggers Context.Command`. Does not change verifiability. |
 | `emits` | All events published by the handler. |
 
 ### Resolution patterns
@@ -113,6 +117,46 @@ sets Order.status to cancelled
 - Optional on `sets` clauses.
 - Use it when the *why* is not obvious from the construct alone — especially for cross-aggregate mutations.
 - The justification is not verifiable itself — it is the reason *why the verifiable proof exists*.
+
+### `triggers notification` — out-of-domain side-effects
+
+Use `triggers notification` when the code sends a message, email, SMS, webhook, or push notification as a business-required side-effect.
+
+```
+triggers notification "Notify customer that order is confirmed"
+triggers notification "Notify customer that order is cancelled"
+  :: "Cancellation notification is a contractual obligation"
+```
+
+**Rules:**
+- The string literal describes the notification in business language — not technical language.
+- Optional `on EventType` narrows to a specific triggering event (useful when the interaction handles multiple events, or to make the trigger explicit).
+- Optional `:: "justification"` adds a business reason — use it for contractual or regulatory obligations.
+- **Checker verification:** the code contains a call to a notification/messaging service. The checker verifies the notification *exists*, not its content.
+- **Do not use** for internal logging, metrics, cache invalidation — these are infrastructure (`// NOTE`).
+
+### `triggers Context.Command` — inter-context communication
+
+Use `triggers Context.Command` when the code triggers behaviour in another bounded context — via REST call, message queue, saga step, or choreography.
+
+```
+triggers Shipping.PrepareShipment
+  :: "Shipment preparation starts automatically after confirmation"
+```
+
+**Rules:**
+- The dot-path must be `ContextName.CommandName`. `ContextName` matches the `domain` declaration in another `.struct` file (linked via `uses`). `CommandName` matches a `command` defined in that `.struct`.
+- Optional `:: "justification"` adds a business reason.
+- **Checker verification:** the code contains a call/message to the target context that triggers the specified command.
+- If the target context's `.struct` is not available, fall back to `then "description"` with `// NOTE: cross-context trigger — target .struct not yet extracted`.
+- **Do not use** for intra-context event emission — use `emits Event` instead.
+
+### Cross-file coherence for `triggers`
+
+The lint (level 0) validates:
+- `triggers notification` → a notification mechanism exists in the code for that event.
+- `triggers Context.Command` → the command exists in the referenced `.struct`.
+- Every `triggers` has a corresponding handler somewhere in the `.flow` files.
 
 ---
 

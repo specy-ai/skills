@@ -83,7 +83,7 @@ interaction "Handle order cancellation side effects" {
       :: "Restore stock for each cancelled line"
   }
 
-  then "Notify customer that order is cancelled"
+  triggers notification "Notify customer that order is cancelled"
 
   emits OrderStockRestored
 }

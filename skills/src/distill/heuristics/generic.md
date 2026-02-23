@@ -80,6 +80,44 @@ When a source type does not map to a primitive, check if it corresponds to anoth
 - Add `:: "justification"` when the business reason for the cross-aggregate mutation is not obvious from the construct alone.
 - **Decision criterion:** if the code modifies a field on an entity other than the primary aggregate, it is a cross-aggregate mutation. If verifiable (the assignment is in the code), use `sets`. If not verifiable, use `then`.
 
+## Notifications and Side-Effects (`triggers notification`)
+
+### Identification
+
+| Source Pattern | Specy Construct |
+|---|---|
+| Call to `*NotificationService`, `*EmailService`, `*SmsService`, `*MessagingService`, `*PushService` | `triggers notification "description"` |
+| Event listener whose only effect is sending a message (no entity mutation) | `triggers notification "description" on Event` |
+| Call to `send*`, `notify*`, `publish*` on a non-domain service inside an event handler | `triggers notification "description"` |
+| Webhook dispatch, HTTP callback to an external system | `triggers notification "description"` |
+
+### Rules
+
+- The string literal must describe the notification in business language ("Notify customer that order is confirmed"), not technical language ("Send email via SES").
+- Use `on EventType` when the notification is directly caused by a specific event and the interaction reacts to that event.
+- Use `:: "justification"` when the notification is a contractual or regulatory obligation.
+- **Do not use** `triggers notification` for: internal logging, metrics emission, cache invalidation — these are infrastructure (`// NOTE`).
+- **Decision criterion:** if a non-technical stakeholder would say "the customer must be notified when X happens", it is a `triggers notification`.
+
+## Inter-Context Communication (`triggers Context.Command`)
+
+### Identification
+
+| Source Pattern | Specy Construct |
+|---|---|
+| REST/gRPC call to another bounded context's service | `triggers Context.Command` |
+| Message published to a topic/queue named after another domain (e.g. `shipping.prepare`) | `triggers Shipping.PrepareShipment` |
+| Saga step invoking another context's command handler | `triggers Context.Command` |
+| Choreography: event emission consumed by another context that triggers a command | `triggers Context.Command` |
+
+### Rules
+
+- The dot-path must be `ContextName.CommandName` — the context name matches another `.struct` file's `domain` declaration; the command name matches a `command` defined in that `.struct`.
+- Add `:: "justification"` when the business reason for the cross-context trigger is not obvious.
+- If the target context's `.struct` is not available, use `then "description"` with `// NOTE: cross-context trigger — target .struct not yet extracted`.
+- **Do not use** for intra-context event emission — use `emits Event` instead.
+- **Decision criterion:** if the code triggers behaviour in a *different* bounded context (different aggregate root, different deployment unit, different team), it is a `triggers Context.Command`.
+
 ## Repositories
 
 ### Identification

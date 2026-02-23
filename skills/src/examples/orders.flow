@@ -147,8 +147,9 @@ interaction "Deliver a shipped order" {
 interaction "Notify customer when order is confirmed" {
   on OrderConfirmed
 
-  then "Notify customer that order is confirmed"
-  then "Trigger shipment preparation"
+  triggers notification "Notify customer that order is confirmed"
+  triggers Shipping.PrepareShipment
+    :: "Shipment preparation starts automatically after confirmation"
 }
 
 interaction "Handle payment failure" {
@@ -156,10 +157,11 @@ interaction "Handle payment failure" {
 
   resolves Payment from PaymentFailed.paymentId
 
-  then "Notify customer of payment failure"
   then "Allow retry with a different payment method"
 
   sets Payment.status to failed
+
+  triggers notification "Notify customer of payment failure"
 }
 
 interaction "Handle order cancellation side effects" {
@@ -172,7 +174,7 @@ interaction "Handle order cancellation side effects" {
       :: "Restore stock for each cancelled line"
   }
 
-  then "Notify customer that order is cancelled"
+  triggers notification "Notify customer that order is cancelled"
 
   emits OrderStockRestored
 }
@@ -180,13 +182,13 @@ interaction "Handle order cancellation side effects" {
 interaction "Notify customer of refund" {
   on PaymentRefunded
 
-  then "Notify customer that refund has been processed"
+  triggers notification "Notify customer that refund has been processed"
 }
 
 interaction "Notify customer of delivery" {
   on OrderDelivered
 
-  then "Notify customer that order has been delivered"
+  triggers notification "Notify customer that order has been delivered"
   then "Close order lifecycle"
 }
 
