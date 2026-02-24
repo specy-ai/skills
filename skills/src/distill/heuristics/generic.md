@@ -118,6 +118,42 @@ When a source type does not map to a primitive, check if it corresponds to anoth
 - **Do not use** for intra-context event emission — use `emits Event` instead.
 - **Decision criterion:** if the code triggers behaviour in a *different* bounded context (different aggregate root, different deployment unit, different team), it is a `triggers Context.Command`.
 
+## Test Correlation & Branch Decomposition
+
+### Correlating tests to production code
+
+| Strategy | Fiability | Method |
+|---|---|---|
+| Import/require | High | Test file imports the handler class → direct link |
+| Naming convention | Medium | `FooServiceTest` → `FooService`, `foo.spec.ts` → `foo.service.ts` |
+| Subject under test | Low | Test instantiates or calls a class → inferred link |
+
+Use the highest-fiability strategy available. When no correlation is found, skip the test file — do not guess.
+
+### What test assertions evidence
+
+| Assertion pattern | Evidence for |
+|---|---|
+| `assertThrows` / `expect(...).rejects.toThrow` / `(is (thrown? ...))` | `fails` — confirms guard condition + message |
+| `assertEquals(value, entity.getField())` / `expect(result.field).toBe(value)` | `sets Entity.field to value` — confirms mutation target and value |
+| `verify(publisher).publishEvent(any(Event.class))` / `expect(emitter.emit).toHaveBeenCalledWith(...)` | `emits Event` — confirms event emission |
+| `verify(notificationService).send(...)` / `expect(notifService.send).toHaveBeenCalled()` | `triggers notification` — confirms side-effect |
+| `when(service.compute(...)).thenReturn(...)` / `jest.spyOn(service, 'compute')` | `delegates Service.operation` — confirms delegation |
+| `when(repository.findById(id)).willReturn(entity)` / `mockResolvedValue(entity)` | `resolves Entity` — confirms resolution pattern |
+| Test name: `should_X_when_Y` | Candidate interaction label — often more expressive than method names |
+
+### Branch decomposition
+
+When **2+ tests** target the **same handler** with **different preconditions** and **different assertions**, this signals branching. Each test case represents a distinct business behaviour.
+
+**Rule:** decompose into separate event-triggered interactions with complementary guards, rather than using `then` for the branching.
+
+Example signal:
+- `should_allow_retry_when_retryCount_below_3` → interaction "Allow payment retry" with `fails ... when { Payment.retryCount >= 3 }`
+- `should_mark_permanent_failure_after_3_retries` → interaction "Mark payment as permanently failed" with `fails ... when { Payment.retryCount < 3 }`
+
+**Decision criterion:** if the tests assert different mutations (`sets`) or different side-effects (`emits`, `triggers notification`) depending on preconditions, decompose. If the tests only vary in error messages for the same outcome, keep as a single interaction with multiple `fails`.
+
 ## Repositories
 
 ### Identification

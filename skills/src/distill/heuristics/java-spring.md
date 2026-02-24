@@ -45,3 +45,16 @@
 | `entity.getItems().stream().forEach(...)` / `.map(...)` with side effects | `foreach Entity.items as item { ... }` |
 | Inside loop: `item.getRelated().setField(value)` | `sets item.related.field to value` (cross-aggregate) |
 | `otherEntity.setField(value)` where otherEntity ≠ primary aggregate | `sets OtherEntity.field to value` (cross-aggregate, add `::`) |
+
+## Test Assertions (JUnit / Mockito)
+
+| Test Pattern | Evidence for |
+|---|---|
+| `assertThrows(FooException.class, () -> service.handle(...))` | `fails` — exception class + message confirm guard |
+| `assertEquals(Status.FAILED, payment.getStatus())` | `sets Payment.status to failed` |
+| `verify(publisher).publishEvent(any(OrderPlaced.class))` | `emits OrderPlaced` |
+| `verify(publisher, never()).publishEvent(any(OrderPlaced.class))` | Confirms event is NOT emitted on this path |
+| `verify(notificationService).send(any())` | `triggers notification` |
+| `when(repository.findById(id)).thenReturn(entity)` | `resolves Entity from Command.field` |
+| `when(service.compute(...)).thenReturn(result)` | `delegates Service.operation` |
+| `@Test` method named `should_*_when_*` (2+ on same handler with different preconditions) | Branch decomposition signal |

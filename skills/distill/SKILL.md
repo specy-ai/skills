@@ -22,10 +22,17 @@ Run these 4 tests **in sequence** on every element you are about to emit. If any
 
 ## Test 1 — "Is it real?"
 
-> Can I point to a line of source code that evidences this element?
+> Can I point to a line of production code **or** test code that evidences this element?
 
-- **Yes** → proceed to Test 2.
+- **Yes (production code)** → proceed to Test 2.
+- **Yes (test code only)** → proceed to Test 2, but annotate with `// NOTE: evidenced by test ({test file})`.
 - **No** → **do not emit**. Never invent logic absent from code.
+
+### Evidence weight
+
+Production code establishes **what exists** — the implementation. Test code establishes **what is expected** — the intent. When both sources converge on the same element, confidence is high. When a test reveals a behaviour not obvious in production code (e.g. an assertion on a side-effect buried in a helper), the test is sufficient evidence to emit, but the annotation signals reduced traceability.
+
+**Non-regression rule:** absence of tests must never degrade extraction. When no test files exist or no test correlates to a handler, `distill` extracts from production code exactly as before. Tests improve confidence; they do not condition it.
 
 ## Test 2 — "Is it domain?"
 
@@ -107,14 +114,14 @@ Four sequential phases. Print a summary at the end of each phase for user valida
 
 1. Study the canonical examples below to calibrate output style.
 2. Explore the project tree. Identify language, framework, layout.
-3. Locate key code areas: models/entities, handlers/services, events, repositories, validators/policies.
+3. Locate key code areas: models/entities, handlers/services, events, repositories, validators/policies, test suites (integration, acceptance, BDD).
 4. Identify bounded context(s) and propose domain name(s).
 5. Print reconnaissance summary:
    ```
    ## Reconnaissance Summary
    - Language: {lang}, Framework: {framework}
    - Domain(s) identified: {list}
-   - Models found: {count} — Handlers/Services: {count} — Events: {count}
+   - Models found: {count} — Handlers/Services: {count} — Events: {count} — Test suites: {count}
    - Mode: {creation | update}
    ```
 6. Determine mode:
@@ -147,7 +154,8 @@ For each bounded context:
 3. **For each command handler** → `interaction` block. For each service call → `delegates`. For each repository call → `resolves ... via`.
 4. **For each event listener** → event-triggered `interaction` block. Skip technical listeners (logging, metrics, cache).
 5. **Cross-cutting rules** → `policy` blocks. **Structural constraints** → `invariant` blocks.
-6. Write `.flow` and print summary:
+6. **Test-aware enrichment:** for each extracted interaction, read associated test files (correlated by naming convention or imports — see test heuristics). Use test assertions to confirm or enrich `fails`, `sets`, `emits`, `triggers notification`, and `delegates`. Use test names as candidate interaction labels when they are more expressive than handler method names. When 2+ tests target the same handler with different preconditions and different assertions, consider decomposing into separate interactions with complementary guards rather than collapsing into `then`.
+7. Write `.flow` and print summary:
    ```
    ## Flow Extraction — {domain}
    Repositories: {n} | Services: {n} | Interactions (cmd): {n} | Interactions (evt): {n} | Policies: {n} | Invariants: {n} | UNCLEAR: {n}
@@ -163,7 +171,8 @@ For each bounded context:
 6. Verify every `delegates` resolves to a `service` + `operation` in `.flow`.
 7. Verify every `resolves ... via Repository.op` exists in `.flow`.
 8. Verify every `accepts`/`returns` type resolves in `.struct`.
-9. Fix obvious errors. For ambiguous cases → `// UNCLEAR`.
+9. **Test confirmation:** when a test assertion confirms an extracted behaviour (`fails`, `sets`, `emits`, `triggers notification`), treat it as validation. When a test asserts a behaviour absent from the extraction, flag it for review — the extraction may be incomplete.
+10. Fix obvious errors. For ambiguous cases → `// UNCLEAR`.
 10. Write `specy/gaps.report`:
     ```
     # Distill Report — {date}
@@ -253,7 +262,7 @@ For all modes, present changes before applying:
 
 Applies when `specy/.meta.json` exists AND `gitSha` is reachable.
 
-1. **Differential recon:** `git diff --name-only <savedSha>..HEAD`. Cross-reference with filemap → modified, new, deleted files. Skip non-business files (tests, config, CI, migrations).
+1. **Differential recon:** `git diff --name-only <savedSha>..HEAD`. Cross-reference with filemap → modified, new, deleted files. Skip non-business files (config, CI, migrations). Include test files correlated to changed handlers — a changed test may reveal new guards, mutations, or branching.
 2. **If no pertinent changes** → `No changes detected since last run (commit <sha>).` and stop.
 3. **Targeted extraction:** load existing specs as base. Read only changed/new files. Re-extract impacted definitions. Merge with unchanged.
 4. **Cascade warning:** if an entity changes and unchanged interactions reference it, signal the dependency but do not re-read the handler unless referenced fields changed.
@@ -424,6 +433,42 @@ When a source type does not map to a primitive, check if it corresponds to anoth
 - If the target context's `.struct` is not available, use `then "description"` with `// NOTE: cross-context trigger — target .struct not yet extracted`.
 - **Do not use** for intra-context event emission — use `emits Event` instead.
 - **Decision criterion:** if the code triggers behaviour in a *different* bounded context (different aggregate root, different deployment unit, different team), it is a `triggers Context.Command`.
+
+## Test Correlation & Branch Decomposition
+
+### Correlating tests to production code
+
+| Strategy | Fiability | Method |
+|---|---|---|
+| Import/require | High | Test file imports the handler class → direct link |
+| Naming convention | Medium | `FooServiceTest` → `FooService`, `foo.spec.ts` → `foo.service.ts` |
+| Subject under test | Low | Test instantiates or calls a class → inferred link |
+
+Use the highest-fiability strategy available. When no correlation is found, skip the test file — do not guess.
+
+### What test assertions evidence
+
+| Assertion pattern | Evidence for |
+|---|---|
+| `assertThrows` / `expect(...).rejects.toThrow` / `(is (thrown? ...))` | `fails` — confirms guard condition + message |
+| `assertEquals(value, entity.getField())` / `expect(result.field).toBe(value)` | `sets Entity.field to value` — confirms mutation target and value |
+| `verify(publisher).publishEvent(any(Event.class))` / `expect(emitter.emit).toHaveBeenCalledWith(...)` | `emits Event` — confirms event emission |
+| `verify(notificationService).send(...)` / `expect(notifService.send).toHaveBeenCalled()` | `triggers notification` — confirms side-effect |
+| `when(service.compute(...)).thenReturn(...)` / `jest.spyOn(service, 'compute')` | `delegates Service.operation` — confirms delegation |
+| `when(repository.findById(id)).willReturn(entity)` / `mockResolvedValue(entity)` | `resolves Entity` — confirms resolution pattern |
+| Test name: `should_X_when_Y` | Candidate interaction label — often more expressive than method names |
+
+### Branch decomposition
+
+When **2+ tests** target the **same handler** with **different preconditions** and **different assertions**, this signals branching. Each test case represents a distinct business behaviour.
+
+**Rule:** decompose into separate event-triggered interactions with complementary guards, rather than using `then` for the branching.
+
+Example signal:
+- `should_allow_retry_when_retryCount_below_3` → interaction "Allow payment retry" with `fails ... when { Payment.retryCount >= 3 }`
+- `should_mark_permanent_failure_after_3_retries` → interaction "Mark payment as permanently failed" with `fails ... when { Payment.retryCount < 3 }`
+
+**Decision criterion:** if the tests assert different mutations (`sets`) or different side-effects (`emits`, `triggers notification`) depending on preconditions, decompose. If the tests only vary in error messages for the same outcome, keep as a single interaction with multiple `fails`.
 
 ## Repositories
 
@@ -1013,7 +1058,7 @@ Before writing final files, verify each item. If any fails, fix it.
 - **Multiple bounded contexts:** separate `.struct` / `.flow` per context.
 - **Shared types:** duplicate in each `.struct` (each context is self-contained).
 - **Generated code:** ignore unless it reveals domain concepts not found elsewhere.
-- **Tests as source:** read test files — assertions reveal `fails` conditions, setup reveals creation patterns.
+- **Tests as source:** tests are a legitimate evidence source (see Decision Test 1). Read test files correlated to handlers — assertions confirm `fails`, `sets`, `emits`, `triggers`. Multiple tests on the same handler with different preconditions signal branching (see test heuristics for decomposition rules). Absence of tests never degrades extraction.
 - **Large projects (>50 models):** ask the user to scope before proceeding.
 - **Missing events:** do not invent. Signal with `// NOTE: no domain event emitted — consider adding {Event} if {reason}`.
 - **Inheritance:** same type field → single entity + enum (`// NOTE: collapsed hierarchy`). Different fields → separate entities.

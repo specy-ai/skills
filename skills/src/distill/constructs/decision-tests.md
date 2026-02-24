@@ -4,10 +4,17 @@ Run these 4 tests **in sequence** on every element you are about to emit. If any
 
 ## Test 1 — "Is it real?"
 
-> Can I point to a line of source code that evidences this element?
+> Can I point to a line of production code **or** test code that evidences this element?
 
-- **Yes** → proceed to Test 2.
+- **Yes (production code)** → proceed to Test 2.
+- **Yes (test code only)** → proceed to Test 2, but annotate with `// NOTE: evidenced by test ({test file})`.
 - **No** → **do not emit**. Never invent logic absent from code.
+
+### Evidence weight
+
+Production code establishes **what exists** — the implementation. Test code establishes **what is expected** — the intent. When both sources converge on the same element, confidence is high. When a test reveals a behaviour not obvious in production code (e.g. an assertion on a side-effect buried in a helper), the test is sufficient evidence to emit, but the annotation signals reduced traceability.
+
+**Non-regression rule:** absence of tests must never degrade extraction. When no test files exist or no test correlates to a handler, `distill` extracts from production code exactly as before. Tests improve confidence; they do not condition it.
 
 ## Test 2 — "Is it domain?"
 

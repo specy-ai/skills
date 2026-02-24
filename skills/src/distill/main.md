@@ -50,14 +50,14 @@ Four sequential phases. Print a summary at the end of each phase for user valida
 
 1. Study the canonical examples below to calibrate output style.
 2. Explore the project tree. Identify language, framework, layout.
-3. Locate key code areas: models/entities, handlers/services, events, repositories, validators/policies.
+3. Locate key code areas: models/entities, handlers/services, events, repositories, validators/policies, test suites (integration, acceptance, BDD).
 4. Identify bounded context(s) and propose domain name(s).
 5. Print reconnaissance summary:
    ```
    ## Reconnaissance Summary
    - Language: {lang}, Framework: {framework}
    - Domain(s) identified: {list}
-   - Models found: {count} — Handlers/Services: {count} — Events: {count}
+   - Models found: {count} — Handlers/Services: {count} — Events: {count} — Test suites: {count}
    - Mode: {creation | update}
    ```
 6. Determine mode:
@@ -90,7 +90,8 @@ For each bounded context:
 3. **For each command handler** → `interaction` block. For each service call → `delegates`. For each repository call → `resolves ... via`.
 4. **For each event listener** → event-triggered `interaction` block. Skip technical listeners (logging, metrics, cache).
 5. **Cross-cutting rules** → `policy` blocks. **Structural constraints** → `invariant` blocks.
-6. Write `.flow` and print summary:
+6. **Test-aware enrichment:** for each extracted interaction, read associated test files (correlated by naming convention or imports — see test heuristics). Use test assertions to confirm or enrich `fails`, `sets`, `emits`, `triggers notification`, and `delegates`. Use test names as candidate interaction labels when they are more expressive than handler method names. When 2+ tests target the same handler with different preconditions and different assertions, consider decomposing into separate interactions with complementary guards rather than collapsing into `then`.
+7. Write `.flow` and print summary:
    ```
    ## Flow Extraction — {domain}
    Repositories: {n} | Services: {n} | Interactions (cmd): {n} | Interactions (evt): {n} | Policies: {n} | Invariants: {n} | UNCLEAR: {n}
@@ -106,7 +107,8 @@ For each bounded context:
 6. Verify every `delegates` resolves to a `service` + `operation` in `.flow`.
 7. Verify every `resolves ... via Repository.op` exists in `.flow`.
 8. Verify every `accepts`/`returns` type resolves in `.struct`.
-9. Fix obvious errors. For ambiguous cases → `// UNCLEAR`.
+9. **Test confirmation:** when a test assertion confirms an extracted behaviour (`fails`, `sets`, `emits`, `triggers notification`), treat it as validation. When a test asserts a behaviour absent from the extraction, flag it for review — the extraction may be incomplete.
+10. Fix obvious errors. For ambiguous cases → `// UNCLEAR`.
 10. Write `specy/gaps.report`:
     ```
     # Distill Report — {date}
@@ -196,7 +198,7 @@ For all modes, present changes before applying:
 
 Applies when `specy/.meta.json` exists AND `gitSha` is reachable.
 
-1. **Differential recon:** `git diff --name-only <savedSha>..HEAD`. Cross-reference with filemap → modified, new, deleted files. Skip non-business files (tests, config, CI, migrations).
+1. **Differential recon:** `git diff --name-only <savedSha>..HEAD`. Cross-reference with filemap → modified, new, deleted files. Skip non-business files (config, CI, migrations). Include test files correlated to changed handlers — a changed test may reveal new guards, mutations, or branching.
 2. **If no pertinent changes** → `No changes detected since last run (commit <sha>).` and stop.
 3. **Targeted extraction:** load existing specs as base. Read only changed/new files. Re-extract impacted definitions. Merge with unchanged.
 4. **Cascade warning:** if an entity changes and unchanged interactions reference it, signal the dependency but do not re-read the handler unless referenced fields changed.
@@ -325,7 +327,7 @@ Before writing final files, verify each item. If any fails, fix it.
 - **Multiple bounded contexts:** separate `.struct` / `.flow` per context.
 - **Shared types:** duplicate in each `.struct` (each context is self-contained).
 - **Generated code:** ignore unless it reveals domain concepts not found elsewhere.
-- **Tests as source:** read test files — assertions reveal `fails` conditions, setup reveals creation patterns.
+- **Tests as source:** tests are a legitimate evidence source (see Decision Test 1). Read test files correlated to handlers — assertions confirm `fails`, `sets`, `emits`, `triggers`. Multiple tests on the same handler with different preconditions signal branching (see test heuristics for decomposition rules). Absence of tests never degrades extraction.
 - **Large projects (>50 models):** ask the user to scope before proceeding.
 - **Missing events:** do not invent. Signal with `// NOTE: no domain event emitted — consider adding {Event} if {reason}`.
 - **Inheritance:** same type field → single entity + enum (`// NOTE: collapsed hierarchy`). Different fields → separate entities.

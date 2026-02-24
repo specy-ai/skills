@@ -38,3 +38,16 @@
 | `entity.items.map(item => ...)` with mutation side effects | `foreach Entity.items as item { ... }` |
 | Inside loop: `item.related.field = value` | `sets item.related.field to value` (cross-aggregate) |
 | `otherEntity.field = value` where otherEntity ≠ primary aggregate | `sets OtherEntity.field to value` (cross-aggregate, add `::`) |
+
+## Test Assertions (Jest / Vitest)
+
+| Test Pattern | Evidence for |
+|---|---|
+| `expect(service.handle(...)).rejects.toThrow('msg')` | `fails "msg"` — confirms guard message |
+| `expect(result.status).toBe('failed')` | `sets Entity.status to failed` |
+| `expect(eventEmitter.emit).toHaveBeenCalledWith('EventName', ...)` | `emits Event` |
+| `expect(eventEmitter.emit).not.toHaveBeenCalled()` | Confirms event is NOT emitted on this path |
+| `expect(notificationService.send).toHaveBeenCalled()` | `triggers notification` |
+| `jest.spyOn(repository, 'findOne').mockResolvedValue(entity)` | `resolves Entity` |
+| `jest.spyOn(service, 'compute').mockResolvedValue(result)` | `delegates Service.operation` |
+| `it('should ... when ...', ...)` / `describe` (2+ on same handler with different preconditions) | Branch decomposition signal |
