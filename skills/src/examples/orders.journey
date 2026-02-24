@@ -49,13 +49,13 @@ journey "Place an order" {
   }
 
   on success {
-    then "Show order confirmation with order number"
-    then "Navigate to order detail"
+    then presents "Order confirmation with order number"
+    then navigates to "Order detail"
   }
 
   on failure {
-    then "Show error message"
-    then "Return to last valid step"
+    then presents "Error message"
+    then navigates to "Last valid step"
   }
 }
 
@@ -75,8 +75,8 @@ journey "Cancel an order" {
   }
 
   on success {
-    then "Show cancellation confirmation"
-    then "Navigate to order list"
+    then presents "Cancellation confirmation"
+    then navigates to "Order list"
   }
 }
 
