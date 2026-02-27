@@ -1,10 +1,190 @@
-# Flow Construct Reference
+# Specy Construct Reference
 
-## Interaction
+## Structural constructs (.struct)
+
+### Entity
+
+An `entity` is a domain object with a unique identity that persists over time. Entities are aggregate roots or members of an aggregate — they own mutable state and are the primary targets of commands and invariants.
+
+#### Skeleton
+
+```
+entity Name {
+  id : uuid unique immutable
+  field : type constraint constraint
+  ref : OtherEntity
+  collection : list<ValueOrEntity>
+}
+```
+
+#### Rules
+
+| Rule | Detail |
+|------|--------|
+| Identity | Must have at least one `unique immutable` field (typically `id : uuid`). |
+| References | A field typed as another entity or value creates a structural relationship. |
+| Collections | Use `list<T>` or `set<T>` for multi-valued associations. |
+| Constraints | Apply domain constraints directly on fields (`min`, `max`, `optional`, `default`, etc.). |
+| Naming | `PascalCase` for the entity name, `camelCase` for field names. |
+
+#### Example
+
+```
+entity Order {
+  id : uuid unique immutable
+  customer : Customer
+  lines : list<OrderLine>
+  status : OrderStatus default("draft")
+  totalAmount : Money
+  shippingAddress : string
+  placedAt : datetime optional pastOrPresent
+  createdAt : datetime immutable pastOrPresent
+}
+```
+
+---
+
+### Value
+
+A `value` is an immutable object defined entirely by its attributes — it has no identity. Two values with the same fields are considered equal.
+
+#### Skeleton
+
+```
+value Name {
+  field : type constraint
+}
+```
+
+#### Rules
+
+| Rule | Detail |
+|------|--------|
+| No identity | Never add `unique immutable` identity fields — that makes it an entity. |
+| Immutability | All fields are implicitly immutable. |
+| Composability | Values can be embedded inside entities or other values. |
+| Naming | `PascalCase` for the value name, `camelCase` for field names. |
+
+#### Example
+
+```
+value Money {
+  amount : decimal min(0)
+  currency : string default("EUR") maxLength(3)
+}
+```
+
+---
+
+### Enum
+
+An `enum` defines a closed set of named values representing a domain classification.
+
+#### Skeleton
+
+```
+enum Name {
+  value1
+  value2
+  value3
+}
+```
+
+#### Rules
+
+| Rule | Detail |
+|------|--------|
+| Values | `camelCase` identifiers — convert `UPPER_SNAKE_CASE` from source code. |
+| Closed set | All valid values must be listed exhaustively. |
+| No fields | Enum values have no associated data — use a value object if data is needed. |
+| Referenced by | Entities and commands reference enums as field types. |
+
+#### Example
+
+```
+enum OrderStatus {
+  draft
+  confirmed
+  shipped
+  delivered
+  cancelled
+}
+```
+
+---
+
+### Command
+
+A `command` represents an intent to change the state of the domain. Each command triggers exactly one interaction.
+
+#### Skeleton
+
+```
+command Name {
+  field : type constraint
+}
+```
+
+#### Rules
+
+| Rule | Detail |
+|------|--------|
+| Naming | `PascalCase`, verb-noun form (e.g., `PlaceOrder`, `CancelOrder`). |
+| Fields | Carry the data needed to fulfill the intent — identity references, payload. |
+| 1:1 mapping | Exactly one `interaction` block must declare `on` this command. |
+| No behavior | Commands are pure data — behavior lives in the interaction. |
+
+#### Example
+
+```
+command CancelOrder {
+  orderId : uuid
+  reason : string optional maxLength(500)
+}
+```
+
+---
+
+### Event
+
+An `event` signals that something has happened in the domain. Events are emitted by interactions and can trigger zero or more reactive interactions.
+
+#### Skeleton
+
+```
+event Name {
+  field : type
+}
+```
+
+#### Rules
+
+| Rule | Detail |
+|------|--------|
+| Naming | `PascalCase`, past-tense (e.g., `OrderPlaced`, `OrderCancelled`). |
+| Fields | Carry the facts of what happened — enough for any listener to react. |
+| 0:N mapping | Zero or more interactions may declare `on` this event. |
+| Immutable | Events are facts — they cannot be modified after emission. |
+
+#### Example
+
+```
+event OrderCancelled {
+  orderId : uuid
+  reason : string optional
+  cancelledAt : datetime
+}
+```
+
+---
+
+## Behavioral constructs (.flow)
+
+### Interaction
 
 An `interaction` block models a handler triggered by a command (intentional) or an event (reactive).
 
-### Skeleton
+#### Skeleton
 
 ```
 interaction "Business intent label" {
@@ -25,7 +205,7 @@ interaction "Business intent label" {
 }
 ```
 
-### Clause rules
+#### Clause rules
 
 | Clause | Rule |
 |---|---|
@@ -43,11 +223,11 @@ interaction "Business intent label" {
 | `::` | Justification operator — attaches a business reason to a clause. Optional on `sets`, `triggers notification`, `triggers Context.Command`. Does not change verifiability. |
 | `emits` | All events published by the handler. |
 
-### Resolution patterns
+#### Resolution patterns
 
 Three patterns for `resolves`. The `from` dotPath identifies the source; `via` specifies how.
 
-#### Pattern 1 — Direct resolution
+##### Pattern 1 — Direct resolution
 
 The `from` dotPath points to a field on the command/event carrying the entity's identity.
 
@@ -56,7 +236,7 @@ resolves Order from CancelOrder.orderId
 resolves User via UserRepository.findById from UpdateProfile.userId
 ```
 
-#### Pattern 2 — Indirect (forward ref)
+##### Pattern 2 — Indirect (forward ref)
 
 The `from` dotPath points to a field on an already-resolved entity.
 
@@ -65,7 +245,7 @@ resolves Order via OrderRepository.findById from ShipOrder.orderId
 resolves Payment from Order.paymentId
 ```
 
-#### Pattern 3 — Indirect (reverse ref)
+##### Pattern 3 — Indirect (reverse ref)
 
 The resolved entity has a field referencing the `from` entity. Use `via Entity.field` to name it.
 
@@ -74,7 +254,7 @@ resolves Order from ConfirmOrder.orderId
 resolves Payment via Payment.order from Order
 ```
 
-#### Decision table
+##### Decision table
 
 | Situation | Pattern |
 |---|---|
@@ -82,12 +262,12 @@ resolves Payment via Payment.order from Order
 | An already-resolved entity carries the ID | Indirect (forward) |
 | The entity to resolve has a field pointing back | Indirect (reverse) |
 
-### `via` — two uses
+#### `via` — two uses
 
 - **Repository operation:** `via Repository.operation` — infrastructure method.
 - **Relationship field:** `via Entity.field` — reverse-ref field (entity name matches `resolves` typeName).
 
-### `foreach` — collection iteration
+#### `foreach` — collection iteration
 
 Use `foreach` when the code iterates over a collection and performs per-item mutations, emissions, or validations.
 
@@ -104,7 +284,7 @@ foreach Order.lines as line {
 - Body allows: `sets`, `emits`, `fails`, `then` — same constructs as an interaction body (minus `resolves`, `creates`, `delegates`, `foreach`).
 - **Checker verification:** the code contains a loop over the collection with per-item mutations matching the declared `sets`.
 
-### `::` — justification operator
+#### `::` — justification operator
 
 Attaches a business reason to a clause. Does not change semantics or verifiability.
 
@@ -118,7 +298,7 @@ sets Order.status to cancelled
 - Use it when the *why* is not obvious from the construct alone — especially for cross-aggregate mutations.
 - The justification is not verifiable itself — it is the reason *why the verifiable proof exists*.
 
-### `triggers notification` — out-of-domain side-effects
+#### `triggers notification` — out-of-domain side-effects
 
 Use `triggers notification` when the code sends a message, email, SMS, webhook, or push notification as a business-required side-effect.
 
@@ -135,7 +315,7 @@ triggers notification "Notify customer that order is cancelled"
 - **Checker verification:** the code contains a call to a notification/messaging service. The checker verifies the notification *exists*, not its content.
 - **Do not use** for internal logging, metrics, cache invalidation — these are infrastructure (`// NOTE`).
 
-### `triggers Context.Command` — inter-context communication
+#### `triggers Context.Command` — inter-context communication
 
 Use `triggers Context.Command` when the code triggers behaviour in another bounded context — via REST call, message queue, saga step, or choreography.
 
@@ -151,20 +331,38 @@ triggers Shipping.PrepareShipment
 - If the target context's `.struct` is not available, fall back to `then "description"` with `// NOTE: cross-context trigger — target .struct not yet extracted`.
 - **Do not use** for intra-context event emission — use `emits Event` instead.
 
-### Cross-file coherence for `triggers`
+#### Cross-file coherence for `triggers`
 
 The lint (level 0) validates:
 - `triggers notification` → a notification mechanism exists in the code for that event.
 - `triggers Context.Command` → the command exists in the referenced `.struct`.
 - Every `triggers` has a corresponding handler somewhere in the `.flow` files.
 
+#### Example
+
+```
+interaction "Cancel an order" {
+  on CancelOrder
+
+  resolves Order via OrderRepository.findById from CancelOrder.orderId
+
+  fails "Order cannot be cancelled" when {
+    Order.status not in {draft, confirmed}
+  }
+
+  sets Order.status to cancelled
+
+  emits OrderCancelled
+}
+```
+
 ---
 
-## Service
+### Service
 
 A `service` block models a stateless class/interface with business logic.
 
-### Skeleton
+#### Skeleton
 
 ```
 service Name {
@@ -178,21 +376,35 @@ service Name {
 }
 ```
 
-### Rules
+#### Rules
 
-- One service block per service class/interface.
-- One operation per public method with business logic.
-- Use `then` for logic that cannot be captured structurally.
-- Do not create services for pure infrastructure (password hashing, image processing, logging, caching). Use `// NOTE` instead.
-- **Decision criterion:** if the result affects an entity field via `sets` or conditions the flow via `fails`, it is a business service.
+| Rule | Detail |
+|------|--------|
+| Scope | One service block per service class/interface. |
+| Operations | One operation per public method with business logic. |
+| `then` | Use for logic that cannot be captured structurally. |
+| Exclusion | Do not create services for pure infrastructure (password hashing, image processing, logging, caching). Use `// NOTE` instead. |
+| Decision criterion | If the result affects an entity field via `sets` or conditions the flow via `fails`, it is a business service. |
+
+#### Example
+
+```
+service PricingCalculator {
+  operation computeTotal {
+    accepts lines : list<OrderLine>
+    returns decimal
+    then "Applies volume discounts and tax calculations"
+  }
+}
+```
 
 ---
 
-## Repository
+### Repository
 
 A `repository` block models a persistence interface for an aggregate root.
 
-### Skeleton
+#### Skeleton
 
 ```
 repository Name {
@@ -204,13 +416,15 @@ repository Name {
 }
 ```
 
-### Rules
+#### Rules
 
-- `for` must reference an entity (aggregate root), not a value or enum.
-- Operations contain only `accepts` and `returns` — never `then`, `fails`, `sets`, `emits`.
-- Only model operations referenced by at least one `resolves ... via` or used in an extracted interaction.
+| Rule | Detail |
+|------|--------|
+| `for` | Must reference an entity (aggregate root), not a value or enum. |
+| Operations | Contain only `accepts` and `returns` — never `then`, `fails`, `sets`, `emits`. |
+| Filtering | Only model operations referenced by at least one `resolves ... via` or used in an extracted interaction. |
 
-### Filtering guide
+#### Filtering guide
 
 | Operation type | Model? |
 |---|---|
@@ -219,13 +433,26 @@ repository Name {
 | `existsBy*` (used in a guard) | Yes |
 | `search`, `pagination`, `count` (dashboards) | No — `// NOTE: query-only` |
 
+#### Example
+
+```
+repository OrderRepository {
+  for Order
+
+  operation findById {
+    accepts id : uuid
+    returns Order
+  }
+}
+```
+
 ---
 
-## Policy
+### Policy
 
 A `policy` block models a cross-cutting domain rule spanning multiple operations.
 
-### Skeleton
+#### Skeleton
 
 ```
 policy Name {
@@ -234,20 +461,33 @@ policy Name {
 }
 ```
 
-### Rules
+#### Rules
 
-- `when` must be a real, evaluable boolean expression — never a tautology, never empty (apply Test 3).
-- **Never emit a policy block with an empty or commented-out `when`.** If the condition cannot be expressed, use an inline `// UNCLEAR` comment instead of a policy block.
-- If the rule applies to only one command handler, use `fails` in the interaction instead.
-- If the real condition is infrastructure → `// NOTE`.
+| Rule | Detail |
+|------|--------|
+| `when` | Must be a real, evaluable boolean expression — never a tautology, never empty (apply Test 3). |
+| Empty guard | **Never emit a policy block with an empty or commented-out `when`.** If the condition cannot be expressed, use an inline `// UNCLEAR` comment instead. |
+| Scope | If the rule applies to only one command handler, use `fails` in the interaction instead. |
+| Infrastructure | If the real condition is infrastructure → `// NOTE`. |
+
+#### Example
+
+```
+policy MaxOrderAmount {
+  when {
+    Order.totalAmount.amount > 10000
+  }
+  then "Orders above 10000 require manual approval before confirmation"
+}
+```
 
 ---
 
-## Invariant
+### Invariant
 
 An `invariant` block models a structural constraint that must always be true for an entity.
 
-### Skeleton
+#### Skeleton
 
 ```
 invariant Name {
@@ -257,9 +497,23 @@ invariant Name {
 }
 ```
 
-### Rules
+#### Rules
 
-- `on` must reference an **entity** — never a command, event, or value.
-- `must` must be a real, evaluable condition (apply Test 3).
-- If the condition cannot be expressed faithfully, use `// UNCLEAR` instead of creating an invariant with a tautological `must`.
-- Validation rules on command inputs belong in `fails` clauses, not invariants.
+| Rule | Detail |
+|------|--------|
+| `on` | Must reference an **entity** — never a command, event, or value. |
+| `must` | Must be a real, evaluable condition (apply Test 3). |
+| Unexpressible | If the condition cannot be expressed faithfully, use `// UNCLEAR` instead of creating an invariant with a tautological `must`. |
+| Scope | Validation rules on command inputs belong in `fails` clauses, not invariants. |
+
+#### Example
+
+```
+invariant OrderMustHaveLines {
+  on Order
+  must {
+    isNotEmpty(Order.lines)
+  }
+  message "An order must contain at least one line"
+}
+```

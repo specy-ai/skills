@@ -272,7 +272,7 @@ If no specific stack is detected, rely on generic heuristics only. Annotate non-
 
 ### Construct Reference
 
-<!-- include: constructs/reference.md -->
+<!-- include: grammars/constructs.md -->
 
 ---
 

@@ -2,6 +2,10 @@
 
 During Phase 3 (Extraction: flow), load the relevant construct files for rules, examples, and anti-patterns.
 
+## Shared construct reference
+
+The definitions, skeletons, rules, and examples for all 10 constructs (entity, value, enum, command, event, interaction, service, repository, policy, invariant) are in `grammars/constructs.md` — shared across all three skills.
+
 ## Always load
 
 | File                        | Content                                                                                 |

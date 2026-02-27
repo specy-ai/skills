@@ -598,6 +598,10 @@ When the user wants to re-validate an existing `.spec` file after models have be
 
 <!-- include-code: ebnf grammars/flow.ebnf -->
 
+### Construct Reference
+
+<!-- include: grammars/constructs.md -->
+
 ---
 
 ## Canonical Examples
