@@ -116,9 +116,10 @@ An artefact that survives all three loops is **proven** at three levels: intenti
 | 1 | **Checker AI** — independent AI reads code + `.journey`, reports gaps (separate prompt from builder) | Static | Post-generation |
 | 2 | **Contract assertions** — generated unit/component tests from `.journey` constructs (validates, presents, field order, warns when, visible when) | Tests | CI |
 | 3 | **Reverse DOM** — AI inspects rendered DOM, produces observed `.journey`, diffs against declared `.journey` | Dynamic | CI / post-deploy |
-| 4 | **Reverse visual navigation** — AI navigates live application via screenshots/OCR, discovers journeys from scratch | Semi-automatic | Legacy extraction / audit |
+| 4a | **Navigate** — AI agent browses live application guided by extracted interactions as hypotheses, produces candidate `.journey` files (discovery outputs marked `// OBSERVED: unconfirmed`) | Semi-automatic | Legacy extraction |
+| 4b | **Probe** — Adversarial confrontation using available infrastructure (CDC, logs, instrumentation, variant navigation). Challenges all artifacts against observed evidence, produces confrontation report | Semi-automatic | Legacy extraction / audit |
 
-Levels 0-2 verify **construction** (code matches intent). Levels 3-4 verify **observable behaviour** (running application matches intent). Level 4 doubles as a **discovery tool** for legacy extraction.
+Levels 0-2 verify **construction** (code matches intent). Levels 3-4 verify **observable behaviour** (running application matches intent). Level 4a is **descriptive** (captures experience); level 4b is **adversarial** (confronts artifacts against evidence).
 
 ### Reverse as knowledge detector
 
@@ -164,27 +165,69 @@ Three columns a CTO can read: **Intention** — **Domain materialisation** — *
 
 ### Legacy extraction workflow
 
-For legacy systems with a user interface, extraction starts from what the user sees — not from the code:
+Legacy extraction follows a three-phase approach: static analysis first, then AI-assisted navigation, then adversarial probing.
+
+#### Phase 1 — DISTILL (static, code-only)
 
 ```
-1. OBSERVE — AI navigates the live application (screenshots/OCR)
-   → produces a candidate .journey (what the user experiences)
-
-2. DISTILL — AI reads the source code
+1. DISTILL — AI reads the source code (front, back, tests)
    → produces .struct and .flow (what the code does)
+   → discovers candidate bounded context boundaries from code structure
 
-3. CONFRONT — diff between observed journey and extracted domain
-   → surfaces fragmented knowledge:
-     - UI rules with no domain counterpart
-     - Domain rules with no UI manifestation
-     - Behaviour gaps between what is shown and what is enforced
+2. CROSS-VALIDATE — internal coherence check
+   → dot-paths resolve, commands match interactions, events are consumed
+   → produces gaps.report with UNCLEAR markers
+```
 
-4. RECONCILE — human reviews the gaps
+Phase 1 requires only source code access — no running application, no environment setup, no DBA cooperation. It delivers a navigable domain model that is immediately valuable for rewrite planning.
+
+#### Phase 2 — NAVIGATE (descriptive, expert-guided)
+
+The UI is a denormalisation of the interaction. The `.journey` captures the delta of knowledge between what the interaction declares (`.flow`) and what the experience materialises (field order, warnings, confirmations, feedback). Navigation is organised as atomic sessions — one interaction at a time.
+
+**Protocol:**
+
+```
+3. NAVIGATE — expert-guided sessions, one interaction at a time
+   a. Expert picks an interaction from the distill-extracted list
+   b. Expert navigates the live application in a shared browser
+      (AI observes via DOM + screenshots in real time)
+   c. Expert points at components, provides context (oral or textual)
+      → AI maps pointed elements to .struct fields
+      → AI structures the .journey live in a visible side panel
+   d. Expert validates or corrects the .journey in real time
+   e. Session produces one atomic .journey tied to one interaction
+
+   Optional composition pass:
+   f. Expert chains interactions into end-to-end journeys
+      → reveals transitions (on success → navigates to) invisible at atomic scale
+      → produces composite .journey files
+```
+
+Each session is short (5-15 min), scoped, and produces an immediately verifiable artefact. The expert sees the `.journey` being built — not a recording to post-process. A coverage map tracks documented vs. undocumented interactions, giving the CTO a progression view.
+
+Navigation is descriptive: it captures *what the user lives*. The output is a structured description of the experience, not a judgement on its correctness. Phase 2 requires a running, navigable application and an available domain expert.
+
+#### Phase 3 — PROBE (adversarial, infrastructure-dependent)
+
+```
+4. PROBE — confrontation using available instrumentation
+   → tactics adapt to infrastructure:
+     - CDC available → capture DB effects per navigation step
+     - Logs available → trace event emissions per interaction
+     - Neither → repeated navigation with variant inputs
+   → challenges extracted artifacts against observed evidence
+   → produces confrontation report + corrections to .struct, .flow, .journey
+
+5. RECONCILE — human reviews the confrontation report
+   → validates or rejects corrections and discovery candidates
    → decides what is business knowledge (enters Specy)
      vs. accidental complexity (stays in code or is discarded)
 ```
 
-For legacy systems without a user interface (APIs, batch jobs, backend services), extraction starts at step 2 (distill) directly.
+Probing is adversarial: it puts the extracted model to the test against observable system behaviour. The confrontation report — deltas between what distill/navigate produced and what probing observed — is the primary value artifact. These deltas reveal where business knowledge is fragmented across layers. Phase 3 degrades gracefully: the tactics adapt to whatever infrastructure is available (CDC, logs, instrumentation, or repeated variant navigation).
+
+For legacy systems without a user interface (APIs, batch jobs, backend services), phase 2 is replaced by API probing or log analysis, and extraction starts at phase 1 directly.
 
 ## Design principles (from brainstorm)
 
@@ -194,11 +237,13 @@ For legacy systems without a user interface (APIs, batch jobs, backend services)
 4. **Proofs, not documentation.** Every Specy artifact must be mechanically verifiable against code. If it cannot produce a proof, it is not earning its place. The `::` operator carries business justification — the proof says *what*, the justification says *why*.
 5. **AI as amplifier, human as validator.** AI extracts, generates, and validates at scale. Humans confirm intent and review gaps. The 80/20 split: 80% mechanical verification, 20% human judgement.
 6. **Reverse as discovery, not just verification.** The observe loop (reverse UI→journey) is both a checker and a detector of unmodeled knowledge. Gaps between observed and declared journeys reveal where business knowledge is fragmented across layers.
+7. **Three-phase extraction: distill, navigate, probe.** Each phase has independent value and increasing prerequisites. Distill extracts from code. Navigate describes the user experience. Probe confronts all artifacts against observable evidence. An organization can stop at any phase and still hold usable knowledge.
+8. **The gap is the gold.** The confrontation report — deltas between what distill extracted, what navigate described, and what probe observed — is the primary value artifact of legacy extraction. Gaps reveal where business knowledge is fragmented across code, UI, and database layers.
 
 ## Open questions
 
 1. **`.journey` EBNF grammar.** ~~The formal EBNF grammar remains to be written.~~ **Resolved.** The formal grammar is defined in `skills/src/grammars/journey.ebnf`. Core constructs: `journey`, `step`, `presents`/`with`, `collects`/`maps to`, `validates`, `confirms`, `precondition`, `field order`, `warns when`, `visible when`, `constraint`, `::` as justification operator. Panel refinement: `then` in `on success/failure` blocks is typed (`then presents`, `then navigates to`, `then notifies`) for proof derivability.
 2. **Infrastructure annotation syntax.** Is `// materializes: <intention>` sufficient, or does a more structured mechanism need to exist within the grammar?
 3. **Proof coverage threshold.** Hypothesis: mechanical verification covers 70%+ of business conformity. This needs validation on a real legacy extraction.
-4. **Reverse tooling.** Two modes identified (DOM inspection for CI, visual navigation for legacy extraction). Technical feasibility and accuracy thresholds need prototyping.
+4. **Probing prototype.** The three-phase extraction workflow (distill → navigate → probe) needs a concrete prototype to validate: (a) AI agent navigation guided by extracted interactions, (b) minimum viable confrontation report format, (c) probing value with and without CDC/logs/instrumentation, (d) false-positive rate in discovery mode (fabricated journeys).
 5. **Journey variants.** Deferred to V2. Current approach: one journey per variant (`"Place an order (B2B)"`, `"Place an order (B2C)"`). If the pattern repeats enough, a variant mechanism will be introduced.
