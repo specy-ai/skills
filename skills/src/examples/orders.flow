@@ -193,53 +193,59 @@ interaction "Notify customer of delivery" {
 }
 
 // =============================================================================
-// Policies — domain-wide rules
+// Policies — preconditions guarding interactions
 // =============================================================================
 
 policy MaxOrderAmount {
-  when {
-    Order.totalAmount.amount > 10000
+  on "Place a new order", "Confirm an order after payment"
+  must {
+    Order.totalAmount.amount <= 10000
   }
-  then "Orders above 10000 require manual approval before confirmation"
+  message "Orders above 10000 require manual approval before confirmation"
 }
 
-policy InactiveCustomerBlocked {
-  when {
-    Customer.status = suspended or Customer.status = closed
+policy ActiveCustomerRequired {
+  on "Place a new order"
+  must {
+    Customer.status != suspended and Customer.status != closed
   }
-  then "Suspended or closed customers cannot place new orders"
+  message "Suspended or closed customers cannot place new orders"
 }
 
 policy MinimumOrderAmount {
-  when {
-    Order.totalAmount.amount < 1
+  on "Place a new order"
+  must {
+    Order.totalAmount.amount >= 1
   }
-  then "Orders must have a total amount of at least 1"
+  message "Orders must have a total amount of at least 1"
 }
 
-policy UnavailableProductBlocked {
-  when {
-    Product.available = false
+policy AvailableProductRequired {
+  on "Place a new order"
+  must {
+    Product.available = true
   }
-  then "Unavailable products cannot be added to orders"
+  message "Unavailable products cannot be added to orders"
 }
 
-policy LateDeliveryAlert {
-  when {
-    (Order.status = confirmed or Order.status = shipped) and Order.estimatedDelivery <= today()
+policy DeliveryOnTime {
+  on "Ship a confirmed order", "Deliver a shipped order"
+  must {
+    Order.estimatedDelivery > today()
   }
-  then "Orders past their estimated delivery date require attention"
+  message "Orders past their estimated delivery date require attention"
 }
 
 policy MaxOrderLines {
-  when {
-    count(Order.lines) > 20
+  on "Place a new order"
+  must {
+    count(Order.lines) <= 20
   }
-  then "Orders with more than 20 lines require manual review"
+  message "Orders with more than 20 lines require manual review"
 }
 
 // =============================================================================
-// Invariants — structural constraints on entities
+// Invariants — properties always true after any successful mutation
 // =============================================================================
 
 invariant OrderMustHaveLines {

@@ -63,5 +63,5 @@ A role check (`user.isAdmin`, `requirePermission`) is an **authorization mechani
 | Persistence interface for aggregate root | `repository` (in `.flow`) |
 | Handler for a command → write operation | `interaction` (command-triggered) |
 | Handler for an event → side effects | `interaction` (event-triggered) |
-| Cross-cutting rule spanning multiple operations | `policy` |
-| Structural constraint always true for an entity | `invariant` (entities only, never commands/events/values) |
+| Precondition that must hold before one or more interactions execute | `policy` (with `on "interaction"`) |
+| Property always true after any successful mutation of an entity | `invariant` (with `on Entity` — entities only, never commands/events/values) |

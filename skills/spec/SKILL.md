@@ -1066,16 +1066,22 @@ repositoryOpDef  = "operation" , identifier , "{"
                  , "}" ;
 
 // -----------------------------------------------------------------------------
-// Policy — domain-wide rule
+// Policy — precondition guarding one or more interactions
+//
+// A policy is a state requirement that must be true before an action executes.
+// The `on` clause lists the interactions it guards (string literals matching
+// interaction labels). Disambiguation with invariant: policy targets
+// interactions (stringLiteral), invariant targets entities (typeName).
 // -----------------------------------------------------------------------------
 
 policyDef        = "policy" , typeName , "{"
-                 ,   "when" , "{" , expression , "}"
-                 ,   "then" , stringLiteral
+                 ,   "on" , stringLiteral , { "," , stringLiteral }
+                 ,   "must" , "{" , expression , "}"
+                 ,   "message" , stringLiteral
                  , "}" ;
 
 // -----------------------------------------------------------------------------
-// Invariant — structural constraint on an entity
+// Invariant — property always true after any successful mutation of an entity
 // -----------------------------------------------------------------------------
 
 invariantDef     = "invariant" , typeName , "{"
@@ -1649,14 +1655,15 @@ repository OrderRepository {
 
 ### Policy
 
-A `policy` block models a cross-cutting domain rule spanning multiple operations.
+A `policy` block models a precondition — a state requirement that must be true **before** one or more interactions can execute.
 
 #### Skeleton
 
 ```
 policy Name {
-  when { expression }
-  then "consequence in business language"
+  on "interaction label", "another interaction"
+  must { expression }
+  message "constraint in business language"
 }
 ```
 
@@ -1664,19 +1671,22 @@ policy Name {
 
 | Rule | Detail |
 |------|--------|
-| `when` | Must be a real, evaluable boolean expression — never a tautology, never empty (apply Test 3). |
-| Empty guard | **Never emit a policy block with an empty or commented-out `when`.** If the condition cannot be expressed, use an inline `// UNCLEAR` comment instead. |
-| Scope | If the rule applies to only one command handler, use `fails` in the interaction instead. |
+| `on` | Lists the interaction labels this policy guards. Must be string literals matching interaction names. At least one required. |
+| `must` | The precondition — must be a real, evaluable boolean expression that must hold for the action to proceed (apply Test 3). Never a tautology, never empty. |
+| Empty guard | **Never emit a policy block with an empty or commented-out `must`.** If the condition cannot be expressed, use an inline `// UNCLEAR` comment instead. |
+| Condition sense | `must` expresses what must be **true** for the action to proceed (precondition). This is the inverse of "when the problem occurs". |
+| Scope | If the rule applies to only one command handler and is specific to that handler's logic, use `fails` in the interaction instead. Use `policy` when the rule is a cross-cutting concern shared across interactions. |
 | Infrastructure | If the real condition is infrastructure → `// NOTE`. |
 
 #### Example
 
 ```
 policy MaxOrderAmount {
-  when {
-    Order.totalAmount.amount > 10000
+  on "Place a new order", "Confirm an order after payment"
+  must {
+    Order.totalAmount.amount <= 10000
   }
-  then "Orders above 10000 require manual approval before confirmation"
+  message "Orders above 10000 require manual approval before confirmation"
 }
 ```
 
@@ -1684,7 +1694,7 @@ policy MaxOrderAmount {
 
 ### Invariant
 
-An `invariant` block models a structural constraint that must always be true for an entity.
+An `invariant` block models a property that is always guaranteed to be true **after** any action completes successfully on an entity.
 
 #### Skeleton
 

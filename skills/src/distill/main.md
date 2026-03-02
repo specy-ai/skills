@@ -89,7 +89,7 @@ For each bounded context:
 2. Read every handler, service, listener, saga, policy file.
 3. **For each command handler** → `interaction` block. For each service call → `delegates`. For each repository call → `resolves ... via`.
 4. **For each event listener** → event-triggered `interaction` block. Skip technical listeners (logging, metrics, cache).
-5. **Cross-cutting rules** → `policy` blocks. **Structural constraints** → `invariant` blocks.
+5. **Preconditions guarding interactions** → `policy` blocks (with `on "interaction label"`). **Properties always true after mutation** → `invariant` blocks (with `on Entity`).
 6. **Test-aware enrichment:** for each extracted interaction, read associated test files (correlated by naming convention or imports — see test heuristics). Use test assertions to confirm or enrich `fails`, `sets`, `emits`, `triggers notification`, and `delegates`. Use test names as candidate interaction labels when they are more expressive than handler method names. When 2+ tests target the same handler with different preconditions and different assertions, consider decomposing into separate interactions with complementary guards rather than collapsing into `then`.
 7. Write `.flow` and print summary:
    ```
@@ -307,7 +307,8 @@ Before writing final files, verify each item. If any fails, fix it.
 - [ ] No `fails when { field is defined }` on a required/immutable field
 - [ ] No `invariant` with `must { field is defined }` on a required/immutable field (same tautology)
 - [ ] No `invariant` on command, event, or value (entities only)
-- [ ] No `policy` with a tautological or empty `when` — if the condition is unexpressible, use `// UNCLEAR` inline instead of emitting a policy block
+- [ ] No `policy` with a tautological or empty `must` — if the condition is unexpressible, use `// UNCLEAR` inline instead of emitting a policy block
+- [ ] Every `policy` has an `on` clause listing at least one interaction label
 - [ ] No `service` for pure infrastructure
 - [ ] No `repository` for technical types (audit logs, session tokens)
 - [ ] Every `sets` entity appears in `resolves` or `creates` of the same interaction

@@ -81,8 +81,8 @@ A role check (`user.isAdmin`, `requirePermission`) is an **authorization mechani
 | Persistence interface for aggregate root | `repository` (in `.flow`) |
 | Handler for a command → write operation | `interaction` (command-triggered) |
 | Handler for an event → side effects | `interaction` (event-triggered) |
-| Cross-cutting rule spanning multiple operations | `policy` |
-| Structural constraint always true for an entity | `invariant` (entities only, never commands/events/values) |
+| Precondition that must hold before one or more interactions execute | `policy` (with `on "interaction"`) |
+| Property always true after any successful mutation of an entity | `invariant` (with `on Entity` — entities only, never commands/events/values) |
 
 ---
 
@@ -153,7 +153,7 @@ For each bounded context:
 2. Read every handler, service, listener, saga, policy file.
 3. **For each command handler** → `interaction` block. For each service call → `delegates`. For each repository call → `resolves ... via`.
 4. **For each event listener** → event-triggered `interaction` block. Skip technical listeners (logging, metrics, cache).
-5. **Cross-cutting rules** → `policy` blocks. **Structural constraints** → `invariant` blocks.
+5. **Preconditions guarding interactions** → `policy` blocks (with `on "interaction label"`). **Properties always true after mutation** → `invariant` blocks (with `on Entity`).
 6. **Test-aware enrichment:** for each extracted interaction, read associated test files (correlated by naming convention or imports — see test heuristics). Use test assertions to confirm or enrich `fails`, `sets`, `emits`, `triggers notification`, and `delegates`. Use test names as candidate interaction labels when they are more expressive than handler method names. When 2+ tests target the same handler with different preconditions and different assertions, consider decomposing into separate interactions with complementary guards rather than collapsing into `then`.
 7. Write `.flow` and print summary:
    ```
@@ -509,7 +509,7 @@ If no specific stack is detected, rely on generic heuristics only. Annotate non-
 
 # Expression Rules
 
-Rules for all `when { ... }` and `must { ... }` blocks across `fails`, `policy`, and `invariant`.
+Rules for all `when { ... }` blocks in `fails` clauses and `must { ... }` blocks in `policy` and `invariant`.
 
 ## Available Operators
 
@@ -995,14 +995,15 @@ repository OrderRepository {
 
 ### Policy
 
-A `policy` block models a cross-cutting domain rule spanning multiple operations.
+A `policy` block models a precondition — a state requirement that must be true **before** one or more interactions can execute.
 
 #### Skeleton
 
 ```
 policy Name {
-  when { expression }
-  then "consequence in business language"
+  on "interaction label", "another interaction"
+  must { expression }
+  message "constraint in business language"
 }
 ```
 
@@ -1010,19 +1011,22 @@ policy Name {
 
 | Rule | Detail |
 |------|--------|
-| `when` | Must be a real, evaluable boolean expression — never a tautology, never empty (apply Test 3). |
-| Empty guard | **Never emit a policy block with an empty or commented-out `when`.** If the condition cannot be expressed, use an inline `// UNCLEAR` comment instead. |
-| Scope | If the rule applies to only one command handler, use `fails` in the interaction instead. |
+| `on` | Lists the interaction labels this policy guards. Must be string literals matching interaction names. At least one required. |
+| `must` | The precondition — must be a real, evaluable boolean expression that must hold for the action to proceed (apply Test 3). Never a tautology, never empty. |
+| Empty guard | **Never emit a policy block with an empty or commented-out `must`.** If the condition cannot be expressed, use an inline `// UNCLEAR` comment instead. |
+| Condition sense | `must` expresses what must be **true** for the action to proceed (precondition). This is the inverse of "when the problem occurs". |
+| Scope | If the rule applies to only one command handler and is specific to that handler's logic, use `fails` in the interaction instead. Use `policy` when the rule is a cross-cutting concern shared across interactions. |
 | Infrastructure | If the real condition is infrastructure → `// NOTE`. |
 
 #### Example
 
 ```
 policy MaxOrderAmount {
-  when {
-    Order.totalAmount.amount > 10000
+  on "Place a new order", "Confirm an order after payment"
+  must {
+    Order.totalAmount.amount <= 10000
   }
-  then "Orders above 10000 require manual approval before confirmation"
+  message "Orders above 10000 require manual approval before confirmation"
 }
 ```
 
@@ -1030,7 +1034,7 @@ policy MaxOrderAmount {
 
 ### Invariant
 
-An `invariant` block models a structural constraint that must always be true for an entity.
+An `invariant` block models a property that is always guaranteed to be true **after** any action completes successfully on an entity.
 
 #### Skeleton
 
@@ -1259,14 +1263,15 @@ interaction "Handle order cancellation side effects" {
 }
 
 // =============================================================================
-// Policies
+// Policies — preconditions guarding interactions
 // =============================================================================
 
 policy MaxOrderAmount {
-  when {
-    Order.totalAmount.amount > 10000
+  on "Place a new order", "Confirm an order after payment"
+  must {
+    Order.totalAmount.amount <= 10000
   }
-  then "Orders above 10000 require manual approval before confirmation"
+  message "Orders above 10000 require manual approval before confirmation"
 }
 
 // =============================================================================
@@ -1292,7 +1297,8 @@ Before writing final files, verify each item. If any fails, fix it.
 - [ ] No `fails when { field is defined }` on a required/immutable field
 - [ ] No `invariant` with `must { field is defined }` on a required/immutable field (same tautology)
 - [ ] No `invariant` on command, event, or value (entities only)
-- [ ] No `policy` with a tautological or empty `when` — if the condition is unexpressible, use `// UNCLEAR` inline instead of emitting a policy block
+- [ ] No `policy` with a tautological or empty `must` — if the condition is unexpressible, use `// UNCLEAR` inline instead of emitting a policy block
+- [ ] Every `policy` has an `on` clause listing at least one interaction label
 - [ ] No `service` for pure infrastructure
 - [ ] No `repository` for technical types (audit logs, session tokens)
 - [ ] Every `sets` entity appears in `resolves` or `creates` of the same interaction

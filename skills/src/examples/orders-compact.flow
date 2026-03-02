@@ -89,14 +89,15 @@ interaction "Handle order cancellation side effects" {
 }
 
 // =============================================================================
-// Policies
+// Policies — preconditions guarding interactions
 // =============================================================================
 
 policy MaxOrderAmount {
-  when {
-    Order.totalAmount.amount > 10000
+  on "Place a new order", "Confirm an order after payment"
+  must {
+    Order.totalAmount.amount <= 10000
   }
-  then "Orders above 10000 require manual approval before confirmation"
+  message "Orders above 10000 require manual approval before confirmation"
 }
 
 // =============================================================================

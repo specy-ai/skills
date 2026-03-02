@@ -132,16 +132,22 @@ repositoryOpDef  = "operation" , identifier , "{"
                  , "}" ;
 
 // -----------------------------------------------------------------------------
-// Policy — domain-wide rule
+// Policy — precondition guarding one or more interactions
+//
+// A policy is a state requirement that must be true before an action executes.
+// The `on` clause lists the interactions it guards (string literals matching
+// interaction labels). Disambiguation with invariant: policy targets
+// interactions (stringLiteral), invariant targets entities (typeName).
 // -----------------------------------------------------------------------------
 
 policyDef        = "policy" , typeName , "{"
-                 ,   "when" , "{" , expression , "}"
-                 ,   "then" , stringLiteral
+                 ,   "on" , stringLiteral , { "," , stringLiteral }
+                 ,   "must" , "{" , expression , "}"
+                 ,   "message" , stringLiteral
                  , "}" ;
 
 // -----------------------------------------------------------------------------
-// Invariant — structural constraint on an entity
+// Invariant — property always true after any successful mutation of an entity
 // -----------------------------------------------------------------------------
 
 invariantDef     = "invariant" , typeName , "{"

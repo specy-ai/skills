@@ -1,6 +1,6 @@
 # Expression Rules
 
-Rules for all `when { ... }` and `must { ... }` blocks across `fails`, `policy`, and `invariant`.
+Rules for all `when { ... }` blocks in `fails` clauses and `must { ... }` blocks in `policy` and `invariant`.
 
 ## Available Operators
 
