@@ -969,7 +969,6 @@ interactionDef   = "interaction" , stringLiteral , "{"
                  , { createsClause }
                  , { failsClause }
                  , { delegatesClause }
-                 , { thenClause }
                  , { setsClause }
                  , { foreachClause }
                  , { triggersNotificationClause }
@@ -1000,12 +999,10 @@ failsClause      = "fails" , stringLiteral , "when" , "{" , expression , "}" ;
 
 delegatesClause  = "delegates" , dotPath ;
 
-thenClause       = "then" , stringLiteral ;
-
 // foreach — iterates over a collection with per-item clauses.
 // The dotPath must resolve to a list<T> field. The identifier aliases one item.
 foreachClause    = "foreach" , dotPath , "as" , identifier , "{"
-                 , { setsClause | emitsClause | failsClause | thenClause
+                 , { setsClause | emitsClause | failsClause
                    | triggersNotificationClause | triggersCommandClause }
                  , "}" ;
 
@@ -1034,7 +1031,7 @@ operationDef     = "operation" , identifier , "{"
                  , { acceptsClause }
                  , [ returnsClause ]
                  , { failsClause }
-                 , { thenClause }
+                 , { justification }
                  , { setsClause }
                  , { emitsClause }
                  , "}" ;
@@ -1398,7 +1395,6 @@ interaction "Business intent label" {
   creates Entity
   fails "message" when { expression }
   delegates Service.operation
-  then "side effect in business language"
   sets Entity.field to value :: "business justification"
   foreach Collection.path as alias {
     sets alias.field to valueExpr :: "justification"
@@ -1420,9 +1416,8 @@ interaction "Business intent label" {
 | `creates` | Every `new Entity()` / `.save()` on a new object. Never omit the primary entity. |
 | `fails` | Guard clauses / validation. Business-language message. Expression must pass Test 3. |
 | `delegates` | After `fails`, before `sets`. Result assigned → `sets Entity.field to Service.op`. |
-| `then` | Irreducibly narrative side effects not expressible with `sets`/`emits`/`triggers`. |
 | `sets` | Target dot-path must be reachable from an entity in `resolves` or `creates`. Cross-aggregate targets (via dot-path navigation) are allowed. Use `::` justification on cross-aggregate mutations where the business reason is not obvious. |
-| `foreach` | Iterates over a `list<T>` field. Body allows `sets`, `emits`, `fails`, `then`, `triggers notification`, `triggers Context.Command`. The alias can be used as the root of dot-paths inside the body. |
+| `foreach` | Iterates over a `list<T>` field. Body allows `sets`, `emits`, `fails`, `triggers notification`, `triggers Context.Command`. The alias can be used as the root of dot-paths inside the body. |
 | `triggers notification` | Out-of-domain side-effect (email, SMS, webhook). Business-language description. Optional `on Event` and `:: justification`. |
 | `triggers Context.Command` | Inter-bounded-context communication. `Context` matches a `domain` in another `.struct`; `Command` matches a `command` in that `.struct`. Optional `:: justification`. |
 | `::` | Justification operator — attaches a business reason to a clause. Optional on `sets`, `triggers notification`, `triggers Context.Command`. Does not change verifiability. |
@@ -1486,7 +1481,7 @@ foreach Order.lines as line {
 **Rules:**
 - The dot-path must resolve to a `list<T>` field in the structural model.
 - The alias (`line`) scopes all dot-paths inside the body — `line.product.stockQuantity` means "the stockQuantity of the product of this particular line".
-- Body allows: `sets`, `emits`, `fails`, `then` — same constructs as an interaction body (minus `resolves`, `creates`, `delegates`, `foreach`).
+- Body allows: `sets`, `emits`, `fails`, `triggers notification`, `triggers Context.Command` — same constructs as an interaction body (minus `resolves`, `creates`, `delegates`, `foreach`).
 - **Checker verification:** the code contains a loop over the collection with per-item mutations matching the declared `sets`.
 
 #### `::` — justification operator
@@ -1533,7 +1528,7 @@ triggers Shipping.PrepareShipment
 - The dot-path must be `ContextName.CommandName`. `ContextName` matches the `domain` declaration in another `.struct` file (linked via `uses`). `CommandName` matches a `command` defined in that `.struct`.
 - Optional `:: "justification"` adds a business reason.
 - **Checker verification:** the code contains a call/message to the target context that triggers the specified command.
-- If the target context's `.struct` is not available, fall back to `then "description"` with `// NOTE: cross-context trigger — target .struct not yet extracted`.
+- If the target context's `.struct` is not available, use `// NOTE: cross-context trigger — target .struct not yet extracted`.
 - **Do not use** for intra-context event emission — use `emits Event` instead.
 
 #### Cross-file coherence for `triggers`
@@ -1575,7 +1570,7 @@ service Name {
     accepts param : type [optional]
     returns type
     fails "message" when { expression }
-    then "business logic description"
+    :: "business logic description"
     emits Event
   }
 }
@@ -1587,7 +1582,7 @@ service Name {
 |------|--------|
 | Scope | One service block per service class/interface. |
 | Operations | One operation per public method with business logic. |
-| `then` | Use for logic that cannot be captured structurally. |
+| `::` | Use justification to describe logic that cannot be captured structurally. |
 | Exclusion | Do not create services for pure infrastructure (password hashing, image processing, logging, caching). Use `// NOTE` instead. |
 | Decision criterion | If the result affects an entity field via `sets` or conditions the flow via `fails`, it is a business service. |
 
@@ -1598,7 +1593,7 @@ service PricingCalculator {
   operation computeTotal {
     accepts lines : list<OrderLine>
     returns decimal
-    then "Applies volume discounts and tax calculations"
+    :: "Applies volume discounts and tax calculations"
   }
 }
 ```
@@ -1626,7 +1621,7 @@ repository Name {
 | Rule | Detail |
 |------|--------|
 | `for` | Must reference an entity (aggregate root), not a value or enum. |
-| Operations | Contain only `accepts` and `returns` — never `then`, `fails`, `sets`, `emits`. |
+| Operations | Contain only `accepts` and `returns` — never `fails`, `sets`, `emits`. |
 | Filtering | Only model operations referenced by at least one `resolves ... via` or used in an extracted interaction. |
 
 #### Filtering guide

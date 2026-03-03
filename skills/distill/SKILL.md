@@ -154,7 +154,7 @@ For each bounded context:
 3. **For each command handler** → `interaction` block. For each service call → `delegates`. For each repository call → `resolves ... via`.
 4. **For each event listener** → event-triggered `interaction` block. Skip technical listeners (logging, metrics, cache).
 5. **Preconditions guarding interactions** → `policy` blocks (with `on "interaction label"`). **Properties always true after mutation** → `invariant` blocks (with `on Entity`).
-6. **Test-aware enrichment:** for each extracted interaction, read associated test files (correlated by naming convention or imports — see test heuristics). Use test assertions to confirm or enrich `fails`, `sets`, `emits`, `triggers notification`, and `delegates`. Use test names as candidate interaction labels when they are more expressive than handler method names. When 2+ tests target the same handler with different preconditions and different assertions, consider decomposing into separate interactions with complementary guards rather than collapsing into `then`.
+6. **Test-aware enrichment:** for each extracted interaction, read associated test files (correlated by naming convention or imports — see test heuristics). Use test assertions to confirm or enrich `fails`, `sets`, `emits`, `triggers notification`, and `delegates`. Use test names as candidate interaction labels when they are more expressive than handler method names. When 2+ tests target the same handler with different preconditions and different assertions, consider decomposing into separate interactions with complementary guards.
 7. Write `.flow` and print summary:
    ```
    ## Flow Extraction — {domain}
@@ -377,8 +377,8 @@ When a source type does not map to a primitive, check if it corresponds to anoth
 
 - The collection must be a `list<T>` field in the structural model.
 - The alias scopes dot-paths inside the body — `alias.field` navigates the item, not the collection.
-- If the loop body contains only a single `then` narrative, keep it as `then` inside the interaction (no `foreach` needed).
-- **Decision criterion:** if each iteration produces a verifiable mutation (`sets`) or emission (`emits`), use `foreach`. If the iteration effect is only describable as narrative, keep `then`.
+- If the loop body contains no verifiable mutation or emission, omit the `foreach` and use `// NOTE:` to describe the iteration effect.
+- **Decision criterion:** if each iteration produces a verifiable mutation (`sets`) or emission (`emits`), use `foreach`. If the iteration effect is only describable as narrative, use `// NOTE:` or `// UNCLEAR:`.
 
 ## Cross-Aggregate Mutation
 
@@ -394,7 +394,7 @@ When a source type does not map to a primitive, check if it corresponds to anoth
 
 - The target dot-path must be reachable from a `resolves` or `creates` entity — either directly or via relationship navigation.
 - Add `:: "justification"` when the business reason for the cross-aggregate mutation is not obvious from the construct alone.
-- **Decision criterion:** if the code modifies a field on an entity other than the primary aggregate, it is a cross-aggregate mutation. If verifiable (the assignment is in the code), use `sets`. If not verifiable, use `then`.
+- **Decision criterion:** if the code modifies a field on an entity other than the primary aggregate, it is a cross-aggregate mutation. If verifiable (the assignment is in the code), use `sets`. If not verifiable, use `// NOTE:` or `// UNCLEAR:`.
 
 ## Notifications and Side-Effects (`triggers notification`)
 
@@ -430,7 +430,7 @@ When a source type does not map to a primitive, check if it corresponds to anoth
 
 - The dot-path must be `ContextName.CommandName` — the context name matches another `.struct` file's `domain` declaration; the command name matches a `command` defined in that `.struct`.
 - Add `:: "justification"` when the business reason for the cross-context trigger is not obvious.
-- If the target context's `.struct` is not available, use `then "description"` with `// NOTE: cross-context trigger — target .struct not yet extracted`.
+- If the target context's `.struct` is not available, use `// NOTE: cross-context trigger — target .struct not yet extracted`.
 - **Do not use** for intra-context event emission — use `emits Event` instead.
 - **Decision criterion:** if the code triggers behaviour in a *different* bounded context (different aggregate root, different deployment unit, different team), it is a `triggers Context.Command`.
 
@@ -462,7 +462,7 @@ Use the highest-fiability strategy available. When no correlation is found, skip
 
 When **2+ tests** target the **same handler** with **different preconditions** and **different assertions**, this signals branching. Each test case represents a distinct business behaviour.
 
-**Rule:** decompose into separate event-triggered interactions with complementary guards, rather than using `then` for the branching.
+**Rule:** decompose into separate event-triggered interactions with complementary guards.
 
 Example signal:
 - `should_allow_retry_when_retryCount_below_3` → interaction "Allow payment retry" with `fails ... when { Payment.retryCount >= 3 }`
@@ -738,7 +738,6 @@ interaction "Business intent label" {
   creates Entity
   fails "message" when { expression }
   delegates Service.operation
-  then "side effect in business language"
   sets Entity.field to value :: "business justification"
   foreach Collection.path as alias {
     sets alias.field to valueExpr :: "justification"
@@ -760,9 +759,8 @@ interaction "Business intent label" {
 | `creates` | Every `new Entity()` / `.save()` on a new object. Never omit the primary entity. |
 | `fails` | Guard clauses / validation. Business-language message. Expression must pass Test 3. |
 | `delegates` | After `fails`, before `sets`. Result assigned → `sets Entity.field to Service.op`. |
-| `then` | Irreducibly narrative side effects not expressible with `sets`/`emits`/`triggers`. |
 | `sets` | Target dot-path must be reachable from an entity in `resolves` or `creates`. Cross-aggregate targets (via dot-path navigation) are allowed. Use `::` justification on cross-aggregate mutations where the business reason is not obvious. |
-| `foreach` | Iterates over a `list<T>` field. Body allows `sets`, `emits`, `fails`, `then`, `triggers notification`, `triggers Context.Command`. The alias can be used as the root of dot-paths inside the body. |
+| `foreach` | Iterates over a `list<T>` field. Body allows `sets`, `emits`, `fails`, `triggers notification`, `triggers Context.Command`. The alias can be used as the root of dot-paths inside the body. |
 | `triggers notification` | Out-of-domain side-effect (email, SMS, webhook). Business-language description. Optional `on Event` and `:: justification`. |
 | `triggers Context.Command` | Inter-bounded-context communication. `Context` matches a `domain` in another `.struct`; `Command` matches a `command` in that `.struct`. Optional `:: justification`. |
 | `::` | Justification operator — attaches a business reason to a clause. Optional on `sets`, `triggers notification`, `triggers Context.Command`. Does not change verifiability. |
@@ -826,7 +824,7 @@ foreach Order.lines as line {
 **Rules:**
 - The dot-path must resolve to a `list<T>` field in the structural model.
 - The alias (`line`) scopes all dot-paths inside the body — `line.product.stockQuantity` means "the stockQuantity of the product of this particular line".
-- Body allows: `sets`, `emits`, `fails`, `then` — same constructs as an interaction body (minus `resolves`, `creates`, `delegates`, `foreach`).
+- Body allows: `sets`, `emits`, `fails`, `triggers notification`, `triggers Context.Command` — same constructs as an interaction body (minus `resolves`, `creates`, `delegates`, `foreach`).
 - **Checker verification:** the code contains a loop over the collection with per-item mutations matching the declared `sets`.
 
 #### `::` — justification operator
@@ -873,7 +871,7 @@ triggers Shipping.PrepareShipment
 - The dot-path must be `ContextName.CommandName`. `ContextName` matches the `domain` declaration in another `.struct` file (linked via `uses`). `CommandName` matches a `command` defined in that `.struct`.
 - Optional `:: "justification"` adds a business reason.
 - **Checker verification:** the code contains a call/message to the target context that triggers the specified command.
-- If the target context's `.struct` is not available, fall back to `then "description"` with `// NOTE: cross-context trigger — target .struct not yet extracted`.
+- If the target context's `.struct` is not available, use `// NOTE: cross-context trigger — target .struct not yet extracted`.
 - **Do not use** for intra-context event emission — use `emits Event` instead.
 
 #### Cross-file coherence for `triggers`
@@ -915,7 +913,7 @@ service Name {
     accepts param : type [optional]
     returns type
     fails "message" when { expression }
-    then "business logic description"
+    :: "business logic description"
     emits Event
   }
 }
@@ -927,7 +925,7 @@ service Name {
 |------|--------|
 | Scope | One service block per service class/interface. |
 | Operations | One operation per public method with business logic. |
-| `then` | Use for logic that cannot be captured structurally. |
+| `::` | Use justification to describe logic that cannot be captured structurally. |
 | Exclusion | Do not create services for pure infrastructure (password hashing, image processing, logging, caching). Use `// NOTE` instead. |
 | Decision criterion | If the result affects an entity field via `sets` or conditions the flow via `fails`, it is a business service. |
 
@@ -938,7 +936,7 @@ service PricingCalculator {
   operation computeTotal {
     accepts lines : list<OrderLine>
     returns decimal
-    then "Applies volume discounts and tax calculations"
+    :: "Applies volume discounts and tax calculations"
   }
 }
 ```
@@ -966,7 +964,7 @@ repository Name {
 | Rule | Detail |
 |------|--------|
 | `for` | Must reference an entity (aggregate root), not a value or enum. |
-| Operations | Contain only `accepts` and `returns` — never `then`, `fails`, `sets`, `emits`. |
+| Operations | Contain only `accepts` and `returns` — never `fails`, `sets`, `emits`. |
 | Filtering | Only model operations referenced by at least one `resolves ... via` or used in an extracted interaction. |
 
 #### Filtering guide
@@ -1196,7 +1194,7 @@ service PricingCalculator {
   operation computeTotal {
     accepts lines : list<OrderLine>
     returns decimal
-    then "Applies volume discounts and tax calculations"
+    :: "Applies volume discounts and tax calculations"
   }
 }
 

@@ -157,9 +157,8 @@ interaction "Handle payment failure" {
 
   resolves Payment from PaymentFailed.paymentId
 
-  then "Allow retry with a different payment method"
-
   sets Payment.status to failed
+  // NOTE: retry mechanism (infrastructure)
 
   triggers notification "Notify customer of payment failure"
 }
@@ -189,7 +188,6 @@ interaction "Notify customer of delivery" {
   on OrderDelivered
 
   triggers notification "Notify customer that order has been delivered"
-  then "Close order lifecycle"
 }
 
 // =============================================================================

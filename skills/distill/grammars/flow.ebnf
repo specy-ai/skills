@@ -35,7 +35,6 @@ interactionDef   = "interaction" , stringLiteral , "{"
                  , { createsClause }
                  , { failsClause }
                  , { delegatesClause }
-                 , { thenClause }
                  , { setsClause }
                  , { foreachClause }
                  , { triggersNotificationClause }
@@ -66,12 +65,10 @@ failsClause      = "fails" , stringLiteral , "when" , "{" , expression , "}" ;
 
 delegatesClause  = "delegates" , dotPath ;
 
-thenClause       = "then" , stringLiteral ;
-
 // foreach — iterates over a collection with per-item clauses.
 // The dotPath must resolve to a list<T> field. The identifier aliases one item.
 foreachClause    = "foreach" , dotPath , "as" , identifier , "{"
-                 , { setsClause | emitsClause | failsClause | thenClause
+                 , { setsClause | emitsClause | failsClause
                    | triggersNotificationClause | triggersCommandClause }
                  , "}" ;
 
@@ -100,7 +97,7 @@ operationDef     = "operation" , identifier , "{"
                  , { acceptsClause }
                  , [ returnsClause ]
                  , { failsClause }
-                 , { thenClause }
+                 , { justification }
                  , { setsClause }
                  , { emitsClause }
                  , "}" ;

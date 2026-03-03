@@ -61,8 +61,8 @@ When a source type does not map to a primitive, check if it corresponds to anoth
 
 - The collection must be a `list<T>` field in the structural model.
 - The alias scopes dot-paths inside the body — `alias.field` navigates the item, not the collection.
-- If the loop body contains only a single `then` narrative, keep it as `then` inside the interaction (no `foreach` needed).
-- **Decision criterion:** if each iteration produces a verifiable mutation (`sets`) or emission (`emits`), use `foreach`. If the iteration effect is only describable as narrative, keep `then`.
+- If the loop body contains no verifiable mutation or emission, omit the `foreach` and use `// NOTE:` to describe the iteration effect.
+- **Decision criterion:** if each iteration produces a verifiable mutation (`sets`) or emission (`emits`), use `foreach`. If the iteration effect is only describable as narrative, use `// NOTE:` or `// UNCLEAR:`.
 
 ## Cross-Aggregate Mutation
 
@@ -78,7 +78,7 @@ When a source type does not map to a primitive, check if it corresponds to anoth
 
 - The target dot-path must be reachable from a `resolves` or `creates` entity — either directly or via relationship navigation.
 - Add `:: "justification"` when the business reason for the cross-aggregate mutation is not obvious from the construct alone.
-- **Decision criterion:** if the code modifies a field on an entity other than the primary aggregate, it is a cross-aggregate mutation. If verifiable (the assignment is in the code), use `sets`. If not verifiable, use `then`.
+- **Decision criterion:** if the code modifies a field on an entity other than the primary aggregate, it is a cross-aggregate mutation. If verifiable (the assignment is in the code), use `sets`. If not verifiable, use `// NOTE:` or `// UNCLEAR:`.
 
 ## Notifications and Side-Effects (`triggers notification`)
 
@@ -114,7 +114,7 @@ When a source type does not map to a primitive, check if it corresponds to anoth
 
 - The dot-path must be `ContextName.CommandName` — the context name matches another `.struct` file's `domain` declaration; the command name matches a `command` defined in that `.struct`.
 - Add `:: "justification"` when the business reason for the cross-context trigger is not obvious.
-- If the target context's `.struct` is not available, use `then "description"` with `// NOTE: cross-context trigger — target .struct not yet extracted`.
+- If the target context's `.struct` is not available, use `// NOTE: cross-context trigger — target .struct not yet extracted`.
 - **Do not use** for intra-context event emission — use `emits Event` instead.
 - **Decision criterion:** if the code triggers behaviour in a *different* bounded context (different aggregate root, different deployment unit, different team), it is a `triggers Context.Command`.
 
@@ -146,7 +146,7 @@ Use the highest-fiability strategy available. When no correlation is found, skip
 
 When **2+ tests** target the **same handler** with **different preconditions** and **different assertions**, this signals branching. Each test case represents a distinct business behaviour.
 
-**Rule:** decompose into separate event-triggered interactions with complementary guards, rather than using `then` for the branching.
+**Rule:** decompose into separate event-triggered interactions with complementary guards.
 
 Example signal:
 - `should_allow_retry_when_retryCount_below_3` → interaction "Allow payment retry" with `fails ... when { Payment.retryCount >= 3 }`
