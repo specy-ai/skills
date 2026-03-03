@@ -368,7 +368,6 @@ service Name {
     accepts param : type [optional]
     returns type
     fails "message" when { expression }
-    :: "business logic description"
     emits Event
   }
 }
@@ -380,7 +379,6 @@ service Name {
 |------|--------|
 | Scope | One service block per service class/interface. |
 | Operations | One operation per public method with business logic. |
-| `::` | Use justification to describe logic that cannot be captured structurally. |
 | Exclusion | Do not create services for pure infrastructure (password hashing, image processing, logging, caching). Use `// NOTE` instead. |
 | Decision criterion | If the result affects an entity field via `sets` or conditions the flow via `fails`, it is a business service. |
 
@@ -391,7 +389,6 @@ service PricingCalculator {
   operation computeTotal {
     accepts lines : list<OrderLine>
     returns decimal
-    :: "Applies volume discounts and tax calculations"
   }
 }
 ```

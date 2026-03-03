@@ -97,7 +97,6 @@ operationDef     = "operation" , identifier , "{"
                  , { acceptsClause }
                  , [ returnsClause ]
                  , { failsClause }
-                 , { justification }
                  , { setsClause }
                  , { emitsClause }
                  , "}" ;

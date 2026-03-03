@@ -22,7 +22,6 @@ service PricingCalculator {
   operation computeTotal {
     accepts lines : list<OrderLine>
     returns decimal
-    :: "Applies volume discounts and tax calculations"
   }
 }
 
