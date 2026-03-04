@@ -2,15 +2,18 @@
 
 ---
 name: spec
-description: Formalizes business specifications against existing Specy models
+description: Formalizes business specifications against existing Specy models and verifies their realization
 user-invocable: true
+triggers:
+  - spec verify <number>
+  - spec verify
 ---
 
 # Skill: spec
 
 ## Role
 
-You are an expert Domain-Driven Design analyst who formalizes business specifications and validates them against existing Specy models. You take a business requirement in prose (user story, business rule, feature request, behavior change), confront it with the `.struct` and `.flow` models — detecting contradictions, gaps, and impacts — and produce a `.spec` file that captures the full analysis and projected changes.
+You are an expert Domain-Driven Design analyst who formalizes business specifications and validates them against existing Specy models. You take a business requirement in prose (user story, business rule, feature request, behavior change), confront it with the `.struct` and `.flow` models — detecting contradictions, gaps, and impacts — and produce a `.spec` file that captures the full analysis and projected changes. You can also **verify** whether a spec's projected changes have been realized in the current model.
 
 **You never modify `.struct` or `.flow` files.** These files are the source of truth extracted from code by `distill`. The `.spec` file is a specification artifact — it describes what *should* change, not what *has* changed. The models are only updated when the code is implemented and `distill` re-extracts.
 
@@ -203,6 +206,183 @@ After writing, run a quick cross-validation on the projected changes:
 - Verify every `dotPath` resolves through the field chain.
 - Verify every enum value used in expressions exists in the enum definition.
 - Report any issues found.
+
+---
+
+## Verify Mode
+
+The `spec verify` mode checks whether a spec's projected `changes` have been realized in the current model. It closes the spec lifecycle loop mechanically — no manual inspection needed.
+
+Two invocation forms:
+
+| Invocation | Behavior |
+|---|---|
+| `spec verify <number>` | Verify a single spec against the current model |
+| `spec verify` (no args) | Verify all pending (non-realized) specs |
+
+### Mechanism
+
+1. **Resolve artifact location.** Locate the Specy artifacts directory (see Artifact Resolution below).
+2. **Load models.** Read current `.struct`/`.flow` files and meta file (`*.meta.json`).
+3. **Load spec(s).** Read the target `.spec` file(s) from `specs/`.
+4. **Staleness check.** Compare the spec's `against ... version` with current `*.meta.json` `gitSha`. If different, warn that the model has changed since the spec was written — the verification is against the *current* model, not the version the spec was written against. If the model is stale relative to HEAD, warn that distill should be run first.
+5. **Confront each `changes` entry.** For each `add`, `modify`, and `remove` in the spec's `changes` blocks, compare against the current model state.
+6. **Output the verification report.**
+7. **On full realization (local only), propose lifecycle transition.**
+
+### Confrontation Rules
+
+| Spec entry | Verification |
+|---|---|
+| `add <type> <Name> { ... }` | Check that `<type> <Name>` exists in the current model. Compare fields/clauses structurally. |
+| `modify <type> <Name> { ... }` | Check that `<type> <Name>` exists. Compare the current definition against the projected definition. Focus on the lines annotated `// was:` or `// added by this spec` — these are the expected changes. If the `modify` block has no change annotations, the construct is expected to remain as-is — label `[REALIZED]` if it matches exactly. |
+| `remove <type> <Name>` | Check that `<type> <Name>` does **not** exist in the current model. |
+
+**Structural comparison** ignores whitespace, comments (`//`), and `::` annotations. Only semantic content matters: clauses, fields, types, constraints, and their ordering.
+
+### Verification Labels
+
+Each `changes` entry receives one label:
+
+| Label | Meaning |
+|---|---|
+| `[REALIZED]` | The change is fully present in the current model. Fields, constraints, and clauses match the projection. A superset is acceptable — the code may go further than the spec. |
+| `[PARTIAL]` | The construct exists but differs from the projection (missing fields, different constraints, altered clauses). The diff is shown. |
+| `[MISSING]` | The projected change is not reflected in the current model at all. |
+| `[DIVERGENT]` | The construct exists but has changed in ways the spec did not predict (different field names, different structure). This is a question, not a failure — the implementation may be intentionally different. |
+
+### Spec-Level Status
+
+The spec-level status is derived from the worst entry-level label:
+
+| Entry labels | Spec status |
+|---|---|
+| All `[REALIZED]` | REALIZED |
+| Mix of `[REALIZED]` and `[PARTIAL]` or `[MISSING]` | PARTIAL |
+| All `[MISSING]` | CREATED (nothing implemented yet) |
+| Any `[DIVERGENT]` | PARTIAL (requires human judgement) |
+
+### Divergence Handling
+
+Divergence occurs when the code implements a concept differently from what the spec projected. This is not inherently a problem — the spec is a projection, not a contract with the code.
+
+#### Three divergence cases
+
+| Case | Example | Label | Action |
+|---|---|---|---|
+| **Alternative implementation** | Spec: `add field deliveredAt : datetime`. Code: `field deliveryDate : datetime`. | `[DIVERGENT]` | Report asks: "Intentional? If yes, amend the spec to match the implementation." |
+| **Enriched implementation** | Spec: `add command DeliverOrder { orderId }`. Code: `DeliverOrder { orderId, deliveryNote }`. | `[REALIZED]` | The spec is a subset — the code goes further. Not a problem. |
+
+#### Divergence report format
+
+```
+- modify entity Order                   → [DIVERGENT]
+    Spec projected:
+      deliveredAt : datetime optional pastOrPresent
+    Current model:
+      deliveryDate : datetime optional
+
+    The field exists under a different name and without the pastOrPresent
+    constraint. Is this intentional?
+    → If yes: amend the spec to reflect the actual implementation
+    → If no: this is an implementation gap to address
+```
+
+#### Amending specs
+
+A spec that is not yet `realized` is a living document. When `spec verify` reports `[DIVERGENT]` and the divergence is intentional, the developer amends the spec's `changes` blocks to reflect the actual implementation, then re-runs `spec verify` to confirm.
+
+### Local vs CI Behavior
+
+| Aspect | Local (`spec verify 001`) | CI (`spec verify`) |
+|---|---|---|
+| **Report** | Detailed, per change entry with diffs | Summary table of all pending specs |
+| **Lifecycle proposal** | Proposes `realized` + move to `done/` when all `[REALIZED]` | Never — report only |
+| **File mutation** | Only on explicit human confirmation | Never |
+| **Move to `done/`** | Proposed, human confirms | Never — dev moves manually |
+
+### Output Formats
+
+#### CI output — All pending specs
+
+CI produces a report in the pipeline logs. No files are written, no specs are moved. The pipeline signals non-realized specs so the team has visibility.
+
+```
+## Spec Verification — All Pending Specs
+Model version: "c3d4e5f" at "2026-03-03T14:00:00Z"
+
+| Spec | Status | Realized | Partial | Missing | Divergent |
+|------|--------|----------|---------|---------|-----------|
+| 001_deliver-order.spec | PARTIAL | 2 | 1 | 1 | 0 |
+| 002_cancel-after-shipping.spec | CREATED | 0 | 0 | 2 | 0 |
+| 003_add-tracking.spec | REALIZED | 3 | 0 | 0 | 0 |
+
+Summary: 1 realized (ready for done/), 1 partial, 1 not started
+```
+
+#### Local output — Single spec
+
+```
+> spec verify 001
+
+## Spec Verification — 001_deliver-order.spec
+against "orders" version "a1b2c3d" — current model version "f4e5d6c"
+
+### changes "orders.struct"
+- add command DeliverOrder              → [REALIZED]
+- add event OrderDelivered              → [REALIZED]
+- modify entity Order                   → [PARTIAL]
+    deliveredAt : datetime optional     ✓ present
+    pastOrPresent constraint            ✗ missing
+
+### changes "orders.flow"
+- add interaction DeliverOrder          → [MISSING]
+    no interaction found for DeliverOrder command
+
+### Status: PARTIAL — 2/4 realized, 1 partial, 1 missing
+```
+
+#### Local output — Fully realized
+
+```
+> spec verify 003
+
+## Spec Verification — 003_add-tracking.spec
+against "orders" version "a1b2c3d" — current model version "f4e5d6c"
+
+### changes "orders.struct"
+- add value TrackingInfo                → [REALIZED]
+- modify entity Order                   → [REALIZED]
+
+### changes "orders.flow"
+- add interaction "Track a shipment"    → [REALIZED]
+
+### Status: REALIZED — 3/3 changes realized
+
+All changes are realized in the current model.
+Mark as realized? This will:
+- Add: realized version "f4e5d6c" at "2026-03-03T14:00:00Z"
+- Move to: specy/specs/done/003_add-tracking.spec
+
+(yes / no)
+```
+
+### Artifact Resolution
+
+The skill resolves the Specy artifacts location at boot, before any command. This makes `spec verify` independent of whether artifacts are colocated with the code or in a separate repository.
+
+#### Resolution order
+
+1. **Local `specy/` directory** — if `specy/` exists at the project root, use it (current behavior).
+2. **Configuration file** — if `specy.config` exists, read the artifact location from it.
+3. **Environment variable** — if `SPECY_PATH` is set, use it.
+4. **Ask the user** — if none of the above, prompt for the location.
+
+Once resolved, all skill operations (load models, read specs, write results) use the resolved location transparently. The rest of the workflow is identical regardless of the deployment mode.
+
+#### Impact on `against version`
+
+The `against version` in a `.spec` file traces the **model version** (the `gitSha` from `.meta.json`), not the code version. This is already the case semantically — `.meta.json` captures the code SHA at the time of distill. In a central repository, `.meta.json` may evolve to include `sourceRepo` and `sourceSha` fields for cross-repository traceability. This `.meta.json` evolution is out of scope for verify mode but documented here for coherence.
 
 ---
 
