@@ -265,7 +265,10 @@ mulExpr          = unaryExpr , { ( "*" | "/" ) , unaryExpr } ;
 
 unaryExpr        = ifExpr
                  | everyExpr
+<<<<<<< HEAD:skills/src/grammars/specy.ebnf
                  | existsExpr
+=======
+>>>>>>> 39ed8d1 (Add conditional expression to v2 grammar):skills/distill-v2/grammars/specy.ebnf
                  | dotPath , "is" , "defined"
                  | dotPath , "is" , "not" , "defined"
                  | dotPath , "in" , "{" , valueList , "}"
