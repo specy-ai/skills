@@ -26,6 +26,7 @@
     - [Conflict detection](#conflict-detection)
   - [Integration with verification loops](#integration-with-verification-loops)
   - [Concrete syntax](#concrete-syntax)
+    - [Syntax rules](#syntax-rules)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
