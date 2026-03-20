@@ -213,7 +213,7 @@ Relations:
 
 ## Operation
 
-A named unit of behavior with typed input arguments and one typed output (which may be an error). An operation is either safe (no mutation, read-only) or unsafe (mutates domain state). An operation is either idempotent or not. An operation may emit multiple events.
+A named unit of behavior with typed input arguments and one typed output (which may be an error). An operation is either safe (no mutation, read-only) or unsafe (mutates domain state). An operation is either idempotent or not. An operation may emit multiple events, including errors that must be explicitely defined as Error event.
 
 Ownership and exposure follow a strict hierarchy: entities own operations, interfaces expose a subset of entity or domain service operations, and state machine transitions reference entity operations.
 
@@ -287,7 +287,7 @@ Relations (in addition to all entity relations):
 
 ## Command
 
-An inbound message expressing an intention to change domain state. A command triggers an entity operation, which produces one or more events as its result.
+An inbound message expressing an intention to change domain state. A command triggers an entity operation, which produces one or more events as its result. A command must always include an identifier field (that will represent the correlation id in the chain of causality downstream).
 
 A command succeeds or fails. Success implies at least one state change occurred. Failure produces an error event.
 
@@ -313,7 +313,7 @@ Relations:
 
 ## Event
 
-A recorded fact about something that happened in the domain. An event is raised when an entity reaches a new state after a transition. Events are append-only: they cannot be retracted, only superseded by a subsequent event. An event may reference the command or query identifier that caused it.
+A recorded fact about something that happened in the domain. An event is raised when an entity reaches a new state after a transition. Events are append-only: they cannot be retracted, only superseded by a subsequent event. An event may reference the command or query identifier that caused it.An event related to an entity must always include a field that reference the entity identifier.
 
 **Naming**: Events use a past participle. Example: `OrderPlaced`, `PaymentReceived`.
 
@@ -322,22 +322,93 @@ Relations:
 - 1..1 "raised by" relation with operation (the operation whose execution produced this event)
 
 ### Internal Event
+
 An event raised within the bounded context from an entity state transition. Internal events can trigger policies.
 
 Relations:
 - 0..n "triggers" relation with policies
 
 ### External Event
-An event originating from an upstream bounded context.
+
+An event originating from an upstream bounded context. if the external event doesn't have an Id we should add one that will act as a correlation id for the chain of causality.
 
 Relations:
 - 1..n "triggers" relation with commands (the reactions deduced from consuming this event)
 
 ### Error Event
+
 An error raised by an operation is a special case of event. Error events can be referenced by policies.
 
 Relations:
 - 0..n "triggers" relation with policies
+
+### Temporal Event
+
+A temporal event is a domain fact caused by the passage of time. Unlike internal events (caused by an operation) or external events (caused by an upstream BC), a temporal event fires because a time condition — anchored to a domain reference — has been met.
+
+A temporal event is an event. It inherits all event properties: it is a recorded fact, it is append-only, it can trigger policies, and it maintains the causality chain. Every temporal event has a domain-rooted cause — time alone is never the cause; the cause is the domain event, entity field, or schedule that establishes the temporal reference.
+
+A temporal event has three flavors, determined by its trigger type:
+
+#### Relative temporal event
+
+Fires after a duration elapses from a reference event. The causality chain flows from the reference event: if the reference event never fires, the temporal event never exists.
+
+A relative temporal event has:
+- **reference**: the event that starts the countdown.
+- **offset**: a duration expression, which may be a fixed duration or a computed expression referencing entity state (e.g., `ride.estimatedDriverArrivalTime + 5 minutes`).
+- **guard**: a predicate over entity state evaluated at firing time. If the guard is false when the moment arrives, the event does not fire. The guard absorbs cancellation logic — no separate armed/fired/cancelled lifecycle is needed.
+
+Example: "Driver arrival deadline elapsed" — fires `ride.estimatedDriverArrivalTime + 5 minutes` after `RideCreated`, guarded by `ride.status = driverEnRoute`. If the driver arrives before the deadline (status changes to `driverArrived`), the guard is false and the event is suppressed.
+
+#### Absolute temporal event
+
+Fires at a specific instant described by an entity field. The causality chain flows from the operation that set the field: if the entity is never created, no temporal event exists.
+
+A absolute temporal event has:
+- **instant**: a reference to an entity field of type datetime that defines when the event fires.
+- **guard**: a predicate over entity state evaluated at firing time.
+
+Example: "Promotional credit expired" — fires at `credit.expiryDate`, guarded by `credit.status = active`. If the credit was already used, the guard is false and the event is suppressed.
+
+#### Recurring temporal event
+
+Fires on each occurrence of a schedule expression. The causality chain is the schedule definition itself — a standing domain commitment established at system design time.
+
+A recurring temporal event has:
+- **schedule**: a cron-like expression defining the recurrence pattern.
+- **guard**: a predicate over system state evaluated at each occurrence.
+
+Example: "Weekly payout cycle due" — fires every Monday at 00:00 UTC, guarded by `true` (always fires on schedule).
+
+#### Guard expression
+
+The guard is the mechanism that absorbs both cancellation and conditional firing. At firing time, the system evaluates the guard predicate against current entity state. If the guard evaluates to false, the temporal event is silently suppressed — no event is recorded, no policy triggers.
+
+The guard expression has access to the entity state referenced by the temporal event's context. A temporal event with no guard (or `guard: true`) fires unconditionally when its time condition is met.
+
+#### Recomputation heuristic
+
+When the reference instant can change after the temporal event is armed (e.g., a route recalculation updates the ETA), the modeler should define an explicit **recomputation policy** that:
+1. Listens to the event that changes the reference value.
+2. Cancels or re-arms the temporal event with the updated firing time.
+
+The recomputation policy is a regular policy — no special metamodel construct is needed. The metamodel documents this as a modeling heuristic: *whenever a temporal event's offset or instant depends on a mutable value, the modeler must identify which events can change that value and define a policy that re-arms the deadline accordingly.* Failure to do so is a modeling gap detectable by audit.
+
+#### Differentiators with other event types
+
+| | Internal Event | External Event | Error Event | Temporal Event |
+|---|---|---|---|---|
+| **Cause** | An operation within the BC | An upstream BC | An operation failure | Time, anchored to a domain reference |
+| **Firing** | Synchronous with operation | Asynchronous from upstream | Synchronous with operation | Asynchronous from clock |
+| **Suppression** | Cannot be suppressed | Cannot be suppressed | Cannot be suppressed | Guard can suppress at firing time |
+| **Triggers** | Policies | Commands | Policies | Policies (same as internal) |
+
+Relations:
+- 1..1 "references" relation with event (for relative), entity field (for absolute), or schedule expression (for recurring) — the temporal anchor that roots the causality chain
+- 0..1 "offset by" duration expression (for relative temporal events only)
+- 0..1 "guarded by" predicate expression over entity state (evaluated at firing time)
+- 0..n "triggers" relation with policies (inherited from event)
 
 
 ## Value Type
