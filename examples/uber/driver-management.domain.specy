@@ -1,0 +1,937 @@
+module DriverManagement
+uses module RideManagement  // consumes RideCompleted events for rating workflows
+uses module GeolocationRouting // consumes location updates for inactivity detection
+
+// =============================================================================
+// Enums
+// =============================================================================
+
+// source: driver-management.model.md
+enum VerificationState {
+    pendingVerification
+    verified
+    rejected
+    suspended
+    appealInReview
+    permanentlySuspended
+}
+
+// source: driver-management.model.md
+enum AvailabilityState {
+    offline
+    online
+}
+
+// source: driver-management.model.md
+enum DocumentType {
+    driversLicense
+    passport
+    nationalId
+}
+
+// source: driver-management.model.md
+enum BackgroundCheckResult {
+    clear
+    failed
+}
+
+// source: driver-management.model.md
+enum OfflineReason {
+    voluntary
+    inactivityTimeout
+    suspension
+}
+
+// source: driver-management.model.md
+enum AppealOutcome {
+    reinstated
+    permanentlySuspended
+}
+
+// source: driver-management.model.md
+enum NotificationChannel {
+    email
+    sms
+    push
+}
+
+// =============================================================================
+// Value Objects
+// =============================================================================
+
+// source: driver-management.model.md
+value EmailAddress {
+    fields {
+        value : string
+    }
+    invariants {
+        validEmailFormat :: "Value must match a valid email pattern" {
+            // UNCLEAR: email pattern validation not expressible as simple expression
+        }
+    }
+}
+
+// source: driver-management.model.md
+value PhoneNumber {
+    fields {
+        countryCode : string
+        number : string
+    }
+    invariants {
+        validPhoneFormat :: "Country code must be valid ISO dial code and number must contain only digits" {
+            // UNCLEAR: phone format validation not expressible as simple expression
+        }
+    }
+}
+
+// source: driver-management.model.md
+value FullName {
+    fields {
+        firstName : string
+        lastName : string
+    }
+    invariants {
+        nonBlankName :: "Both firstName and lastName must be non-blank" {
+            size(firstName) > 0 and size(lastName) > 0
+        }
+    }
+}
+
+// source: driver-management.model.md
+value Rating {
+    fields {
+        value : int
+    }
+    invariants {
+        ratingRange :: "Rating value must be between 1 and 5" {
+            value >= 1 and value <= 5
+        }
+    }
+}
+
+// source: driver-management.model.md
+value AverageRating {
+    fields {
+        value : decimal
+        totalRatings : int
+        ratingSum : int
+    }
+    invariants {
+        nonNegativeTotals :: "Total ratings and rating sum must be non-negative" {
+            totalRatings >= 0 and ratingSum >= 0
+        }
+        // UNCLEAR: ConsistentAverage — totalRatings == 0 OR value == ratingSum / totalRatings (division not expressible)
+    }
+}
+
+// source: driver-management.model.md
+value Address {
+    fields {
+        street : string
+        city : string
+        state : string
+        zipCode : string
+        country : string
+    }
+    invariants {
+        nonBlankRequiredFields :: "Street, city, zipCode, and country must be non-blank" {
+            size(street) > 0 and size(city) > 0 and size(zipCode) > 0 and size(country) > 0
+        }
+    }
+}
+
+// source: driver-management.model.md
+value VehicleDetails {
+    fields {
+        make : string
+        model : string
+        year : int
+        color : string
+        licensePlate : string
+    }
+    invariants {
+        validYear :: "Year must be between 1900 and current year + 1" {
+            year >= 1900
+        }
+        nonBlankPlate :: "License plate must be non-blank" {
+            size(licensePlate) > 0
+        }
+    }
+}
+
+// source: driver-management.model.md
+value InspectionResult {
+    fields {
+        passed : boolean
+        inspectedAt : datetime
+        expiresAt : datetime
+        notes : string optional
+    }
+    invariants {
+        expiryAfterInspection :: "Expiry must be after inspection date" {
+            expiresAt > inspectedAt
+        }
+    }
+}
+
+// source: driver-management.model.md
+value AppealDetails {
+    fields {
+        reason : string
+        submittedAt : datetime
+        supportingDocumentIds : list<string> optional
+    }
+    invariants {
+        nonBlankReason :: "Reason must be non-blank" {
+            size(reason) > 0
+        }
+    }
+}
+
+// source: driver-management.model.md
+value AppealResolution {
+    fields {
+        outcome : AppealOutcome
+        resolvedBy : string
+        resolvedAt : datetime
+        justification : string
+    }
+    invariants {
+        nonBlankJustification :: "Justification must be non-blank" {
+            size(justification) > 0
+        }
+    }
+}
+
+// =============================================================================
+// Domain Services
+// =============================================================================
+
+// source: driver-management.model.md
+service DocumentExpiryChecker {
+    operations {
+        checkDocumentExpiry(now: datetime) : void
+            :: "Scan all verified drivers for expired identity documents or vehicle inspections" {
+            // Emits DocumentExpired event for each expired document found
+        }
+    }
+}
+
+// source: driver-management.model.md
+service InactivityMonitor {
+    operations {
+        detectInactiveDrivers(now: datetime) : void
+            :: "Find online drivers with stale location updates and issue timeout commands" {
+            // Queries drivers where now - lastLocationUpdateAt > 5 minutes
+            // Issues TimeoutInactiveDriver command for each
+        }
+    }
+}
+
+// =============================================================================
+// Infrastructure Services
+// =============================================================================
+
+// source: driver-management.model.md
+service BackgroundCheckService {
+    operations {
+        requestBackgroundCheck(driverId: uuid, fullName: FullName, documentNumber: string) : string
+            :: "Submit a background check request to external screening provider" {
+            // NOTE: infrastructure — result arrives asynchronously as CompleteBackgroundCheck command
+        }
+
+        getBackgroundCheckStatus(requestId: string) : string
+            :: "Query external provider for current status of a background check" {
+            // NOTE: infrastructure — returns PENDING, CLEAR, or FAILED
+        }
+    }
+}
+
+// source: driver-management.model.md
+service NotificationService {
+    operations {
+        sendNotification(driverId: uuid, subject: string, message: string, channel: NotificationChannel) : void
+            :: "Dispatch a notification to the driver through the specified channel" {
+            // NOTE: infrastructure — delegates to external messaging infrastructure
+        }
+    }
+}
+
+// source: driver-management.model.md
+service DocumentStorageService {
+    operations {
+        storeDocument(driverId: uuid, documentType: DocumentType, fileContent: string) : string
+            :: "Upload document to external object storage and return file URL" {
+            // NOTE: infrastructure — returns URL
+        }
+
+        getDocumentUrl(fileUrl: string) : string
+            :: "Return a time-limited signed URL for accessing the stored document" {
+            // NOTE: infrastructure
+        }
+    }
+}
+
+// =============================================================================
+// File-level Policies
+// =============================================================================
+
+// source: driver-management.model.md
+policy initiateVerificationOnDocumentUpload(driver: Driver) :: "Initiate background check when a document is uploaded and driver is pending verification" {
+    driver.verificationState = pendingVerification
+    and isNotEmpty(driver.identityDocuments)
+}
+
+// source: driver-management.model.md
+policy notifyOnBackgroundCheckFailure(driver: Driver) :: "Notify driver when background check fails" {
+    // NOTE: always fires on BackgroundCheckFailed event — no guard
+}
+
+// source: driver-management.model.md
+policy suspendOnLowRating(driver: Driver) :: "Suspend driver when average rating drops below 4.2 after more than 20 rides" {
+    driver.totalRidesCompleted > 20
+    and driver.averageRating.value < 4.2
+}
+
+// source: driver-management.model.md
+policy notifyOnSuspension(driver: Driver) :: "Notify driver when account is suspended" {
+    // NOTE: always fires on DriverSuspended event — no guard
+}
+
+// source: driver-management.model.md
+policy suspendOnDocumentExpiry(driver: Driver) :: "Suspend driver when identity document or vehicle inspection expires" {
+    driver.verificationState = verified
+}
+
+// source: driver-management.model.md
+policy notifyOnAppealResolution(driver: Driver) :: "Notify driver of appeal decision" {
+    // NOTE: always fires on AppealResolved event — no guard
+}
+
+// source: driver-management.model.md
+policy autoOfflineOnInactivity(driver: Driver) :: "Auto-offline driver when location updates are stale for more than 5 minutes" {
+    driver.availabilityState = online
+    // UNCLEAR: now() - driver.lastLocationUpdateAt > 5 minutes (duration arithmetic)
+}
+
+// =============================================================================
+// Entities
+// =============================================================================
+
+// source: driver-management.model.md
+entity IdentityDocument :: "An identity document uploaded by a driver for verification" {
+    identifier documentId : UUID
+    fields {
+        driverId : uuid
+        documentType : DocumentType
+        documentNumber : string
+        fileUrl : string
+        uploadedAt : datetime
+        expiresAt : datetime
+        verified : boolean default("false")
+    }
+
+    invariants {
+        nonBlankDocumentNumber :: "Document number must be non-blank" {
+            size(documentNumber) > 0
+        }
+        nonBlankFileUrl :: "File URL must be non-blank" {
+            size(fileUrl) > 0
+        }
+        futureExpiry :: "Expiry must be after upload date" {
+            expiresAt > uploadedAt
+        }
+    }
+
+    operations {
+        "Upload identity document" on UploadIdentityDocument {
+            creates IdentityDocument {
+                driverId = uploadIdentityDocument.driverId
+                documentType = uploadIdentityDocument.documentType
+                documentNumber = uploadIdentityDocument.documentNumber
+                fileUrl = uploadIdentityDocument.fileUrl
+                expiresAt = uploadIdentityDocument.expiresAt
+                uploadedAt = now()
+                verified = false
+            }
+
+            emits IdentityDocumentUploaded {
+                driverId = IdentityDocument.driverId
+                documentId = IdentityDocument.documentId
+                documentType = IdentityDocument.documentType
+                uploadedAt = IdentityDocument.uploadedAt
+            }
+        }
+
+        markVerified() :: "Mark document as verified" {
+            sets IdentityDocument {
+                verified = true
+            }
+        }
+    }
+}
+
+// source: driver-management.model.md
+entity Vehicle :: "A vehicle registered by a driver" {
+    identifier vehicleId : UUID
+    fields {
+        driverId : uuid
+        details : VehicleDetails
+        inspectionResult : InspectionResult optional
+        registeredAt : datetime
+    }
+
+    invariants {
+        // UNCLEAR: InspectionRequiredForActivation — cross-aggregate invariant with Driver.goOnline
+    }
+
+    operations {
+        "Register vehicle" on RegisterVehicle {
+            creates Vehicle {
+                driverId = registerVehicle.driverId
+                details = registerVehicle.details
+                registeredAt = now()
+            }
+
+            emits VehicleRegistered {
+                driverId = Vehicle.driverId
+                vehicleId = Vehicle.vehicleId
+                details = Vehicle.details
+                registeredAt = Vehicle.registeredAt
+            }
+        }
+
+        "Record vehicle inspection" on RecordVehicleInspection {
+            resolves Vehicle from recordVehicleInspection.vehicleId
+
+            sets Vehicle {
+                inspectionResult = recordVehicleInspection.result
+            }
+
+            emits VehicleInspectionRecorded {
+                driverId = Vehicle.driverId
+                vehicleId = Vehicle.vehicleId
+                result = Vehicle.inspectionResult
+                recordedAt = now()
+            }
+        }
+    }
+}
+
+// source: driver-management.model.md
+entity Driver :: "A driver who provides rides through the platform" {
+    identifier driverId : UUID
+    fields {
+        fullName : FullName
+        email : EmailAddress unique
+        phone : PhoneNumber unique
+        address : Address
+        verificationState : VerificationState default("pendingVerification")
+        availabilityState : AvailabilityState default("offline")
+        averageRating : AverageRating
+        totalRidesCompleted : int default("0")
+        suspensionReason : string optional
+        appeal : AppealDetails optional
+        appealResolution : AppealResolution optional
+        lastLocationUpdateAt : datetime optional
+        registeredAt : datetime immutable
+        verifiedAt : datetime optional
+        suspendedAt : datetime optional
+    }
+
+    references {
+        identityDocuments : IdentityDocument 0..N
+        vehicle : Vehicle 0..1
+    }
+
+    policies {
+        driverMustBePendingVerification(driver: Driver) :: "Driver must be pending verification" {
+            driver.verificationState = pendingVerification
+        }
+
+        driverMustBeVerified(driver: Driver) :: "Driver must be verified" {
+            driver.verificationState = verified
+        }
+
+        driverMustBeSuspended(driver: Driver) :: "Driver must be suspended to submit appeal" {
+            driver.verificationState = suspended
+        }
+
+        driverMustBeAppealInReview(driver: Driver) :: "Driver must be in appeal review to resolve" {
+            driver.verificationState = appealInReview
+        }
+
+        driverMustBeOnline(driver: Driver) :: "Driver must be online" {
+            driver.availabilityState = online
+        }
+
+        driverMustBeOffline(driver: Driver) :: "Driver must be offline to go online" {
+            driver.availabilityState = offline
+        }
+
+        vehicleReadyForOnline(driver: Driver) :: "A vehicle with valid inspection is required to go online" {
+            driver.vehicle is defined
+            and driver.vehicle.inspectionResult is defined
+            and driver.vehicle.inspectionResult.passed = true
+        }
+
+        driverNotSuspended(driver: Driver) :: "Suspended drivers cannot go online" {
+            driver.verificationState = verified
+        }
+    }
+
+    invariants {
+        singleVehicle :: "A driver has at most one active vehicle" {
+            // NOTE: enforced by 0..1 cardinality in references
+        }
+    }
+
+    operations {
+        // === Registration ===
+
+        "Register a new driver" on RegisterDriver {
+            creates Driver {
+                fullName = registerDriver.fullName
+                email = registerDriver.email
+                phone = registerDriver.phone
+                address = registerDriver.address
+                verificationState = pendingVerification
+                availabilityState = offline
+                averageRating = AverageRating { value = 0.0, totalRatings = 0, ratingSum = 0 }
+                totalRidesCompleted = 0
+                registeredAt = now()
+            }
+
+            emits DriverRegistered {
+                driverId = Driver.driverId
+                fullName = Driver.fullName
+                email = Driver.email
+                phone = Driver.phone
+                registeredAt = Driver.registeredAt
+            }
+        }
+
+        // === Verification ===
+
+        "Complete background check — clear" on CompleteBackgroundCheck {
+            resolves Driver from completeBackgroundCheck.driverId
+
+            policy driverMustBePendingVerification(Driver)
+
+            sets Driver {
+                verificationState = verified
+                verifiedAt = now()
+            }
+
+            emits BackgroundCheckCompleted {
+                driverId = Driver.driverId
+                checkId = completeBackgroundCheck.checkId
+                result = clear
+                completedAt = now()
+            }
+        }
+
+        // NOTE: BackgroundCheckFailed handled separately — same command, different branch
+        // UNCLEAR: branching on completeBackgroundCheck.backgroundCheckResult (clear vs failed) within single operation
+
+        // === Availability ===
+
+        "Go online" on GoOnline {
+            resolves Driver from goOnline.driverId
+
+            policy driverNotSuspended(Driver)
+            policy driverMustBeOffline(Driver)
+            policy vehicleReadyForOnline(Driver)
+
+            sets Driver {
+                availabilityState = online
+                lastLocationUpdateAt = now()
+            }
+
+            emits DriverWentOnline {
+                driverId = Driver.driverId
+                timestamp = now()
+            }
+        }
+
+        "Go offline" on GoOffline {
+            resolves Driver from goOffline.driverId
+
+            policy driverMustBeOnline(Driver)
+
+            sets Driver {
+                availabilityState = offline
+            }
+
+            emits DriverWentOffline {
+                driverId = Driver.driverId
+                reason = voluntary
+                timestamp = now()
+            }
+        }
+
+        "Timeout inactive driver" on TimeoutInactiveDriver {
+            resolves Driver from timeoutInactiveDriver.driverId
+
+            policy driverMustBeOnline(Driver)
+            // UNCLEAR: now() - Driver.lastLocationUpdateAt > 5 minutes (duration arithmetic)
+
+            sets Driver {
+                availabilityState = offline
+            }
+
+            emits DriverWentOffline {
+                driverId = Driver.driverId
+                reason = inactivityTimeout
+                timestamp = now()
+            }
+        }
+
+        // === Rating ===
+
+        "Submit rating for driver" on SubmitRating {
+            resolves Driver from submitRating.driverId
+
+            sets Driver {
+                averageRating = Driver.averageRating
+                // NOTE: averageRating.incorporate(submitRating.rating) — recomputes average
+                totalRidesCompleted = Driver.totalRidesCompleted + 1
+            }
+
+            emits RatingSubmitted {
+                driverId = Driver.driverId
+                rideId = submitRating.rideId
+                rating = submitRating.rating
+                newAverageRating = Driver.averageRating
+                totalRidesCompleted = Driver.totalRidesCompleted
+                submittedAt = now()
+            }
+        }
+
+        // === Suspension ===
+
+        "Suspend driver" on SuspendDriver {
+            resolves Driver from suspendDriver.driverId
+
+            policy driverMustBeVerified(Driver)
+
+            sets Driver {
+                verificationState = suspended
+                suspensionReason = suspendDriver.reason
+                suspendedAt = now()
+                availabilityState = offline
+            }
+
+            emits DriverSuspended {
+                driverId = Driver.driverId
+                reason = suspendDriver.reason
+                suspendedAt = now()
+            }
+        }
+
+        // === Appeal ===
+
+        "Submit appeal" on SubmitAppeal {
+            resolves Driver from submitAppeal.driverId
+
+            policy driverMustBeSuspended(Driver)
+
+            sets Driver {
+                verificationState = appealInReview
+                appeal = submitAppeal.appeal
+            }
+
+            emits AppealSubmitted {
+                driverId = Driver.driverId
+                appeal = submitAppeal.appeal
+            }
+        }
+
+        "Resolve appeal" on ResolveAppeal {
+            resolves Driver from resolveAppeal.driverId
+
+            policy driverMustBeAppealInReview(Driver)
+
+            sets Driver {
+                appealResolution = resolveAppeal.resolution
+                // NOTE: if resolution.outcome = reinstated → verificationState = verified, clear suspension
+                // NOTE: if resolution.outcome = permanentlySuspended → verificationState = permanentlySuspended
+            }
+
+            emits AppealResolved {
+                driverId = Driver.driverId
+                resolution = resolveAppeal.resolution
+                resolvedAt = now()
+            }
+        }
+    }
+
+    // Verification Lifecycle transitions
+    transitions {
+        [*] --> pendingVerification on "Register a new driver"
+        pendingVerification --> verified on "Complete background check — clear"
+        // NOTE: pendingVerification --> rejected on "Complete background check — failed" (branching not modelled)
+        verified --> suspended on "Suspend driver"
+        suspended --> appealInReview on "Submit appeal"
+        // NOTE: appealInReview --> verified on "Resolve appeal" (when reinstated)
+        // NOTE: appealInReview --> permanentlySuspended on "Resolve appeal" (when permanently suspended)
+    }
+}
+
+// =============================================================================
+// Commands
+// =============================================================================
+
+// source: driver-management.model.md
+command RegisterDriver {
+    fields {
+        fullName : FullName
+        email : EmailAddress
+        phone : PhoneNumber
+        address : Address
+    }
+}
+
+// source: driver-management.model.md
+command UploadIdentityDocument {
+    fields {
+        driverId : uuid
+        documentType : DocumentType
+        documentNumber : string
+        fileUrl : string
+        expiresAt : datetime
+    }
+}
+
+// source: driver-management.model.md
+command CompleteBackgroundCheck {
+    fields {
+        driverId : uuid
+        backgroundCheckResult : BackgroundCheckResult
+        checkId : string
+    }
+}
+
+// source: driver-management.model.md
+command RegisterVehicle {
+    fields {
+        driverId : uuid
+        details : VehicleDetails
+    }
+}
+
+// source: driver-management.model.md
+command RecordVehicleInspection {
+    fields {
+        driverId : uuid
+        vehicleId : uuid
+        result : InspectionResult
+    }
+}
+
+// source: driver-management.model.md
+command GoOnline {
+    fields {
+        driverId : uuid
+    }
+}
+
+// source: driver-management.model.md
+command GoOffline {
+    fields {
+        driverId : uuid
+    }
+}
+
+// source: driver-management.model.md
+command TimeoutInactiveDriver {
+    fields {
+        driverId : uuid
+        now : datetime
+    }
+}
+
+// source: driver-management.model.md
+command SubmitRating {
+    fields {
+        driverId : uuid
+        rideId : uuid
+        rating : Rating
+    }
+}
+
+// source: driver-management.model.md
+command SuspendDriver {
+    fields {
+        driverId : uuid
+        reason : string
+    }
+}
+
+// source: driver-management.model.md
+command SubmitAppeal {
+    fields {
+        driverId : uuid
+        appeal : AppealDetails
+    }
+}
+
+// source: driver-management.model.md
+command ResolveAppeal {
+    fields {
+        driverId : uuid
+        resolution : AppealResolution
+    }
+}
+
+// source: driver-management.model.md
+command NotifyDriver {
+    fields {
+        driverId : uuid
+        subject : string
+        message : string
+        channel : NotificationChannel
+    }
+}
+
+// =============================================================================
+// Events
+// =============================================================================
+
+// source: driver-management.model.md
+event DriverRegistered {
+    fields {
+        driverId : uuid
+        fullName : FullName
+        email : EmailAddress
+        phone : PhoneNumber
+        registeredAt : datetime
+    }
+}
+
+// source: driver-management.model.md
+event IdentityDocumentUploaded {
+    fields {
+        driverId : uuid
+        documentId : uuid
+        documentType : DocumentType
+        uploadedAt : datetime
+    }
+}
+
+// source: driver-management.model.md
+event BackgroundCheckCompleted {
+    fields {
+        driverId : uuid
+        checkId : string
+        result : BackgroundCheckResult
+        completedAt : datetime
+    }
+}
+
+// source: driver-management.model.md
+event BackgroundCheckFailed {
+    fields {
+        driverId : uuid
+        checkId : string
+        result : BackgroundCheckResult
+        failureReason : string
+        completedAt : datetime
+    }
+}
+
+// source: driver-management.model.md
+event VehicleRegistered {
+    fields {
+        driverId : uuid
+        vehicleId : uuid
+        details : VehicleDetails
+        registeredAt : datetime
+    }
+}
+
+// source: driver-management.model.md
+event VehicleInspectionRecorded {
+    fields {
+        driverId : uuid
+        vehicleId : uuid
+        result : InspectionResult
+        recordedAt : datetime
+    }
+}
+
+// source: driver-management.model.md
+event DriverWentOnline {
+    fields {
+        driverId : uuid
+        timestamp : datetime
+    }
+}
+
+// source: driver-management.model.md
+event DriverWentOffline {
+    fields {
+        driverId : uuid
+        reason : OfflineReason
+        timestamp : datetime
+    }
+}
+
+// source: driver-management.model.md
+event RatingSubmitted {
+    fields {
+        driverId : uuid
+        rideId : uuid
+        rating : Rating
+        newAverageRating : AverageRating
+        totalRidesCompleted : int
+        submittedAt : datetime
+    }
+}
+
+// source: driver-management.model.md
+event DriverSuspended {
+    fields {
+        driverId : uuid
+        reason : string
+        suspendedAt : datetime
+    }
+}
+
+// source: driver-management.model.md
+event AppealSubmitted {
+    fields {
+        driverId : uuid
+        appeal : AppealDetails
+    }
+}
+
+// source: driver-management.model.md
+event AppealResolved {
+    fields {
+        driverId : uuid
+        resolution : AppealResolution
+        resolvedAt : datetime
+    }
+}
+
+// source: driver-management.model.md
+event DriverNotified {
+    fields {
+        driverId : uuid
+        subject : string
+        channel : NotificationChannel
+        sentAt : datetime
+    }
+}
+
+// source: driver-management.model.md
+event DocumentExpired {
+    fields {
+        driverId : uuid
+        documentId : uuid optional
+        vehicleId : uuid optional
+        expiryType : string
+        expiredAt : datetime
+    }
+}

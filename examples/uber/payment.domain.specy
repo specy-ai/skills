@@ -1,0 +1,1632 @@
+module Payment
+uses module RideManagement   // consumes RideCancelledBySystem event
+uses module DriverManagement // reads driver bank account details via ACL
+
+// =============================================================================
+// Enums
+// =============================================================================
+
+// source: payment.model.md
+enum Currency {
+    usd
+    eur
+    gbp
+}
+
+// source: payment.model.md
+enum PaymentStatus {
+    authorized
+    captured
+    failed
+    partiallyRefunded
+    fullyRefunded
+}
+
+// source: payment.model.md
+enum PaymentMethodType {
+    creditCard
+    debitCard
+    paypal
+    applePay
+    googlePay
+}
+
+// source: payment.model.md
+enum RefundRequestStatus {
+    pending
+    underReview
+    approved
+    rejected
+    processed
+}
+
+// source: payment.model.md
+enum RefundFaultType {
+    driverFault
+    platformFault
+    disputed
+}
+
+// source: payment.model.md
+enum PromotionalCreditStatus {
+    active
+    applied
+    expired
+    voided
+}
+
+// source: payment.model.md
+enum PayoutType {
+    weekly
+    instant
+}
+
+// source: payment.model.md
+enum ReceiptStatus {
+    generated
+    corrected
+}
+
+// =============================================================================
+// Value Objects
+// =============================================================================
+
+// source: payment.model.md
+value Money {
+    fields {
+        amount : decimal min(0)
+        currency : string maxLength(3) default("USD")
+    }
+    invariants {
+        nonNegativeAmount :: "A monetary amount must not be negative" {
+            amount >= 0
+        }
+    }
+}
+
+// source: payment.model.md
+value FareBreakdown {
+    fields {
+        baseFare : Money
+        distanceCharge : Money
+        timeCharge : Money
+        surgeCharge : Money
+        tolls : Money
+        promotionDiscount : Money
+        cancellationFee : Money optional
+        total : Money
+    }
+    invariants {
+        totalConsistency :: "Total must equal the sum of all components minus promotions" {
+            total.amount = baseFare.amount + distanceCharge.amount + timeCharge.amount + surgeCharge.amount + tolls.amount - promotionDiscount.amount + cancellationFee.amount
+        }
+    }
+}
+
+// source: payment.model.md
+value CommissionRate {
+    fields {
+        percentage : decimal min(0) max(100)
+    }
+    invariants {
+        validPercentage :: "Commission rate must be between 0 and 100" {
+            percentage >= 0 and percentage <= 100
+        }
+    }
+}
+
+// source: payment.model.md
+value FareParameters {
+    fields {
+        baseFare : Money
+        perKmRate : Money
+        perMinuteRate : Money
+        surgeMultiplier : decimal min(1.0) default("1.0")
+        minimumFare : Money
+    }
+}
+
+// source: payment.model.md
+value PaymentMethodInfo {
+    fields {
+        paymentMethodId : uuid
+        type : PaymentMethodType
+        last4 : string maxLength(4)
+        isDefault : boolean
+        priority : int min(1)
+    }
+}
+
+// source: payment.model.md
+value PayoutDetails {
+    fields {
+        payoutId : uuid
+        amount : Money
+        fee : Money
+        netAmount : Money
+        transferredAt : datetime
+    }
+    invariants {
+        netAmountConsistency :: "Net amount must equal amount minus fee" {
+            netAmount.amount = amount.amount - fee.amount
+        }
+    }
+}
+
+// NOTE: BankAccount not modelled in this context — referenced from Driver Management
+
+// =============================================================================
+// Services
+// =============================================================================
+
+// source: payment.model.md
+service FareCalculationService {
+    operations {
+        computeEstimate(distanceKm: decimal, estimatedMinutes: decimal, fareParameters: FareParameters) : FareBreakdown
+            :: "Compute an upfront fare estimate for a prospective ride" {
+            returns FareBreakdown
+        }
+
+        computeFinalFare(actualDistanceKm: decimal, actualMinutes: decimal, fareParameters: FareParameters, tolls: Money, promotionDiscount: Money) : FareBreakdown
+            :: "Compute the final fare after ride completion using actual distance and duration" {
+            returns FareBreakdown
+        }
+
+        computeCancellationFee(minutesSinceAssignment: decimal, cancellationPolicy: string) : Money
+            :: "Compute the cancellation fee based on elapsed time and the applicable cancellation policy" {
+            // NOTE: cancellation policy details (grace period, fee tiers) are configuration-driven
+            returns Money
+        }
+
+        computeDriverEarnings(fareAmount: Money, commissionRate: CommissionRate) : Money
+            :: "Compute driver earnings by deducting the platform commission from the fare" {
+            returns Money
+        }
+    }
+}
+
+// =============================================================================
+// Infrastructure Services
+// =============================================================================
+
+// source: payment.model.md
+service PaymentGateway {
+    operations {
+        placeHold(paymentMethod: PaymentMethodInfo, amount: Money) : void
+            :: "Place an authorization hold on the rider's payment method" {
+        }
+        captureCharge(paymentMethod: PaymentMethodInfo, amount: Money) : void
+            :: "Capture a charge on the rider's payment method" {
+        }
+        releaseHold(paymentMethod: PaymentMethodInfo, amount: Money) : void
+            :: "Release a previously placed authorization hold without charging" {
+        }
+        refund(paymentMethod: PaymentMethodInfo, amount: Money) : void
+            :: "Refund a specified amount to the rider's original payment method" {
+        }
+        validatePaymentMethod(paymentMethod: PaymentMethodInfo) : boolean
+            :: "Verify that a payment method is valid and active" {
+        }
+    }
+}
+
+// source: payment.model.md
+service BankTransferService {
+    operations {
+        transferToBank(bankAccount: string, amount: Money) : void
+            :: "Initiate a bank transfer to the driver's registered bank account" {
+            // NOTE: bankAccount type simplified — actual type from Driver Management
+        }
+        getTransferStatus(transferId: uuid) : string
+            :: "Query the status of a pending bank transfer" {
+        }
+    }
+}
+
+// source: payment.model.md
+service InvoicingService {
+    operations {
+        generateMonthlyInvoice(businessAccountId: uuid, month: int, year: int) : string
+            :: "Generate a consolidated invoice for a business account" {
+            // NOTE: returns MonthlyInvoice (not modelled)
+        }
+    }
+}
+
+// =============================================================================
+// Entities
+// =============================================================================
+
+// source: payment.model.md
+entity Payment :: "A financial transaction for a ride" {
+    identifier id : UUID
+    fields {
+        rideId : uuid immutable
+        riderId : uuid immutable
+        status : PaymentStatus default("authorized")
+        estimatedAmount : Money
+        finalAmount : Money optional
+        fareBreakdown : FareBreakdown optional
+        paymentMethodUsed : PaymentMethodInfo
+        refundedAmount : Money optional
+        retryCount : int default("0") min(0) max(3)
+        debtRecorded : boolean default("false")
+        authorizedAt : datetime immutable
+        capturedAt : datetime optional
+        failedAt : datetime optional
+        failureReason : string optional maxLength(500)
+        createdAt : datetime immutable
+    }
+    references {
+        riderAccount : RiderAccount 1..1
+    }
+
+    policies {
+        paymentMustBeAuthorized(payment: Payment) :: "Payment must be in authorized status to capture" {
+            payment.status = authorized
+        }
+        retryLimitNotExceeded(payment: Payment) :: "Payment retry count must not exceed 3" {
+            payment.retryCount < 3
+        }
+        riderHasNoOutstandingDebt(riderAccount: RiderAccount) :: "Rider must not have outstanding debt to authorize new payments" {
+            riderAccount.outstandingDebt.amount = 0
+        }
+    }
+
+    invariants {
+        finalAmountNonNegative :: "Final amount must not be negative" {
+            if finalAmount is defined { finalAmount.amount >= 0 }
+        }
+        refundDoesNotExceedCapture :: "Refunded amount must not exceed captured amount" {
+            if refundedAmount is defined and finalAmount is defined { refundedAmount.amount <= finalAmount.amount }
+        }
+    }
+
+    operations {
+        "Authorize payment for ride" on AuthorizePayment {
+            resolves RiderAccount from authorizePayment.riderId
+            policy riderHasNoOutstandingDebt(RiderAccount)
+
+            creates Payment {
+                rideId = authorizePayment.rideId
+                riderId = authorizePayment.riderId
+                status = authorized
+                estimatedAmount = authorizePayment.estimatedAmount
+                paymentMethodUsed = RiderAccount.defaultPaymentMethod
+                authorizedAt = now()
+            }
+
+            PaymentGateway.placeHold(Payment.paymentMethodUsed, Payment.estimatedAmount)
+
+            emits PaymentAuthorized {
+                paymentId = Payment.id
+                rideId = Payment.rideId
+                riderId = Payment.riderId
+                amount = Payment.estimatedAmount
+                authorizedAt = Payment.authorizedAt
+            }
+        }
+
+        "Capture payment after ride completion" on CapturePayment {
+            resolves Payment from capturePayment.paymentId
+            resolves RiderAccount from Payment.riderId
+
+            policy paymentMustBeAuthorized(Payment)
+
+            sets Payment {
+                status = captured
+                finalAmount = capturePayment.finalAmount
+                fareBreakdown = capturePayment.fareBreakdown
+                capturedAt = now()
+            }
+
+            PaymentGateway.captureCharge(Payment.paymentMethodUsed, Payment.finalAmount)
+
+            emits PaymentCaptured {
+                paymentId = Payment.id
+                rideId = Payment.rideId
+                riderId = Payment.riderId
+                amount = Payment.finalAmount
+                fareBreakdown = Payment.fareBreakdown
+                capturedAt = Payment.capturedAt
+            }
+        }
+
+        "Retry failed payment" on RetryPayment {
+            resolves Payment from retryPayment.paymentId
+            resolves RiderAccount from Payment.riderId
+
+            policy retryLimitNotExceeded(Payment)
+
+            sets Payment {
+                retryCount = Payment.retryCount + 1
+            }
+
+            PaymentGateway.captureCharge(Payment.paymentMethodUsed, Payment.finalAmount)
+
+            emits PaymentRetryAttempted {
+                paymentId = Payment.id
+                retryCount = Payment.retryCount
+                attemptedAt = now()
+            }
+        }
+
+        "Fall back to next payment method" when PaymentRetryExhausted then FallbackPaymentMethod {
+            resolves Payment from fallbackPaymentMethod.paymentId
+            resolves RiderAccount from Payment.riderId
+
+            sets Payment {
+                paymentMethodUsed = RiderAccount.nextActivePaymentMethod(Payment.paymentMethodUsed)
+                retryCount = 0
+            }
+
+            PaymentGateway.captureCharge(Payment.paymentMethodUsed, Payment.finalAmount)
+
+            emits PaymentMethodFallback {
+                paymentId = Payment.id
+                newPaymentMethodId = Payment.paymentMethodUsed.paymentMethodId
+                attemptedAt = now()
+            }
+        }
+
+        "Record payment failure" when AllPaymentMethodsExhausted then RecordPaymentFailure {
+            resolves Payment from recordPaymentFailure.paymentId
+            resolves RiderAccount from Payment.riderId
+
+            sets Payment {
+                status = failed
+                debtRecorded = true
+                failedAt = now()
+                failureReason = recordPaymentFailure.reason
+            }
+
+            sets RiderAccount {
+                outstandingDebt = RiderAccount.outstandingDebt.amount + Payment.finalAmount.amount
+            }
+
+            emits PaymentFailed {
+                paymentId = Payment.id
+                rideId = Payment.rideId
+                riderId = Payment.riderId
+                amount = Payment.finalAmount
+                reason = Payment.failureReason
+                failedAt = Payment.failedAt
+            }
+        }
+
+        "Release hold on system cancellation" when RideCancelledBySystem then ReleasePaymentHold {
+            resolves Payment from releasePaymentHold.paymentId
+
+            sets Payment {
+                status = fullyRefunded
+                refundedAmount = Payment.estimatedAmount
+            }
+
+            PaymentGateway.releaseHold(Payment.paymentMethodUsed, Payment.estimatedAmount)
+
+            emits PaymentHoldReleased {
+                paymentId = Payment.id
+                rideId = Payment.rideId
+                riderId = Payment.riderId
+                amount = Payment.estimatedAmount
+                releasedAt = now()
+            }
+        }
+
+        "Process partial refund" on ProcessPartialRefund {
+            resolves Payment from processPartialRefund.paymentId
+
+            sets Payment {
+                status = partiallyRefunded
+                refundedAmount = processPartialRefund.refundAmount
+            }
+
+            PaymentGateway.refund(Payment.paymentMethodUsed, processPartialRefund.refundAmount)
+
+            emits PartialRefundProcessed {
+                paymentId = Payment.id
+                rideId = Payment.rideId
+                riderId = Payment.riderId
+                refundAmount = processPartialRefund.refundAmount
+                refundedAt = now()
+            }
+        }
+
+        "Process full refund" on ProcessFullRefund {
+            resolves Payment from processFullRefund.paymentId
+
+            sets Payment {
+                status = fullyRefunded
+                refundedAmount = Payment.finalAmount
+            }
+
+            PaymentGateway.refund(Payment.paymentMethodUsed, Payment.finalAmount)
+
+            emits FullRefundProcessed {
+                paymentId = Payment.id
+                rideId = Payment.rideId
+                riderId = Payment.riderId
+                refundAmount = Payment.finalAmount
+                refundedAt = now()
+            }
+        }
+    }
+
+    transitions {
+        [*] --> authorized on "Authorize payment for ride"
+        authorized --> captured on "Capture payment after ride completion"
+        authorized --> fullyRefunded on "Release hold on system cancellation"
+        captured --> partiallyRefunded on "Process partial refund"
+        captured --> fullyRefunded on "Process full refund"
+        captured --> failed on "Record payment failure"
+        authorized --> failed on "Record payment failure"
+        partiallyRefunded --> fullyRefunded on "Process full refund"
+    }
+}
+
+// source: payment.model.md
+entity RiderAccount :: "Tracks a rider's payment methods, outstanding debt, and promotional credits" {
+    identifier id : UUID
+    fields {
+        riderId : uuid unique immutable
+        outstandingDebt : Money default("0")
+        createdAt : datetime immutable
+    }
+    references {
+        paymentMethods : PaymentMethodInfo 1..N
+        promotionalCredits : PromotionalCredit 0..N
+    }
+
+    policies {
+        hasAtLeastOnePaymentMethod(riderAccount: RiderAccount) :: "Rider must have at least one active payment method" {
+            isNotEmpty(riderAccount.paymentMethods)
+        }
+    }
+
+    invariants {
+        debtNonNegative :: "Outstanding debt must not be negative" {
+            outstandingDebt.amount >= 0
+        }
+    }
+
+    operations {
+        "Add payment method" on AddPaymentMethod {
+            resolves RiderAccount from addPaymentMethod.riderId
+
+            sets RiderAccount {
+                paymentMethods = append(RiderAccount.paymentMethods, addPaymentMethod.paymentMethod)
+            }
+
+            emits PaymentMethodAdded {
+                riderId = RiderAccount.riderId
+                paymentMethodId = addPaymentMethod.paymentMethod.paymentMethodId
+                addedAt = now()
+            }
+        }
+
+        "Settle outstanding debt" on SettleDebt {
+            resolves RiderAccount from settleDebt.riderId
+
+            sets RiderAccount {
+                outstandingDebt = Money { amount = 0, currency = RiderAccount.outstandingDebt.currency }
+            }
+
+            PaymentGateway.captureCharge(RiderAccount.defaultPaymentMethod, settleDebt.amount)
+
+            emits DebtSettled {
+                riderId = RiderAccount.riderId
+                amount = settleDebt.amount
+                settledAt = now()
+            }
+        }
+    }
+}
+
+// source: payment.model.md
+entity PromotionalCredit :: "A time-limited credit on a rider's account" {
+    identifier id : UUID
+    fields {
+        riderId : uuid immutable
+        amount : Money
+        remainingAmount : Money
+        status : PromotionalCreditStatus default("active")
+        reason : string maxLength(200)
+        expiresAt : datetime
+        appliedAt : datetime optional
+        voidedAt : datetime optional
+        createdAt : datetime immutable
+    }
+
+    invariants {
+        remainingDoesNotExceedOriginal :: "Remaining amount must not exceed original credit amount" {
+            remainingAmount.amount <= amount.amount
+        }
+        expiryInFuture :: "Credit expiry must be in the future at creation" {
+            expiresAt > createdAt
+        }
+    }
+
+    operations {
+        "Grant promotional credit" on GrantPromotionalCredit {
+            resolves RiderAccount from grantPromotionalCredit.riderId
+
+            creates PromotionalCredit {
+                riderId = grantPromotionalCredit.riderId
+                amount = grantPromotionalCredit.amount
+                remainingAmount = grantPromotionalCredit.amount
+                status = active
+                reason = grantPromotionalCredit.reason
+                expiresAt = grantPromotionalCredit.expiresAt
+            }
+
+            emits PromotionalCreditGranted {
+                creditId = PromotionalCredit.id
+                riderId = PromotionalCredit.riderId
+                amount = PromotionalCredit.amount
+                expiresAt = PromotionalCredit.expiresAt
+                grantedAt = now()
+            }
+        }
+
+        "Apply promotional credit to fare" on ApplyPromotionalCredit {
+            resolves PromotionalCredit from applyPromotionalCredit.creditId
+
+            sets PromotionalCredit {
+                status = applied
+                remainingAmount = PromotionalCredit.remainingAmount.amount - applyPromotionalCredit.appliedAmount.amount
+                appliedAt = now()
+            }
+
+            emits PromotionalCreditApplied {
+                creditId = PromotionalCredit.id
+                riderId = PromotionalCredit.riderId
+                appliedAmount = applyPromotionalCredit.appliedAmount
+                remainingAmount = PromotionalCredit.remainingAmount
+                rideId = applyPromotionalCredit.rideId
+                appliedAt = PromotionalCredit.appliedAt
+            }
+        }
+
+        "Expire promotional credit" when CreditExpiryReached then ExpirePromotionalCredit {
+            resolves PromotionalCredit from expirePromotionalCredit.creditId
+
+            sets PromotionalCredit {
+                status = expired
+                voidedAt = now()
+            }
+
+            emits PromotionalCreditExpired {
+                creditId = PromotionalCredit.id
+                riderId = PromotionalCredit.riderId
+                amount = PromotionalCredit.remainingAmount
+                expiredAt = now()
+            }
+        }
+
+        "Void promotional credit" on VoidPromotionalCredit {
+            resolves PromotionalCredit from voidPromotionalCredit.creditId
+
+            sets PromotionalCredit {
+                status = voided
+                voidedAt = now()
+            }
+
+            emits PromotionalCreditVoided {
+                creditId = PromotionalCredit.id
+                riderId = PromotionalCredit.riderId
+                amount = PromotionalCredit.remainingAmount
+                voidedAt = now()
+            }
+        }
+    }
+
+    transitions {
+        [*] --> active on "Grant promotional credit"
+        active --> applied on "Apply promotional credit to fare"
+        active --> expired on "Expire promotional credit"
+        active --> voided on "Void promotional credit"
+    }
+}
+
+// source: payment.model.md
+entity DriverBalance :: "Tracks a driver's accumulated earnings from completed rides" {
+    identifier id : UUID
+    fields {
+        driverId : uuid unique immutable
+        availableBalance : Money default("0")
+        pendingBalance : Money default("0")
+        totalEarnings : Money default("0")
+        totalPayouts : Money default("0")
+        lastPayoutAt : datetime optional
+        createdAt : datetime immutable
+    }
+    // NOTE: bankAccount (BankAccount from DriverManagement — not modelled in this context)
+
+    policies {
+        balanceExceedsPayoutMinimum(driverBalance: DriverBalance, minimumThreshold: Money) :: "Driver balance must exceed the minimum payout threshold" {
+            driverBalance.availableBalance.amount >= minimumThreshold.amount
+        }
+        hasSufficientBalance(driverBalance: DriverBalance, amount: Money) :: "Driver must have sufficient balance for deduction" {
+            driverBalance.availableBalance.amount >= amount.amount
+        }
+    }
+
+    invariants {
+        balanceNonNegative :: "Available balance must not be negative" {
+            availableBalance.amount >= 0
+        }
+        earningsConsistency :: "Total earnings must equal available balance plus total payouts plus pending balance" {
+            totalEarnings.amount = availableBalance.amount + totalPayouts.amount + pendingBalance.amount
+        }
+    }
+
+    operations {
+        "Credit driver earnings for ride" on CreditDriverEarnings {
+            resolves DriverBalance from creditDriverEarnings.driverId
+
+            sets DriverBalance {
+                availableBalance = DriverBalance.availableBalance.amount + creditDriverEarnings.driverEarnings.amount
+                totalEarnings = DriverBalance.totalEarnings.amount + creditDriverEarnings.driverEarnings.amount
+            }
+
+            emits DriverEarningsCredited {
+                driverId = DriverBalance.driverId
+                rideId = creditDriverEarnings.rideId
+                fareAmount = creditDriverEarnings.fareAmount
+                commissionDeducted = creditDriverEarnings.commissionAmount
+                driverEarnings = creditDriverEarnings.driverEarnings
+                newBalance = DriverBalance.availableBalance
+                creditedAt = now()
+            }
+        }
+
+        "Process weekly payout" on ProcessWeeklyPayout {
+            resolves DriverBalance from processWeeklyPayout.driverId
+
+            policy balanceExceedsPayoutMinimum(DriverBalance, processWeeklyPayout.minimumThreshold)
+
+            sets DriverBalance {
+                pendingBalance = DriverBalance.availableBalance
+                availableBalance = Money { amount = 0, currency = DriverBalance.availableBalance.currency }
+            }
+
+            BankTransferService.transferToBank(DriverBalance.bankAccount, DriverBalance.pendingBalance)
+
+            emits WeeklyPayoutInitiated {
+                driverId = DriverBalance.driverId
+                amount = DriverBalance.pendingBalance
+                initiatedAt = now()
+            }
+        }
+
+        "Complete payout" when BankTransferCompleted then CompletePayout {
+            resolves DriverBalance from completePayout.driverId
+
+            sets DriverBalance {
+                totalPayouts = DriverBalance.totalPayouts.amount + completePayout.transferredAmount.amount
+                pendingBalance = Money { amount = 0, currency = DriverBalance.pendingBalance.currency }
+                lastPayoutAt = now()
+            }
+
+            emits PayoutCompleted {
+                driverId = DriverBalance.driverId
+                amount = completePayout.transferredAmount
+                payoutType = weekly
+                completedAt = now()
+            }
+        }
+
+        "Process instant payout" on ProcessInstantPayout {
+            resolves DriverBalance from processInstantPayout.driverId
+
+            policy balanceExceedsPayoutMinimum(DriverBalance, processInstantPayout.minimumThreshold)
+
+            sets DriverBalance {
+                availableBalance = Money { amount = 0, currency = DriverBalance.availableBalance.currency }
+                totalPayouts = DriverBalance.totalPayouts.amount + DriverBalance.availableBalance.amount - processInstantPayout.instantPayoutFee.amount
+            }
+
+            BankTransferService.transferToBank(DriverBalance.bankAccount, DriverBalance.availableBalance - processInstantPayout.instantPayoutFee)
+
+            emits InstantPayoutProcessed {
+                driverId = DriverBalance.driverId
+                grossAmount = DriverBalance.availableBalance
+                fee = processInstantPayout.instantPayoutFee
+                netAmount = DriverBalance.availableBalance.amount - processInstantPayout.instantPayoutFee.amount
+                payoutType = instant
+                processedAt = now()
+            }
+        }
+
+        "Deduct driver balance for driver-fault refund" on DeductDriverBalance {
+            resolves DriverBalance from deductDriverBalance.driverId
+
+            policy hasSufficientBalance(DriverBalance, deductDriverBalance.amount)
+
+            sets DriverBalance {
+                availableBalance = DriverBalance.availableBalance.amount - deductDriverBalance.amount.amount
+                totalEarnings = DriverBalance.totalEarnings.amount - deductDriverBalance.amount.amount
+            }
+
+            emits DriverBalanceDeducted {
+                driverId = DriverBalance.driverId
+                rideId = deductDriverBalance.rideId
+                amount = deductDriverBalance.amount
+                reason = "driver-fault refund"
+                deductedAt = now()
+            }
+        }
+    }
+}
+
+// source: payment.model.md
+entity RefundRequest :: "A rider's request for a refund on a completed ride" {
+    identifier id : UUID
+    fields {
+        rideId : uuid immutable
+        riderId : uuid immutable
+        paymentId : uuid immutable
+        driverId : uuid immutable
+        requestedAmount : Money
+        approvedAmount : Money optional
+        status : RefundRequestStatus default("pending")
+        faultType : RefundFaultType optional
+        reason : string maxLength(500)
+        reviewerNotes : string optional maxLength(1000)
+        requestedAt : datetime immutable
+        reviewedAt : datetime optional
+        processedAt : datetime optional
+    }
+
+    policies {
+        refundMustBePending(refundRequest: RefundRequest) :: "Refund must be in pending status to begin review" {
+            refundRequest.status = pending
+        }
+        refundMustBeUnderReview(refundRequest: RefundRequest) :: "Refund must be under review to approve or reject" {
+            refundRequest.status = underReview
+        }
+        approvedAmountDoesNotExceedRequested(refundRequest: RefundRequest) :: "Approved amount must not exceed the requested refund" {
+            refundRequest.approvedAmount.amount <= refundRequest.requestedAmount.amount
+        }
+    }
+
+    operations {
+        "Request refund" on RequestRefund {
+            creates RefundRequest {
+                rideId = requestRefund.rideId
+                riderId = requestRefund.riderId
+                paymentId = requestRefund.paymentId
+                driverId = requestRefund.driverId
+                requestedAmount = requestRefund.requestedAmount
+                status = pending
+                reason = requestRefund.reason
+                requestedAt = now()
+            }
+
+            emits RefundRequested {
+                refundRequestId = RefundRequest.id
+                rideId = RefundRequest.rideId
+                riderId = RefundRequest.riderId
+                requestedAmount = RefundRequest.requestedAmount
+                requestedAt = RefundRequest.requestedAt
+            }
+        }
+
+        "Begin refund review" on BeginRefundReview {
+            resolves RefundRequest from beginRefundReview.refundRequestId
+
+            policy refundMustBePending(RefundRequest)
+
+            sets RefundRequest {
+                status = underReview
+            }
+
+            emits RefundReviewStarted {
+                refundRequestId = RefundRequest.id
+                startedAt = now()
+            }
+        }
+
+        "Approve refund" on ApproveRefund {
+            resolves RefundRequest from approveRefund.refundRequestId
+
+            policy refundMustBeUnderReview(RefundRequest)
+
+            sets RefundRequest {
+                status = approved
+                approvedAmount = approveRefund.approvedAmount
+                faultType = approveRefund.faultType
+                reviewerNotes = approveRefund.reviewerNotes
+                reviewedAt = now()
+            }
+
+            policy approvedAmountDoesNotExceedRequested(RefundRequest)
+
+            emits RefundApproved {
+                refundRequestId = RefundRequest.id
+                rideId = RefundRequest.rideId
+                riderId = RefundRequest.riderId
+                paymentId = RefundRequest.paymentId
+                approvedAmount = RefundRequest.approvedAmount
+                faultType = RefundRequest.faultType
+                approvedAt = RefundRequest.reviewedAt
+            }
+        }
+
+        "Reject refund" on RejectRefund {
+            resolves RefundRequest from rejectRefund.refundRequestId
+
+            policy refundMustBeUnderReview(RefundRequest)
+
+            sets RefundRequest {
+                status = rejected
+                reviewerNotes = rejectRefund.reviewerNotes
+                reviewedAt = now()
+            }
+
+            emits RefundRejected {
+                refundRequestId = RefundRequest.id
+                rideId = RefundRequest.rideId
+                riderId = RefundRequest.riderId
+                rejectedAt = RefundRequest.reviewedAt
+            }
+        }
+
+        "Execute approved refund" when RefundApproved then ExecuteRefund {
+            resolves RefundRequest from executeRefund.refundRequestId
+            resolves Payment from RefundRequest.paymentId
+
+            sets RefundRequest {
+                status = processed
+                processedAt = now()
+            }
+
+            // NOTE: determines partial vs full refund based on approvedAmount vs finalAmount
+            // NOTE: if faultType = driverFault, deducts from driver balance
+
+            emits RefundExecuted {
+                refundRequestId = RefundRequest.id
+                paymentId = RefundRequest.paymentId
+                amount = RefundRequest.approvedAmount
+                faultType = RefundRequest.faultType
+                processedAt = RefundRequest.processedAt
+            }
+        }
+    }
+
+    transitions {
+        [*] --> pending on "Request refund"
+        pending --> underReview on "Begin refund review"
+        underReview --> approved on "Approve refund"
+        underReview --> rejected on "Reject refund"
+        approved --> processed on "Execute approved refund"
+    }
+}
+
+// source: payment.model.md
+entity Receipt :: "A financial document generated after payment capture" {
+    identifier id : UUID
+    fields {
+        rideId : uuid immutable
+        riderId : uuid immutable
+        driverId : uuid immutable
+        paymentId : uuid immutable
+        fareBreakdown : FareBreakdown
+        routeSummary : string maxLength(2000)
+        driverName : string maxLength(200)
+        driverLicensePlate : string maxLength(20)
+        paymentMethodUsed : PaymentMethodInfo
+        originalTotal : Money
+        adjustedTotal : Money optional
+        refundAmount : Money optional
+        status : ReceiptStatus default("generated")
+        generatedAt : datetime immutable
+        correctedAt : datetime optional
+    }
+
+    invariants {
+        adjustedTotalConsistency :: "Adjusted total must equal original total minus refund amount" {
+            if adjustedTotal is defined and refundAmount is defined {
+                adjustedTotal.amount = originalTotal.amount - refundAmount.amount
+            }
+        }
+    }
+
+    operations {
+        "Generate ride receipt" when PaymentCaptured then GenerateReceipt {
+            creates Receipt {
+                rideId = generateReceipt.rideId
+                riderId = generateReceipt.riderId
+                driverId = generateReceipt.driverId
+                paymentId = generateReceipt.paymentId
+                fareBreakdown = generateReceipt.fareBreakdown
+                routeSummary = generateReceipt.routeSummary
+                driverName = generateReceipt.driverName
+                driverLicensePlate = generateReceipt.driverLicensePlate
+                paymentMethodUsed = generateReceipt.paymentMethodUsed
+                originalTotal = generateReceipt.fareBreakdown.total
+                status = generated
+                generatedAt = now()
+            }
+
+            // NOTE: receipt delivery to rider handled by Notification BC
+
+            emits ReceiptGenerated {
+                receiptId = Receipt.id
+                rideId = Receipt.rideId
+                riderId = Receipt.riderId
+                generatedAt = Receipt.generatedAt
+            }
+        }
+
+        "Correct receipt after refund" when RefundExecuted then CorrectReceipt {
+            resolves Receipt from correctReceipt.paymentId
+
+            sets Receipt {
+                status = corrected
+                refundAmount = correctReceipt.refundAmount
+                adjustedTotal = Receipt.originalTotal.amount - correctReceipt.refundAmount.amount
+                correctedAt = now()
+            }
+
+            // NOTE: corrected receipt delivery to rider handled by Notification BC
+
+            emits ReceiptCorrected {
+                receiptId = Receipt.id
+                rideId = Receipt.rideId
+                riderId = Receipt.riderId
+                originalTotal = Receipt.originalTotal
+                adjustedTotal = Receipt.adjustedTotal
+                refundAmount = Receipt.refundAmount
+                correctedAt = Receipt.correctedAt
+            }
+        }
+    }
+
+    transitions {
+        [*] --> generated on "Generate ride receipt"
+        generated --> corrected on "Correct receipt after refund"
+    }
+}
+
+// =============================================================================
+// File-level Policies
+// =============================================================================
+
+// source: payment.model.md
+// NOTE: AutoApplyPromotionalCredit — triggered by PaymentAuthorized, applies oldest active credit
+
+// source: payment.model.md
+// NOTE: RecordDebtOnPaymentFailure — triggered by PaymentFailed, notifies rider of outstanding debt
+
+// source: payment.model.md
+// NOTE: BlockNewRidesOnDebt — precondition on AuthorizePayment, rejects if outstanding debt > 0
+
+// source: payment.model.md
+// NOTE: AutoRefundOnSystemCancellation — triggered by RideCancelledBySystem, releases hold
+
+// source: payment.model.md
+// NOTE: CreditDriverAfterCapture — triggered by PaymentCaptured, computes and credits driver earnings
+
+// source: payment.model.md
+// NOTE: DeductDriverOnFaultRefund — triggered by RefundApproved where faultType = driverFault
+
+// source: payment.model.md
+// NOTE: GenerateReceiptAfterCapture — triggered by PaymentCaptured, creates receipt
+
+// source: payment.model.md
+// NOTE: CorrectReceiptAfterRefund — triggered by RefundExecuted, corrects receipt
+
+// source: payment.model.md
+// NOTE: RetryPaymentOnTransientFailure — triggered by PaymentRetryAttempted when retryCount < 3
+
+// source: payment.model.md
+// NOTE: FallbackOnRetryExhaustion — triggered by PaymentRetryExhausted, switches payment method
+
+// source: payment.model.md
+// NOTE: ExpirePromotionalCreditsOnSchedule — triggered by CreditExpiryReached temporal event
+
+// =============================================================================
+// Commands
+// =============================================================================
+
+// source: payment.model.md
+command AuthorizePayment {
+    fields {
+        rideId : uuid
+        riderId : uuid
+        estimatedAmount : Money
+    }
+}
+
+// source: payment.model.md
+command CapturePayment {
+    fields {
+        paymentId : uuid
+        finalAmount : Money
+        fareBreakdown : FareBreakdown
+    }
+}
+
+// source: payment.model.md
+command RetryPayment {
+    fields {
+        paymentId : uuid
+    }
+}
+
+// source: payment.model.md
+command FallbackPaymentMethod {
+    fields {
+        paymentId : uuid
+    }
+}
+
+// source: payment.model.md
+command RecordPaymentFailure {
+    fields {
+        paymentId : uuid
+        reason : string maxLength(500)
+    }
+}
+
+// source: payment.model.md
+command ReleasePaymentHold {
+    fields {
+        paymentId : uuid
+    }
+}
+
+// source: payment.model.md
+command ProcessPartialRefund {
+    fields {
+        paymentId : uuid
+        refundAmount : Money
+    }
+}
+
+// source: payment.model.md
+command ProcessFullRefund {
+    fields {
+        paymentId : uuid
+    }
+}
+
+// source: payment.model.md
+command AddPaymentMethod {
+    fields {
+        riderId : uuid
+        paymentMethod : PaymentMethodInfo
+    }
+}
+
+// source: payment.model.md
+command SettleDebt {
+    fields {
+        riderId : uuid
+        amount : Money
+    }
+}
+
+// source: payment.model.md
+command GrantPromotionalCredit {
+    fields {
+        riderId : uuid
+        amount : Money
+        reason : string maxLength(200)
+        expiresAt : datetime
+    }
+}
+
+// source: payment.model.md
+command ApplyPromotionalCredit {
+    fields {
+        creditId : uuid
+        rideId : uuid
+        appliedAmount : Money
+    }
+}
+
+// source: payment.model.md
+command ExpirePromotionalCredit {
+    fields {
+        creditId : uuid
+    }
+}
+
+// source: payment.model.md
+command VoidPromotionalCredit {
+    fields {
+        creditId : uuid
+    }
+}
+
+// source: payment.model.md
+command CreditDriverEarnings {
+    fields {
+        driverId : uuid
+        rideId : uuid
+        fareAmount : Money
+        commissionAmount : Money
+        driverEarnings : Money
+    }
+}
+
+// source: payment.model.md
+command ProcessWeeklyPayout {
+    fields {
+        driverId : uuid
+        minimumThreshold : Money
+    }
+}
+
+// source: payment.model.md
+command CompletePayout {
+    fields {
+        driverId : uuid
+        transferredAmount : Money
+    }
+}
+
+// source: payment.model.md
+command ProcessInstantPayout {
+    fields {
+        driverId : uuid
+        minimumThreshold : Money
+        instantPayoutFee : Money
+    }
+}
+
+// source: payment.model.md
+command DeductDriverBalance {
+    fields {
+        driverId : uuid
+        rideId : uuid
+        amount : Money
+    }
+}
+
+// source: payment.model.md
+command RequestRefund {
+    fields {
+        rideId : uuid
+        riderId : uuid
+        paymentId : uuid
+        driverId : uuid
+        requestedAmount : Money
+        reason : string maxLength(500)
+    }
+}
+
+// source: payment.model.md
+command BeginRefundReview {
+    fields {
+        refundRequestId : uuid
+    }
+}
+
+// source: payment.model.md
+command ApproveRefund {
+    fields {
+        refundRequestId : uuid
+        approvedAmount : Money
+        faultType : RefundFaultType
+        reviewerNotes : string optional maxLength(1000)
+    }
+}
+
+// source: payment.model.md
+command RejectRefund {
+    fields {
+        refundRequestId : uuid
+        reviewerNotes : string optional maxLength(1000)
+    }
+}
+
+// source: payment.model.md
+command ExecuteRefund {
+    fields {
+        refundRequestId : uuid
+    }
+}
+
+// source: payment.model.md
+command GenerateReceipt {
+    fields {
+        rideId : uuid
+        riderId : uuid
+        driverId : uuid
+        paymentId : uuid
+        fareBreakdown : FareBreakdown
+        routeSummary : string maxLength(2000)
+        driverName : string maxLength(200)
+        driverLicensePlate : string maxLength(20)
+        paymentMethodUsed : PaymentMethodInfo
+    }
+}
+
+// source: payment.model.md
+command CorrectReceipt {
+    fields {
+        paymentId : uuid
+        refundAmount : Money
+    }
+}
+
+// source: payment.model.md
+command ComputeFareEstimate {
+    fields {
+        pickupLocation : string
+        dropoffLocation : string
+        rideType : string
+        distanceKm : decimal min(0)
+        estimatedMinutes : decimal min(0)
+        fareParameters : FareParameters
+    }
+}
+
+// source: payment.model.md
+command ComputeFinalFare {
+    fields {
+        rideId : uuid
+        actualDistanceKm : decimal min(0)
+        actualMinutes : decimal min(0)
+        fareParameters : FareParameters
+        tolls : Money optional
+        promotionDiscount : Money optional
+    }
+}
+
+// source: payment.model.md
+command ComputeCancellationFee {
+    fields {
+        rideId : uuid
+        minutesSinceAssignment : decimal min(0)
+        cancellationPolicy : string
+    }
+}
+
+// =============================================================================
+// Events
+// =============================================================================
+
+// source: payment.model.md
+event PaymentAuthorized {
+    fields {
+        paymentId : uuid
+        rideId : uuid
+        riderId : uuid
+        amount : Money
+        authorizedAt : datetime
+    }
+}
+
+// source: payment.model.md
+event PaymentCaptured {
+    fields {
+        paymentId : uuid
+        rideId : uuid
+        riderId : uuid
+        amount : Money
+        fareBreakdown : FareBreakdown
+        capturedAt : datetime
+    }
+}
+
+// source: payment.model.md
+event PaymentRetryAttempted {
+    fields {
+        paymentId : uuid
+        retryCount : int
+        attemptedAt : datetime
+    }
+}
+
+// source: payment.model.md
+event PaymentRetryExhausted {
+    fields {
+        paymentId : uuid
+        totalRetries : int
+        exhaustedAt : datetime
+    }
+}
+
+// source: payment.model.md
+event PaymentMethodFallback {
+    fields {
+        paymentId : uuid
+        newPaymentMethodId : uuid
+        attemptedAt : datetime
+    }
+}
+
+// source: payment.model.md
+event AllPaymentMethodsExhausted {
+    fields {
+        paymentId : uuid
+        reason : string
+        exhaustedAt : datetime
+    }
+}
+
+// source: payment.model.md
+event PaymentFailed {
+    fields {
+        paymentId : uuid
+        rideId : uuid
+        riderId : uuid
+        amount : Money
+        reason : string
+        failedAt : datetime
+    }
+}
+
+// source: payment.model.md
+event PaymentHoldReleased {
+    fields {
+        paymentId : uuid
+        rideId : uuid
+        riderId : uuid
+        amount : Money
+        releasedAt : datetime
+    }
+}
+
+// source: payment.model.md
+event PartialRefundProcessed {
+    fields {
+        paymentId : uuid
+        rideId : uuid
+        riderId : uuid
+        refundAmount : Money
+        refundedAt : datetime
+    }
+}
+
+// source: payment.model.md
+event FullRefundProcessed {
+    fields {
+        paymentId : uuid
+        rideId : uuid
+        riderId : uuid
+        refundAmount : Money
+        refundedAt : datetime
+    }
+}
+
+// source: payment.model.md
+event PaymentMethodAdded {
+    fields {
+        riderId : uuid
+        paymentMethodId : uuid
+        addedAt : datetime
+    }
+}
+
+// source: payment.model.md
+event DebtSettled {
+    fields {
+        riderId : uuid
+        amount : Money
+        settledAt : datetime
+    }
+}
+
+// source: payment.model.md
+event PromotionalCreditGranted {
+    fields {
+        creditId : uuid
+        riderId : uuid
+        amount : Money
+        expiresAt : datetime
+        grantedAt : datetime
+    }
+}
+
+// source: payment.model.md
+event PromotionalCreditApplied {
+    fields {
+        creditId : uuid
+        riderId : uuid
+        appliedAmount : Money
+        remainingAmount : Money
+        rideId : uuid
+        appliedAt : datetime
+    }
+}
+
+// source: payment.model.md
+event PromotionalCreditExpired {
+    fields {
+        creditId : uuid
+        riderId : uuid
+        amount : Money
+        expiredAt : datetime
+    }
+}
+
+// source: payment.model.md
+event PromotionalCreditVoided {
+    fields {
+        creditId : uuid
+        riderId : uuid
+        amount : Money
+        voidedAt : datetime
+    }
+}
+
+// source: payment.model.md
+event DriverEarningsCredited {
+    fields {
+        driverId : uuid
+        rideId : uuid
+        fareAmount : Money
+        commissionDeducted : Money
+        driverEarnings : Money
+        newBalance : Money
+        creditedAt : datetime
+    }
+}
+
+// source: payment.model.md
+event WeeklyPayoutInitiated {
+    fields {
+        driverId : uuid
+        amount : Money
+        initiatedAt : datetime
+    }
+}
+
+// source: payment.model.md
+event PayoutCompleted {
+    fields {
+        driverId : uuid
+        amount : Money
+        payoutType : PayoutType
+        completedAt : datetime
+    }
+}
+
+// source: payment.model.md
+event InstantPayoutProcessed {
+    fields {
+        driverId : uuid
+        grossAmount : Money
+        fee : Money
+        netAmount : Money
+        payoutType : PayoutType
+        processedAt : datetime
+    }
+}
+
+// source: payment.model.md
+event BankTransferCompleted {
+    fields {
+        driverId : uuid
+        transferredAmount : Money
+        completedAt : datetime
+    }
+}
+
+// source: payment.model.md
+event DriverBalanceDeducted {
+    fields {
+        driverId : uuid
+        rideId : uuid
+        amount : Money
+        reason : string
+        deductedAt : datetime
+    }
+}
+
+// source: payment.model.md
+event RefundRequested {
+    fields {
+        refundRequestId : uuid
+        rideId : uuid
+        riderId : uuid
+        requestedAmount : Money
+        requestedAt : datetime
+    }
+}
+
+// source: payment.model.md
+event RefundReviewStarted {
+    fields {
+        refundRequestId : uuid
+        startedAt : datetime
+    }
+}
+
+// source: payment.model.md
+event RefundApproved {
+    fields {
+        refundRequestId : uuid
+        rideId : uuid
+        riderId : uuid
+        paymentId : uuid
+        approvedAmount : Money
+        faultType : RefundFaultType
+        approvedAt : datetime
+    }
+}
+
+// source: payment.model.md
+event RefundRejected {
+    fields {
+        refundRequestId : uuid
+        rideId : uuid
+        riderId : uuid
+        rejectedAt : datetime
+    }
+}
+
+// source: payment.model.md
+event RefundExecuted {
+    fields {
+        refundRequestId : uuid
+        paymentId : uuid
+        amount : Money
+        faultType : RefundFaultType
+        processedAt : datetime
+    }
+}
+
+// source: payment.model.md
+event ReceiptGenerated {
+    fields {
+        receiptId : uuid
+        rideId : uuid
+        riderId : uuid
+        generatedAt : datetime
+    }
+}
+
+// source: payment.model.md
+event ReceiptCorrected {
+    fields {
+        receiptId : uuid
+        rideId : uuid
+        riderId : uuid
+        originalTotal : Money
+        adjustedTotal : Money
+        refundAmount : Money
+        correctedAt : datetime
+    }
+}
+
+// source: payment.model.md
+event RideCancelledBySystem {
+    fields {
+        rideId : uuid
+        paymentId : uuid
+        reason : string
+        cancelledAt : datetime
+    }
+}
+
+// =============================================================================
+// Temporal Events
+// =============================================================================
+
+// source: payment.model.md
+temporal event CreditExpiryReached {
+    trigger : absolute
+    instant : credit.expiresAt
+    guard   : credit.status = active
+}
+
+// source: payment.model.md
+temporal event WeeklyPayoutCycleDue {
+    trigger  : recurring
+    schedule : "0 0 * * MON"
+    guard    : true
+}
+
+// source: payment.model.md
+policy initiateWeeklyPayouts {
+    trigger : WeeklyPayoutCycleDue
+    guard   : true
+    effect  : ProcessWeeklyPayout { for each DriverBalance where balance > minimumPayoutThreshold }
+    :: "Weekly payout cycle — transfer accumulated balances to drivers"
+}

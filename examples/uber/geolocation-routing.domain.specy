@@ -1,0 +1,501 @@
+module GeolocationRouting
+
+// =============================================================================
+// Enums
+// =============================================================================
+
+// source: geolocation-routing.model.md
+enum SurgeZoneStatus {
+    inactive
+    active
+}
+
+// source: geolocation-routing.model.md
+enum DriverAvailability {
+    online
+    offline
+    onTrip
+}
+
+// =============================================================================
+// Value Objects
+// =============================================================================
+
+// source: geolocation-routing.model.md
+value GeoCoordinate :: "A geographic point on the Earth's surface" {
+    fields {
+        latitude : decimal min(-90) max(90)
+        longitude : decimal min(-180) max(180)
+    }
+}
+
+// source: geolocation-routing.model.md
+value BoundingBox :: "A rectangular geographic area defined by two corners" {
+    fields {
+        southWest : GeoCoordinate
+        northEast : GeoCoordinate
+    }
+}
+
+// source: geolocation-routing.model.md
+value Polyline :: "An encoded sequence of coordinates representing a route path" {
+    fields {
+        encodedPath : string
+        coordinates : list<GeoCoordinate>
+    }
+}
+
+// source: geolocation-routing.model.md
+value Distance :: "A physical distance measurement" {
+    fields {
+        meters : decimal min(0)
+    }
+}
+
+// source: geolocation-routing.model.md
+value Duration :: "A time duration measurement" {
+    fields {
+        seconds : int min(0)
+    }
+}
+
+// source: geolocation-routing.model.md
+value ETA :: "Estimated time of arrival between two points" {
+    fields {
+        origin : GeoCoordinate
+        destination : GeoCoordinate
+        duration : Duration
+        computedAt : datetime
+    }
+}
+
+// source: geolocation-routing.model.md
+value SurgeMultiplier :: "A pricing multiplier applied during high-demand periods" {
+    fields {
+        value : decimal min(1.0) max(5.0)
+    }
+
+    invariants {
+        surgeMultiplierCap :: "Surge multiplier must never exceed 5.0x" {
+            value <= 5.0
+        }
+    }
+}
+
+// source: geolocation-routing.model.md
+value Route :: "A computed route between two points with metadata" {
+    fields {
+        origin : GeoCoordinate
+        destination : GeoCoordinate
+        polyline : Polyline
+        distance : Distance
+        duration : Duration
+        computedAt : datetime
+    }
+}
+
+// source: geolocation-routing.model.md
+value LocationAccuracy :: "Horizontal accuracy of a GPS fix in meters" {
+    fields {
+        horizontalAccuracyMeters : decimal min(0)
+    }
+}
+
+// =============================================================================
+// Domain Services
+// =============================================================================
+
+// source: geolocation-routing.model.md
+service ProximityService :: "Spatial queries over real-time driver positions" {
+    operations {
+        findNearbyDrivers(pickup: GeoCoordinate, radiusMeters: decimal, maxResults: int) : list<DriverPosition> :: "Find online drivers within radius, ordered by distance" {
+            // NOTE: uses spatial index over DriverPosition records
+            // Filters: availability = online, position within radius
+            // Orders results by ascending distance from pickup
+            returns list<DriverPosition>
+        }
+    }
+}
+
+// source: geolocation-routing.model.md
+service RoutingService :: "Route and ETA computation using traffic-aware algorithms" {
+    operations {
+        computeETA(origin: GeoCoordinate, destination: GeoCoordinate) : ETA :: "Compute estimated travel time considering current traffic" {
+            TrafficDataProvider.getCurrentTraffic(origin, destination)
+            MappingProvider.computeRoute(origin, destination)
+            returns ETA
+        }
+
+        computeRoute(origin: GeoCoordinate, destination: GeoCoordinate) : Route :: "Compute optimal route with polyline, distance, and duration" {
+            TrafficDataProvider.getCurrentTraffic(origin, destination)
+            MappingProvider.computeRoute(origin, destination)
+            returns Route
+        }
+
+        recalculateRoute(rideId: uuid, currentPosition: GeoCoordinate, destination: GeoCoordinate) : Route :: "Recompute route when traffic conditions change significantly" {
+            TrafficDataProvider.getCurrentTraffic(currentPosition, destination)
+            MappingProvider.computeRoute(currentPosition, destination)
+            returns Route
+        }
+    }
+}
+
+// source: geolocation-routing.model.md
+service SurgeDetectionService :: "Monitors demand/supply ratios and triggers surge zone activation" {
+    operations {
+        evaluateZone(zoneId: uuid, requestCount: int, availableDriverCount: int) : void :: "Evaluate demand/supply ratio and activate or deactivate surge" {
+            resolves SurgeZone from zoneId
+            // NOTE: computes demandSupplyRatio = requestCount / availableDriverCount
+            // If ratio > threshold and zone inactive → SurgeZone.ActivateSurge
+            // If ratio <= threshold and zone active → SurgeZone.DeactivateSurge
+        }
+
+        computeMultiplier(demandSupplyRatio: decimal) : SurgeMultiplier :: "Derive surge multiplier from demand/supply ratio, capped at 5.0x" {
+            // NOTE: multiplier = min(demandSupplyRatio, 5.0)
+            returns SurgeMultiplier
+        }
+    }
+}
+
+// =============================================================================
+// Infrastructure Services
+// =============================================================================
+
+// source: geolocation-routing.model.md
+// NOTE: TrafficDataProvider is an infrastructure service wrapping an external traffic API
+service TrafficDataProvider :: "External traffic data provider — infrastructure boundary" {
+    operations {
+        getCurrentTraffic(origin: GeoCoordinate, destination: GeoCoordinate) : void :: "Fetch real-time traffic conditions between two points" {
+            // NOTE: infrastructure — delegates to external traffic API (e.g., Google Maps, HERE, Mapbox)
+        }
+    }
+}
+
+// source: geolocation-routing.model.md
+// NOTE: MappingProvider is an infrastructure service wrapping an external maps/geocoding API
+service MappingProvider :: "External mapping and geocoding provider — infrastructure boundary" {
+    operations {
+        computeRoute(origin: GeoCoordinate, destination: GeoCoordinate) : Route :: "Compute route via external mapping API" {
+            // NOTE: infrastructure — delegates to external maps API
+            returns Route
+        }
+    }
+}
+
+// =============================================================================
+// File-level Policies (cross-entity)
+// =============================================================================
+
+// source: geolocation-routing.model.md
+policy surgeConfirmationRequired(zone: SurgeZone) :: "Rider must see surge multiplier and confirm before ride request proceeds" {
+    if zone.status = active {
+        zone.currentMultiplier is defined
+    }
+}
+
+// =============================================================================
+// Entities
+// =============================================================================
+
+// source: geolocation-routing.model.md
+entity DriverPosition :: "Real-time geographic position of a driver — continuously updated projection" {
+    identifier driverId : UUID
+    fields {
+        position : GeoCoordinate
+        accuracy : LocationAccuracy
+        heading : decimal optional min(0) max(360)
+        speed : decimal optional min(0)
+        availability : DriverAvailability default("online")
+        recordedAt : datetime
+        receivedAt : datetime
+    }
+
+    policies {
+        locationMustBeFresh(recordedAt: datetime) :: "Discard location updates older than 30 seconds" {
+            now() - recordedAt <= 30s
+        }
+
+        locationMustBeAccurate(accuracy: LocationAccuracy) :: "Discard location updates with horizontal accuracy worse than 100 meters" {
+            accuracy.horizontalAccuracyMeters <= 100
+        }
+    }
+
+    invariants {
+        positionHasTimestamp :: "Every driver position must have a recording timestamp" {
+            recordedAt is defined
+        }
+    }
+
+    operations {
+        "Update driver location" on UpdateDriverLocation {
+            policy locationMustBeFresh(updateDriverLocation.recordedAt)
+            policy locationMustBeAccurate(updateDriverLocation.accuracy)
+
+            sets DriverPosition {
+                position = updateDriverLocation.position
+                accuracy = updateDriverLocation.accuracy
+                heading = updateDriverLocation.heading
+                speed = updateDriverLocation.speed
+                recordedAt = updateDriverLocation.recordedAt
+                receivedAt = now()
+            }
+
+            emits DriverLocationUpdated {
+                driverId = DriverPosition.driverId
+                position = DriverPosition.position
+                accuracy = DriverPosition.accuracy
+                recordedAt = DriverPosition.recordedAt
+            }
+        }
+
+        "Set driver availability" on SetDriverAvailability {
+            sets DriverPosition {
+                availability = setDriverAvailability.availability
+            }
+
+            emits DriverAvailabilityChanged {
+                driverId = DriverPosition.driverId
+                availability = DriverPosition.availability
+                changedAt = now()
+            }
+        }
+    }
+}
+
+// source: geolocation-routing.model.md
+entity SurgeZone :: "A geographic zone where demand/supply imbalance triggers surge pricing" {
+    identifier zoneId : UUID
+    fields {
+        name : string maxLength(200)
+        boundary : BoundingBox
+        status : SurgeZoneStatus default("inactive")
+        currentMultiplier : SurgeMultiplier optional
+        demandSupplyRatio : decimal optional min(0)
+        surgeThreshold : decimal min(0) default("2.0")
+        activatedAt : datetime optional
+        deactivatedAt : datetime optional
+    }
+
+    policies {
+        ratioExceedsThreshold(zone: SurgeZone) :: "Demand/supply ratio must exceed surge threshold to activate" {
+            zone.demandSupplyRatio > zone.surgeThreshold
+        }
+
+        ratioBelowThreshold(zone: SurgeZone) :: "Demand/supply ratio must be below surge threshold to deactivate" {
+            zone.demandSupplyRatio <= zone.surgeThreshold
+        }
+
+        multiplierWithinCap(multiplier: SurgeMultiplier) :: "Surge multiplier must not exceed the maximum of 5.0x" {
+            multiplier.value <= 5.0
+        }
+
+        zoneMustBeInactive(zone: SurgeZone) :: "Zone must be inactive to activate surge" {
+            zone.status = inactive
+        }
+
+        zoneMustBeActive(zone: SurgeZone) :: "Zone must be active to deactivate surge" {
+            zone.status = active
+        }
+    }
+
+    invariants {
+        activeZoneHasMultiplier :: "An active surge zone must have a multiplier" {
+            if status = active {
+                currentMultiplier is defined
+            }
+        }
+
+        multiplierNeverExceedsCap :: "Surge multiplier must never exceed 5.0x" {
+            if currentMultiplier is defined {
+                currentMultiplier.value <= 5.0
+            }
+        }
+    }
+
+    operations {
+        "Activate surge in zone" on ActivateSurge {
+            resolves SurgeZone from activateSurge.zoneId
+
+            policy zoneMustBeInactive(SurgeZone)
+            policy ratioExceedsThreshold(SurgeZone)
+            policy multiplierWithinCap(activateSurge.multiplier)
+
+            sets SurgeZone {
+                status = active
+                currentMultiplier = activateSurge.multiplier
+                demandSupplyRatio = activateSurge.demandSupplyRatio
+                activatedAt = now()
+            }
+
+            emits SurgeActivated {
+                zoneId = SurgeZone.zoneId
+                zoneName = SurgeZone.name
+                multiplier = SurgeZone.currentMultiplier
+                demandSupplyRatio = SurgeZone.demandSupplyRatio
+                activatedAt = SurgeZone.activatedAt
+            }
+        }
+
+        "Deactivate surge in zone" on DeactivateSurge {
+            resolves SurgeZone from deactivateSurge.zoneId
+
+            policy zoneMustBeActive(SurgeZone)
+            policy ratioBelowThreshold(SurgeZone)
+
+            sets SurgeZone {
+                status = inactive
+                currentMultiplier = deactivateSurge.multiplier
+                demandSupplyRatio = deactivateSurge.demandSupplyRatio
+                deactivatedAt = now()
+            }
+
+            emits SurgeDeactivated {
+                zoneId = SurgeZone.zoneId
+                zoneName = SurgeZone.name
+                previousMultiplier = deactivateSurge.previousMultiplier
+                deactivatedAt = SurgeZone.deactivatedAt
+            }
+        }
+
+        "Update surge multiplier" on UpdateSurgeMultiplier {
+            resolves SurgeZone from updateSurgeMultiplier.zoneId
+
+            policy zoneMustBeActive(SurgeZone)
+            policy multiplierWithinCap(updateSurgeMultiplier.multiplier)
+
+            sets SurgeZone {
+                currentMultiplier = updateSurgeMultiplier.multiplier
+                demandSupplyRatio = updateSurgeMultiplier.demandSupplyRatio
+            }
+
+            emits SurgeMultiplierUpdated {
+                zoneId = SurgeZone.zoneId
+                previousMultiplier = updateSurgeMultiplier.previousMultiplier
+                newMultiplier = SurgeZone.currentMultiplier
+                updatedAt = now()
+            }
+        }
+    }
+
+    transitions {
+        [*] --> inactive
+        inactive --> active on "Activate surge in zone"
+        active --> inactive on "Deactivate surge in zone"
+    }
+}
+
+// =============================================================================
+// Commands
+// =============================================================================
+
+// source: geolocation-routing.model.md
+command UpdateDriverLocation {
+    fields {
+        driverId : uuid
+        position : GeoCoordinate
+        accuracy : LocationAccuracy
+        heading : decimal optional
+        speed : decimal optional
+        recordedAt : datetime
+    }
+}
+
+// source: geolocation-routing.model.md
+command SetDriverAvailability {
+    fields {
+        driverId : uuid
+        availability : DriverAvailability
+    }
+}
+
+// source: geolocation-routing.model.md
+command ActivateSurge {
+    fields {
+        zoneId : uuid
+        multiplier : SurgeMultiplier
+        demandSupplyRatio : decimal
+    }
+}
+
+// source: geolocation-routing.model.md
+command DeactivateSurge {
+    fields {
+        zoneId : uuid
+        multiplier : SurgeMultiplier
+        demandSupplyRatio : decimal
+        previousMultiplier : SurgeMultiplier
+    }
+}
+
+// source: geolocation-routing.model.md
+command UpdateSurgeMultiplier {
+    fields {
+        zoneId : uuid
+        multiplier : SurgeMultiplier
+        demandSupplyRatio : decimal
+        previousMultiplier : SurgeMultiplier
+    }
+}
+
+// =============================================================================
+// Events
+// =============================================================================
+
+// source: geolocation-routing.model.md
+event DriverLocationUpdated {
+    fields {
+        driverId : uuid
+        position : GeoCoordinate
+        accuracy : LocationAccuracy
+        recordedAt : datetime
+    }
+}
+
+// source: geolocation-routing.model.md
+event DriverAvailabilityChanged {
+    fields {
+        driverId : uuid
+        availability : DriverAvailability
+        changedAt : datetime
+    }
+}
+
+// source: geolocation-routing.model.md
+event SurgeActivated {
+    fields {
+        zoneId : uuid
+        zoneName : string
+        multiplier : SurgeMultiplier
+        demandSupplyRatio : decimal
+        activatedAt : datetime
+    }
+}
+
+// source: geolocation-routing.model.md
+event SurgeDeactivated {
+    fields {
+        zoneId : uuid
+        zoneName : string
+        previousMultiplier : SurgeMultiplier
+        deactivatedAt : datetime
+    }
+}
+
+// source: geolocation-routing.model.md
+event SurgeMultiplierUpdated {
+    fields {
+        zoneId : uuid
+        previousMultiplier : SurgeMultiplier
+        newMultiplier : SurgeMultiplier
+        updatedAt : datetime
+    }
+}
+
+// source: geolocation-routing.model.md
+event RouteRecalculated {
+    fields {
+        rideId : uuid
+        newRoute : Route
+        recalculatedAt : datetime
+    }
+}
