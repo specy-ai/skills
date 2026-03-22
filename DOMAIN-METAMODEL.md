@@ -6,14 +6,14 @@
   - [Convention](#convention)
   - [Organization](#organization)
   - [Bounded Context](#bounded-context)
-  - [Context map patterns](#context-map-patterns)
-    - [Upstream patterns](#upstream-patterns)
+    - [Context map patterns](#context-map-patterns)
+      - [Upstream patterns](#upstream-patterns)
       - [Open Host Service (OHS)](#open-host-service-ohs)
-    - [Downstream patterns](#downstream-patterns)
+      - [Downstream patterns](#downstream-patterns)
       - [Customer / Supplier (C/S)](#customer--supplier-cs)
       - [Conformist (Conf)](#conformist-conf)
       - [Anti-Corruption Layer (ACL)](#anti-corruption-layer-acl)
-    - [Symmetric patterns](#symmetric-patterns)
+      - [Symmetric patterns](#symmetric-patterns)
       - [Shared Kernel (SK)](#shared-kernel-sk)
       - [Published Language (PL)](#published-language-pl)
       - [Partnership (P)](#partnership-p)
@@ -267,7 +267,7 @@ Relations:
 
 A domain concept with a fixed identity and a lifecycle. An entity changes through time; its identity stays the same. Two entities are equal if and only if their identities are equal.
 
-**Structure**: An entity holds fields composed of values and references to other entities. A state — often named with a past participle — is the set of attribute values the entity holds at a given point in its lifecycle.
+**Structure**: An entity holds fields. Each field is typed as a primitive type (String, Integer, Boolean, Float, Date, DateTime, …), a value type, or a reference to another entity. A value type used as a field type is embedded — it is owned by the entity instance and has no independent identity. The same value type definition can be embedded in many different entities. The entity's state — often named with a past participle — is the complete set of its field values (primitives and embedded value types) at a given point in its lifecycle.
 
 **Behavior**: An entity owns operations, named with verbs. Each operation takes the entity as its first explicit argument and returns the entity in its next state. An entity may relate to other entities.
 
@@ -427,12 +427,15 @@ Relations:
 
 An immutable domain concept defined entirely by its attributes. Two values are equal if and only if all their attributes are equal.
 
-A value measures, quantifies, or describes a domain thing. Values may be ordered. Values compose — a value can contain other values. 
+A value measures, quantifies, or describes a domain thing. Values may be ordered. Values compose — a value can contain other values.
 Values may be ordered and has constraints enforced at creation with a "transactional" constructor (exist if fields are valid, otherwise creation is impossible).
-A value has fields and operations. Operations on a value return a new value.
+A value has fields (typed as primitive types or other value types) and operations. Operations on a value return a new value.
+
+A value type can be embedded in one or more entities as a field type. When embedded, the value type instance is owned by the entity — it has no independent identity or lifecycle. The same value type definition may appear as a field in many different entities: for example, an `Address` value type can be embedded in both a `Customer` entity and a `Warehouse` entity.
 
 Relations:
 - 0..n "composes" relation with other value types (a value can contain other values)
+- 0..n "embedded in" relation with entities (the entities that use this value type as a field type)
 - 0..n "has" relation with operations (behavior on the value; operations return new values)
 
 
