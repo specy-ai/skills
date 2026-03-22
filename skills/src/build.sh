@@ -140,6 +140,8 @@ build_skill distill
 build_skill dialogue
 build_skill spec
 build_skill distill-v2
+build_skill dialogue-v2
+build_skill spec-v2
 copy_runtime_files
 
 echo "Done."

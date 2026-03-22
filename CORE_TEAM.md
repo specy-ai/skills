@@ -78,6 +78,10 @@ Creative counterweight. Asks if the proposal reveals a deeper structural issue. 
 **Watches for:** incremental patches that accumulate incoherence, historical-accident constructs, missed simplification opportunities.
 **Blind spot:** redesign proposals carry high disruption cost. The Provocateur proposes, the panel decides.
 
+## Construct legitimacy criteria
+
+When debating the introduction of a new construct, panellists must evaluate it against the legitimacy grid defined in [`CONSTRUCT_CRITERIA.md`](CONSTRUCT_CRITERIA.md). The grid distinguishes eliminatory axes (failure = rejection) from discriminating axes (failure = strong signal). Each panellist focuses on the axes mapped to their perspective.
+
 ## Debate protocol
 
 Every debate follows six stages. All eight perspectives must speak on every item.
