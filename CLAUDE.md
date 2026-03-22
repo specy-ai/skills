@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Project Is
 
-Specy is a DDD toolkit providing AI skills (`/distill`, `/dialogue`, `/spec`, `/distill-v2`, `/dialogue-v2`, `/spec-v2`) that operate on a three-file DSL (`.struct`, `.flow`, `.spec`) or the unified v2 format (`.domain.specy`). Skills run as slash commands inside AI coding assistants (Claude Code, GitHub Copilot, Vibe).
+Specy is a DDD toolkit providing AI skills (`/distill`, `/dialogue`, `/spec`) that operate on the unified `.domain.specy` DSL format. Skills run as slash commands inside AI coding assistants (Claude Code, GitHub Copilot, Vibe).
 
 ## Build
 
@@ -36,9 +36,9 @@ skills/src/{skill}/main.md  →  build.sh  →  skills/{skill}/SKILL.md
 
 ### Key directories
 
-- `skills/src/grammars/` — EBNF definitions for `.struct`, `.flow`, `.spec` syntax
-- `skills/src/examples/` — Canonical Orders domain examples (referenced by grammars)
-- `skills/src/distill/constructs/` — Per-construct extraction rules (interaction, service, repository, policy, invariant)
+- `skills/src/grammars/` — EBNF definition for `.domain.specy` syntax (`specy.ebnf`)
+- `skills/src/examples/` — Canonical Orders domain example (`orders.domain.specy`)
+- `skills/src/distill/constructs/` — Construct extraction rules (entity, value, command, event, operation, service, policy, invariant)
 - `skills/src/distill/heuristics/` — Stack-specific extraction rules (java-spring, typescript-nestjs, clojure). Generic heuristics are inlined at build; stack-specific ones are loaded at runtime on demand
 - `proposals/` — Grammar evolution proposals and gap backlog
 
@@ -46,19 +46,16 @@ skills/src/{skill}/main.md  →  build.sh  →  skills/{skill}/SKILL.md
 
 Grammars, canonical examples, construct rules, and generic heuristics are **inlined** into `SKILL.md` at build time. Stack-specific heuristics stay as **separate files** loaded on demand at runtime (to avoid bloating the initial skill load).
 
-## The Three Skills
+## The Skills
 
-- **`/distill`** — Reverse-engineers source code into `.struct` and `.flow` files. 4-phase workflow (recon → struct → flow → cross-validation). Uses an internal Archi+PO deliberation panel for ambiguous cases.
-- **`/dialogue`** — Interactive DDD facilitator. Scans block headers first, loads full content on demand. Four modes: Explorer, Questionner, Confronter, Compléter.
-- **`/spec`** — Formalizes business specifications against existing models. 5-phase workflow producing `.spec` files.
-- **`/distill-v2`** — Reverse-engineers source code into v2 `.domain.specy` files. 3-phase workflow (recon → extraction → cross-validation) with module dependency graph and layer-by-layer extraction.
-- **`/dialogue-v2`** — Interactive DDD facilitator for v2 `.domain.specy` models. Same 4-phase conversation model as v1 (scan, load-on-demand, tests, follow-ups) adapted to the unified format with transversal navigation.
-- **`/spec-v2`** — Formalizes business specifications against v2 `.domain.specy` models. 5-phase workflow (decompose → anchor → confront → propose → confirm) with dotPath modify, semi-automatic impact analysis, and verify mode for spec lifecycle tracking.
+- **`/distill`** — Reverse-engineers source code into `.domain.specy` files. 3-phase workflow (recon → extraction → cross-validation) with module dependency graph and layer-by-layer extraction.
+- **`/dialogue`** — Interactive DDD facilitator for `.domain.specy` models. 4-phase conversation model (scan, load-on-demand, tests, follow-ups) with transversal navigation.
+- **`/spec`** — Formalizes business specifications against existing `.domain.specy` models. 5-phase workflow (decompose → anchor → confront → propose → confirm) with dotPath modify, semi-automatic impact analysis, and verify mode for spec lifecycle tracking.
 
 ## DSL Conventions
 
 - Type names: `PascalCase`. Field names and enum values: `camelCase` (convert UPPER_SNAKE_CASE from source)
-- Interaction names: string literals in business language, not identifiers
+- Operation labels: string literals in business language, not identifiers
 - Every definition must have a `// source: path/to/file.ext` comment for traceability
 - `// UNCLEAR:` — grammar genuinely cannot express the condition (business-critical)
 - `// NOTE:` — infrastructure concern omitted or gap flagged
@@ -75,7 +72,7 @@ Known limitations are tracked in `proposals/grammar-gaps-backlog.md` with severi
 
 ## Analyzing Specy Artifacts
 
-When the user asks to analyze Specy artifacts (`.struct`, `.flow`, `.spec`, `gaps.report`, `.meta.json`):
+When the user asks to analyze Specy artifacts (`.domain.specy`, `.spec`, `gaps.report`, `.meta.json`):
 
 1. **Read all files** in the target `specy/` directory
 2. **Produce the analysis** — cover: extraction statistics, model quality (well-modeled parts, suspicious types, missing fields), UNCLEAR markers, unresolved dot-paths, and actionable recommendations

@@ -25,11 +25,11 @@ Production code establishes **what exists** — the implementation. Test code es
 
 ### Grey-zone heuristic
 
-If the result affects an entity field via `sets` or conditions the flow via `fails`, it is domain. Otherwise it is likely infrastructure.
+If the result affects an entity field via `sets` or is enforced as a policy, it is domain. Otherwise it is likely infrastructure.
 
 ### Separate the authorization mechanism from the protected action
 
-A role check (`user.isAdmin`, `requirePermission`) is an **authorization mechanism** — infrastructure. But the action it protects (freeze a user, delete content, manage tokens) may be a **domain operation** that changes entity state. Evaluate the action independently of its guard: if the action passes Test 2, model the interaction; annotate the role check with `// UNCLEAR: admin role authorization`.
+A role check (`user.isAdmin`, `requirePermission`) is an **authorization mechanism** — infrastructure. But the action it protects (freeze a user, delete content, manage tokens) may be a **domain operation** that changes entity state. Evaluate the action independently of its guard: if the action passes Test 2, model the operation; annotate the role check with `// UNCLEAR: admin role authorization`.
 
 ## Test 3 — "Is it faithful?"
 
@@ -59,9 +59,8 @@ A role check (`user.isAdmin`, `requirePermission`) is an **authorization mechani
 | Fixed set of named constants | `enum` |
 | Input DTO triggering a write | `command` |
 | Record of something that happened | `event` |
-| Stateless class with business logic | `service` (in `.flow`) |
-| Persistence interface for aggregate root | `repository` (in `.flow`) |
-| Handler for a command → write operation | `interaction` (command-triggered) |
-| Handler for an event → side effects | `interaction` (event-triggered) |
-| Precondition that must hold before one or more interactions execute | `policy` (with `on "interaction"`) |
-| Property always true after any successful mutation of an entity | `invariant` (with `on Entity` — entities only, never commands/events/values) |
+| Stateless class with business logic | `service` (in `.domain.specy`) |
+| Handler for a command → write operation | `operation` (command-triggered, inside entity) |
+| Handler for an event → side effects | `operation` (event-triggered, inside entity) |
+| Precondition that must hold before one or more operations execute | `policy` (file-level or entity-scoped, with params) |
+| Property always true after any successful mutation of an entity | `invariant` (entity-scoped or value-scoped, never commands/events) |

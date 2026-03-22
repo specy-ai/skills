@@ -106,29 +106,13 @@ copy_runtime_files() {
 
   echo "  distill/heuristics/: 3 files copied"
 
-  # Copy grammars for runtime loading
+  # Copy grammar for runtime loading
   local distill_grammars="$SKILLS_DIR/distill/grammars"
   mkdir -p "$distill_grammars"
 
-  for f in struct.ebnf flow.ebnf; do
-    cp "$SCRIPT_DIR/grammars/$f" "$distill_grammars/$f"
-  done
+  cp "$SCRIPT_DIR/grammars/specy.ebnf" "$distill_grammars/specy.ebnf"
 
-  echo "  distill/grammars/: 2 files copied"
-
-  # distill-v2: copy stack-specific heuristics (reuse v1 for now)
-  local distill_v2_heuristics="$SKILLS_DIR/distill-v2/heuristics"
-  mkdir -p "$distill_v2_heuristics"
-  for f in java-spring.md typescript-nestjs.md clojure.md; do
-    cp "$SCRIPT_DIR/distill/heuristics/$f" "$distill_v2_heuristics/$f"
-  done
-  echo "  distill-v2/heuristics/: 3 files copied"
-
-  # distill-v2: copy v2 grammar for runtime loading
-  local distill_v2_grammars="$SKILLS_DIR/distill-v2/grammars"
-  mkdir -p "$distill_v2_grammars"
-  cp "$SCRIPT_DIR/examples/v2/specy.ebnf" "$distill_v2_grammars/specy.ebnf"
-  echo "  distill-v2/grammars/: 1 file copied"
+  echo "  distill/grammars/: 1 file copied"
 }
 
 # -----------------------------------------------------------------------------
@@ -139,9 +123,6 @@ echo "Building skills..."
 build_skill distill
 build_skill dialogue
 build_skill spec
-build_skill distill-v2
-build_skill dialogue-v2
-build_skill spec-v2
 copy_runtime_files
 
 echo "Done."

@@ -1,4 +1,4 @@
-# Specy v2 Construct Reference
+# Specy Construct Reference
 
 ## Structural constructs
 
@@ -39,7 +39,7 @@ entity Name :: "justification" {
 
 | Rule | Detail |
 |------|--------|
-| Identity | Must have an `identifier` declaration (e.g., `identifier id : UUID`). Replaces the v1 `id : uuid unique immutable` convention. |
+| Identity | Must have an `identifier` declaration (e.g., `identifier id : UUID`). |
 | Justification | Optional `:: "justification"` after the entity name describes the entity's purpose. |
 | Fields | Wrapped in a `fields { }` block. Apply domain constraints directly on fields (`min`, `max`, `optional`, `default`, etc.). |
 | References | Declared in a separate `references { }` block with explicit cardinality (`1..1`, `1..N`). |
@@ -78,7 +78,7 @@ entity Order :: "A customer order" {
 
 ### Value
 
-A `value` is an immutable object defined entirely by its attributes — it has no identity. Two values with the same fields are considered equal. In v2, values can contain an `invariants` block to express self-consistency rules.
+A `value` is an immutable object defined entirely by its attributes — it has no identity. Two values with the same fields are considered equal. Values can contain an `invariants` block to express self-consistency rules.
 
 #### Skeleton
 
@@ -495,7 +495,7 @@ policies {
 
 ### Invariant
 
-An `invariant` models a property that is always guaranteed to be true **after** any successful mutation. In v2, invariants can be placed on entities AND values (not on commands or events).
+An `invariant` models a property that is always guaranteed to be true **after** any successful mutation. Invariants can be placed on entities AND values (not on commands or events).
 
 #### Two scopes
 
@@ -575,7 +575,7 @@ references {
 | Rule | Detail |
 |------|--------|
 | Cardinality | `N..M` notation where N and M are integers or `N` (unbounded). Common: `1..1` (required single), `1..N` (required collection), `0..1` (optional single), `0..N` (optional collection). |
-| Replaces inline refs | In v1, references were inline fields (`customer : Customer`, `lines : list<OrderLine>`). In v2, they are declared in a dedicated block with cardinality. |
+| Replaces inline refs | References are declared in a dedicated block with explicit cardinality. |
 | Cross-module references | When the target type is modelled in another module, declare it as a normal reference and add `uses module` at file level. Do not use `// NOTE` for business types that exist in another module. Reserve `// NOTE` for unmodelled technical types (CodeValue, AppUser, Staff, etc.). |
 | Naming | `camelCase` for field names, `PascalCase` for type names. |
 
@@ -628,11 +628,3 @@ transitions {
 ```
 
 ---
-
-## Removed constructs (vs v1)
-
-- **`repository`** — eliminated. Resolution is direct via `resolves Entity from dotPath`.
-- **`interaction`** (top-level) — replaced by entity-scoped `operations`.
-- **`fails when { }`** — replaced by named `policy` calls.
-- **`delegates`** — replaced by direct service calls.
-- **`triggers notification`** — replaced by service calls to notification services.
