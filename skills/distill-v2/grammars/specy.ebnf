@@ -1,0 +1,384 @@
+// =============================================================================
+// Specy v2 — Unified Domain Model Grammar (.domain.specy)
+// EBNF (ISO 14977 style)
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// Top-level structure
+// -----------------------------------------------------------------------------
+
+specyFile        = { comment | moduleDecl | usesDecl | definition } ;
+
+moduleDecl       = "module" , typeName ;
+
+usesDecl         = "uses" , "module" , typeName ;
+
+definition       = enumDef
+                 | valueDef
+                 | entityDef
+                 | serviceDef
+                 | policyDef
+                 | commandDef
+                 | eventDef ;
+
+// -----------------------------------------------------------------------------
+// Enum
+// -----------------------------------------------------------------------------
+
+enumDef          = "enum" , typeName , "{" , enumValue , { enumValue } , "}" ;
+
+enumValue        = identifier ;
+
+// -----------------------------------------------------------------------------
+// Value Object
+// -----------------------------------------------------------------------------
+
+valueDef         = "value" , typeName , "{"
+                 ,   "fields" , "{" , { comment | fieldDecl } , "}"
+                 , [ "invariants" , "{" , { scopedInvariantDef } , "}" ]
+                 , "}" ;
+
+// -----------------------------------------------------------------------------
+// Entity
+// -----------------------------------------------------------------------------
+
+entityDef        = "entity" , typeName , [ justification ] , "{"
+                 ,   "identifier" , fieldName , ":" , fieldType
+                 ,   "fields" , "{" , { comment | fieldDecl } , "}"
+                 , [ "references" , "{" , { referenceDecl } , "}" ]
+                 , [ "policies" , "{" , { scopedPolicyDef } , "}" ]
+                 , [ "invariants" , "{" , { scopedInvariantDef } , "}" ]
+                 , [ "operations" , "{" , { comment | operationDef } , "}" ]
+                 , [ "transitions" , "{" , { transitionDef } , "}" ]
+                 , "}" ;
+
+referenceDecl    = fieldName , ":" , typeName , cardinality ;
+
+cardinality      = number , ".." , ( number | "N" ) ;
+
+// -----------------------------------------------------------------------------
+// Service
+// -----------------------------------------------------------------------------
+
+serviceDef       = "service" , typeName , "{"
+                 ,   "operations" , "{" , { comment | serviceOpDef } , "}"
+                 , "}" ;
+
+serviceOpDef     = identifier , "(" , [ paramList ] , ")" , [ ":" , fieldType ] , [ justification ] , "{"
+                 , { serviceClause }
+                 , "}" ;
+
+serviceClause    = foreachClause
+                 | resolvesClause
+                 | entityCallClause
+                 | returnsClause ;
+
+entityCallClause = dotPath , "(" , [ argList ] , ")" ;
+
+returnsClause    = "returns" , valueExpr ;
+
+// -----------------------------------------------------------------------------
+// Policy — precondition (file-level or entity-scoped)
+// -----------------------------------------------------------------------------
+
+policyDef        = "policy" , identifier , "(" , paramList , ")" , [ justification ] , "{"
+                 , expression
+                 , "}" ;
+
+// -----------------------------------------------------------------------------
+// Invariant — property always true after any successful mutation
+// -----------------------------------------------------------------------------
+
+// File-level invariant (with keyword)
+invariantDef     = "invariant" , identifier , [ justification ] , "{"
+                 , expression
+                 , "}" ;
+
+// Scoped invariant inside invariants { } block (no keyword repetition)
+scopedInvariantDef = identifier , [ justification ] , "{"
+                   , expression
+                   , "}" ;
+
+// Scoped policy inside policies { } block (no keyword repetition)
+scopedPolicyDef  = identifier , "(" , paramList , ")" , [ justification ] , "{"
+                 , expression
+                 , "}" ;
+
+// -----------------------------------------------------------------------------
+// Command
+// -----------------------------------------------------------------------------
+
+commandDef       = "command" , typeName , "{" , "fields" , "{" , { comment | fieldDecl } , "}" , "}" ;
+
+// -----------------------------------------------------------------------------
+// Event
+// -----------------------------------------------------------------------------
+
+eventDef         = "event" , typeName , "{" , "fields" , "{" , { comment | fieldDecl } , "}" , "}" ;
+
+// -----------------------------------------------------------------------------
+// Operations (inside entity)
+//
+// Three forms:
+//   Command-triggered:  "Label" on CommandType { ... }
+//   Event-triggered:    "Label" when EventType then CommandType { ... }
+//   Internal:           name(params) :: "label" { ... }
+// -----------------------------------------------------------------------------
+
+operationDef     = commandTriggeredOp
+                 | eventTriggeredOp
+                 | internalOp ;
+
+commandTriggeredOp = stringLiteral , "on" , typeName , "{"
+                   , { operationClause }
+                   , "}" ;
+
+eventTriggeredOp   = stringLiteral , "when" , typeName , "then" , typeName , "{"
+                   , { operationClause }
+                   , "}" ;
+
+internalOp         = identifier , "(" , [ paramList ] , ")" , [ justification ] , "{"
+                   , { operationClause }
+                   , "}" ;
+
+// -----------------------------------------------------------------------------
+// Operation clauses — statements inside an operation body
+// -----------------------------------------------------------------------------
+
+operationClause  = resolvesClause
+                 | policyCallClause
+                 | createsClause
+                 | setsClause
+                 | emitsClause
+                 | serviceCallClause
+                 | foreachClause
+                 | comment ;
+
+resolvesClause   = "resolves" , typeName , "from" , dotPath ;
+
+policyCallClause = "policy" , identifier , "(" , [ argList ] , ")" ;
+
+createsClause    = "creates" , typeName , "{" , { assignmentClause } , "}" ;
+
+setsClause       = "sets" , typeName , "{" , { assignmentClause } , "}" ;
+
+emitsClause      = "emits" , typeName , "{" , { assignmentClause } , "}" ;
+
+assignmentClause = fieldName , "=" , valueExpr ;
+
+serviceCallClause = dotPath , "(" , [ argList ] , ")" , [ justification ] ;
+
+// foreach — iterates over a collection. Usable in operations and services.
+foreachClause    = "foreach" , dotPath , "as" , identifier , "{"
+                 , { resolvesClause | setsClause | emitsClause | entityCallClause
+                   | serviceCallClause | policyCallClause }
+                 , "}" ;
+
+// -----------------------------------------------------------------------------
+// Transitions — prescriptive state machine
+//
+//   [*] --> state on "label"
+//   state --> state on "label" { , "label" }
+// -----------------------------------------------------------------------------
+
+transitionDef    = transitionSource , "-->" , identifier , "on" , stringLiteral , { "," , stringLiteral } ;
+
+transitionSource = "[*]" | identifier ;
+
+// -----------------------------------------------------------------------------
+// Fields
+// -----------------------------------------------------------------------------
+
+fieldDecl        = fieldName , ":" , fieldType , { constraint } ;
+
+fieldName        = identifier ;
+
+fieldType        = primitiveType
+                 | collectionType
+                 | typeName ;
+
+primitiveType    = "string"
+                 | "int"
+                 | "decimal"
+                 | "boolean"
+                 | "date"
+                 | "datetime"
+                 | "uuid" ;
+
+collectionType   = ( "list" | "set" ) , "<" , fieldType , ">" ;
+
+// -----------------------------------------------------------------------------
+// Constraints
+// -----------------------------------------------------------------------------
+
+constraint       = "required"
+                 | "optional"
+                 | "unique"
+                 | "immutable"
+                 | "default" , "(" , literalValue , ")"
+                 | "min" , "(" , number , ")"
+                 | "max" , "(" , number , ")"
+                 | "range" , "(" , number , "," , number , ")"
+                 | "minLength" , "(" , integer , ")"
+                 | "maxLength" , "(" , integer , ")"
+                 | "pattern" , "(" , stringLiteral , ")"
+                 | "past"
+                 | "future"
+                 | "pastOrPresent"
+                 | "futureOrPresent" ;
+
+// -----------------------------------------------------------------------------
+// Parameters
+// -----------------------------------------------------------------------------
+
+paramList        = paramDecl , { "," , paramDecl } ;
+
+paramDecl        = identifier , ":" , fieldType ;
+
+// Named arguments (for cross-module calls)
+namedArgList     = namedArg , { "," , namedArg } ;
+
+namedArg         = identifier , "=" , valueExpr ;
+
+argList          = expression , { "," , expression }
+                 | namedArgList ;
+
+// -----------------------------------------------------------------------------
+// Expressions
+// -----------------------------------------------------------------------------
+
+expression       = orExpr ;
+
+orExpr           = andExpr , { "or" , andExpr } ;
+
+andExpr          = notExpr , { "and" , notExpr } ;
+
+notExpr          = [ "not" ] , comparison ;
+
+comparison       = addExpr , [ compOp , addExpr ] ;
+
+compOp           = "=" | "!=" | ">" | "<" | ">=" | "<=" ;
+
+addExpr          = mulExpr , { ( "+" | "-" ) , mulExpr } ;
+
+mulExpr          = unaryExpr , { ( "*" | "/" ) , unaryExpr } ;
+
+unaryExpr        = ifExpr
+                 | everyExpr
+                 | existsExpr
+                 | dotPath , "is" , "defined"
+                 | dotPath , "is" , "not" , "defined"
+                 | dotPath , "in" , "{" , valueList , "}"
+                 | dotPath , "not" , "in" , "{" , valueList , "}"
+                 | functionCall
+                 | dotPath
+                 | literal
+                 | "(" , expression , ")" ;
+
+// if — logical implication (if A then B ≡ ¬A ∨ B)
+// Used in policies/invariants for conditional validation.
+// The policy holds when the condition is false (vacuous truth)
+// or when both condition and body are true.
+ifExpr           = "if" , expression , "{" , expression , "}" ;
+
+// every — universal quantifier over a collection
+// Resolves each entity from the collection implicitly.
+everyExpr        = "every" , typeName , "in" , dotPath , "{" , expression , "}" ;
+
+// exists — existential quantifier over a type (reverse-lookup query)
+// Evaluates to true if at least one instance of typeName satisfies the predicate.
+// The typeName must be declared in the current module or in a `uses module` import.
+// Inside the predicate, typeName.field navigates the queried type's fields and references.
+// Negation uses the existing `not` operator: `not exists Type where { ... }`.
+existsExpr       = "exists" , typeName , "where" , "{" , expression , "}" ;
+
+// -----------------------------------------------------------------------------
+// Dot-path: references to fields across the model
+// -----------------------------------------------------------------------------
+
+dotPath          = identifier , { "." , identifier } ;
+
+// -----------------------------------------------------------------------------
+// Value expressions (right-hand side of assignments, comparisons, etc.)
+// -----------------------------------------------------------------------------
+
+valueExpr        = expression
+                 | serviceCallExpr ;
+
+serviceCallExpr  = dotPath , "(" , [ argList ] , ")" ;
+
+valueList        = valueExpr , { "," , valueExpr } ;
+
+// -----------------------------------------------------------------------------
+// Built-in functions
+// -----------------------------------------------------------------------------
+
+functionCall     = functionName , "(" , [ argList ] , ")" ;
+
+functionName     = "count"
+                 | "sum"
+                 | "now"
+                 | "today"
+                 | "size"
+                 | "isEmpty"
+                 | "isNotEmpty" ;
+
+// -----------------------------------------------------------------------------
+// Justification — :: operator
+// Attaches a business reason to any construct. Does not change semantics.
+// -----------------------------------------------------------------------------
+
+justification    = "::" , stringLiteral ;
+
+// -----------------------------------------------------------------------------
+// Literals and identifiers
+// -----------------------------------------------------------------------------
+
+literalValue     = stringLiteral | number | "true" | "false" ;
+
+literal          = literalValue ;
+
+stringLiteral    = '"' , { character } , '"' ;
+
+number           = [ "-" ] , digit , { digit } , [ "." , digit , { digit } ] ;
+
+integer          = [ "-" ] , digit , { digit } ;
+
+typeName         = pascalCaseId ;
+
+identifier       = camelCaseId | pascalCaseId ;
+
+pascalCaseId     = upperLetter , { letter | digit } ;
+
+camelCaseId      = lowerLetter , { letter | digit } ;
+
+// -----------------------------------------------------------------------------
+// Comments
+// -----------------------------------------------------------------------------
+
+comment          = "//" , { character } , newline ;
+
+// NOTE: infrastructure — marks infrastructure concerns outside domain scope
+
+// -----------------------------------------------------------------------------
+// Character classes
+// -----------------------------------------------------------------------------
+
+upperLetter      = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I"
+                 | "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R"
+                 | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" ;
+
+lowerLetter      = "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i"
+                 | "j" | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r"
+                 | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" ;
+
+letter           = upperLetter | lowerLetter ;
+
+digit            = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+
+character        = letter | digit | " " | "!" | "@" | "#" | "$" | "%" | "^"
+                 | "&" | "*" | "(" | ")" | "-" | "_" | "=" | "+" | "["
+                 | "]" | "{" | "}" | "|" | "\\" | ":" | ";" | "'" | ","
+                 | "." | "<" | ">" | "/" | "?" | "~" | "`" ;
+
+newline          = "\n" ;

@@ -115,6 +115,20 @@ copy_runtime_files() {
   done
 
   echo "  distill/grammars/: 2 files copied"
+
+  # distill-v2: copy stack-specific heuristics (reuse v1 for now)
+  local distill_v2_heuristics="$SKILLS_DIR/distill-v2/heuristics"
+  mkdir -p "$distill_v2_heuristics"
+  for f in java-spring.md typescript-nestjs.md clojure.md; do
+    cp "$SCRIPT_DIR/distill/heuristics/$f" "$distill_v2_heuristics/$f"
+  done
+  echo "  distill-v2/heuristics/: 3 files copied"
+
+  # distill-v2: copy v2 grammar for runtime loading
+  local distill_v2_grammars="$SKILLS_DIR/distill-v2/grammars"
+  mkdir -p "$distill_v2_grammars"
+  cp "$SCRIPT_DIR/examples/v2/specy.ebnf" "$distill_v2_grammars/specy.ebnf"
+  echo "  distill-v2/grammars/: 1 file copied"
 }
 
 # -----------------------------------------------------------------------------
@@ -125,6 +139,7 @@ echo "Building skills..."
 build_skill distill
 build_skill dialogue
 build_skill spec
+build_skill distill-v2
 copy_runtime_files
 
 echo "Done."

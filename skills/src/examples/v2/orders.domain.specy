@@ -122,7 +122,15 @@ policy minimumOrderAmount(order: Order) :: "Orders must have a total amount of a
 }
 
 policy deliveryOnTime(order: Order) :: "Orders past their estimated delivery date require attention" {
-    order.estimatedDelivery > today()
+    if order.estimatedDelivery is defined {
+        order.estimatedDelivery > today()
+    }
+}
+
+policy bankTransferMinimum(order: Order, payment: Payment) :: "Bank transfers require a minimum of 50" {
+    if payment.method = bankTransfer {
+        order.totalAmount.amount >= 50
+    }
 }
 
 // =============================================================================
@@ -396,6 +404,7 @@ entity Payment :: "A payment associated with an order" {
             resolves Order from processPayment.orderId
 
             policy orderMustBeDraft(Order)
+            policy bankTransferMinimum(Order, Payment)
 
             creates Payment {
                 order = Order
