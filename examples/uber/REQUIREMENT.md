@@ -1,6 +1,6 @@
 # Requirements — RideNow (Uber-like ride-hailing platform)
 
-This directory captures the requirements for a ride-hailing platform organized into five bounded contexts. Requirements follow the EARS syntax defined in the top-level [REQUIREMENT.md](../../REQUIREMENT.md). Satisfaction links are intentionally left empty — they will be populated once the domain model is formalized.
+This directory captures the requirements for a ride-hailing platform organized into five bounded contexts. Requirements follow the EARS syntax defined in the top-level [SYSTEM-REQ-METAMODEL.md](../../SYSTEM-REQ-METAMODEL.md). Satisfaction links are intentionally left empty — they will be populated once the domain model is formalized.
 
 ## Bounded Contexts
 
