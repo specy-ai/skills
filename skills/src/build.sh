@@ -106,15 +106,13 @@ copy_runtime_files() {
 
   echo "  distill/heuristics/: 3 files copied"
 
-  # Copy grammars for runtime loading
+  # Copy grammar for runtime loading
   local distill_grammars="$SKILLS_DIR/distill/grammars"
   mkdir -p "$distill_grammars"
 
-  for f in struct.ebnf flow.ebnf; do
-    cp "$SCRIPT_DIR/grammars/$f" "$distill_grammars/$f"
-  done
+  cp "$SCRIPT_DIR/grammars/specy.ebnf" "$distill_grammars/specy.ebnf"
 
-  echo "  distill/grammars/: 2 files copied"
+  echo "  distill/grammars/: 1 file copied"
 }
 
 # -----------------------------------------------------------------------------

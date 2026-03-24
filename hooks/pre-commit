@@ -25,6 +25,7 @@ GENERATED_FILES=(
   "skills/distill/heuristics/java-spring.md"
   "skills/distill/heuristics/typescript-nestjs.md"
   "skills/distill/heuristics/clojure.md"
+  "skills/distill/grammars/specy.ebnf"
 )
 
 DIRTY=()
