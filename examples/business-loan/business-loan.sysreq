@@ -1,0 +1,1083 @@
+# Business Loan Module — System Requirements
+
+# This file formalizes the product requirements from business-loan.prd into
+# testable EARS statements. Each requirement traces back to the PRD via `source`
+# and forward to the domain model via `satisfied-by` links.
+#
+# Satisfaction links are declared structurally but targets are named by intent
+# (not by implementation class) — the domain model will realize them.
+#
+# Bounded contexts:
+#   LoanOriginationContext  — application intake, scoring, decisioning
+#   LoanServicingContext    — disbursement, schedule, payments, lifecycle
+#   CollateralContext       — collateral registration, valuation, release
+#   CreditRiskContext       — IFRS 9 provisioning, Basel RWA, regulatory reporting
+#   ComplianceContext       — AML/CFT screening, audit trail
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  LOAN ORIGINATION
+# ═══════════════════════════════════════════════════════════════════════════════
+
+requirements "Loan Application Intake" scoped-to LoanOriginationContext {
+  prd-source "business-loan.prd"
+
+  REQ-ORI-001 "Application creation" : event-driven
+    :: "Entry point for every loan — relationship manager initiates the process"
+    source "Feature: Loan origination — Story: RM selects a loan product and sees the required checklist"
+    "When a relationship manager creates a new loan application and selects
+     a loan product, the system shall create the application in DRAFT status
+     and display the product-specific document checklist."
+    priority must
+    satisfied-by {
+      implemented-by LoanApplication."Create application"
+      implemented-by CreateLoanApplication
+      implemented-by LoanApplicationCreated
+      structured-by LoanApplication.status
+      structured-by LoanApplication.productType
+    }
+
+  REQ-ORI-002 "Dynamic checklist by product" : ubiquitous
+    :: "Each product has different documentation needs — the checklist must reflect this"
+    source "Feature: Loan origination — AC: Checklist is product-specific and configurable per product type"
+    "The system shall display a document checklist that is specific to the
+     selected loan product type, distinguishing required from optional items."
+    priority must
+    satisfied-by {
+      structured-by ProductConfiguration.checklist
+      implemented-by LoanApplication."Load product checklist"
+    }
+
+  REQ-ORI-003 "Checklist update on product change" : event-driven
+    :: "Prevents stale checklist when RM switches product mid-application"
+    source "Feature: Loan origination — AC: Checklist updates dynamically when the loan product changes"
+    "When the loan product type is changed on a draft application, the system
+     shall recalculate and display the updated document checklist."
+    priority must
+    satisfied-by {
+      implemented-by LoanApplication."Change product type"
+      implemented-by ProductTypeChanged
+    }
+
+  REQ-ORI-004 "Submission completeness guard" : unwanted
+    :: "Incomplete applications waste analyst time — block them at the gate"
+    source "Feature: Loan origination — AC: Submission is blocked with a clear list of missing items"
+    "If a relationship manager attempts to submit an application with missing
+     required fields or documents, then the system shall reject the submission
+     and return the list of missing items."
+    priority must
+    satisfied-by {
+      enforced-by applicationMustBeComplete
+      detected-by ApplicationSubmissionRejected
+    }
+
+  REQ-ORI-005 "Real-time field validation" : event-driven
+    :: "Immediate feedback reduces errors and frustration during data entry"
+    source "Feature: Loan origination — AC: Validation runs in real time as fields are filled"
+    "When a field value is entered or modified on a draft application, the
+     system shall validate the field immediately and display any validation
+     error inline."
+    priority must
+    satisfied-by {
+      implemented-by LoanApplication."Validate field"
+      enforced-by fieldValidationRules
+    }
+
+  REQ-ORI-006 "Application submission" : complex
+    :: "Submission is the gate between draft and the credit pipeline — must be clean"
+    source "Feature: Loan origination — Story: System blocks submission until all required fields and documents are present"
+    "While the application is in DRAFT status, when the relationship manager
+     submits the application, the system shall transition the application to
+     SUBMITTED status, trigger AML screening, check exposure limits, initiate
+     credit scoring, and emit a LoanApplicationSubmitted event."
+    priority must
+    satisfied-by {
+      enforced-by applicationMustBeComplete
+      implemented-by LoanApplication."Submit application"
+      implemented-by SubmitLoanApplication
+      implemented-by LoanApplicationSubmitted
+      structured-by LoanApplication.status
+    }
+
+  REQ-ORI-007 "Borrower status tracking" : state-driven
+    :: "Borrowers need visibility — reduces calls to relationship managers"
+    source "Feature: Loan origination — Story: As a business borrower, I want to track the status of my application"
+    "While an application exists, the system shall provide a read-only view
+     of the current application status, the history of state transitions,
+     and the estimated decision date based on current pipeline position."
+    priority should
+    satisfied-by {
+      structured-by LoanApplication.status
+      structured-by LoanApplication.stateHistory
+      implemented-by LoanApplication."Get application status"
+    }
+
+  REQ-ORI-008 "Status change notification" : event-driven
+    :: "Proactive notification avoids the borrower having to check repeatedly"
+    source "Feature: Loan origination — AC: Status updates are sent at each major state transition"
+    "When an application transitions to SUBMITTED, UNDER_REVIEW, APPROVED,
+     or REJECTED status, the system shall send a notification to the borrower
+     and the relationship manager."
+    priority should
+    satisfied-by {
+      implemented-by NotificationService."Send status notification"
+      implemented-by LoanApplicationSubmitted
+      implemented-by LoanApplicationApproved
+      implemented-by LoanApplicationRejected
+    }
+}
+
+
+requirements "Credit Scoring and Decisioning" scoped-to LoanOriginationContext {
+  prd-source "business-loan.prd"
+
+  REQ-SCO-001 "Automated financial ratio computation" : event-driven
+    :: "Analysts should judge, not calculate — automate the mechanical work"
+    source "Feature: Credit scoring and analysis — AC: Ratios are computed automatically from uploaded financial statements"
+    "When financial statements are uploaded to a submitted application, the
+     system shall compute DSCR, leverage ratio, liquidity ratio, and
+     profitability ratios automatically and display them with source data
+     and computation method."
+    priority must
+    satisfied-by {
+      implemented-by CreditAnalysis."Compute financial ratios"
+      implemented-by FinancialRatiosComputed
+      structured-by CreditAnalysis.financialRatios
+    }
+
+  REQ-SCO-002 "Composite credit score" : event-driven
+    :: "Single score synthesizes multiple risk dimensions for routing"
+    source "Feature: Credit scoring and analysis"
+    "When an application is submitted, the system shall compute a composite
+     credit score from financial ratios, client history, sector risk,
+     and external bureau data, and record the score with its breakdown."
+    priority must
+    satisfied-by {
+      implemented-by CreditAnalysis."Compute credit score"
+      implemented-by CreditScoreComputed
+      structured-by CreditAnalysis.compositeScore
+    }
+
+  REQ-SCO-003 "Analyst ratio override" : event-driven
+    :: "Automated ratios can be wrong — analysts must be able to correct with justification"
+    source "Feature: Credit scoring and analysis — AC: Analyst can override a ratio with recorded justification"
+    "When a credit analyst overrides a computed financial ratio, the system
+     shall record the override with the original value, the new value,
+     the analyst identity, and the written justification."
+    priority must
+    satisfied-by {
+      implemented-by CreditAnalysis."Override financial ratio"
+      implemented-by FinancialRatioOverridden
+      enforced-by overrideMustHaveJustification
+    }
+
+  REQ-SCO-004 "Delegation matrix routing" : event-driven
+    :: "Correct routing avoids escalation ping-pong and ensures the right authority decides"
+    source "Feature: Credit scoring and analysis — AC: Delegation matrix is configurable by amount tier and score band"
+    "When the credit score is computed, the system shall route the application
+     to the appropriate decision authority based on the configurable delegation
+     matrix (amount tier × score band)."
+    priority must
+    satisfied-by {
+      implemented-by CreditAnalysis."Route to decision authority"
+      implemented-by ApplicationRouted
+      structured-by DelegationMatrix
+    }
+
+  REQ-SCO-005 "Delegation routing override" : event-driven
+    :: "Sometimes routing must be corrected — but never silently"
+    source "Feature: Credit scoring and analysis — AC: Override of routing level requires recorded justification and higher authority approval"
+    "When an override of the delegation routing level is requested, the system
+     shall require approval from an authority one level above the target level
+     and record the override with justification."
+    priority must
+    satisfied-by {
+      enforced-by routingOverrideRequiresHigherAuthority
+      implemented-by DelegationRoutingOverridden
+    }
+
+  REQ-SCO-006 "Credit decision recording" : event-driven
+    :: "Every decision must be auditable — rationale, conditions, and approver are mandatory"
+    source "Feature: Audit trail and event history — Story: Credit committee member approval or rejection"
+    "When a decision authority approves or rejects an application, the system
+     shall record the decision with the decision type (approve/reject),
+     conditions, rationale text, approving authority identity, and reference
+     to the scoring output, and emit a LoanApplicationApproved or
+     LoanApplicationRejected event."
+    priority must
+    satisfied-by {
+      implemented-by LoanApplication."Record credit decision"
+      implemented-by DecideLoanApplication
+      implemented-by LoanApplicationApproved
+      implemented-by LoanApplicationRejected
+    }
+
+  REQ-SCO-007 "Scoring override flag" : event-driven
+    :: "Regulators scrutinize manual overrides — flag them for review"
+    source "Feature: Audit trail and event history — AC: Override of scoring recommendation is flagged and requires additional rationale"
+    "When a decision authority approves an application that the scoring model
+     recommended for rejection (or vice versa), the system shall flag the
+     decision as a scoring override and require additional rationale text."
+    priority must
+    satisfied-by {
+      enforced-by scoringOverrideMustHaveRationale
+      implemented-by ScoringOverrideRecorded
+    }
+}
+
+
+requirements "Auto-Approval" scoped-to LoanOriginationContext {
+  prd-source "business-loan.prd"
+
+  REQ-AUT-001 "Auto-approval trigger" : complex
+    :: "Instant decisions for low-risk loans — the core speed differentiator"
+    source "Feature: Auto-approval engine — AC: Auto-approval triggers within 60 seconds of submission for eligible applications"
+    "While auto-approval is enabled for the loan product, when an application
+     is submitted with a composite score at or above the configured threshold
+     and a requested amount at or below the configured ceiling, the system
+     shall approve the application automatically within 60 seconds, generate
+     a system decision rationale referencing the scoring output, and emit
+     a LoanApplicationApproved event with decision_type AUTO."
+    priority should
+    satisfied-by {
+      enforced-by autoApprovalEligibilityCriteria
+      implemented-by LoanApplication."Auto-approve"
+      implemented-by LoanApplicationApproved
+      structured-by CreditDecision.decisionType
+    }
+
+  REQ-AUT-002 "Auto-approval configurability" : ubiquitous
+    :: "Risk appetite varies by product and branch — the rules must be tunable"
+    source "Feature: Auto-approval engine — AC: Eligibility criteria are configurable (score threshold, amount ceiling, product type)"
+    "The system shall allow configuration of auto-approval eligibility criteria
+     per loan product type and per branch, including score threshold, amount
+     ceiling, and product inclusion/exclusion."
+    priority should
+    satisfied-by {
+      structured-by AutoApprovalConfiguration
+      structured-by AutoApprovalConfiguration.scoreThreshold
+      structured-by AutoApprovalConfiguration.amountCeiling
+    }
+
+  REQ-AUT-003 "Auto-approval disable switch" : event-driven
+    :: "Kill switch for when auto-approval produces unacceptable results"
+    source "Feature: Auto-approval engine — AC: Auto-approval can be disabled per product or per branch via configuration"
+    "When an administrator disables auto-approval for a product or branch,
+     the system shall immediately stop auto-approving new applications for
+     that scope and route them to manual review."
+    priority should
+    satisfied-by {
+      implemented-by AutoApprovalConfiguration."Disable auto-approval"
+      implemented-by AutoApprovalDisabled
+    }
+
+  REQ-AUT-004 "No auto-rejection" : ubiquitous
+    :: "Rejections always need human judgment — false negatives are costly"
+    source "Feature: Auto-approval engine — Non-goal: Auto-rejection"
+    "The system shall never reject an application automatically — all rejections
+     shall require a decision by a human authority."
+    priority must
+    satisfied-by {
+      enforced-by noAutoRejection
+    }
+}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  LOAN SERVICING
+# ═══════════════════════════════════════════════════════════════════════════════
+
+requirements "Disbursement and Contract" scoped-to LoanServicingContext {
+  prd-source "business-loan.prd"
+
+  REQ-DIS-001 "Disbursement pre-condition verification" : complex
+    :: "Disbursing without pre-conditions met creates legal and financial exposure"
+    source "Feature: Disbursement and contract management — AC: System blocks disbursement if any pre-condition is not met"
+    "While an application is in APPROVED status, when a loan operations officer
+     triggers disbursement, if any pre-condition (signed contract, registered
+     collateral, conditions precedent) is not met, then the system shall block
+     the disbursement and display the unmet conditions."
+    priority must
+    satisfied-by {
+      enforced-by disbursementPreConditionsMustBeMet
+      detected-by DisbursementBlocked
+    }
+
+  REQ-DIS-002 "Condition waiver" : event-driven
+    :: "Operational flexibility with controls — not every condition is blocking"
+    source "Feature: Disbursement and contract management — AC: Officer can record a waiver for non-blocking conditions with manager approval"
+    "When a loan operations officer requests a waiver for a non-blocking
+     pre-condition, the system shall require manager approval and record
+     the waiver with justification, approver identity, and timestamp."
+    priority should
+    satisfied-by {
+      enforced-by waiverRequiresManagerApproval
+      implemented-by Loan."Waive pre-condition"
+      implemented-by PreConditionWaived
+    }
+
+  REQ-DIS-003 "Single disbursement" : event-driven
+    :: "Standard path — the full amount is released at once"
+    source "Feature: Disbursement and contract management"
+    "When all pre-conditions are met and the operations officer confirms
+     disbursement, the system shall transfer the loan amount to the borrower's
+     designated account, create the loan in DISBURSED status, generate
+     accounting entries in the Ledger, generate the repayment schedule,
+     and emit a LoanDisbursed event."
+    priority must
+    satisfied-by {
+      implemented-by Loan."Disburse loan"
+      implemented-by DisburseLoan
+      implemented-by LoanDisbursed
+      structured-by Loan.status
+    }
+
+  REQ-DIS-004 "Tranched disbursement" : event-driven
+    :: "Construction and investment loans release funds as milestones are achieved"
+    source "Feature: Disbursement and contract management — Story: Disburse in tranches for construction or investment loans"
+    "When a tranche disbursement is triggered for a loan with a tranche
+     schedule, the system shall release the tranche amount, generate a
+     per-tranche accounting entry, update the undisbursed commitment,
+     and emit a TrancheDisbursed event."
+    priority should
+    satisfied-by {
+      implemented-by Loan."Disburse tranche"
+      implemented-by TrancheDisbursed
+      structured-by Loan.trancheSchedule
+      structured-by Loan.undisbursedCommitment
+    }
+
+  REQ-DIS-005 "Undisbursed commitment tracking" : state-driven
+    :: "Regulators require off-balance-sheet exposure reporting"
+    source "Feature: Disbursement and contract management — AC: Undisbursed commitment is tracked and reported as off-balance-sheet exposure"
+    "While a loan has undisbursed tranches, the system shall track the
+     undisbursed commitment amount and include it in off-balance-sheet
+     exposure reporting."
+    priority must
+    satisfied-by {
+      structured-by Loan.undisbursedCommitment
+      quality-constrained-by RegulatoryReportingService
+    }
+
+  REQ-DIS-006 "Repayment schedule generation" : event-driven
+    :: "Borrowers and operations need a clear payment plan from day one"
+    source "Feature: Disbursement and contract management — AC: Schedule is generated automatically at disbursement"
+    "When a loan is disbursed, the system shall generate a repayment schedule
+     using the configured amortization method (constant principal, constant
+     annuity, bullet, or custom/deferred) and day count convention
+     (Actual/360, Actual/365, 30/360, Actual/Actual)."
+    priority must
+    satisfied-by {
+      implemented-by Schedule."Generate schedule"
+      implemented-by ScheduleGenerated
+      structured-by Schedule.amortizationMethod
+      structured-by Schedule.dayCountConvention
+    }
+
+  REQ-DIS-007 "Schedule recalculation on modifying event" : event-driven
+    :: "Any event that changes cash flows must update the schedule — stale schedules cause errors"
+    source "Feature: Disbursement and contract management — AC: Schedule is recalculated after any modifying event"
+    "When an early repayment, restructuring, rate reset, or tranche
+     disbursement occurs, the system shall recalculate the remaining
+     repayment schedule and emit a ScheduleRecalculated event."
+    priority must
+    satisfied-by {
+      implemented-by Schedule."Recalculate schedule"
+      implemented-by ScheduleRecalculated
+    }
+}
+
+
+requirements "Payment Processing" scoped-to LoanServicingContext {
+  prd-source "business-loan.prd"
+
+  REQ-PAY-001 "Automatic payment matching" : event-driven
+    :: "Manual matching is the #1 time sink in loan operations — automate it"
+    source "Feature: Loan servicing — AC: Payments are auto-matched by reference, amount, and due date"
+    "When a payment is received, the system shall attempt automatic matching
+     against the repayment schedule using payment reference, amount, and
+     due date."
+    priority must
+    satisfied-by {
+      implemented-by Payment."Match payment"
+      implemented-by PaymentMatched
+    }
+
+  REQ-PAY-002 "Partial payment allocation" : event-driven
+    :: "Allocation order has legal and accounting implications — must be configurable"
+    source "Feature: Loan servicing — AC: Partial payments are allocated to interest first, then principal (configurable)"
+    "When a partial payment is matched, the system shall allocate the amount
+     to interest first and then to principal, following the configurable
+     allocation order."
+    priority must
+    satisfied-by {
+      implemented-by Payment."Allocate partial payment"
+      implemented-by PaymentAllocated
+      structured-by PaymentAllocationPolicy
+    }
+
+  REQ-PAY-003 "Unmatched payment queue" : unwanted
+    :: "Unmatched payments must not be lost — they need manual resolution"
+    source "Feature: Loan servicing — AC: Unmatched payments are queued for manual review with suggested allocations"
+    "If a payment cannot be automatically matched, then the system shall
+     queue the payment for manual review, display suggested allocation
+     candidates, and emit a PaymentUnmatched event."
+    priority must
+    satisfied-by {
+      detected-by PaymentUnmatched
+      implemented-by Payment."Queue for manual review"
+    }
+
+  REQ-PAY-004 "Early repayment with indemnity" : event-driven
+    :: "Early repayment has contractual and legal implications — IRA must be computed correctly"
+    source "Feature: Loan servicing — Story: As a business borrower, I want to make an early full or partial repayment"
+    "When a borrower requests an early repayment (full or partial), the system
+     shall compute the early repayment indemnity (IRA) per contractual terms,
+     enforce the legal cap on IRA, apply the repayment, and recalculate
+     the schedule."
+    priority must
+    satisfied-by {
+      implemented-by Loan."Process early repayment"
+      implemented-by EarlyRepaymentProcessed
+      enforced-by iraCappedAtLegalMaximum
+    }
+
+  REQ-PAY-005 "Full early repayment triggers closure" : event-driven
+    :: "When the balance reaches zero, the loan lifecycle completes"
+    source "Feature: Loan servicing — AC: Full early repayment triggers loan closure workflow"
+    "When a full early repayment brings the outstanding balance to zero,
+     the system shall transition the loan to CLOSED status and initiate
+     the collateral release workflow."
+    priority must
+    satisfied-by {
+      implemented-by Loan."Close loan"
+      implemented-by LoanClosed
+      structured-by Loan.status
+    }
+
+  REQ-PAY-006 "Loan restructuring" : event-driven
+    :: "Restructuring accommodates borrower distress while maintaining traceability"
+    source "Feature: Loan servicing — Story: As a credit analyst, I want to restructure a loan"
+    "When a restructuring is approved, the system shall create a new version
+     of the loan contract with the modified terms, retain the original terms,
+     recalculate the schedule, trigger an IFRS 9 reassessment, and emit
+     a LoanRestructured event with rationale and approving authority."
+    priority must
+    satisfied-by {
+      implemented-by Loan."Restructure loan"
+      implemented-by LoanRestructured
+      structured-by Loan.contractVersion
+    }
+
+  REQ-PAY-007 "Restructuring preserves original terms" : ubiquitous
+    :: "Regulatory audits require access to both original and modified terms"
+    source "Feature: Loan servicing — AC: Original and modified terms are both retained and queryable"
+    "The system shall retain all versions of loan contract terms and allow
+     querying of both original and current terms for any loan."
+    priority must
+    satisfied-by {
+      structured-by Loan.contractVersion
+      structured-by Loan.contractHistory
+    }
+}
+
+
+requirements "Delinquency and Collections" scoped-to LoanServicingContext {
+  prd-source "business-loan.prd"
+
+  REQ-DEL-001 "Missed payment detection" : event-driven
+    :: "Delinquency must be detected on the day it occurs — not days later"
+    source "Feature: Delinquency and collections — AC: Missed payment is detected at end-of-day on the due date"
+    "When the end-of-day batch runs, the system shall identify all scheduled
+     installments with a due date of today that have not been paid, mark
+     them as overdue, compute late penalties per contractual rate (capped
+     at legal maximum), and emit a PaymentMissed event for each."
+    priority must
+    satisfied-by {
+      implemented-by Loan."Detect missed payments"
+      implemented-by PaymentMissed
+      enforced-by latePenaltyCappedAtLegalMaximum
+    }
+
+  REQ-DEL-002 "Configurable escalation chain" : event-driven
+    :: "One-size-fits-all collections does not work — escalation must be tunable"
+    source "Feature: Delinquency and collections — AC: Escalation chain is configurable"
+    "When a payment is missed, the system shall initiate a configurable
+     escalation chain with steps (notification, reminder, formal notice,
+     collections referral, default declaration), each with a configurable
+     delay and action."
+    priority must
+    satisfied-by {
+      implemented-by CollectionEscalation."Initiate escalation"
+      structured-by EscalationChainConfiguration
+      implemented-by EscalationStepTriggered
+    }
+
+  REQ-DEL-003 "Delinquency to default transition" : complex
+    :: "Basel definition of default is regulatory — the system must enforce it"
+    source "Feature: Delinquency and collections — AC: Default threshold is configurable (default: 90 days)"
+    "While a loan has overdue installments, when the days past due exceeds
+     the configurable default threshold (default: 90 days per Basel definition),
+     the system shall transition the loan to DEFAULT status, trigger IFRS 9
+     Stage 3 classification, and emit a LoanDefaulted event."
+    priority must
+    satisfied-by {
+      enforced-by defaultThresholdRule
+      implemented-by Loan."Declare default"
+      implemented-by LoanDefaulted
+      structured-by Loan.status
+    }
+
+  REQ-DEL-004 "Cure from default" : complex
+    :: "A loan can recover from default — but only under controlled conditions"
+    source "Feature: Delinquency and collections — AC: Cure requires configurable cure period and conditions"
+    "While a loan is in DEFAULT status, when the borrower clears all overdue
+     amounts and the configurable cure period elapses without further missed
+     payments, the system shall transition the loan to PERFORMING status
+     and trigger IFRS 9 stage reassessment."
+    priority should
+    satisfied-by {
+      enforced-by cureConditions
+      implemented-by Loan."Cure default"
+      implemented-by LoanCured
+    }
+}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  COLLATERAL
+# ═══════════════════════════════════════════════════════════════════════════════
+
+requirements "Collateral Management" scoped-to CollateralContext {
+  prd-source "business-loan.prd"
+
+  REQ-COL-001 "Collateral registration" : event-driven
+    :: "Collateral is the bank's security — it must be formally registered"
+    source "Feature: Collateral management — Story: Link collateral items to a loan"
+    "When a collateral item is linked to a loan, the system shall register
+     the collateral with its type (mortgage, pledge, guarantee, lien), value,
+     valuation date, and allocate it to the loan."
+    priority must
+    satisfied-by {
+      implemented-by Collateral."Register collateral"
+      implemented-by CollateralRegistered
+      structured-by Collateral.type
+      structured-by Collateral.value
+    }
+
+  REQ-COL-002 "LTV computation" : event-driven
+    :: "LTV is the primary collateral adequacy metric — must always be current"
+    source "Feature: Collateral management — AC: LTV is computed as outstanding loan balance / total collateral value"
+    "When collateral is registered, revalued, or the loan balance changes,
+     the system shall recompute the Loan-to-Value ratio as outstanding
+     balance divided by total collateral value."
+    priority must
+    satisfied-by {
+      implemented-by Collateral."Compute LTV"
+      implemented-by LtvRecomputed
+      structured-by Collateral.ltvRatio
+    }
+
+  REQ-COL-003 "Shared collateral allocation" : ubiquitous
+    :: "A single asset can secure multiple loans — allocation must be tracked"
+    source "Feature: Collateral management — AC: Collateral can be shared across multiple loans with proportional allocation"
+    "The system shall support allocation of a single collateral item across
+     multiple loans with proportional value distribution, and include
+     only the allocated portion in each loan's LTV calculation."
+    priority should
+    satisfied-by {
+      structured-by CollateralAllocation
+      structured-by CollateralAllocation.allocatedValue
+    }
+
+  REQ-COL-004 "LTV breach alert" : unwanted
+    :: "Deteriorating collateral coverage is a risk signal — surface it immediately"
+    source "Feature: Collateral management — AC: Alert is triggered when LTV breaches threshold"
+    "If the LTV ratio exceeds the configurable contractual threshold after
+     a revaluation or balance change, then the system shall generate an
+     alert with current LTV, threshold, and gap amount, and notify the
+     relationship manager and credit analyst."
+    priority must
+    satisfied-by {
+      enforced-by ltvThresholdRule
+      detected-by LtvBreachDetected
+      implemented-by NotificationService."Send LTV alert"
+    }
+
+  REQ-COL-005 "Automatic collateral release on loan closure" : event-driven
+    :: "Holding collateral after loan closure exposes the bank to claims"
+    source "Feature: Collateral management — Story: Collateral released automatically when loan is closed"
+    "When a loan transitions to CLOSED status, the system shall initiate
+     the collateral release workflow for all collateral items allocated
+     exclusively to that loan."
+    priority must
+    satisfied-by {
+      implemented-by Collateral."Release collateral"
+      implemented-by CollateralReleased
+    }
+
+  REQ-COL-006 "Shared collateral release guard" : unwanted
+    :: "Releasing shared collateral prematurely leaves other loans unsecured"
+    source "Feature: Collateral management — AC: Release is blocked if collateral is shared with another active loan"
+    "If a collateral release is triggered for an item allocated to another
+     active loan, then the system shall block the release and notify the
+     operations officer of the shared allocation."
+    priority must
+    satisfied-by {
+      enforced-by sharedCollateralReleaseGuard
+      detected-by CollateralReleaseBlocked
+    }
+}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  CREDIT RISK & REGULATORY
+# ═══════════════════════════════════════════════════════════════════════════════
+
+requirements "IFRS 9 Provisioning" scoped-to CreditRiskContext {
+  prd-source "business-loan.prd"
+
+  REQ-IFR-001 "Stage 1 — 12-month ECL" : state-driven
+    :: "Performing loans with no deterioration carry a 12-month loss provision"
+    source "Feature: IFRS 9 provisioning — AC: Stage 1: no significant deterioration — ECL = 12-month PD x LGD x EAD"
+    "While a loan is classified as IFRS 9 Stage 1 (no significant credit risk
+     deterioration), the system shall compute and maintain the expected credit
+     loss as 12-month PD × LGD × EAD."
+    priority must
+    satisfied-by {
+      implemented-by Provision."Compute Stage 1 ECL"
+      structured-by Provision.stage
+      structured-by Provision.eclAmount
+    }
+
+  REQ-IFR-002 "Stage 2 — Lifetime ECL" : state-driven
+    :: "Significant deterioration requires lifetime loss recognition"
+    source "Feature: IFRS 9 provisioning — AC: Stage 2: significant deterioration — ECL = lifetime"
+    "While a loan is classified as IFRS 9 Stage 2 (significant credit risk
+     deterioration), the system shall compute and maintain the expected credit
+     loss as lifetime PD × LGD × EAD."
+    priority must
+    satisfied-by {
+      implemented-by Provision."Compute Stage 2 ECL"
+      structured-by Provision.stage
+      structured-by Provision.eclAmount
+    }
+
+  REQ-IFR-003 "Stage 3 — Default" : state-driven
+    :: "Defaulted loans carry lifetime ECL and interest is computed on net amount"
+    source "Feature: IFRS 9 provisioning — AC: Stage 3: default — ECL = lifetime, interest on net amount"
+    "While a loan is classified as IFRS 9 Stage 3 (credit-impaired / default),
+     the system shall compute expected credit loss as lifetime PD × LGD × EAD
+     and compute interest revenue on the net carrying amount (gross minus
+     provision)."
+    priority must
+    satisfied-by {
+      implemented-by Provision."Compute Stage 3 ECL"
+      structured-by Provision.stage
+      structured-by Provision.eclAmount
+      implemented-by Provision."Compute net interest"
+    }
+
+  REQ-IFR-004 "Stage transition on deterioration signal" : event-driven
+    :: "Stage transitions must be triggered by observable signals — not manual judgment alone"
+    source "Feature: IFRS 9 provisioning — AC: Stage transitions are triggered by configurable signals"
+    "When a configurable deterioration signal is detected (days past due
+     threshold, rating downgrade, sector shock event), the system shall
+     transition the loan to the appropriate IFRS 9 stage and emit a
+     StageTransitioned event with the trigger details."
+    priority must
+    satisfied-by {
+      implemented-by Provision."Transition stage"
+      implemented-by StageTransitioned
+      structured-by StageTransitionConfiguration
+    }
+
+  REQ-IFR-005 "Provision event recording" : event-driven
+    :: "Provision changes must be auditable — regulators require full history"
+    source "Feature: IFRS 9 provisioning — AC: Each stage transition is recorded as a domain event"
+    "When a provision is computed or a stage transition occurs, the system
+     shall record a ProvisionCalculated event with the computation inputs
+     (PD, LGD, EAD), the result (ECL amount), the stage, and the trigger."
+    priority must
+    satisfied-by {
+      implemented-by ProvisionCalculated
+      implemented-by StageTransitioned
+    }
+
+  REQ-IFR-006 "On-demand IFRS 9 reporting" : event-driven
+    :: "Month-end-only reporting is too slow for regulatory queries"
+    source "Feature: IFRS 9 provisioning — AC: Reports are available on demand"
+    "When a compliance officer requests an IFRS 9 report, the system shall
+     generate the report from the current event-sourced provision data,
+     filterable by stage, product type, branch, and sector."
+    priority must
+    satisfied-by {
+      implemented-by RegulatoryReportingService."Generate IFRS 9 report"
+    }
+
+  REQ-IFR-007 "Report-to-event consistency" : ubiquitous
+    :: "A report that disagrees with events creates reconciliation nightmares"
+    source "Feature: IFRS 9 provisioning — AC: Report data matches the event-sourced provision history exactly"
+    "The system shall guarantee that IFRS 9 report data is derived exclusively
+     from the event-sourced provision history with zero reconciliation gap."
+    priority must
+    satisfied-by {
+      enforced-by reportConsistencyWithEventStore
+    }
+}
+
+
+requirements "Basel and Regulatory Reporting" scoped-to CreditRiskContext {
+  prd-source "business-loan.prd"
+
+  REQ-BAS-001 "RWA computation" : ubiquitous
+    :: "Capital adequacy depends on accurate RWA — mandatory for prudential reporting"
+    source "Feature: Regulatory reporting — AC: RWA computation supports both standardized and IRB approaches"
+    "The system shall compute Risk-Weighted Assets for the loan book using
+     the configured approach (standardized or IRB) per portfolio segment."
+    priority must
+    satisfied-by {
+      implemented-by RegulatoryReportingService."Compute RWA"
+      structured-by RwaComputation.approach
+    }
+
+  REQ-BAS-002 "COREP template population" : event-driven
+    :: "COREP submissions are regulatory obligations with strict deadlines"
+    source "Feature: Regulatory reporting — AC: COREP templates C07, C08, C09 are populated automatically"
+    "When a COREP reporting period closes, the system shall populate
+     templates C07, C08, and C09 automatically from the loan book data."
+    priority must
+    satisfied-by {
+      implemented-by RegulatoryReportingService."Generate COREP"
+    }
+
+  REQ-BAS-003 "AnaCredit submission" : event-driven
+    :: "ECB requires granular credit data — no separate data entry"
+    source "Feature: Regulatory reporting — AC: AnaCredit attributes are derived from operational loan data"
+    "When the AnaCredit reporting period closes, the system shall generate
+     the submission file from operational loan data, conforming to the
+     ECB AnaCredit specification, and run data quality checks with an
+     error report before submission."
+    priority must
+    satisfied-by {
+      implemented-by RegulatoryReportingService."Generate AnaCredit"
+      enforced-by anaCreDataQualityChecks
+    }
+
+  REQ-BAS-004 "Leverage ratio inclusion" : ubiquitous
+    :: "Off-balance-sheet commitments affect the leverage ratio"
+    source "Feature: Regulatory reporting — AC: Leverage ratio contribution from loan commitments is included"
+    "The system shall include on-balance-sheet loan exposures and off-balance-sheet
+     undisbursed commitments in the leverage ratio computation."
+    priority must
+    satisfied-by {
+      structured-by Loan.undisbursedCommitment
+      implemented-by RegulatoryReportingService."Compute leverage ratio"
+    }
+}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  COMPLIANCE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+requirements "AML/CFT Screening" scoped-to ComplianceContext {
+  prd-source "business-loan.prd"
+
+  REQ-AML-001 "Sanctions screening at origination" : event-driven
+    :: "Onboarding a sanctioned party is a criminal offense — screen before anything else"
+    source "Feature: AML/CFT screening — AC: Screening covers the borrower, all beneficial owners, and guarantors"
+    "When a loan application is submitted, the system shall screen the
+     borrower, all beneficial owners (UBO), and guarantors against
+     OFAC, EU consolidated, UN Security Council, and Tracfin sanctions lists."
+    priority must
+    satisfied-by {
+      implemented-by SanctionsScreeningService."Screen parties"
+      implemented-by SanctionsScreeningCompleted
+    }
+
+  REQ-AML-002 "Screening result recording" : event-driven
+    :: "Screening results are regulatory evidence — must be stored"
+    source "Feature: AML/CFT screening — AC: Screening results are recorded in the loan event history"
+    "When sanctions screening is completed, the system shall record the
+     screening result (clear or match) with timestamp, lists checked,
+     and matched entries (if any) in the loan event history."
+    priority must
+    satisfied-by {
+      implemented-by SanctionsScreeningCompleted
+    }
+
+  REQ-AML-003 "Positive match handling" : unwanted
+    :: "A sanctions match must halt the process until compliance clears it"
+    source "Feature: AML/CFT screening — AC: Positive match blocks submission and routes to compliance review"
+    "If a sanctions screening returns a positive match, then the system
+     shall block further processing of the application and route it to
+     the compliance team for manual review."
+    priority must
+    satisfied-by {
+      enforced-by sanctionsMatchBlocksProcessing
+      detected-by SanctionsMatchDetected
+      implemented-by ComplianceReview."Route for review"
+    }
+}
+
+
+requirements "Audit Trail" scoped-to ComplianceContext {
+  prd-source "business-loan.prd"
+
+  REQ-AUD-001 "Immutable event recording" : ubiquitous
+    :: "Immutability is the foundation of audit — events must never be altered"
+    source "Feature: Audit trail and event history — AC: Events cannot be modified or deleted after creation"
+    "The system shall record every loan state transition as an immutable
+     event that cannot be modified or deleted after creation."
+    priority must
+    satisfied-by {
+      enforced-by eventImmutability
+      satisfied-by-infrastructure
+    }
+
+  REQ-AUD-002 "Event content completeness" : ubiquitous
+    :: "An event without context is useless for audit — capture the full picture"
+    source "Feature: Audit trail and event history — AC: Events include: actor, action, timestamp, rationale, before/after state"
+    "The system shall include in every state transition event: the actor
+     identity (who), the action performed (what), the timestamp (when),
+     the rationale (why), and the before and after state values."
+    priority must
+    satisfied-by {
+      structured-by DomainEvent.actor
+      structured-by DomainEvent.action
+      structured-by DomainEvent.timestamp
+      structured-by DomainEvent.rationale
+      structured-by DomainEvent.stateDelta
+    }
+
+  REQ-AUD-003 "Event queryability" : ubiquitous
+    :: "An audit trail that cannot be searched is operationally useless"
+    source "Feature: Audit trail and event history — AC: Event history is queryable by loan, by actor, by date range, by event type"
+    "The system shall support querying the event history by loan identifier,
+     by actor, by date range, and by event type."
+    priority must
+    satisfied-by {
+      implemented-by AuditService."Query event history"
+    }
+}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  PRODUCT CONFIGURATION
+# ═══════════════════════════════════════════════════════════════════════════════
+
+requirements "Product Configuration" scoped-to LoanOriginationContext {
+  prd-source "business-loan.prd"
+
+  REQ-CFG-001 "Product definition via configuration" : event-driven
+    :: "Code changes for new products are too slow — configuration is the path to speed"
+    source "Feature: Product configuration engine — AC: Product definition includes amortization type, rate structure, fee schedule, etc."
+    "When a product manager activates a new loan product configuration,
+     the system shall validate the configuration against the product
+     metamodel and make the product available for new applications."
+    priority should
+    satisfied-by {
+      implemented-by ProductConfiguration."Activate product"
+      implemented-by ProductConfigurationActivated
+      enforced-by productConfigurationMustBeValid
+    }
+
+  REQ-CFG-002 "Product versioning" : ubiquitous
+    :: "Existing loans must not be affected by product changes"
+    source "Feature: Product configuration engine — AC: Product configuration is versioned"
+    "The system shall version product configurations so that changes create
+     a new version while existing loans remain on their origination version."
+    priority should
+    satisfied-by {
+      structured-by ProductConfiguration.version
+      structured-by Loan.productConfigurationVersion
+    }
+}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  NON-FUNCTIONAL REQUIREMENTS — CROSS-CUTTING
+# ═══════════════════════════════════════════════════════════════════════════════
+
+requirements "Platform Performance" scoped-to BusinessLoanOrganization {
+  prd-source "business-loan.prd"
+
+  REQ-NFR-001 "Application creation latency" : event-driven
+    :: "Slow application creation frustrates RMs in client-facing meetings"
+    source "Goal: Reduce time-to-decision"
+    "When a loan application is created, the system shall return a response
+     within 500 milliseconds at the 95th percentile."
+    priority must
+    satisfied-by {
+      quality-constrained-by LoanApplication."Create application"
+    }
+
+  REQ-NFR-002 "Scoring latency" : event-driven
+    :: "Scoring is on the critical path to decision — must be fast"
+    source "Goal: Reduce time-to-decision"
+    "When credit scoring is initiated, the system shall return the composite
+     score within 2 seconds at the 95th percentile."
+    priority must
+    satisfied-by {
+      quality-constrained-by CreditAnalysis."Compute credit score"
+    }
+
+  REQ-NFR-003 "Schedule generation latency" : event-driven
+    :: "Schedule generation blocks the disbursement confirmation to the borrower"
+    source "Goal: Reduce time-to-decision"
+    "When a repayment schedule is generated, the system shall return the
+     complete schedule within 1 second at the 95th percentile."
+    priority must
+    satisfied-by {
+      quality-constrained-by Schedule."Generate schedule"
+    }
+
+  REQ-NFR-004 "End-of-day batch throughput" : event-driven
+    :: "Batch must complete before next business day opens"
+    source "Constraint: Event sourcing architecture"
+    "When the end-of-day batch runs, the system shall process payment
+     detection, penalty computation, and delinquency assessment for
+     100,000 active loans within 30 minutes."
+    priority must
+    satisfied-by {
+      quality-constrained-by Loan."Detect missed payments"
+    }
+
+  REQ-NFR-005 "IFRS 9 batch throughput" : event-driven
+    :: "Monthly provision run must complete within the reporting window"
+    source "Constraint: IFRS 9 expected credit loss"
+    "When the monthly IFRS 9 provisioning batch runs, the system shall
+     compute ECL for 100,000 active loans within 1 hour."
+    priority must
+    satisfied-by {
+      quality-constrained-by Provision."Compute Stage 1 ECL"
+      quality-constrained-by Provision."Compute Stage 2 ECL"
+      quality-constrained-by Provision."Compute Stage 3 ECL"
+    }
+}
+
+
+requirements "Platform Reliability" scoped-to BusinessLoanOrganization {
+  prd-source "business-loan.prd"
+
+  REQ-NFR-010 "Module availability" : ubiquitous
+    :: "Lending is revenue-critical — downtime blocks origination and servicing"
+    source "Goal: Reduce time-to-decision"
+    "The Business Loan module shall maintain 99.95% availability measured
+     monthly, excluding planned maintenance windows."
+    priority must
+    satisfied-by {
+      satisfied-by-infrastructure
+    }
+
+  REQ-NFR-011 "Recovery point objective" : ubiquitous
+    :: "Event sourcing with synchronous replication guarantees zero data loss"
+    source "Constraint: Event sourcing architecture"
+    "The system shall achieve a Recovery Point Objective of zero data loss
+     through event sourcing with synchronous replication."
+    priority must
+    satisfied-by {
+      satisfied-by-infrastructure
+    }
+
+  REQ-NFR-012 "Recovery time objective" : ubiquitous
+    :: "15 minutes is the maximum acceptable recovery time for a core banking module"
+    source "Constraint: Event sourcing architecture"
+    "The system shall achieve a Recovery Time Objective of under 15 minutes."
+    priority must
+    satisfied-by {
+      satisfied-by-infrastructure
+    }
+}
+
+
+requirements "Platform Security" scoped-to BusinessLoanOrganization {
+  prd-source "business-loan.prd"
+
+  REQ-NFR-020 "Data encryption at rest" : ubiquitous
+    :: "Regulatory baseline — all persistent financial data must be encrypted"
+    source "Constraint: Data encryption and access control"
+    "The system shall encrypt all data at rest using AES-256."
+    priority must
+    satisfied-by {
+      satisfied-by-infrastructure
+    }
+
+  REQ-NFR-021 "Data encryption in transit" : ubiquitous
+    :: "Man-in-the-middle attacks on financial data are unacceptable"
+    source "Constraint: Data encryption and access control"
+    "The system shall encrypt all data in transit using TLS 1.3."
+    priority must
+    satisfied-by {
+      satisfied-by-infrastructure
+    }
+
+  REQ-NFR-022 "RBAC access control" : ubiquitous
+    :: "Not everyone can see or do everything — permissions must be granular"
+    source "Constraint: Data encryption and access control"
+    "The system shall enforce role-based access control with granular
+     permissions by loan product type, branch, and amount tier."
+    priority must
+    satisfied-by {
+      enforced-by rbacPolicy
+      satisfied-by-infrastructure
+    }
+
+  REQ-NFR-023 "Inter-module mTLS" : ubiquitous
+    :: "Module-to-module communication must be mutually authenticated"
+    source "Constraint: Data encryption and access control"
+    "The system shall use mutual TLS (mTLS) for all inter-module
+     communication."
+    priority must
+    satisfied-by {
+      satisfied-by-infrastructure
+    }
+}
+
+
+requirements "Platform Observability" scoped-to BusinessLoanOrganization {
+  prd-source "business-loan.prd"
+
+  REQ-NFR-030 "Structured logging" : ubiquitous
+    :: "Unstructured logs are unsearchable — JSON with correlation IDs enables tracing"
+    source "Goal: Ensure full audit traceability"
+    "The system shall produce structured JSON logs with a correlation ID
+     propagated across all inter-module calls for a given operation."
+    priority must
+    satisfied-by {
+      satisfied-by-infrastructure
+    }
+
+  REQ-NFR-031 "RED metrics" : ubiquitous
+    :: "Rate, Errors, Duration — the universal service health signal"
+    source "Goal: Ensure full audit traceability"
+    "The system shall expose Rate, Error rate, and Duration (RED) metrics
+     per API endpoint and per business operation."
+    priority must
+    satisfied-by {
+      satisfied-by-infrastructure
+    }
+
+  REQ-NFR-032 "Distributed tracing" : ubiquitous
+    :: "Cross-module flows must be traceable end-to-end"
+    source "Goal: Ensure full audit traceability"
+    "The system shall produce OpenTelemetry-compatible distributed traces
+     covering all cross-module request flows."
+    priority must
+    satisfied-by {
+      satisfied-by-infrastructure
+    }
+
+  REQ-NFR-033 "SLA breach alerting" : unwanted
+    :: "SLA breaches must be detected and escalated — not discovered in retrospective"
+    source "Goal: Ensure full audit traceability"
+    "If any operation exceeds its p95 latency SLA or the module error rate
+     exceeds 1% over a 5-minute window, then the system shall emit an
+     alert to the configured alerting channel."
+    priority must
+    satisfied-by {
+      detected-by SlaBreachAlert
+      satisfied-by-infrastructure
+    }
+}

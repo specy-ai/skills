@@ -1,0 +1,102 @@
+domain "Orders"
+uses "orders.struct"
+uses "orders.flow"
+
+// =============================================================================
+// Journeys
+// =============================================================================
+
+journey "Place an order" {
+  actor Customer
+
+  step "Select products" {
+    presents Product with { name, price, rating }
+      :: "Price and rating visible before selection for informed purchase decisions"
+    validates {
+      Product.available = true :: "Only available products can be selected"
+    }
+  }
+
+  step "Review cart" {
+    presents Order.lines with { product.name, quantity, unitPrice, lineTotal }
+    presents Order.totalAmount
+    validates {
+      isNotEmpty(Order.lines) :: "Cart cannot be empty"
+      Order.totalAmount.amount >= 1 :: "Minimum order amount is 1"
+    }
+  }
+
+  step "Enter shipping address" {
+    collects Address
+      maps to Order.shippingAddress
+      :: "Collected before payment to calculate delivery options"
+    validates {
+      Order.shippingAddress is defined :: "Shipping address is required"
+    }
+    field order { street, city, zipCode, country }
+      :: "National postal convention reduces input errors"
+  }
+
+  step "Confirm and pay" {
+    presents Order with { lines, totalAmount, shippingAddress }
+      :: "Full order summary for final review before commitment"
+    collects PaymentMethod
+      maps to ProcessPayment.method
+    confirms PlaceOrder
+      :: "Payment and order placement are a single atomic action from user perspective"
+    warns when Order.totalAmount.amount > 5000
+      :: "High-value orders show warning to prevent accidental large purchases"
+  }
+
+  on success {
+    then presents "Order confirmation with order number"
+    then navigates to "Order detail"
+  }
+
+  on failure {
+    then presents "Error message"
+    then navigates to "Last valid step"
+  }
+}
+
+journey "Cancel an order" {
+  actor Customer
+
+  precondition {
+    Order.status in { draft, confirmed }
+      :: "Only draft or confirmed orders can be cancelled per cancellation policy"
+  }
+
+  step "Confirm cancellation" {
+    presents Order with { status, totalAmount, lines }
+      :: "Order details shown to prevent accidental cancellation of wrong order"
+    collects CancelOrder.reason optional
+    confirms CancelOrder
+  }
+
+  on success {
+    then presents "Cancellation confirmation"
+    then navigates to "Order list"
+  }
+}
+
+journey "Track an order" {
+  actor Customer
+  readonly
+
+  step "View order status" {
+    presents Order with { status, shippedAt, estimatedDelivery }
+    presents Order.lines with { product.name, quantity }
+      :: "Line details shown for package content verification"
+  }
+}
+
+// =============================================================================
+// Cross-journey constraints
+// =============================================================================
+
+constraint OwnershipVisibility {
+  on "Cancel an order"
+  visible when Order.customer = currentUser
+    :: "Customers can only see and cancel their own orders"
+}

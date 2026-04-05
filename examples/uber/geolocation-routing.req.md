@@ -118,4 +118,4 @@ requirements "Surge Zones" scoped-to GeolocationRouting {
 |---|---|---|
 | REQ-GEO-023 (Surge transparency) | Ride Management | Geo → Ride: display surge to rider |
 
-Note: REQ-GEO-010 (Nearby driver query) and REQ-GEO-011/012 (ETA/Route) are services *consumed by* Ride Management — the dependency flows from Ride → Geo (documented in ride-management.req.md).
+Note: REQ-GEO-010 (Nearby driver query) and REQ-GEO-011/012 (ETA/Route) are services *consumed by* Ride Management — the dependency flows from Ride → Geo (documented in ride-management.sysreq.md).

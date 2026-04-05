@@ -1,0 +1,987 @@
+product "Sniplink" {
+
+  vision "A URL shortener that unifies link sharing, click analytics, and bookmark management
+         into one workspace — giving publishers full visibility on what content performs where,
+         while offering consumers a frictionless, trustworthy click experience."
+
+  problem {
+    situation "Marketers, developers, and content creators share links across dozens of channels
+               every day. They need short, memorable URLs and they need to know which channels
+               drive engagement. Separately, they accumulate hundreds of interesting links they
+               want to find again later."
+    complication "Existing URL shorteners (Bitly, TinyURL) treat link creation and analytics
+                  as separate concerns from bookmark management. Publishers must juggle a shortener
+                  for distribution, a bookmark tool for curation, and a spreadsheet for cross-channel
+                  comparison. None of these tools detect which channel a click came from automatically —
+                  publishers must manually tag UTM parameters. Meanwhile, consumers clicking shortened
+                  links have no way to know if the destination is safe before they arrive."
+    question "How can we give publishers a single workspace where every link they shorten is also
+              a bookmark they can search, with per-channel analytics that require zero manual tagging —
+              while making every click trustworthy for the consumer?"
+  }
+
+  non-goals {
+    "Build a full-featured social media management tool — we shorten and track links, we do not schedule posts or manage accounts"
+    "Become a web analytics platform — we measure link clicks per channel, not page views, sessions, or conversion funnels"
+    "Offer a self-hosted or on-premise version — this is a cloud SaaS product only"
+    "Support link monetization or interstitial ads — our trust signal depends on a clean click-through experience"
+    "Build a mobile app for v1 — the product is web-first, mobile-responsive"
+  }
+
+  persona "Publisher" {
+    role "A marketer, developer, social media manager, or content creator who shares links
+          professionally across multiple channels"
+    goals {
+      "Share clean, short, memorable URLs that reflect their brand"
+      "Know which channel drives the most clicks for each link"
+      "Find any link they have ever shortened — by topic, tag, or search"
+      "Collaborate with teammates on shared link collections"
+    }
+    frustrations {
+      "Manual UTM tagging is tedious and error-prone"
+      "Bookmark tools and link shorteners are separate products that do not talk to each other"
+      "Free tiers of existing shorteners have limited analytics"
+      "No easy way to share curated link collections with a team"
+    }
+    context "Uses desktop browser primarily, shares links on Twitter/X, LinkedIn, Slack, email,
+             and newsletters. Manages dozens of links per week. May work solo or in a small team."
+    weight primary
+  }
+
+  persona "Consumer" {
+    role "Anyone who clicks a shortened link — a reader, follower, or colleague"
+    goals {
+      "Arrive at the intended destination quickly and safely"
+      "Know the link is not malicious before or during the click"
+    }
+    frustrations {
+      "Shortened links obscure the destination — no way to know if it is safe"
+      "Slow redirects or interstitial pages add friction"
+    }
+    context "Clicks links from social media, email, messaging apps. No account needed.
+             Expects sub-second redirect. Uses mobile and desktop."
+    weight secondary
+  }
+
+  persona "Team lead" {
+    role "A publisher who manages a team and wants pooled link collections and shared analytics"
+    goals {
+      "See aggregated analytics across all team members' links"
+      "Curate shared collections of links organized by topic or campaign"
+      "Control who can create links under the team's custom domain"
+    }
+    frustrations {
+      "No visibility into what links teammates are sharing"
+      "Collaboration features in existing tools are gated behind expensive enterprise plans"
+    }
+    context "Manages 3-15 people. Needs admin controls but not enterprise-grade SSO or compliance.
+             Pays for tools that demonstrably save the team time."
+    weight secondary
+  }
+
+  job "Share a clean link quickly" {
+    persona "Publisher"
+    statement "When I have a URL I want to share on social media or in a message,
+               I want to shorten it into a clean, memorable link in seconds,
+               so I can share it without the ugly long URL cluttering my post."
+    type functional
+    importance critical
+    satisfaction underserved
+    related-to "Know which channel drives the most clicks"
+    desired-outcomes {
+      "Minimize the time between pasting a URL and getting a short link" {
+        importance high
+        current-satisfaction medium
+      }
+      "Maximize the memorability of the generated short link" {
+        importance medium
+        current-satisfaction low
+      }
+      "Minimize the number of steps to customize the short link slug" {
+        importance high
+        current-satisfaction medium
+      }
+    }
+  }
+
+  job "Know which channel drives the most clicks" {
+    persona "Publisher"
+    statement "When I have shared a link across multiple channels,
+               I want to see how many clicks came from each channel without manual tagging,
+               so I can invest my effort in the channels that actually drive engagement."
+    type functional
+    importance critical
+    satisfaction unserved
+    related-to "Share a clean link quickly"
+    desired-outcomes {
+      "Minimize the effort required to get per-channel click data" {
+        importance high
+        current-satisfaction low
+      }
+      "Minimize the delay between a click happening and seeing it in analytics" {
+        importance high
+        current-satisfaction low
+      }
+      "Maximize the accuracy of channel attribution" {
+        importance high
+        current-satisfaction low
+      }
+    }
+  }
+
+  job "Find a link I saved weeks ago" {
+    persona "Publisher"
+    statement "When I remember reading something interesting but cannot find the URL,
+               I want to search my link history by keyword, tag, or date,
+               so I can retrieve it without digging through browser history or chat logs."
+    type functional
+    importance important
+    satisfaction underserved
+    desired-outcomes {
+      "Minimize the time to find a previously shortened link" {
+        importance high
+        current-satisfaction low
+      }
+      "Maximize the confidence that the link collection is complete — nothing lost" {
+        importance medium
+        current-satisfaction low
+      }
+    }
+  }
+
+  job "Feel confident a shortened link is safe to click" {
+    persona "Consumer"
+    statement "When I see a shortened link in a social media post or message,
+               I want to know the destination is safe before I click,
+               so I can follow the link without worrying about phishing or malware."
+    type emotional
+    importance important
+    satisfaction unserved
+    desired-outcomes {
+      "Minimize the anxiety about clicking a shortened link" {
+        importance high
+        current-satisfaction low
+      }
+      "Minimize the time between clicking and arriving at the destination" {
+        importance high
+        current-satisfaction medium
+      }
+    }
+  }
+
+  job "Pool interesting content with my team" {
+    persona "Team lead"
+    statement "When my team discovers articles, tools, or resources relevant to our work,
+               I want everyone to save links into shared collections we can all search,
+               so the team builds a knowledge base instead of losing links in private bookmarks."
+    type functional
+    importance important
+    satisfaction unserved
+    desired-outcomes {
+      "Minimize the friction for a team member to add a link to a shared collection" {
+        importance high
+        current-satisfaction low
+      }
+      "Maximize the discoverability of links saved by any team member" {
+        importance medium
+        current-satisfaction low
+      }
+    }
+  }
+
+  evidence "UTM tagging pain" {
+    type user-research
+    summary "In 12 interviews with content marketers, 10 cited UTM parameter management
+             as their top friction with link shorteners. Most admit they skip tagging for
+             quick shares, losing attribution data."
+    source-reference "Publisher discovery interviews — March 2026, internal research"
+    date 2026-03-15
+    confidence moderate
+    supports "Increase per-channel analytics adoption"
+  }
+
+  evidence "Bookmark tool fragmentation" {
+    type customer-feedback
+    summary "Reddit and Twitter threads in the productivity space consistently surface
+             complaints about needing separate tools for bookmarking and link sharing.
+             Raindrop.io users request analytics; Bitly users request better organization."
+    source-reference "Reddit r/productivity, r/marketing — aggregated sentiment, Feb 2026"
+    date 2026-02-20
+    confidence weak
+    supports "Drive weekly active publishers"
+  }
+
+  evidence "Link safety concern" {
+    type market-research
+    summary "Google Safe Browsing processes 10B+ URLs/day. Phishing via shortened links
+             increased 30% YoY per the Anti-Phishing Working Group. No major shortener
+             surfaces safety information to the clicker."
+    source-reference "APWG Phishing Activity Trends Report H2-2025"
+    date 2025-12-01
+    confidence strong
+    supports "Build consumer trust through link safety"
+  }
+
+  evidence "Bitly pricing dissatisfaction" {
+    type market-research
+    summary "Bitly's free tier limits to 10 links/month and hides per-channel analytics
+             behind a $35/month plan. G2 reviews (4.0/5, 800+ reviews) cite pricing as
+             the top complaint. Opportunity for a generous free tier as acquisition lever."
+    source-reference "G2 Bitly reviews, Bitly pricing page — March 2026"
+    date 2026-03-01
+    confidence moderate
+    supports "Drive weekly active publishers"
+  }
+
+  goal "Drive weekly active publishers" {
+    statement "Reach 10,000 weekly active publishers (at least one link shortened per week)
+               within 12 months of public launch"
+    horizon mid-term
+    owner "Head of Growth"
+    metric {
+      indicator "Weekly active publishers (WAP) — unique users who shorten at least one link per week"
+      target "10,000 WAP at month 12"
+      baseline "0 (pre-launch)"
+      measurement "Server-side event tracking on link creation"
+    }
+  }
+
+  goal "Increase per-channel analytics adoption" {
+    statement "80% of links created by active publishers generate per-channel analytics data
+               without any manual tagging by the publisher"
+    horizon short-term
+    owner "Head of Product"
+    metric {
+      indicator "Percentage of shortened links with auto-detected channel data on at least one click"
+      target "80% of links with 5+ clicks"
+      baseline "0% (feature does not exist in competitors without UTM)"
+      measurement "Analytics pipeline — ratio of clicks with detected channel to total clicks"
+    }
+  }
+
+  goal "Build consumer trust through link safety" {
+    statement "Achieve a malicious link detection rate above 99% and display safety status
+               on every redirect within 200ms"
+    horizon short-term
+    owner "Head of Engineering"
+    metric {
+      indicator "Malicious link detection rate (true positive rate)"
+      target "> 99%"
+      baseline "N/A (new capability)"
+      measurement "Comparison against Google Safe Browsing flagged URLs on a monthly test set"
+    }
+    metric {
+      indicator "p95 redirect latency including safety check"
+      target "< 200ms"
+      baseline "N/A"
+      measurement "Server-side latency instrumentation on redirect endpoint"
+    }
+  }
+
+  goal "Team plan adoption" {
+    statement "Convert 5% of active publishers to a team plan within 6 months of team
+               feature launch"
+    horizon mid-term
+    owner "Head of Growth"
+    metric {
+      indicator "Conversion rate from individual active publisher to team plan"
+      target "5%"
+      baseline "0%"
+      measurement "Billing system — team plan activations / total active publishers at time of team launch"
+    }
+  }
+
+  goal "Bookmark retention" {
+    statement "Publishers who save 10+ links return weekly at 60%+ retention after 30 days"
+    horizon short-term
+    owner "Head of Product"
+    metric {
+      indicator "D30 weekly retention rate for publishers with 10+ saved links"
+      target "> 60%"
+      baseline "N/A"
+      measurement "Cohort analysis — weekly login/action rate at D30 for 10+ link cohort"
+    }
+  }
+
+  hypothesis "Auto-channel detection drives analytics adoption" {
+    intervention "Automatically detect the referral channel (Twitter, LinkedIn, Slack, email, etc.)
+                  on each click using HTTP referer, UTM params, and link-placement heuristics —
+                  requiring zero effort from the publisher"
+    expected-outcome "80% of links with 5+ clicks show per-channel breakdown without manual tagging"
+    mechanism "Removing the UTM tagging burden means analytics data is generated passively,
+               so publishers see value without doing extra work"
+    validation-method "Measure auto-detection rate on first 10,000 links in beta —
+                       compare attributed clicks to total clicks"
+    status proposed
+    proposes "Auto-channel analytics"
+    predicts "Increase per-channel analytics adoption"
+  }
+
+  hypothesis "Unified bookmarks increase retention" {
+    intervention "Every shortened link is automatically saved to the publisher's searchable
+                  bookmark collection with title, tags, and preview"
+    expected-outcome "Publishers with 10+ saved links retain at 60%+ weekly after 30 days"
+    mechanism "The bookmark collection creates a personal knowledge base that grows more
+               valuable over time, giving publishers a reason to return beyond link creation"
+    validation-method "Cohort analysis — compare D30 retention of publishers with 10+ links
+                       vs. those with fewer"
+    status proposed
+    proposes "Bookmark collection"
+    predicts "Bookmark retention"
+  }
+
+  hypothesis "Safety badge builds consumer trust" {
+    intervention "Scan every destination URL against malware/phishing databases at creation
+                  and on redirect, showing a verified-safe badge on the redirect interstitial"
+    expected-outcome "Consumer click-through rate on Sniplink shortened links is 15% higher
+                      than on generic short links in A/B shared social posts"
+    mechanism "Visible safety verification reduces the anxiety of clicking an opaque short link,
+               increasing willingness to follow the link"
+    validation-method "Partner with 5 publishers to A/B test Sniplink links (with badge) vs.
+                       Bitly links in identical social posts — measure CTR"
+    status proposed
+    proposes "Link safety scanning"
+    predicts "Build consumer trust through link safety"
+  }
+
+  hypothesis "Zero-friction custom domains drive publisher acquisition" {
+    intervention "Let publishers connect a custom domain (e.g., go.acme.com) with a single
+                  DNS record and automatic SSL — no technical setup beyond one CNAME"
+    expected-outcome "20% of publishers who create 5+ links activate a custom domain within 30 days"
+    mechanism "Custom domains make links look branded and professional, which is a strong
+               motivator for marketers — but only if setup is trivially easy"
+    validation-method "Track custom domain activation rate by publisher cohort after feature launch"
+    status proposed
+    proposes "Custom domains"
+    predicts "Drive weekly active publishers"
+  }
+
+  hypothesis "Team collections drive team plan conversion" {
+    intervention "Offer shared link collections, team-wide analytics, and member management
+                  as a team plan — free to try for 14 days"
+    expected-outcome "5% of active publishers convert to a team plan within 6 months"
+    mechanism "Publishers who already use Sniplink individually see value in pooling links
+               with colleagues, and the trial lowers the commitment barrier"
+    validation-method "Track trial-to-paid conversion rate and team plan activation funnel"
+    status proposed
+    proposes "Team workspaces"
+    predicts "Team plan adoption"
+  }
+
+  feature "Link shortening" {
+    summary "Publisher pastes a long URL and instantly gets a short, shareable link with
+             an optional custom slug"
+    persona "Publisher"
+    value-proposition "Core utility — the fundamental action that brings publishers to the product"
+    priority must
+    status accepted
+    addresses "Share a clean link quickly"
+    advances "Drive weekly active publishers"
+    non-goals {
+      "Bulk URL shortening via CSV upload — single-link and API are sufficient for v1"
+      "QR code generation — deferred to a later release"
+    }
+    stories {
+      "As a publisher, I want to paste a URL and get a short link in one click,
+       so that I can share it immediately without interrupting my workflow." {
+        acceptance-criteria {
+          "Short link is generated within 1 second of pasting the URL"
+          "Short link is copied to clipboard automatically"
+          "Publisher can optionally customize the slug before confirming"
+          "If the custom slug is taken, an alternative is suggested"
+        }
+      }
+      "As a publisher, I want to choose a memorable custom slug for my short link,
+       so that the URL is easy to remember and share verbally." {
+        acceptance-criteria {
+          "Custom slugs support alphanumeric characters and hyphens"
+          "Slug availability is checked in real time as the publisher types"
+          "Slug length is limited to 30 characters"
+        }
+      }
+    }
+  }
+
+  feature "Auto-channel analytics" {
+    summary "Every click on a shortened link is automatically attributed to a channel
+             (Twitter, LinkedIn, Slack, email, direct, etc.) without requiring UTM tags"
+    persona "Publisher"
+    value-proposition "Per-channel click data with zero effort — publishers see which channels
+                       work without touching UTM parameters"
+    priority must
+    status accepted
+    addresses "Know which channel drives the most clicks"
+    advances "Increase per-channel analytics adoption"
+    tested-by "Auto-channel detection drives analytics adoption"
+    non-goals {
+      "Conversion tracking beyond the click — we measure clicks, not downstream actions"
+      "Individual click-level user identification — analytics are aggregate, not PII-linked"
+    }
+    stories {
+      "As a publisher, I want to see a per-channel breakdown of clicks on each link,
+       so that I can identify which channels drive the most engagement." {
+        acceptance-criteria {
+          "Analytics dashboard shows click count per detected channel"
+          "Channels include at minimum: Twitter/X, LinkedIn, Facebook, Slack, Email, Reddit, Direct/Unknown"
+          "Click data updates in near-real-time (within 30 seconds)"
+          "Publisher can filter analytics by date range"
+        }
+      }
+      "As a publisher, I want to see a real-time click counter on my dashboard,
+       so that I can monitor link performance as I share it." {
+        acceptance-criteria {
+          "Total click count updates within 5 seconds of a new click"
+          "Click count is visible on the link list view without opening details"
+        }
+      }
+    }
+  }
+
+  feature "Bookmark collection" {
+    summary "Every shortened link is automatically saved to a searchable, taggable personal
+             collection — turning the shortener into a bookmark manager"
+    persona "Publisher"
+    value-proposition "Publishers never lose a link again — every shortened URL becomes a
+                       searchable bookmark with title, preview, and tags"
+    priority must
+    status accepted
+    addresses "Find a link I saved weeks ago"
+    advances "Bookmark retention"
+    tested-by "Unified bookmarks increase retention"
+    non-goals {
+      "Browser extension for saving unshortened bookmarks — only shortened links are saved for v1"
+      "Full-text content indexing of destination pages — search is over titles, URLs, and tags"
+    }
+    stories {
+      "As a publisher, I want every link I shorten to automatically appear in my collection,
+       so that I build a bookmark library without extra effort." {
+        acceptance-criteria {
+          "Destination page title and meta description are fetched and stored automatically"
+          "A preview thumbnail is generated from the destination's Open Graph image"
+          "Link appears in the collection immediately after shortening"
+        }
+      }
+      "As a publisher, I want to search my collection by keyword or tag,
+       so that I can find a link I saved weeks ago in seconds." {
+        acceptance-criteria {
+          "Full-text search covers link title, URL, tags, and description"
+          "Search results appear within 500ms"
+          "Publisher can add, remove, and filter by tags"
+          "Links can be organized into folders or collections"
+        }
+      }
+    }
+  }
+
+  feature "Link safety scanning" {
+    summary "Every destination URL is scanned against phishing and malware databases at
+             creation time and periodically thereafter, with a verified-safe badge shown
+             to consumers"
+    persona "Consumer"
+    value-proposition "Consumers can trust Sniplink short links — every click is verified safe,
+                       and flagged links are blocked with a warning page"
+    priority must
+    status accepted
+    addresses "Feel confident a shortened link is safe to click"
+    advances "Build consumer trust through link safety"
+    tested-by "Safety badge builds consumer trust"
+    non-goals {
+      "Content moderation beyond safety — we block malware and phishing, not controversial content"
+      "Guaranteed 100% detection — we target 99%+ and provide a report mechanism for missed threats"
+    }
+    stories {
+      "As a consumer, I want to see that a link has been verified safe before I arrive
+       at the destination, so that I feel confident clicking shortened links." {
+        acceptance-criteria {
+          "A brief interstitial (< 500ms) shows the destination domain and a safety badge"
+          "If the destination is flagged as unsafe, the consumer sees a warning page instead of a redirect"
+          "The consumer can choose to proceed to a flagged link at their own risk"
+          "The interstitial does not appear for returning visitors who have opted out"
+        }
+      }
+      "As a publisher, I want to be notified if a link I shortened is later flagged as unsafe,
+       so that I can remove it from circulation." {
+        acceptance-criteria {
+          "Publisher receives an email notification within 1 hour of a link being flagged"
+          "Flagged links are visually marked in the publisher's dashboard"
+          "Publisher can delete or deactivate flagged links with one click"
+        }
+      }
+    }
+  }
+
+  feature "Custom domains" {
+    summary "Publishers can connect their own domain (e.g., go.acme.com) to use for
+             branded short links, with automatic SSL and zero technical friction"
+    persona "Publisher"
+    value-proposition "Branded links build trust and recognition — and setup is just one DNS record"
+    priority should
+    status accepted
+    addresses "Share a clean link quickly"
+    advances "Drive weekly active publishers"
+    tested-by "Zero-friction custom domains drive publisher acquisition"
+    non-goals {
+      "Full DNS management — we handle only the CNAME verification and SSL provisioning"
+      "Multiple custom domains per account on the free plan — one domain free, more on team plan"
+    }
+    stories {
+      "As a publisher, I want to connect my own domain for short links,
+       so that every link I share reinforces my brand." {
+        acceptance-criteria {
+          "Setup requires only adding a single CNAME DNS record"
+          "Domain verification completes within 5 minutes of DNS propagation"
+          "SSL certificate is provisioned automatically — no manual certificate upload"
+          "Custom domain links appear in analytics alongside default domain links"
+        }
+      }
+    }
+  }
+
+  feature "Team workspaces" {
+    summary "Teams can share link collections, view aggregated analytics, and manage
+             members in a shared workspace with a 14-day free trial"
+    persona "Team lead"
+    value-proposition "The team builds a shared knowledge base of curated links with
+                       combined analytics — collaboration without expensive enterprise pricing"
+    priority should
+    status accepted
+    addresses "Pool interesting content with my team"
+    advances "Team plan adoption"
+    tested-by "Team collections drive team plan conversion"
+    non-goals {
+      "Role-based access control beyond admin/member — two roles are sufficient for v1"
+      "SSO or SAML integration — not needed for small teams, deferred to enterprise tier"
+      "Cross-workspace link sharing — teams are isolated workspaces for now"
+    }
+    stories {
+      "As a team lead, I want to create a workspace and invite members by email,
+       so that my team can start collaborating on links immediately." {
+        acceptance-criteria {
+          "Workspace creation takes fewer than 3 steps"
+          "Invitations are sent by email with a one-click join link"
+          "New members see existing shared collections upon joining"
+          "Team lead can remove members at any time"
+        }
+      }
+      "As a team lead, I want to see aggregated click analytics across all team links,
+       so that I can measure the team's overall content performance." {
+        acceptance-criteria {
+          "Team dashboard shows total clicks, top-performing links, and per-channel breakdown"
+          "Analytics can be filtered by team member, date range, and collection"
+          "Data is exportable as CSV"
+        }
+      }
+      "As a publisher on a team, I want to save a link to a shared collection,
+       so that my teammates can discover and use it." {
+        acceptance-criteria {
+          "Publisher can choose between personal and shared collections when shortening a link"
+          "Shared links appear in the team workspace for all members"
+          "The original publisher is credited on shared links"
+        }
+      }
+    }
+  }
+
+  feature "API access" {
+    summary "A RESTful API that lets publishers shorten links, retrieve analytics, and
+             manage collections programmatically"
+    persona "Publisher"
+    value-proposition "Developers and power users integrate Sniplink into their workflows,
+                       scripts, and applications"
+    priority should
+    status accepted
+    addresses "Share a clean link quickly"
+    advances "Drive weekly active publishers"
+    non-goals {
+      "GraphQL endpoint — REST only for v1"
+      "Webhook callbacks — polling and REST for v1, webhooks deferred"
+    }
+    stories {
+      "As a publisher, I want to shorten a link via an API call,
+       so that I can integrate link shortening into my publishing workflow." {
+        acceptance-criteria {
+          "POST endpoint accepts a URL and optional custom slug, returns the short link"
+          "Authentication via API key in header"
+          "Rate limited to 100 requests per minute on the free plan"
+          "API returns JSON with short URL, slug, and creation timestamp"
+        }
+      }
+      "As a publisher, I want to retrieve click analytics via the API,
+       so that I can build custom dashboards or feed data into other tools." {
+        acceptance-criteria {
+          "GET endpoint returns total clicks, per-channel breakdown, and time series"
+          "Supports date range filtering"
+          "Response includes pagination for large result sets"
+        }
+      }
+    }
+  }
+
+  feature "Browser extension" {
+    summary "A browser extension that lets publishers shorten the current page URL with
+             one click and save it to their collection"
+    persona "Publisher"
+    value-proposition "Shortening and bookmarking happens in context — no need to switch to
+                       the Sniplink tab"
+    priority could
+    status proposed
+    addresses "Share a clean link quickly", "Find a link I saved weeks ago"
+    advances "Drive weekly active publishers", "Bookmark retention"
+    non-goals {
+      "Full bookmark manager replacement — the extension is a quick-save tool, not a browser-level bookmark sync"
+    }
+    stories {
+      "As a publisher, I want to click the extension icon and get a short link for the current page,
+       so that I can share or save it without leaving the page I am on." {
+        acceptance-criteria {
+          "One-click shortening from the extension popup"
+          "Short link is copied to clipboard automatically"
+          "Link is saved to the publisher's default collection"
+          "Publisher can optionally add tags in the extension popup"
+        }
+      }
+    }
+  }
+
+  assumption "Referer header is available for most social clicks" {
+    statement "Major social platforms (Twitter/X, LinkedIn, Facebook, Reddit) send HTTP referer
+               headers on outbound link clicks, enabling automatic channel detection"
+    impact-if-wrong "Auto-channel detection accuracy drops significantly — the core differentiator
+                     weakens. Would need to fall back to link-variant-per-channel approach."
+    validation-plan "Test link clicks from each major platform in multiple browsers and measure
+                     referer header availability rate. Target: > 70% of clicks from top 5 platforms
+                     carry a usable referer."
+    status unvalidated
+    underpins "Auto-channel analytics"
+  }
+
+  assumption "Publishers will use shortener as bookmark tool" {
+    statement "Publishers who shorten links will also use the collection/search features
+               to retrieve links later — the two behaviors overlap in the same audience"
+    impact-if-wrong "The bookmark collection becomes a ghost feature — publishers shorten and leave.
+                     Retention thesis collapses."
+    validation-plan "Beta cohort analysis — measure the percentage of publishers who use search or
+                     tag features within 14 days of creating their 5th link"
+    status unvalidated
+    underpins "Bookmark collection"
+  }
+
+  assumption "Safety scanning latency is acceptable" {
+    statement "Checking a URL against Google Safe Browsing and internal heuristics can complete
+               within 100ms, keeping total redirect latency under 200ms"
+    impact-if-wrong "Redirect latency exceeds acceptable threshold — consumers perceive Sniplink
+                     as slow, defeating the purpose of the safety feature"
+    validation-plan "Benchmark Safe Browsing API lookup latency over 1,000 URLs at various times
+                     of day. Target: p95 < 80ms."
+    status unvalidated
+    underpins "Link safety scanning"
+  }
+
+  risk "Platform referrer suppression" {
+    statement "Social platforms may increasingly strip or mask HTTP referer headers for privacy,
+               degrading auto-channel detection accuracy over time"
+    likelihood medium
+    impact high
+    mitigation mitigate
+    owner "Head of Engineering"
+    threatens "Increase per-channel analytics adoption"
+  }
+
+  risk "Abuse for malicious link distribution" {
+    statement "Bad actors may use Sniplink to distribute phishing or malware links,
+               damaging the brand and trust signal"
+    likelihood high
+    impact critical
+    mitigation mitigate
+    owner "Head of Engineering"
+    threatens "Build consumer trust through link safety"
+  }
+
+  risk "Low free-to-team conversion" {
+    statement "Free-tier publishers may have no reason to upgrade to a team plan if the free
+               offering is too generous or team features are not compelling enough"
+    likelihood medium
+    impact medium
+    mitigation mitigate
+    owner "Head of Growth"
+    threatens "Team plan adoption"
+  }
+
+  risk "Safe Browsing API dependency" {
+    statement "Google Safe Browsing API availability or rate limits could bottleneck
+               the redirect path, causing downtime or degraded experience"
+    likelihood low
+    impact critical
+    mitigation mitigate
+    owner "Head of Engineering"
+    threatens "Build consumer trust through link safety"
+  }
+
+  constraint "GDPR compliance" {
+    statement "All click tracking must comply with GDPR — no personal data stored without
+               consent, analytics must be aggregate, and the right to erasure must be supported"
+    source regulatory
+    constrains "Auto-channel analytics", "Link safety scanning"
+  }
+
+  constraint "Link safety from day one" {
+    statement "No link may be shortened without a safety scan — this is a launch requirement,
+               not a post-launch enhancement"
+    source organizational
+    constrains "Link shortening", "Link safety scanning"
+  }
+
+  constraint "Sub-200ms redirect latency" {
+    statement "Total redirect latency including safety check must stay under 200ms at p95
+               to maintain a frictionless consumer experience"
+    source technical
+    constrains "Link safety scanning"
+  }
+
+  open-question "Referer fallback strategy" {
+    question "If referer headers prove unreliable for a significant share of clicks,
+              should we generate unique short URLs per channel (one link per platform)
+              or use JavaScript-based detection on an intermediate page?"
+    context "The per-channel-link approach is more reliable but adds friction for the publisher.
+             The JS approach is seamless but adds latency and may be blocked by ad blockers.
+             This decision shapes the core product experience."
+    owner "Head of Product"
+    deadline 2026-05-01
+    status open
+    blocks "Auto-channel analytics"
+  }
+
+  open-question "Free tier limits" {
+    question "What are the right free tier limits (links per month, analytics retention period,
+              number of custom slugs) that are generous enough for acquisition but create
+              natural upgrade pressure for power users?"
+    context "Bitly offers 10 links/month free. Being significantly more generous is a
+             competitive advantage, but too generous kills conversion."
+    owner "Head of Growth"
+    deadline 2026-05-15
+    status open
+    blocks "Team workspaces"
+  }
+
+  open-question "Safety interstitial opt-out" {
+    question "Should the safety interstitial be shown to all consumers on every click,
+              or should returning visitors be able to opt out? Does an interstitial hurt
+              click-through rates enough to offset the trust benefit?"
+    context "A visible safety check is the trust signal, but any friction before redirect
+             may reduce CTR. Need to balance trust and speed."
+    owner "Head of Product"
+    deadline 2026-04-15
+    status open
+    blocks "Link safety scanning"
+  }
+
+  journey "Publisher shortens and shares a link" for "Publisher" {
+    trigger "Publisher has a blog post URL they want to share on Twitter and LinkedIn"
+    outcome "Short link is shared on both platforms, clicks are being tracked per channel"
+    steps {
+      1 {
+        action "Publisher opens Sniplink and pastes the long URL"
+        system-response "Displays a generated short link with auto-fetched page title and preview"
+        channel web
+        emotional-tone confident
+      }
+      2 {
+        action "Publisher optionally customizes the slug to something memorable"
+        system-response "Validates slug availability in real time and shows the final short URL"
+        channel web
+        emotional-tone confident
+      }
+      3 {
+        action "Publisher clicks 'Copy' to grab the short link"
+        system-response "Short link is copied to clipboard, link is saved to the publisher's collection"
+        channel web
+        emotional-tone delighted
+      }
+      4 {
+        action "Publisher pastes the link into a tweet and a LinkedIn post"
+        system-response "N/A — action happens on external platforms"
+        channel external
+        emotional-tone neutral
+      }
+      5 {
+        action "Publisher checks the analytics dashboard an hour later"
+        system-response "Shows real-time click count with per-channel breakdown:
+                         Twitter 47 clicks, LinkedIn 23 clicks, Direct 8 clicks"
+        channel web
+        emotional-tone delighted
+      }
+    }
+  }
+
+  journey "Consumer clicks a safe link" for "Consumer" {
+    trigger "Consumer sees a Sniplink short link in a tweet and taps it"
+    outcome "Consumer arrives at the destination page, confident the link was safe"
+    steps {
+      1 {
+        action "Consumer taps the short link in their Twitter feed"
+        system-response "Sniplink receives the request, performs a safety check (< 100ms),
+                         records the click with channel=Twitter"
+        channel web
+        emotional-tone neutral
+      }
+      2 {
+        action "Consumer sees a brief interstitial showing the destination domain
+                and a green verified-safe badge"
+        system-response "Interstitial displays for 300ms, then auto-redirects to the destination"
+        channel web
+        emotional-tone confident
+      }
+      3 {
+        action "Consumer arrives at the destination page"
+        system-response "N/A — destination page loads"
+        channel external
+        emotional-tone confident
+      }
+    }
+  }
+
+  journey "Consumer encounters an unsafe link" for "Consumer" {
+    trigger "Consumer clicks a Sniplink short link that has been flagged as unsafe"
+    outcome "Consumer is warned and protected from the malicious destination"
+    steps {
+      1 {
+        action "Consumer taps the short link"
+        system-response "Safety check detects the destination is flagged — serves a warning page
+                         instead of redirecting"
+        channel web
+        emotional-tone anxious
+      }
+      2 {
+        action "Consumer reads the warning explaining the link has been flagged for
+                phishing/malware"
+        system-response "Warning page shows the flagged domain, the reason, and options:
+                         go back (recommended) or proceed at own risk"
+        channel web
+        emotional-tone anxious
+      }
+      3 {
+        action "Consumer clicks 'Go back' and returns to the referring page"
+        system-response "Redirects to the previous page or a safe landing page"
+        channel web
+        emotional-tone confident
+      }
+    }
+  }
+
+  journey "Publisher searches their bookmark collection" for "Publisher" {
+    trigger "Publisher remembers an article about API design they saved weeks ago
+             but cannot recall the URL"
+    outcome "Publisher finds the link in their collection and reshares it"
+    steps {
+      1 {
+        action "Publisher opens Sniplink and navigates to their collection"
+        system-response "Displays the publisher's link collection sorted by most recent"
+        channel web
+        emotional-tone neutral
+      }
+      2 {
+        action "Publisher types 'API design' into the search bar"
+        system-response "Returns matching links filtered by title, URL, and tags — results
+                         appear within 500ms"
+        channel web
+        emotional-tone confident
+      }
+      3 {
+        action "Publisher finds the link, clicks 'Copy short URL'"
+        system-response "Short link is copied to clipboard"
+        channel web
+        emotional-tone delighted
+      }
+    }
+  }
+
+  journey "Team lead sets up a team workspace" for "Team lead" {
+    trigger "Team lead wants the marketing team to pool their curated links in one place"
+    outcome "Team workspace is active with members contributing to shared collections"
+    steps {
+      1 {
+        action "Team lead clicks 'Create team workspace' from their dashboard"
+        system-response "Prompts for workspace name and starts a 14-day free trial"
+        channel web
+        emotional-tone confident
+      }
+      2 {
+        action "Team lead enters teammate email addresses to invite them"
+        system-response "Sends invitation emails with one-click join links"
+        channel web
+        emotional-tone confident
+      }
+      3 {
+        action "Team members click the join link and enter the workspace"
+        system-response "Members see the shared workspace with any existing collections"
+        channel web
+        emotional-tone neutral
+      }
+      4 {
+        action "A team member shortens a link and saves it to a shared collection"
+        system-response "Link appears in the shared collection for all members, with the
+                         contributor credited"
+        channel web
+        emotional-tone delighted
+      }
+      5 {
+        action "Team lead opens the team analytics dashboard"
+        system-response "Shows aggregated analytics across all team links — total clicks,
+                         top links, per-channel breakdown, filterable by member and date"
+        channel web
+        emotional-tone delighted
+      }
+    }
+  }
+
+  release "R1 — Core shortener with safety and analytics" {
+    target-date "Q3 2026"
+    theme "Ship the core loop: shorten, track, and trust"
+    status planned
+    includes {
+      "Link shortening"
+      "Auto-channel analytics"
+      "Link safety scanning"
+      "Bookmark collection"
+    }
+    exit-criteria {
+      "All must features pass acceptance testing"
+      "No P0 or P1 bugs open"
+      "Redirect latency < 200ms at p95 under load test"
+      "Safety scan detection rate > 99% on test set"
+      "Public beta with 500+ publishers"
+    }
+  }
+
+  release "R2 — Custom domains and API" {
+    target-date "Q4 2026"
+    theme "Let publishers brand their links and integrate programmatically"
+    status planned
+    depends-on "R1 — Core shortener with safety and analytics"
+    includes {
+      "Custom domains"
+      "API access"
+    }
+    exit-criteria {
+      "Custom domain setup completes in under 5 minutes for 90% of publishers"
+      "API documentation published and developer portal live"
+      "API handles 100 req/min per publisher without degradation"
+    }
+  }
+
+  release "R3 — Teams and browser extension" {
+    target-date "Q1 2027"
+    theme "Collaboration and convenience — the growth levers"
+    status planned
+    depends-on "R2 — Custom domains and API"
+    includes {
+      "Team workspaces"
+      "Browser extension"
+    }
+    exit-criteria {
+      "Team workspace creation-to-first-shared-link in under 3 minutes"
+      "Browser extension published on Chrome Web Store and Firefox Add-ons"
+      "14-day trial conversion rate tracking operational"
+    }
+  }
+}

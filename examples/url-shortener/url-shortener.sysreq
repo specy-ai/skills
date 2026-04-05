@@ -1,0 +1,661 @@
+requirements "url-shortener" scoped-to UrlShortenerContext {
+  prd-source "url-shortener.prd"
+
+  module "Link Shortening" {
+
+    REQ-LNK-001 "Short link generation" : event-driven
+      :: "Core utility — the fundamental action that brings publishers to the product"
+      source "Feature: Link shortening — AC: Short link is generated within 1 second of pasting the URL"
+      "When a publisher submits a URL, the system shall generate a unique short link
+       and return it within 1 second."
+      priority must
+
+    REQ-LNK-002 "Automatic clipboard copy" : event-driven
+      :: "Reduces friction — publisher can immediately paste the link elsewhere"
+      source "Feature: Link shortening — AC: Short link is copied to clipboard automatically"
+      "When a short link is generated, the system shall copy it to the clipboard
+       automatically."
+      priority must
+
+    REQ-LNK-003 "Custom slug selection" : event-driven
+      :: "Memorable links increase brand value and verbal shareability"
+      source "Feature: Link shortening — AC: Publisher can optionally customize the slug before confirming"
+      "When a publisher provides a custom slug during link creation, the system shall
+       use the custom slug as the short link identifier."
+      priority must
+
+    REQ-LNK-004 "Custom slug character validation" : ubiquitous
+      :: "Slugs must be URL-safe and readable"
+      source "Feature: Link shortening — AC: Custom slugs support alphanumeric characters and hyphens"
+      "The system shall accept only alphanumeric characters and hyphens in custom slugs."
+      priority must
+
+    REQ-LNK-005 "Custom slug length limit" : ubiquitous
+      :: "Prevents abuse and keeps short links actually short"
+      source "Feature: Link shortening — AC: Slug length is limited to 30 characters"
+      "The system shall reject custom slugs exceeding 30 characters."
+      priority must
+
+    REQ-LNK-006 "Slug availability check" : event-driven
+      :: "Real-time feedback prevents frustration from submitting an unavailable slug"
+      source "Feature: Link shortening — AC: Slug availability is checked in real time as the publisher types"
+      "When a publisher types a custom slug, the system shall check slug availability
+       in real time and display the result."
+      priority must
+
+    REQ-LNK-007 "Slug collision handling" : unwanted
+      :: "Graceful handling of taken slugs avoids dead ends in the creation flow"
+      source "Feature: Link shortening — AC: If the custom slug is taken, an alternative is suggested"
+      "If the requested custom slug is already taken, then the system shall suggest
+       an available alternative slug."
+      priority must
+
+    REQ-LNK-008 "Safety scan before shortening" : ubiquitous
+      :: "Launch requirement — no link may be shortened without a safety scan"
+      source "Constraint: Link safety from day one"
+      "The system shall perform a safety scan on every destination URL before
+       completing the link shortening operation."
+      priority must
+      depends-on REQ-SAF-001
+  }
+
+  module "Auto-Channel Analytics" {
+
+    REQ-ANA-001 "Automatic channel detection" : event-driven
+      :: "Core differentiator — per-channel analytics with zero publisher effort"
+      source "Feature: Auto-channel analytics — Story: As a publisher, I want to see a per-channel breakdown of clicks on each link"
+      "When a click is received on a short link, the system shall automatically
+       detect the referral channel using HTTP referer headers and UTM parameters."
+      priority must
+
+    REQ-ANA-002 "Minimum channel set" : ubiquitous
+      :: "Ensures useful analytics from launch by covering the most common distribution channels"
+      source "Feature: Auto-channel analytics — AC: Channels include at minimum: Twitter/X, LinkedIn, Facebook, Slack, Email, Reddit, Direct/Unknown"
+      "The system shall support channel detection for at minimum Twitter/X, LinkedIn,
+       Facebook, Slack, Email, Reddit, and Direct/Unknown."
+      priority must
+
+    REQ-ANA-003 "Per-channel click breakdown" : event-driven
+      :: "Publishers need to know which channels drive engagement to allocate effort"
+      source "Feature: Auto-channel analytics — AC: Analytics dashboard shows click count per detected channel"
+      "When a publisher views analytics for a link, the system shall display
+       the click count per detected channel."
+      priority must
+
+    REQ-ANA-004 "Near-real-time channel analytics update" : event-driven
+      :: "Publishers checking analytics shortly after sharing need current data"
+      source "Feature: Auto-channel analytics — AC: Click data updates in near-real-time (within 30 seconds)"
+      "When a click is recorded, the system shall update per-channel analytics
+       data within 30 seconds."
+      priority must
+
+    REQ-ANA-005 "Date range filtering" : event-driven
+      :: "Publishers need to compare performance across time periods"
+      source "Feature: Auto-channel analytics — AC: Publisher can filter analytics by date range"
+      "When a publisher specifies a date range filter, the system shall display
+       analytics data restricted to that date range."
+      priority must
+
+    REQ-ANA-006 "Real-time click counter" : event-driven
+      :: "Immediate feedback on link performance drives engagement with the product"
+      source "Feature: Auto-channel analytics — AC: Total click count updates within 5 seconds of a new click"
+      "When a new click is recorded, the system shall update the total click count
+       within 5 seconds."
+      priority must
+
+    REQ-ANA-007 "Click count on list view" : ubiquitous
+      :: "Quick scanning of link performance without opening details reduces friction"
+      source "Feature: Auto-channel analytics — AC: Click count is visible on the link list view without opening details"
+      "The system shall display the total click count for each link on the link
+       list view."
+      priority must
+
+    REQ-ANA-008 "Aggregate analytics — no PII" : ubiquitous
+      :: "GDPR compliance — analytics must be aggregate, not linked to individual consumers"
+      source "Constraint: GDPR compliance"
+      "The system shall store click analytics in aggregate form only, without
+       associating click data with personally identifiable information."
+      priority must
+
+    REQ-ANA-009 "Right to erasure for analytics" : event-driven
+      :: "GDPR mandates the ability to delete personal data upon request"
+      source "Constraint: GDPR compliance"
+      "When a publisher requests account deletion, the system shall delete all
+       analytics data associated with that publisher's links within 30 days."
+      priority must
+  }
+
+  module "Bookmark Collection" {
+
+    REQ-BMK-001 "Automatic bookmark creation" : event-driven
+      :: "Unified shortener and bookmark tool — every short link is also a saved bookmark"
+      source "Feature: Bookmark collection — AC: Link appears in the collection immediately after shortening"
+      "When a link is shortened, the system shall automatically save it to the
+       publisher's bookmark collection."
+      priority must
+
+    REQ-BMK-002 "Automatic metadata extraction" : event-driven
+      :: "Rich metadata makes bookmarks scannable and searchable without manual entry"
+      source "Feature: Bookmark collection — AC: Destination page title and meta description are fetched and stored automatically"
+      "When a link is shortened, the system shall fetch and store the destination
+       page title and meta description automatically."
+      priority must
+
+    REQ-BMK-003 "Preview thumbnail generation" : event-driven
+      :: "Visual previews help publishers recognize links at a glance"
+      source "Feature: Bookmark collection — AC: A preview thumbnail is generated from the destination's Open Graph image"
+      "When a link is shortened, the system shall generate a preview thumbnail
+       from the destination page Open Graph image."
+      priority must
+
+    REQ-BMK-004 "Full-text search" : event-driven
+      :: "Publishers must find saved links quickly — search is the primary retrieval mechanism"
+      source "Feature: Bookmark collection — AC: Full-text search covers link title, URL, tags, and description"
+      "When a publisher enters a search query, the system shall return matching
+       links by searching across link title, URL, tags, and description."
+      priority must
+
+    REQ-BMK-005 "Search response time" : event-driven
+      :: "Fast search is essential to the retrieval experience — slow search defeats the purpose"
+      source "Feature: Bookmark collection — AC: Search results appear within 500ms"
+      "When a publisher submits a search query, the system shall return results
+       within 500 milliseconds."
+      priority must
+
+    REQ-BMK-006 "Tag management" : event-driven
+      :: "Tags enable personal organization and filtered browsing of the collection"
+      source "Feature: Bookmark collection — AC: Publisher can add, remove, and filter by tags"
+      "When a publisher adds, removes, or filters by tags, the system shall update
+       the collection view accordingly."
+      priority must
+
+    REQ-BMK-007 "Collection organization" : ubiquitous
+      :: "Folders or collections let publishers group links by topic or campaign"
+      source "Feature: Bookmark collection — AC: Links can be organized into folders or collections"
+      "The system shall allow publishers to organize links into folders
+       or collections."
+      priority must
+  }
+
+  module "Link Safety Scanning" {
+
+    REQ-SAF-001 "URL safety scan at creation" : event-driven
+      :: "No unsafe link may enter the system — safety from day one"
+      source "Feature: Link safety scanning — Story: As a consumer, I want to see that a link has been verified safe"
+      "When a URL is submitted for shortening, the system shall scan the
+       destination URL against phishing and malware databases."
+      priority must
+
+    REQ-SAF-002 "Safety interstitial display" : event-driven
+      :: "Visible safety verification builds consumer trust in shortened links"
+      source "Feature: Link safety scanning — AC: A brief interstitial (< 500ms) shows the destination domain and a safety badge"
+      "When a consumer clicks a safe short link, the system shall display a brief
+       interstitial showing the destination domain and a verified-safe badge for
+       less than 500 milliseconds before redirecting."
+      priority must
+
+    REQ-SAF-003 "Unsafe link warning page" : unwanted
+      :: "Consumers must be protected from phishing and malware destinations"
+      source "Feature: Link safety scanning — AC: If the destination is flagged as unsafe, the consumer sees a warning page instead of a redirect"
+      "If the destination URL is flagged as unsafe, then the system shall display
+       a warning page instead of redirecting the consumer."
+      priority must
+
+    REQ-SAF-004 "Proceed at own risk option" : event-driven
+      :: "Respects consumer autonomy while making the risk explicit"
+      source "Feature: Link safety scanning — AC: The consumer can choose to proceed to a flagged link at their own risk"
+      "When a consumer views an unsafe link warning, the system shall provide
+       an option to proceed to the destination at the consumer's own risk."
+      priority must
+
+    REQ-SAF-005 "Interstitial opt-out for returning visitors" : state-driven
+      :: "Reduces friction for trusted repeat visitors who have already seen the safety signal"
+      source "Feature: Link safety scanning — AC: The interstitial does not appear for returning visitors who have opted out"
+      "While a consumer has opted out of the safety interstitial, the system shall
+       redirect directly without displaying the interstitial."
+      priority should
+
+    REQ-SAF-006 "Publisher notification on flagged link" : event-driven
+      :: "Publishers need to know when their shared links become dangerous"
+      source "Feature: Link safety scanning — AC: Publisher receives an email notification within 1 hour of a link being flagged"
+      "When a previously safe link is flagged as unsafe, the system shall send an
+       email notification to the publisher within 1 hour."
+      priority must
+
+    REQ-SAF-007 "Flagged link visual indicator" : state-driven
+      :: "Dashboard visibility helps publishers quickly identify and act on unsafe links"
+      source "Feature: Link safety scanning — AC: Flagged links are visually marked in the publisher's dashboard"
+      "While a link is flagged as unsafe, the system shall visually mark it in
+       the publisher's dashboard."
+      priority must
+
+    REQ-SAF-008 "One-click link deactivation" : event-driven
+      :: "Fast remediation — publisher must be able to stop distributing unsafe links immediately"
+      source "Feature: Link safety scanning — AC: Publisher can delete or deactivate flagged links with one click"
+      "When a publisher chooses to deactivate or delete a flagged link, the system
+       shall complete the action in one click."
+      priority must
+
+    REQ-SAF-009 "Periodic re-scanning" : ubiquitous
+      :: "Destinations can become unsafe after initial scan — continuous monitoring is needed"
+      source "Feature: Link safety scanning — summary: scanned at creation time and periodically thereafter"
+      "The system shall periodically re-scan all active destination URLs against
+       phishing and malware databases."
+      priority must
+
+    REQ-SAF-010 "Safety scan detection rate" : ubiquitous
+      :: "High detection rate is the foundation of consumer trust"
+      source "Goal: Build consumer trust through link safety"
+      "The system shall achieve a malicious link detection rate above 99 percent."
+      priority must
+
+    REQ-SAF-011 "Consumer report mechanism" : event-driven
+      :: "No scan is 100% — consumers need a way to report missed threats"
+      source "Feature: Link safety scanning — non-goal: we target 99%+ and provide a report mechanism for missed threats"
+      "When a consumer reports a link as potentially unsafe, the system shall
+       accept the report and initiate a priority safety review."
+      priority should
+  }
+
+  module "Custom Domains" {
+
+    REQ-DOM-001 "CNAME-based domain setup" : event-driven
+      :: "Single DNS record keeps setup trivially easy for non-technical publishers"
+      source "Feature: Custom domains — AC: Setup requires only adding a single CNAME DNS record"
+      "When a publisher initiates custom domain setup, the system shall require only
+       a single CNAME DNS record for configuration."
+      priority should
+
+    REQ-DOM-002 "Domain verification" : event-driven
+      :: "Verification must be fast to maintain the zero-friction promise"
+      source "Feature: Custom domains — AC: Domain verification completes within 5 minutes of DNS propagation"
+      "When DNS propagation is complete, the system shall verify the custom domain
+       within 5 minutes."
+      priority should
+
+    REQ-DOM-003 "Automatic SSL provisioning" : event-driven
+      :: "Manual certificate management is a barrier — automation removes it"
+      source "Feature: Custom domains — AC: SSL certificate is provisioned automatically — no manual certificate upload"
+      "When a custom domain is verified, the system shall automatically provision
+       an SSL certificate without requiring manual upload."
+      priority should
+
+    REQ-DOM-004 "Unified analytics for custom domains" : ubiquitous
+      :: "Publishers must not lose analytics visibility when using custom domains"
+      source "Feature: Custom domains — AC: Custom domain links appear in analytics alongside default domain links"
+      "The system shall display analytics for custom domain links alongside default
+       domain links in a unified view."
+      priority should
+  }
+
+  module "Team Workspaces" {
+
+    REQ-TEM-001 "Workspace creation" : event-driven
+      :: "Low-friction onboarding for team adoption"
+      source "Feature: Team workspaces — AC: Workspace creation takes fewer than 3 steps"
+      "When a team lead creates a workspace, the system shall complete workspace
+       creation in fewer than 3 steps."
+      priority should
+
+    REQ-TEM-002 "Email invitation" : event-driven
+      :: "Email invites are the simplest onboarding path for team members"
+      source "Feature: Team workspaces — AC: Invitations are sent by email with a one-click join link"
+      "When a team lead enters member email addresses, the system shall send
+       invitation emails containing a one-click join link."
+      priority should
+
+    REQ-TEM-003 "Existing collections visible on join" : event-driven
+      :: "New members must see value immediately upon joining"
+      source "Feature: Team workspaces — AC: New members see existing shared collections upon joining"
+      "When a new member joins a workspace, the system shall display all existing
+       shared collections."
+      priority should
+
+    REQ-TEM-004 "Member removal" : event-driven
+      :: "Team leads need control over workspace membership"
+      source "Feature: Team workspaces — AC: Team lead can remove members at any time"
+      "When a team lead removes a member, the system shall revoke the member's
+       access to the workspace immediately."
+      priority should
+
+    REQ-TEM-005 "Team analytics dashboard" : event-driven
+      :: "Aggregated view lets team leads measure overall content performance"
+      source "Feature: Team workspaces — AC: Team dashboard shows total clicks, top-performing links, and per-channel breakdown"
+      "When a team lead views the team dashboard, the system shall display total
+       clicks, top-performing links, and per-channel breakdown across all team links."
+      priority should
+
+    REQ-TEM-006 "Team analytics filtering" : event-driven
+      :: "Drill-down by member, date, and collection enables actionable insights"
+      source "Feature: Team workspaces — AC: Analytics can be filtered by team member, date range, and collection"
+      "When a team lead applies filters on team analytics, the system shall filter
+       results by team member, date range, and collection."
+      priority should
+
+    REQ-TEM-007 "Analytics CSV export" : event-driven
+      :: "Export enables reporting and integration with external tools"
+      source "Feature: Team workspaces — AC: Data is exportable as CSV"
+      "When a team lead requests a data export, the system shall generate a CSV
+       file containing the filtered analytics data."
+      priority should
+
+    REQ-TEM-008 "Shared collection selection" : event-driven
+      :: "Publishers must choose where to save — personal or shared — to maintain organization"
+      source "Feature: Team workspaces — AC: Publisher can choose between personal and shared collections when shortening a link"
+      "When a team member shortens a link, the system shall allow the member to
+       choose between saving to a personal or shared collection."
+      priority should
+
+    REQ-TEM-009 "Shared link visibility" : event-driven
+      :: "Shared collections are the core team collaboration feature"
+      source "Feature: Team workspaces — AC: Shared links appear in the team workspace for all members"
+      "When a link is saved to a shared collection, the system shall make it
+       visible to all workspace members."
+      priority should
+
+    REQ-TEM-010 "Contributor attribution" : ubiquitous
+      :: "Credit encourages contribution and provides accountability"
+      source "Feature: Team workspaces — AC: The original publisher is credited on shared links"
+      "The system shall display the original contributor on every shared link
+       in a team workspace."
+      priority should
+
+    REQ-TEM-011 "Free trial for team workspaces" : event-driven
+      :: "14-day trial lowers the commitment barrier for team adoption"
+      source "Feature: Team workspaces — summary: 14-day free trial"
+      "When a team lead creates a workspace, the system shall start a 14-day
+       free trial."
+      priority should
+  }
+
+  module "API Access" {
+
+    REQ-API-001 "Link shortening endpoint" : event-driven
+      :: "API enables developer integration and workflow automation"
+      source "Feature: API access — AC: POST endpoint accepts a URL and optional custom slug, returns the short link"
+      "When a publisher sends a POST request with a URL and optional custom slug,
+       the system shall return the generated short link."
+      priority should
+
+    REQ-API-002 "API key authentication" : ubiquitous
+      :: "API keys are the simplest authentication model for developer adoption"
+      source "Feature: API access — AC: Authentication via API key in header"
+      "The system shall authenticate API requests using an API key provided
+       in the request header."
+      priority should
+
+    REQ-API-003 "API rate limiting" : ubiquitous
+      :: "Protects the platform from abuse and provides natural upgrade pressure"
+      source "Feature: API access — AC: Rate limited to 100 requests per minute on the free plan"
+      "The system shall enforce a rate limit of 100 requests per minute per
+       publisher on the free plan."
+      priority should
+
+    REQ-API-004 "API response format" : ubiquitous
+      :: "Consistent JSON responses enable reliable client integration"
+      source "Feature: API access — AC: API returns JSON with short URL, slug, and creation timestamp"
+      "The system shall return API responses in JSON format including the short URL,
+       slug, and creation timestamp."
+      priority should
+
+    REQ-API-005 "Analytics retrieval endpoint" : event-driven
+      :: "Programmatic analytics access enables custom dashboards and data pipelines"
+      source "Feature: API access — AC: GET endpoint returns total clicks, per-channel breakdown, and time series"
+      "When a publisher sends a GET request for link analytics, the system shall
+       return total clicks, per-channel breakdown, and time series data."
+      priority should
+
+    REQ-API-006 "Analytics date range filtering via API" : event-driven
+      :: "Date filtering is essential for time-bounded reporting"
+      source "Feature: API access — AC: Supports date range filtering"
+      "When a publisher includes date range parameters in an analytics API request,
+       the system shall return data restricted to the specified range."
+      priority should
+
+    REQ-API-007 "API response pagination" : ubiquitous
+      :: "Pagination prevents response size from growing unbounded for active publishers"
+      source "Feature: API access — AC: Response includes pagination for large result sets"
+      "The system shall paginate API responses for large result sets."
+      priority should
+
+    REQ-API-008 "Rate limit exceeded response" : unwanted
+      :: "Clear error messaging helps developers handle throttling gracefully"
+      source "Feature: API access — AC: Rate limited to 100 requests per minute on the free plan"
+      "If a publisher exceeds the API rate limit, then the system shall return
+       a 429 status code with a retry-after interval."
+      priority should
+  }
+
+  module "Browser Extension" {
+
+    REQ-EXT-001 "One-click shortening from extension" : event-driven
+      :: "In-context shortening eliminates the need to switch to the Sniplink tab"
+      source "Feature: Browser extension — AC: One-click shortening from the extension popup"
+      "When a publisher clicks the extension icon, the system shall shorten the
+       current page URL and display the short link in the popup."
+      priority could
+
+    REQ-EXT-002 "Extension clipboard copy" : event-driven
+      :: "Automatic copy matches the web experience and enables immediate sharing"
+      source "Feature: Browser extension — AC: Short link is copied to clipboard automatically"
+      "When a short link is generated via the extension, the system shall copy it
+       to the clipboard automatically."
+      priority could
+
+    REQ-EXT-003 "Default collection save from extension" : event-driven
+      :: "Every extension-shortened link is also bookmarked — unified experience"
+      source "Feature: Browser extension — AC: Link is saved to the publisher's default collection"
+      "When a link is shortened via the extension, the system shall save it to the
+       publisher's default collection."
+      priority could
+
+    REQ-EXT-004 "Tag entry in extension popup" : event-driven
+      :: "Quick tagging in context improves collection organization"
+      source "Feature: Browser extension — AC: Publisher can optionally add tags in the extension popup"
+      "When a publisher shortens a link via the extension, the system shall allow
+       adding tags in the extension popup before confirming."
+      priority could
+  }
+
+  module "Redirect" {
+
+    REQ-RED-001 "Short link redirect" : event-driven
+      :: "The fundamental consumer experience — clicking a short link reaches the destination"
+      source "Feature: Link shortening"
+      "When a consumer clicks a short link, the system shall redirect the consumer
+       to the destination URL."
+      priority must
+
+    REQ-RED-002 "Click recording with channel" : event-driven
+      :: "Every click feeds the auto-channel analytics — the core differentiator"
+      source "Feature: Auto-channel analytics"
+      "When a consumer clicks a short link, the system shall record the click
+       and the detected referral channel."
+      priority must
+      depends-on REQ-ANA-001
+
+    REQ-RED-003 "Deactivated link handling" : unwanted
+      :: "Consumers must get a clear message when a link has been taken down"
+      source "Feature: Link safety scanning — AC: Publisher can delete or deactivate flagged links with one click"
+      "If a consumer clicks a deactivated short link, then the system shall display
+       an informational page stating the link is no longer active."
+      priority must
+  }
+
+  module "Platform NFRs" {
+
+    // --- Performance ---
+
+    REQ-NFR-001 "Redirect latency" : ubiquitous
+      :: "Sub-200ms redirect keeps the consumer experience frictionless — a contractual constraint"
+      source "Constraint: Sub-200ms redirect latency"
+      "The system shall complete short link redirects, including safety check,
+       within 200 milliseconds at the 95th percentile."
+      priority must
+      decomposed-into {
+        REQ-SAF-002
+        REQ-RED-001
+      }
+
+    REQ-NFR-002 "Link creation latency" : event-driven
+      :: "Fast creation keeps publishers in flow — a stated acceptance criterion"
+      source "Feature: Link shortening — AC: Short link is generated within 1 second of pasting the URL"
+      "When a publisher submits a URL for shortening, the system shall return the
+       short link within 1 second."
+      priority must
+
+    REQ-NFR-003 "Search latency" : event-driven
+      :: "Fast search is essential to the bookmark retrieval experience"
+      source "Feature: Bookmark collection — AC: Search results appear within 500ms"
+      "When a publisher submits a bookmark search query, the system shall return
+       results within 500 milliseconds."
+      priority must
+
+    // --- Availability ---
+
+    REQ-NFR-004 "Redirect service availability" : ubiquitous
+      :: "Redirect is the consumer-facing hot path — downtime breaks every shared link"
+      source "Goal: Build consumer trust through link safety"
+      "The system shall maintain 99.9% availability for the redirect service,
+       measured monthly."
+      priority must
+
+    REQ-NFR-005 "API availability" : ubiquitous
+      :: "Developer integrations depend on reliable API uptime"
+      source "Feature: API access"
+      "The system shall maintain 99.5% availability for the API service,
+       measured monthly."
+      priority should
+
+    // --- Scalability ---
+
+    REQ-NFR-006 "Redirect throughput" : ubiquitous
+      :: "The redirect path must handle viral link traffic without degradation"
+      source "Goal: Drive weekly active publishers"
+      "The system shall sustain at least 10,000 redirect requests per second
+       at peak load."
+      priority must
+
+    REQ-NFR-007 "API throughput per publisher" : ubiquitous
+      :: "Each publisher must get their rate limit allocation without cross-tenant interference"
+      source "Feature: API access — AC: Rate limited to 100 requests per minute on the free plan"
+      "The system shall sustain 100 API requests per minute per publisher without
+       degradation."
+      priority should
+
+    // --- Security ---
+
+    REQ-NFR-008 "Data encryption in transit" : ubiquitous
+      :: "All data in transit must be encrypted to protect publisher and consumer data"
+      source "Constraint: GDPR compliance"
+      "The system shall encrypt all data in transit using TLS 1.2 or higher."
+      priority must
+
+    REQ-NFR-009 "Data encryption at rest" : ubiquitous
+      :: "Stored data — analytics, bookmarks, account info — must be protected"
+      source "Constraint: GDPR compliance"
+      "The system shall encrypt all stored data at rest."
+      priority must
+
+    REQ-NFR-010 "API key security" : ubiquitous
+      :: "API keys are bearer credentials — they must be stored securely"
+      source "Feature: API access — AC: Authentication via API key in header"
+      "The system shall store API keys using one-way hashing and never return
+       full API keys after initial generation."
+      priority should
+
+    // --- Compliance ---
+
+    REQ-NFR-011 "GDPR — no PII in analytics" : ubiquitous
+      :: "GDPR requires that analytics data not be traceable to individual consumers"
+      source "Constraint: GDPR compliance"
+      "The system shall not store personally identifiable information in click
+       analytics data."
+      priority must
+
+    REQ-NFR-012 "GDPR — right to erasure" : event-driven
+      :: "GDPR Article 17 — data subjects can request deletion"
+      source "Constraint: GDPR compliance"
+      "When a publisher requests account deletion, the system shall erase all
+       personal data associated with the account within 30 days."
+      priority must
+
+    REQ-NFR-013 "GDPR — consent for tracking" : event-driven
+      :: "GDPR requires informed consent before processing personal data"
+      source "Constraint: GDPR compliance"
+      "When a publisher creates an account, the system shall obtain explicit
+       consent for click tracking before enabling analytics."
+      priority must
+
+    // --- Resilience ---
+
+    REQ-NFR-014 "Safety API fallback" : unwanted
+      :: "Google Safe Browsing dependency must not become a single point of failure for redirects"
+      source "Risk: Safe Browsing API dependency"
+      "If the external safety scanning service is unavailable, then the system shall
+       proceed with the redirect using cached safety data and log the degraded check."
+      priority must
+
+    REQ-NFR-015 "Safety API circuit breaking" : unwanted
+      :: "Prevents cascading failure when the safety API is consistently failing"
+      source "Risk: Safe Browsing API dependency"
+      "If the external safety scanning service fails for 5 consecutive requests,
+       then the system shall activate a circuit breaker and use cached safety data
+       for subsequent requests until the service recovers."
+      priority should
+
+    // --- Operability ---
+
+    REQ-NFR-016 "Redirect latency monitoring" : ubiquitous
+      :: "The p95 redirect latency target must be observable in production"
+      source "Goal: Build consumer trust through link safety"
+      "The system shall expose redirect latency metrics at p50, p95, and p99
+       percentiles."
+      priority must
+
+    REQ-NFR-017 "Click event audit trail" : ubiquitous
+      :: "Operational visibility into click processing for debugging and incident response"
+      source "Feature: Auto-channel analytics"
+      "The system shall log all click events with timestamp, detected channel,
+       and response status for operational monitoring."
+      priority should
+
+    REQ-NFR-018 "Safety scan detection rate monitoring" : ubiquitous
+      :: "The 99% detection target must be measurable against a test set"
+      source "Goal: Build consumer trust through link safety"
+      "The system shall report the malicious link detection rate monthly,
+       measured against a standardized test set."
+      priority must
+
+    // --- Data Retention ---
+
+    REQ-NFR-019 "Analytics data retention" : ubiquitous
+      :: "Analytics data must be retained long enough for publishers to derive value but not indefinitely"
+      source "Feature: Auto-channel analytics"
+      "The system shall retain click analytics data for at least 24 months."
+      priority should
+
+    REQ-NFR-020 "Backup and recovery" : ubiquitous
+      :: "Data loss of shortened links and bookmarks would destroy publisher trust"
+      source "Feature: Bookmark collection"
+      "The system shall maintain automated backups with a recovery point objective
+       of 1 hour and a recovery time objective of 4 hours."
+      priority must
+
+    // --- Abuse Prevention ---
+
+    REQ-NFR-021 "Link creation abuse prevention" : ubiquitous
+      :: "Bad actors may use Sniplink for mass distribution of malicious links"
+      source "Risk: Abuse for malicious link distribution"
+      "The system shall enforce rate limits on link creation to prevent automated
+       mass link generation."
+      priority must
+
+    REQ-NFR-022 "Abuse reporting mechanism" : event-driven
+      :: "Community reporting supplements automated scanning for missed threats"
+      source "Risk: Abuse for malicious link distribution"
+      "When a consumer or publisher reports a link as abusive, the system shall
+       queue it for priority review and acknowledge the report."
+      priority must
+  }
+}

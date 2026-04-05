@@ -1,0 +1,287 @@
+domain "Orders"
+uses "orders.struct"
+
+// =============================================================================
+// Interactions — command-triggered (intentional)
+// =============================================================================
+
+interaction "Place a new order" {
+  on PlaceOrder
+
+  resolves Customer from PlaceOrder.customerId
+  creates Order
+
+  fails "Customer not found or inactive" when {
+    Customer.status != active
+  }
+
+  fails "Order has no lines" when {
+    isEmpty(PlaceOrder.lines)
+  }
+
+  fails "Some products are unavailable" when {
+    PlaceOrder.lines.product.available != true
+  }
+
+  sets Order.status to draft
+  sets Order.placedAt to now()
+  sets Order.totalAmount to sum(Order.lines.lineTotal)
+
+  emits OrderPlaced
+}
+
+interaction "Confirm an order after payment" {
+  on ConfirmOrder
+
+  resolves Order from ConfirmOrder.orderId
+  resolves Payment via Payment.order from Order
+
+  fails "Order is not in draft status" when {
+    Order.status != draft
+  }
+
+  fails "Order has not been placed yet" when {
+    Order.placedAt is not defined
+  }
+
+  fails "Payment not yet captured" when {
+    Payment.status != captured
+  }
+
+  sets Order.status to confirmed
+  sets Order.confirmedAt to now()
+
+  emits OrderConfirmed
+}
+
+interaction "Cancel an order" {
+  on CancelOrder
+
+  resolves Order from CancelOrder.orderId
+
+  fails "Order cannot be cancelled" when {
+    Order.status not in {draft, confirmed}
+  }
+
+  sets Order.status to cancelled
+  sets Order.cancelledAt to now()
+
+  emits OrderCancelled
+}
+
+interaction "Process payment for an order" {
+  on ProcessPayment
+
+  resolves Order from ProcessPayment.orderId
+  creates Payment
+
+  fails "Order is not in draft status" when {
+    Order.status != draft
+  }
+
+  sets Payment.status to captured
+  sets Payment.processedAt to now()
+  sets Payment.method to ProcessPayment.method
+  sets Payment.amount to Order.totalAmount
+
+  emits PaymentProcessed
+}
+
+interaction "Refund a captured payment" {
+  on RefundPayment
+
+  resolves Payment from RefundPayment.paymentId
+
+  fails "Payment is not captured" when {
+    Payment.status != captured
+  }
+
+  fails "Order is not cancelled" when {
+    Payment.order.status != cancelled
+  }
+
+  sets Payment.status to refunded
+
+  emits PaymentRefunded
+}
+
+interaction "Ship a confirmed order" {
+  on ShipOrder
+
+  resolves Order from ShipOrder.orderId
+  resolves Payment via Payment.order from Order
+
+  fails "Shipping address is missing" when {
+    not (Order.shippingAddress is defined)
+  }
+
+  fails "Order is not confirmed or payment not captured" when {
+    (Order.status != confirmed) or (Payment.status != captured)
+  }
+
+  sets Order.status to shipped
+  sets Order.shippedAt to now()
+
+  emits OrderShipped
+}
+
+interaction "Deliver a shipped order" {
+  on DeliverOrder
+
+  resolves Order from DeliverOrder.orderId
+
+  fails "Order is not shipped" when {
+    Order.status != shipped
+  }
+
+  sets Order.status to delivered
+  sets Order.deliveredAt to now()
+
+  emits OrderDelivered
+}
+
+// =============================================================================
+// Interactions — event-triggered (reactive)
+// =============================================================================
+
+interaction "Notify customer when order is confirmed" {
+  on OrderConfirmed
+
+  triggers notification "Notify customer that order is confirmed"
+  triggers Shipping.PrepareShipment
+    :: "Shipment preparation starts automatically after confirmation"
+}
+
+interaction "Handle payment failure" {
+  on PaymentFailed
+
+  resolves Payment from PaymentFailed.paymentId
+
+  sets Payment.status to failed
+  // NOTE: retry mechanism (infrastructure)
+
+  triggers notification "Notify customer of payment failure"
+}
+
+interaction "Handle order cancellation side effects" {
+  on OrderCancelled
+
+  resolves Order from OrderCancelled.orderId
+
+  foreach Order.lines as line {
+    sets line.product.stockQuantity to line.product.stockQuantity + line.quantity
+      :: "Restore stock for each cancelled line"
+  }
+
+  triggers notification "Notify customer that order is cancelled"
+
+  emits OrderStockRestored
+}
+
+interaction "Notify customer of refund" {
+  on PaymentRefunded
+
+  triggers notification "Notify customer that refund has been processed"
+}
+
+interaction "Notify customer of delivery" {
+  on OrderDelivered
+
+  triggers notification "Notify customer that order has been delivered"
+}
+
+// =============================================================================
+// Policies — preconditions guarding interactions
+// =============================================================================
+
+policy MaxOrderAmount {
+  on "Place a new order", "Confirm an order after payment"
+  must {
+    Order.totalAmount.amount <= 10000
+  }
+  message "Orders above 10000 require manual approval before confirmation"
+}
+
+policy ActiveCustomerRequired {
+  on "Place a new order"
+  must {
+    Customer.status != suspended and Customer.status != closed
+  }
+  message "Suspended or closed customers cannot place new orders"
+}
+
+policy MinimumOrderAmount {
+  on "Place a new order"
+  must {
+    Order.totalAmount.amount >= 1
+  }
+  message "Orders must have a total amount of at least 1"
+}
+
+policy AvailableProductRequired {
+  on "Place a new order"
+  must {
+    Product.available = true
+  }
+  message "Unavailable products cannot be added to orders"
+}
+
+policy DeliveryOnTime {
+  on "Ship a confirmed order", "Deliver a shipped order"
+  must {
+    Order.estimatedDelivery > today()
+  }
+  message "Orders past their estimated delivery date require attention"
+}
+
+policy MaxOrderLines {
+  on "Place a new order"
+  must {
+    count(Order.lines) <= 20
+  }
+  message "Orders with more than 20 lines require manual review"
+}
+
+// =============================================================================
+// Invariants — properties always true after any successful mutation
+// =============================================================================
+
+invariant OrderMustHaveLines {
+  on Order
+  must {
+    isNotEmpty(Order.lines)
+  }
+  message "An order must contain at least one line"
+}
+
+invariant OrderTotalMustBePositive {
+  on Order
+  must {
+    Order.totalAmount.amount >= 0
+  }
+  message "Order total amount must not be negative"
+}
+
+invariant PaymentAmountMustMatchOrder {
+  on Payment
+  must {
+    Payment.amount.amount = Payment.order.totalAmount.amount
+  }
+  message "Payment amount must equal the order total"
+}
+
+invariant OrderLineMustHavePositiveQuantity {
+  on OrderLine
+  must {
+    OrderLine.quantity > 0
+  }
+  message "Order line quantity must be greater than zero"
+}
+
+invariant OrderLineTotal {
+  on OrderLine
+  must {
+    OrderLine.lineTotal.amount = OrderLine.unitPrice.amount * OrderLine.quantity
+  }
+  message "Line total must equal unit price multiplied by quantity"
+}

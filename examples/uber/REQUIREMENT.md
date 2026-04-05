@@ -6,11 +6,11 @@ This directory captures the requirements for a ride-hailing platform organized i
 
 | Bounded Context | Shortname | File | Responsibility |
 |---|---|---|---|
-| Driver Management | DRV | [driver-management.req.md](driver-management.req.md) | Onboarding, identity verification, vehicle registration, availability, ratings, suspension |
-| Rider Management | RDR | [rider-management.req.md](rider-management.req.md) | Rider registration, profile, preferences, ratings, bans |
-| Ride Management | RIDE | [ride-management.req.md](ride-management.req.md) | Ride lifecycle from request to completion — matching, dispatch, tracking, cancellation, completion |
-| Geolocation & Routing | GEO | [geolocation-routing.req.md](geolocation-routing.req.md) | Real-time driver positioning, ETA computation, route calculation, surge zone detection |
-| Payment | PAY | [payment.req.md](payment.req.md) | Fare calculation, payment processing, driver payouts, refunds, invoicing |
+| Driver Management | DRV | [driver-management.sysreq.md](driver-management.sysreq.md) | Onboarding, identity verification, vehicle registration, availability, ratings, suspension |
+| Rider Management | RDR | [rider-management.sysreq.md](rider-management.sysreq.md) | Rider registration, profile, preferences, ratings, bans |
+| Ride Management | RIDE | [ride-management.sysreq.md](ride-management.sysreq.md) | Ride lifecycle from request to completion — matching, dispatch, tracking, cancellation, completion |
+| Geolocation & Routing | GEO | [geolocation-routing.sysreq.md](geolocation-routing.sysreq.md) | Real-time driver positioning, ETA computation, route calculation, surge zone detection |
+| Payment | PAY | [payment.sysreq.md](payment.sysreq.md) | Fare calculation, payment processing, driver payouts, refunds, invoicing |
 
 ## Requirement Summary
 

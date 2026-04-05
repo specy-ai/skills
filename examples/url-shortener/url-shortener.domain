@@ -1,0 +1,2290 @@
+organization "Sniplink" {
+
+  requirements-source "url-shortener.sysreq"
+  prd-source "url-shortener.prd"
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // CONTEXT MAP
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // Link Shortening module   -- OHS -->  Redirect module (published short links consumed by redirect)
+  // Link Shortening module   -- OHS -->  Auto-Channel Analytics module (link created events feed analytics)
+  // Link Shortening module   -- OHS -->  Bookmark Collection module (link created events feed bookmark collection)
+  // Link Safety Scanning module -- OHS -->  Link Shortening module (safety scan results consumed before link creation)
+  // Link Safety Scanning module -- OHS -->  Redirect module (safety status checked on redirect)
+  // Redirect module          -- OHS -->  Auto-Channel Analytics module (click events feed analytics)
+  // Bookmark Collection module -- SK  --   Team Workspaces module (shared collections bridge personal and team)
+  // Custom Domains module    -- C/S -->  Link Shortening module (custom domains used during link creation)
+  // API Access module        -- ACL -->  Link Shortening module (API translates HTTP into domain commands)
+  // API Access module        -- ACL -->  Auto-Channel Analytics module (API translates HTTP into analytics queries)
+
+  context "url-shortener" shortname UrlShortenerContext {
+    requirements-source "url-shortener.sysreq"
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // MODULE: Link Shortening
+    // ═══════════════════════════════════════════════════════════════════════
+
+    module "Link Shortening" {
+      depends on {
+        "Custom Domains"           // CustomDomainId on ShortLink
+        "Link Safety Scanning"     // SafetyScan must complete before shortening
+      }
+
+      module "Link Management" {
+
+        // --- Value Types ---
+
+        value Slug {
+          satisfies [REQ-LNK-004, REQ-LNK-005]
+          :: "A URL-safe identifier that forms the path segment of a short link"
+          value : String
+          invariant "alphanumeric-and-hyphens" {
+            must { value matches [a-zA-Z0-9-]+ }
+            message "A slug must contain only alphanumeric characters and hyphens"
+            enforcement reject
+          }
+          invariant "max-length" {
+            must { value.length <= 30 }
+            message "A slug must not exceed 30 characters"
+            enforcement reject
+          }
+        }
+
+        value ShortUrl {
+          :: "The complete short URL combining domain and slug"
+          domain : String
+          slug : Slug
+        }
+
+        value DestinationUrl {
+          :: "The original long URL that the short link redirects to"
+          url : String
+        }
+
+        value SafetyScanResult {
+          :: "The outcome of a safety scan on a destination URL"
+          status : SafetyStatus
+          scannedAt : DateTime
+        }
+
+        value SafetyStatus {
+          :: "Whether a destination URL is safe, unsafe, or pending scan"
+          enum { Safe, Unsafe, Pending }
+        }
+
+        value LinkStatus {
+          :: "The lifecycle status of a short link"
+          enum { Active, Deactivated, Deleted }
+        }
+
+        // --- Entities ---
+
+        entity ShortLink {
+          satisfies [REQ-LNK-001, REQ-LNK-003, REQ-LNK-008]
+          :: "A shortened URL that redirects to a destination, owned by a publisher"
+          id : ShortLinkId
+          slug : Slug
+          shortUrl : ShortUrl
+          destinationUrl : DestinationUrl
+          publisherId : PublisherId
+          customDomainId : CustomDomainId?
+          safetyScanResult : SafetyScanResult
+          status : LinkStatus
+          createdAt : DateTime
+          deactivatedAt : DateTime?
+
+          operation "shorten url" {
+            satisfies [REQ-LNK-001, REQ-LNK-008]
+            on ShortLink
+            accepts destinationUrl : DestinationUrl, slug : Slug?, publisherId : PublisherId, safetyScanResult : SafetyScanResult
+            returns ShortLink
+            emits LinkShortened
+            emits LinkShorteningFailed
+            precondition "destination-must-be-safe" {
+              safetyScanResult.status = Safe
+              violation "Cannot shorten a URL that has not passed safety scanning"
+            }
+          }
+
+          operation "deactivate link" {
+            satisfies [REQ-SAF-008]
+            on ShortLink
+            accepts reason : String
+            returns ShortLink
+            emits LinkDeactivated
+            precondition "link-must-be-active" {
+              status = Active
+              violation "Only active links can be deactivated"
+            }
+          }
+
+          operation "reactivate link" {
+            on ShortLink
+            accepts safetyScanResult : SafetyScanResult
+            returns ShortLink
+            emits LinkReactivated
+            precondition "link-must-be-deactivated" {
+              status = Deactivated
+              violation "Only deactivated links can be reactivated"
+            }
+            precondition "must-be-safe" {
+              safetyScanResult.status = Safe
+              violation "Cannot reactivate a link that is not safe"
+            }
+          }
+
+          operation "delete link" {
+            on ShortLink
+            returns ShortLink
+            emits LinkDeleted
+          }
+
+          operation "update safety status" {
+            satisfies [REQ-SAF-009]
+            on ShortLink
+            accepts safetyScanResult : SafetyScanResult
+            returns ShortLink
+            emits LinkSafetyStatusUpdated
+            emits LinkFlaggedAsUnsafe
+          }
+        }
+
+        aggregate ShortLinkAggregate {
+          satisfies [REQ-LNK-001]
+          root ShortLink
+        }
+
+        // --- State Machine ---
+
+        statemachine ShortLinkLifecycle {
+          on ShortLink
+          start Active
+
+          state Active {
+            invariant "has-safe-scan" {
+              must { safetyScanResult.status != Pending }
+              message "An active link must have completed safety scanning"
+            }
+          }
+
+          state Deactivated {
+            invariant "has-deactivation-timestamp" {
+              must { deactivatedAt != null }
+              message "A deactivated link must record when it was deactivated"
+            }
+          }
+
+          state Deleted {}
+
+          transition Active -> Deactivated triggered-by "deactivate link"
+          transition Active -> Deleted triggered-by "delete link"
+          transition Deactivated -> Active triggered-by "reactivate link"
+          transition Deactivated -> Deleted triggered-by "delete link"
+
+          final Deleted
+        }
+
+        // --- Commands ---
+
+        command ShortenUrl {
+          satisfies [REQ-LNK-001, REQ-LNK-003]
+          :: "Intent to create a new short link from a destination URL"
+          correlationId : CommandId
+          destinationUrl : DestinationUrl
+          customSlug : Slug?
+          publisherId : PublisherId
+        }
+
+        command DeactivateLink {
+          satisfies [REQ-SAF-008]
+          :: "Intent to deactivate a short link"
+          correlationId : CommandId
+          shortLinkId : ShortLinkId
+          reason : String
+        }
+
+        command DeleteLink {
+          :: "Intent to permanently delete a short link"
+          correlationId : CommandId
+          shortLinkId : ShortLinkId
+        }
+
+        // --- Events ---
+
+        event LinkShortened {
+          satisfies [REQ-LNK-001, REQ-LNK-003]
+          :: "A new short link was successfully created"
+          type internal
+          shortLinkId : ShortLinkId
+          slug : Slug
+          shortUrl : ShortUrl
+          destinationUrl : DestinationUrl
+          publisherId : PublisherId
+          createdAt : DateTime
+        }
+
+        event LinkShorteningFailed {
+          satisfies [REQ-LNK-001]
+          :: "A short link creation failed"
+          type error
+          correlationId : CommandId
+          destinationUrl : DestinationUrl
+          reason : String
+        }
+
+        event LinkDeactivated {
+          satisfies [REQ-SAF-008]
+          :: "A short link was deactivated by the publisher"
+          type internal
+          shortLinkId : ShortLinkId
+          reason : String
+          deactivatedAt : DateTime
+        }
+
+        event LinkReactivated {
+          :: "A previously deactivated short link was reactivated"
+          type internal
+          shortLinkId : ShortLinkId
+          reactivatedAt : DateTime
+        }
+
+        event LinkDeleted {
+          :: "A short link was permanently deleted"
+          type internal
+          shortLinkId : ShortLinkId
+          deletedAt : DateTime
+        }
+
+        event LinkSafetyStatusUpdated {
+          :: "The safety status of a link was updated after a re-scan"
+          type internal
+          shortLinkId : ShortLinkId
+          previousStatus : SafetyStatus
+          newStatus : SafetyStatus
+          scannedAt : DateTime
+        }
+
+        event LinkFlaggedAsUnsafe {
+          satisfies [REQ-SAF-006, REQ-SAF-007]
+          :: "A previously safe link was flagged as unsafe during a re-scan"
+          type internal
+          shortLinkId : ShortLinkId
+          publisherId : PublisherId
+          flaggedAt : DateTime
+        }
+
+        // --- Queries ---
+
+        query CheckSlugAvailability {
+          satisfies [REQ-LNK-006]
+          :: "Check if a given slug is available for use"
+          slug : Slug
+          returns SlugAvailability
+        }
+
+        value SlugAvailability {
+          satisfies [REQ-LNK-006, REQ-LNK-007]
+          slug : Slug
+          available : Boolean
+          suggestedAlternative : Slug?
+        }
+
+        // --- Domain Services ---
+
+        domain-service SlugGenerationService {
+          satisfies [REQ-LNK-001, REQ-LNK-007]
+          :: "Generates unique slugs and suggests alternatives when a custom slug is taken"
+
+          operation "generate slug" {
+            satisfies [REQ-LNK-001]
+            returns Slug
+          }
+
+          operation "suggest alternative slug" {
+            satisfies [REQ-LNK-007]
+            accepts requestedSlug : Slug
+            returns Slug
+          }
+        }
+
+        // --- Reactions ---
+
+        reaction "notify-publisher-on-unsafe-link" {
+          satisfies [REQ-SAF-006]
+          :: "When a link is flagged as unsafe, notify the publisher by email"
+          triggered-by LinkFlaggedAsUnsafe
+          effects NotifyPublisherOfUnsafeLink
+        }
+
+        reaction "deactivate-unsafe-link" {
+          :: "When a link is flagged as unsafe, automatically deactivate it"
+          triggered-by LinkFlaggedAsUnsafe
+          effects DeactivateLink
+        }
+
+        command NotifyPublisherOfUnsafeLink {
+          satisfies [REQ-SAF-006]
+          :: "Intent to send an email notification about an unsafe link"
+          correlationId : CommandId
+          shortLinkId : ShortLinkId
+          publisherId : PublisherId
+        }
+
+        // --- Infrastructure Services ---
+
+        infrastructure-service NotificationService {
+          satisfies [REQ-SAF-006]
+          :: "Sends email notifications to publishers"
+          interface NotificationInterface {
+            operation "send unsafe link notification" {
+              accepts publisherId : PublisherId, shortLinkId : ShortLinkId
+              returns Boolean
+            }
+          }
+        }
+      }
+    }
+
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // MODULE: Link Safety Scanning
+    // ═══════════════════════════════════════════════════════════════════════
+
+    module "Link Safety Scanning" {
+      depends on {
+        "Link Shortening"          // ShortLinkId, DeactivateLink (reaction effect)
+      }
+
+      module "Safety Scanning" {
+
+        // --- Value Types ---
+
+        value ThreatType {
+          :: "The category of threat detected"
+          enum { Phishing, Malware, SocialEngineering, UnwantedSoftware, Unknown }
+        }
+
+        value ScanVerdict {
+          :: "The result of a safety scan"
+          enum { Safe, Unsafe, Inconclusive }
+        }
+
+        value SafetyReport {
+          :: "A consumer-submitted report about a potentially unsafe link"
+          reportId : SafetyReportId
+          shortLinkId : ShortLinkId
+          reportedBy : String
+          reason : String
+          reportedAt : DateTime
+        }
+
+        // --- Entities ---
+
+        entity SafetyScan {
+          satisfies [REQ-SAF-001, REQ-SAF-009, REQ-SAF-010]
+          :: "A safety scan performed on a destination URL"
+          id : SafetyScanId
+          destinationUrl : String
+          shortLinkId : ShortLinkId?
+          verdict : ScanVerdict
+          threats : List<ThreatType>
+          scannedAt : DateTime
+          scanSource : ScanSource
+          expiresAt : DateTime
+
+          operation "scan url" {
+            satisfies [REQ-SAF-001]
+            on SafetyScan
+            accepts destinationUrl : String
+            returns SafetyScan
+            emits UrlScanned
+            emits UrlScanFailed
+          }
+
+          operation "re-scan url" {
+            satisfies [REQ-SAF-009]
+            on SafetyScan
+            accepts destinationUrl : String, shortLinkId : ShortLinkId
+            returns SafetyScan
+            emits UrlRescanned
+            emits UrlFlaggedAsUnsafe
+            emits UrlRescanFailed
+          }
+        }
+
+        value ScanSource {
+          :: "What triggered the scan"
+          enum { Creation, PeriodicRescan, ConsumerReport, PublisherRequest }
+        }
+
+        entity ConsumerSafetyReport {
+          satisfies [REQ-SAF-011]
+          :: "A report submitted by a consumer about a potentially unsafe link"
+          id : SafetyReportId
+          shortLinkId : ShortLinkId
+          reporterIdentifier : String
+          reason : String
+          status : ReportStatus
+          reportedAt : DateTime
+          reviewedAt : DateTime?
+
+          operation "submit safety report" {
+            satisfies [REQ-SAF-011]
+            on ConsumerSafetyReport
+            accepts shortLinkId : ShortLinkId, reporterIdentifier : String, reason : String
+            returns ConsumerSafetyReport
+            emits SafetyReportSubmitted
+          }
+
+          operation "review safety report" {
+            on ConsumerSafetyReport
+            accepts verdict : ScanVerdict
+            returns ConsumerSafetyReport
+            emits SafetyReportReviewed
+          }
+        }
+
+        value ReportStatus {
+          :: "The status of a consumer safety report"
+          enum { Submitted, UnderReview, Resolved, Dismissed }
+        }
+
+        statemachine ConsumerSafetyReportLifecycle {
+          on ConsumerSafetyReport
+          start Submitted
+
+          state Submitted {}
+          state UnderReview {}
+          state Resolved {}
+          state Dismissed {}
+
+          transition Submitted -> UnderReview triggered-by "submit safety report"
+          transition UnderReview -> Resolved triggered-by "review safety report"
+          transition UnderReview -> Dismissed triggered-by "review safety report"
+
+          final Resolved
+          final Dismissed
+        }
+
+        aggregate SafetyScanAggregate {
+          satisfies [REQ-SAF-001]
+          root SafetyScan
+        }
+
+        // --- Commands ---
+
+        command ScanUrl {
+          satisfies [REQ-SAF-001]
+          :: "Intent to scan a URL for safety threats"
+          correlationId : CommandId
+          destinationUrl : String
+        }
+
+        command RescanUrl {
+          satisfies [REQ-SAF-009]
+          :: "Intent to re-scan a previously scanned URL"
+          correlationId : CommandId
+          destinationUrl : String
+          shortLinkId : ShortLinkId
+        }
+
+        command ReportUnsafeLink {
+          satisfies [REQ-SAF-011]
+          :: "Intent to report a link as potentially unsafe"
+          correlationId : CommandId
+          shortLinkId : ShortLinkId
+          reporterIdentifier : String
+          reason : String
+        }
+
+        // --- Events ---
+
+        event UrlScanned {
+          satisfies [REQ-SAF-001]
+          :: "A URL was scanned for safety"
+          type internal
+          safetyScanId : SafetyScanId
+          destinationUrl : String
+          verdict : ScanVerdict
+          threats : List<ThreatType>
+          scannedAt : DateTime
+        }
+
+        event UrlScanFailed {
+          satisfies [REQ-SAF-001]
+          :: "A URL safety scan failed due to an error"
+          type error
+          correlationId : CommandId
+          destinationUrl : String
+          reason : String
+        }
+
+        event UrlRescanned {
+          satisfies [REQ-SAF-009]
+          :: "A URL was re-scanned during periodic safety checks"
+          type internal
+          safetyScanId : SafetyScanId
+          shortLinkId : ShortLinkId
+          destinationUrl : String
+          verdict : ScanVerdict
+          scannedAt : DateTime
+        }
+
+        event UrlFlaggedAsUnsafe {
+          satisfies [REQ-SAF-003, REQ-SAF-006]
+          :: "A previously safe URL was found to be unsafe during a re-scan"
+          type internal
+          safetyScanId : SafetyScanId
+          shortLinkId : ShortLinkId
+          destinationUrl : String
+          threats : List<ThreatType>
+          flaggedAt : DateTime
+        }
+
+        event UrlRescanFailed {
+          :: "A periodic re-scan of a URL failed"
+          type error
+          correlationId : CommandId
+          shortLinkId : ShortLinkId
+          destinationUrl : String
+          reason : String
+        }
+
+        event SafetyReportSubmitted {
+          satisfies [REQ-SAF-011]
+          :: "A consumer submitted a safety report about a link"
+          type internal
+          safetyReportId : SafetyReportId
+          shortLinkId : ShortLinkId
+          reportedAt : DateTime
+        }
+
+        event SafetyReportReviewed {
+          :: "A consumer safety report was reviewed"
+          type internal
+          safetyReportId : SafetyReportId
+          shortLinkId : ShortLinkId
+          verdict : ScanVerdict
+          reviewedAt : DateTime
+        }
+
+        // --- Temporal Events ---
+
+        event PeriodicRescanDue {
+          satisfies [REQ-SAF-009]
+          :: "Periodic re-scan of all active destination URLs is due"
+          type temporal
+          schedule "0 */6 * * *"
+          guard { true }
+        }
+
+        // --- Reactions ---
+
+        reaction "trigger-priority-review-on-report" {
+          satisfies [REQ-SAF-011]
+          :: "When a consumer reports a link, trigger a priority re-scan"
+          triggered-by SafetyReportSubmitted
+          effects RescanUrl
+        }
+
+        reaction "flag-link-on-unsafe-rescan" {
+          satisfies [REQ-SAF-006]
+          :: "When a re-scan finds an unsafe URL, propagate the flag to the link context"
+          triggered-by UrlFlaggedAsUnsafe
+          effects DeactivateLink
+        }
+
+        // --- Infrastructure Services ---
+
+        infrastructure-service ThreatIntelligenceService {
+          satisfies [REQ-SAF-001, REQ-SAF-010, REQ-NFR-014, REQ-NFR-015]
+          :: "Adapter for external safety scanning APIs (e.g. Google Safe Browsing)"
+          interface ThreatIntelligenceInterface {
+            operation "check url safety" {
+              accepts url : String
+              returns ScanVerdict
+            }
+
+            operation "check url safety with cache fallback" {
+              satisfies [REQ-NFR-014]
+              accepts url : String
+              returns ScanVerdict
+            }
+          }
+        }
+
+        // --- Invariants ---
+
+        invariant "safety-scan-before-shortening" {
+          satisfies [REQ-LNK-008, REQ-SAF-001]
+          :: "Every destination URL must be scanned before a short link is created"
+          on SafetyScan
+          must { scannedAt != null and verdict != null }
+          message "A safety scan must complete before link shortening proceeds"
+          enforcement reject
+        }
+      }
+    }
+
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // MODULE: Redirect
+    // ═══════════════════════════════════════════════════════════════════════
+
+    module "Redirect" {
+      depends on {
+        "Link Shortening"          // ShortLinkId, SafetyStatus, LinkStatus
+        "Link Safety Scanning"     // safety status checked on redirect
+      }
+
+      module "Click Handling" {
+
+        // --- Value Types ---
+
+        value ReferralChannel {
+          satisfies [REQ-ANA-001, REQ-ANA-002]
+          :: "The detected source channel of a click"
+          enum { TwitterX, LinkedIn, Facebook, Slack, Email, Reddit, DirectUnknown }
+        }
+
+        value ClickContext {
+          :: "Contextual data captured at click time"
+          refererHeader : String?
+          utmSource : String?
+          utmMedium : String?
+          userAgent : String
+          ipCountry : String?
+          clickedAt : DateTime
+        }
+
+        value RedirectOutcome {
+          :: "The result of processing a redirect request"
+          enum { Redirected, InterstitialShown, WarningPageShown, DeactivatedPageShown }
+        }
+
+        value InterstitialPreference {
+          satisfies [REQ-SAF-005]
+          :: "Whether a consumer has opted out of the safety interstitial"
+          optedOut : Boolean
+        }
+
+        // --- Entities ---
+
+        entity Click {
+          satisfies [REQ-RED-001, REQ-RED-002]
+          :: "A recorded click on a short link"
+          id : ClickId
+          shortLinkId : ShortLinkId
+          channel : ReferralChannel
+          clickContext : ClickContext
+          outcome : RedirectOutcome
+          clickedAt : DateTime
+
+          operation "record click and redirect" {
+            satisfies [REQ-RED-001, REQ-RED-002]
+            on Click
+            accepts shortLinkId : ShortLinkId, clickContext : ClickContext, safetyStatus : SafetyStatus, linkStatus : LinkStatus, interstitialPreference : InterstitialPreference
+            returns Click
+            emits ClickRecorded
+            emits DeactivatedLinkAccessed
+            precondition "link-exists" {
+              shortLinkId != null
+              violation "The short link does not exist"
+            }
+          }
+        }
+
+        aggregate ClickAggregate {
+          satisfies [REQ-RED-001]
+          root Click
+        }
+
+        // --- Commands ---
+
+        command ProcessRedirect {
+          satisfies [REQ-RED-001]
+          :: "Intent to process a click on a short link and redirect"
+          correlationId : CommandId
+          slug : String
+          clickContext : ClickContext
+          interstitialPreference : InterstitialPreference
+        }
+
+        // --- Events ---
+
+        event ClickRecorded {
+          satisfies [REQ-RED-001, REQ-RED-002, REQ-ANA-001]
+          :: "A click on a short link was recorded with channel attribution"
+          type internal
+          clickId : ClickId
+          shortLinkId : ShortLinkId
+          channel : ReferralChannel
+          clickedAt : DateTime
+          outcome : RedirectOutcome
+        }
+
+        event DeactivatedLinkAccessed {
+          satisfies [REQ-RED-003]
+          :: "A consumer attempted to access a deactivated link"
+          type internal
+          shortLinkId : ShortLinkId
+          clickedAt : DateTime
+        }
+
+        event UnsafeLinkAccessAttempted {
+          satisfies [REQ-SAF-003]
+          :: "A consumer attempted to access a link flagged as unsafe"
+          type internal
+          shortLinkId : ShortLinkId
+          clickedAt : DateTime
+        }
+
+        event ConsumerProceededToUnsafeLink {
+          satisfies [REQ-SAF-004]
+          :: "A consumer chose to proceed to a flagged destination at their own risk"
+          type internal
+          shortLinkId : ShortLinkId
+          clickedAt : DateTime
+        }
+
+        // --- Domain Services ---
+
+        domain-service ChannelDetectionService {
+          satisfies [REQ-ANA-001, REQ-ANA-002]
+          :: "Detects the referral channel from click context using referer headers and UTM parameters"
+
+          operation "detect channel" {
+            satisfies [REQ-ANA-001]
+            accepts clickContext : ClickContext
+            returns ReferralChannel
+          }
+        }
+
+        domain-service RedirectOrchestrationService {
+          satisfies [REQ-RED-001, REQ-SAF-002, REQ-SAF-003, REQ-SAF-005]
+          :: "Orchestrates the redirect flow including safety check, interstitial, and warning page"
+
+          operation "resolve redirect" {
+            satisfies [REQ-RED-001, REQ-SAF-002, REQ-SAF-003]
+            accepts slug : String, clickContext : ClickContext, interstitialPreference : InterstitialPreference
+            returns RedirectOutcome
+          }
+        }
+
+        // --- Invariants ---
+
+        invariant "aggregate-analytics-no-pii" {
+          satisfies [REQ-ANA-008, REQ-NFR-011]
+          :: "Click data must not contain personally identifiable information"
+          on Click
+          must { clickContext does not contain PII }
+          message "Click analytics must be stored in aggregate form without PII"
+          enforcement reject
+        }
+      }
+    }
+
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // MODULE: Auto-Channel Analytics
+    // ═══════════════════════════════════════════════════════════════════════
+
+    module "Auto-Channel Analytics" {
+      depends on {
+        "Redirect"                 // ClickRecordedExternal event, ReferralChannel
+        "Link Shortening"          // ShortLinkId
+      }
+
+      module "Analytics" {
+
+        // --- Value Types ---
+
+        value ChannelBreakdown {
+          satisfies [REQ-ANA-003]
+          :: "Click counts broken down by referral channel"
+          entries : List<ChannelClickCount>
+        }
+
+        value ChannelClickCount {
+          :: "Click count for a single channel"
+          channel : ReferralChannel
+          clickCount : Integer
+        }
+
+        value DateRange {
+          satisfies [REQ-ANA-005]
+          :: "A time period for filtering analytics"
+          from : Date
+          to : Date
+          invariant "from-before-to" {
+            must { from <= to }
+            message "Start date must be before or equal to end date"
+            enforcement reject
+          }
+        }
+
+        value TimeSeries {
+          :: "Click data points over time"
+          dataPoints : List<TimeSeriesPoint>
+        }
+
+        value TimeSeriesPoint {
+          :: "A single data point in a time series"
+          date : Date
+          clickCount : Integer
+        }
+
+        value AnalyticsSummary {
+          satisfies [REQ-ANA-003, REQ-ANA-007]
+          :: "Aggregated analytics for a short link"
+          shortLinkId : ShortLinkId
+          totalClicks : Integer
+          channelBreakdown : ChannelBreakdown
+          timeSeries : TimeSeries
+        }
+
+        // --- Entities ---
+
+        entity LinkAnalytics {
+          satisfies [REQ-ANA-003, REQ-ANA-004, REQ-ANA-006, REQ-ANA-007]
+          :: "Aggregated click analytics for a single short link"
+          id : LinkAnalyticsId
+          shortLinkId : ShortLinkId
+          publisherId : PublisherId
+          totalClicks : Integer
+          channelBreakdown : ChannelBreakdown
+          lastUpdatedAt : DateTime
+
+          operation "increment click count" {
+            satisfies [REQ-ANA-004, REQ-ANA-006]
+            on LinkAnalytics
+            accepts channel : ReferralChannel, clickedAt : DateTime
+            returns LinkAnalytics
+            emits AnalyticsUpdated
+          }
+
+          operation "delete analytics for publisher" {
+            satisfies [REQ-ANA-009]
+            on LinkAnalytics
+            accepts publisherId : PublisherId
+            returns void
+            emits PublisherAnalyticsDeleted
+          }
+        }
+
+        aggregate LinkAnalyticsAggregate {
+          satisfies [REQ-ANA-003]
+          root LinkAnalytics
+        }
+
+        // --- Commands ---
+
+        command UpdateAnalytics {
+          satisfies [REQ-ANA-004]
+          :: "Intent to update analytics with a new click event"
+          correlationId : CommandId
+          shortLinkId : ShortLinkId
+          channel : ReferralChannel
+          clickedAt : DateTime
+        }
+
+        command DeletePublisherAnalytics {
+          satisfies [REQ-ANA-009]
+          :: "Intent to delete all analytics data for a publisher (GDPR right to erasure)"
+          correlationId : CommandId
+          publisherId : PublisherId
+        }
+
+        // --- Events ---
+
+        event AnalyticsUpdated {
+          satisfies [REQ-ANA-004, REQ-ANA-006]
+          :: "Link analytics were updated with a new click"
+          type internal
+          linkAnalyticsId : LinkAnalyticsId
+          shortLinkId : ShortLinkId
+          channel : ReferralChannel
+          newTotalClicks : Integer
+          updatedAt : DateTime
+        }
+
+        event PublisherAnalyticsDeleted {
+          satisfies [REQ-ANA-009]
+          :: "All analytics data for a publisher was deleted"
+          type internal
+          publisherId : PublisherId
+          deletedAt : DateTime
+        }
+
+        // --- External Events (consumed from Redirect module) ---
+
+        event ClickRecordedExternal {
+          satisfies [REQ-ANA-001]
+          :: "A click was recorded in the Redirect module — consumed to update analytics"
+          type external
+          correlationId : ClickId
+          shortLinkId : ShortLinkId
+          channel : ReferralChannel
+          clickedAt : DateTime
+        }
+
+        // --- Queries ---
+
+        query GetLinkAnalytics {
+          satisfies [REQ-ANA-003]
+          :: "Retrieve analytics for a specific short link"
+          shortLinkId : ShortLinkId
+          dateRange : DateRange?
+          returns AnalyticsSummary
+        }
+
+        query GetPublisherAnalyticsSummary {
+          satisfies [REQ-ANA-007]
+          :: "Retrieve aggregated analytics across all links for a publisher"
+          publisherId : PublisherId
+          dateRange : DateRange?
+          returns List<AnalyticsSummary>
+        }
+
+        // --- Reactions ---
+
+        reaction "update-analytics-on-click" {
+          satisfies [REQ-ANA-004]
+          :: "When a click is recorded in the redirect module, update analytics"
+          triggered-by ClickRecordedExternal
+          effects UpdateAnalytics
+        }
+
+        // --- Invariants ---
+
+        invariant "no-pii-in-analytics" {
+          satisfies [REQ-ANA-008, REQ-NFR-011]
+          :: "Analytics data must never contain personally identifiable information"
+          on LinkAnalytics
+          must { no field contains PII }
+          message "Click analytics must be stored in aggregate form only, without PII"
+          enforcement reject
+        }
+
+        invariant "analytics-retention" {
+          satisfies [REQ-NFR-019]
+          :: "Analytics data must be retained for at least 24 months"
+          on LinkAnalytics
+          must { retentionPeriod >= 24 months }
+          message "Analytics data must be retained for at least 24 months"
+          enforcement alert
+        }
+      }
+    }
+
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // MODULE: Bookmark Collection
+    // ═══════════════════════════════════════════════════════════════════════
+
+    module "Bookmark Collection" {
+      depends on {
+        "Link Shortening"          // LinkShortenedExternal event, ShortLinkId
+      }
+
+      module "Collection Management" {
+
+        // --- Value Types ---
+
+        value PageMetadata {
+          satisfies [REQ-BMK-002]
+          :: "Metadata extracted from the destination page"
+          title : String?
+          description : String?
+          thumbnailUrl : String?
+        }
+
+        value Tag {
+          satisfies [REQ-BMK-006]
+          :: "A label used to categorize bookmarks"
+          name : String
+        }
+
+        // --- Entities ---
+
+        entity Bookmark {
+          satisfies [REQ-BMK-001, REQ-BMK-002, REQ-BMK-003]
+          :: "A saved link in the publisher's collection with enriched metadata"
+          id : BookmarkId
+          shortLinkId : ShortLinkId
+          publisherId : PublisherId
+          destinationUrl : String
+          shortUrl : String
+          metadata : PageMetadata
+          tags : List<Tag>
+          folderId : FolderId?
+          createdAt : DateTime
+          updatedAt : DateTime?
+
+          operation "create bookmark" {
+            satisfies [REQ-BMK-001, REQ-BMK-002, REQ-BMK-003]
+            on Bookmark
+            accepts shortLinkId : ShortLinkId, publisherId : PublisherId, destinationUrl : String, shortUrl : String, metadata : PageMetadata
+            returns Bookmark
+            emits BookmarkCreated
+          }
+
+          operation "add tag" {
+            satisfies [REQ-BMK-006]
+            on Bookmark
+            accepts tag : Tag
+            returns Bookmark
+            emits TagAdded
+          }
+
+          operation "remove tag" {
+            satisfies [REQ-BMK-006]
+            on Bookmark
+            accepts tag : Tag
+            returns Bookmark
+            emits TagRemoved
+          }
+
+          operation "move to folder" {
+            satisfies [REQ-BMK-007]
+            on Bookmark
+            accepts folderId : FolderId
+            returns Bookmark
+            emits BookmarkMovedToFolder
+          }
+        }
+
+        entity Folder {
+          satisfies [REQ-BMK-007]
+          :: "A container for organizing bookmarks"
+          id : FolderId
+          publisherId : PublisherId
+          name : String
+          parentFolderId : FolderId?
+          createdAt : DateTime
+
+          operation "create folder" {
+            satisfies [REQ-BMK-007]
+            on Folder
+            accepts publisherId : PublisherId, name : String, parentFolderId : FolderId?
+            returns Folder
+            emits FolderCreated
+          }
+
+          operation "rename folder" {
+            on Folder
+            accepts name : String
+            returns Folder
+            emits FolderRenamed
+          }
+
+          operation "delete folder" {
+            on Folder
+            returns Folder
+            emits FolderDeleted
+          }
+        }
+
+        aggregate BookmarkAggregate {
+          satisfies [REQ-BMK-001]
+          root Bookmark
+        }
+
+        aggregate FolderAggregate {
+          satisfies [REQ-BMK-007]
+          root Folder
+        }
+
+        // --- Commands ---
+
+        command CreateBookmark {
+          satisfies [REQ-BMK-001]
+          :: "Intent to save a shortened link as a bookmark"
+          correlationId : CommandId
+          shortLinkId : ShortLinkId
+          publisherId : PublisherId
+          destinationUrl : String
+          shortUrl : String
+        }
+
+        command AddTagToBookmark {
+          satisfies [REQ-BMK-006]
+          :: "Intent to add a tag to a bookmark"
+          correlationId : CommandId
+          bookmarkId : BookmarkId
+          tag : Tag
+        }
+
+        command RemoveTagFromBookmark {
+          satisfies [REQ-BMK-006]
+          :: "Intent to remove a tag from a bookmark"
+          correlationId : CommandId
+          bookmarkId : BookmarkId
+          tag : Tag
+        }
+
+        command MoveBookmarkToFolder {
+          satisfies [REQ-BMK-007]
+          :: "Intent to move a bookmark into a folder"
+          correlationId : CommandId
+          bookmarkId : BookmarkId
+          folderId : FolderId
+        }
+
+        command CreateFolder {
+          satisfies [REQ-BMK-007]
+          :: "Intent to create a new folder"
+          correlationId : CommandId
+          publisherId : PublisherId
+          name : String
+          parentFolderId : FolderId?
+        }
+
+        // --- Events ---
+
+        event BookmarkCreated {
+          satisfies [REQ-BMK-001]
+          :: "A new bookmark was created from a shortened link"
+          type internal
+          bookmarkId : BookmarkId
+          shortLinkId : ShortLinkId
+          publisherId : PublisherId
+          destinationUrl : String
+          createdAt : DateTime
+        }
+
+        event TagAdded {
+          satisfies [REQ-BMK-006]
+          :: "A tag was added to a bookmark"
+          type internal
+          bookmarkId : BookmarkId
+          tag : Tag
+        }
+
+        event TagRemoved {
+          satisfies [REQ-BMK-006]
+          :: "A tag was removed from a bookmark"
+          type internal
+          bookmarkId : BookmarkId
+          tag : Tag
+        }
+
+        event BookmarkMovedToFolder {
+          satisfies [REQ-BMK-007]
+          :: "A bookmark was moved to a folder"
+          type internal
+          bookmarkId : BookmarkId
+          folderId : FolderId
+        }
+
+        event FolderCreated {
+          satisfies [REQ-BMK-007]
+          :: "A new folder was created"
+          type internal
+          folderId : FolderId
+          publisherId : PublisherId
+          name : String
+        }
+
+        event FolderRenamed {
+          :: "A folder was renamed"
+          type internal
+          folderId : FolderId
+          newName : String
+        }
+
+        event FolderDeleted {
+          :: "A folder was deleted"
+          type internal
+          folderId : FolderId
+        }
+
+        // --- External Events (consumed from Link Shortening module) ---
+
+        event LinkShortenedExternal {
+          satisfies [REQ-BMK-001]
+          :: "A link was shortened in the Link Shortening module — consumed to create a bookmark"
+          type external
+          correlationId : ShortLinkId
+          shortLinkId : ShortLinkId
+          destinationUrl : String
+          shortUrl : String
+          publisherId : PublisherId
+        }
+
+        // --- Queries ---
+
+        query SearchBookmarks {
+          satisfies [REQ-BMK-004, REQ-BMK-005]
+          :: "Full-text search across bookmarks"
+          publisherId : PublisherId
+          queryText : String
+          tags : List<Tag>?
+          folderId : FolderId?
+          returns List<Bookmark>
+        }
+
+        query GetBookmarksByFolder {
+          satisfies [REQ-BMK-007]
+          :: "Retrieve all bookmarks in a folder"
+          folderId : FolderId
+          returns List<Bookmark>
+        }
+
+        query GetBookmarksByTag {
+          satisfies [REQ-BMK-006]
+          :: "Retrieve bookmarks filtered by tag"
+          publisherId : PublisherId
+          tag : Tag
+          returns List<Bookmark>
+        }
+
+        // --- Reactions ---
+
+        reaction "create-bookmark-on-link-shortened" {
+          satisfies [REQ-BMK-001]
+          :: "When a link is shortened, automatically create a bookmark"
+          triggered-by LinkShortenedExternal
+          effects CreateBookmark
+        }
+
+        // --- Infrastructure Services ---
+
+        infrastructure-service MetadataExtractionService {
+          satisfies [REQ-BMK-002, REQ-BMK-003]
+          :: "Fetches page metadata and Open Graph images from destination URLs"
+          interface MetadataExtractionInterface {
+            operation "extract page metadata" {
+              satisfies [REQ-BMK-002]
+              accepts url : String
+              returns PageMetadata
+            }
+
+            operation "generate preview thumbnail" {
+              satisfies [REQ-BMK-003]
+              accepts openGraphImageUrl : String
+              returns String
+            }
+          }
+        }
+
+        infrastructure-service SearchIndexService {
+          satisfies [REQ-BMK-004, REQ-BMK-005]
+          :: "Full-text search index for bookmarks"
+          interface SearchIndexInterface {
+            operation "index bookmark" {
+              accepts bookmark : Bookmark
+              returns Boolean
+            }
+
+            operation "search" {
+              satisfies [REQ-BMK-004]
+              accepts queryText : String, publisherId : PublisherId
+              returns List<BookmarkId>
+            }
+          }
+        }
+      }
+    }
+
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // MODULE: Custom Domains
+    // ═══════════════════════════════════════════════════════════════════════
+
+    module "Custom Domains" {
+
+      module "Domain Management" {
+
+        // --- Value Types ---
+
+        value DomainName {
+          :: "A custom domain name (e.g., go.acme.com)"
+          value : String
+        }
+
+        value DnsRecord {
+          satisfies [REQ-DOM-001]
+          :: "The CNAME DNS record required for domain setup"
+          recordType : String
+          name : String
+          target : String
+        }
+
+        value VerificationStatus {
+          :: "The status of domain DNS verification"
+          enum { Pending, Verified, Failed }
+        }
+
+        value SslStatus {
+          :: "The status of SSL certificate provisioning"
+          enum { Pending, Provisioned, Expired, Failed }
+        }
+
+        // --- Entities ---
+
+        entity CustomDomain {
+          satisfies [REQ-DOM-001, REQ-DOM-002, REQ-DOM-003, REQ-DOM-004]
+          :: "A publisher's custom domain configured for branded short links"
+          id : CustomDomainId
+          publisherId : PublisherId
+          domainName : DomainName
+          requiredDnsRecord : DnsRecord
+          verificationStatus : VerificationStatus
+          sslStatus : SslStatus
+          createdAt : DateTime
+          verifiedAt : DateTime?
+          sslProvisionedAt : DateTime?
+
+          operation "initiate domain setup" {
+            satisfies [REQ-DOM-001]
+            on CustomDomain
+            accepts publisherId : PublisherId, domainName : DomainName
+            returns CustomDomain
+            emits DomainSetupInitiated
+          }
+
+          operation "verify domain" {
+            satisfies [REQ-DOM-002]
+            on CustomDomain
+            returns CustomDomain
+            emits DomainVerified
+            emits DomainVerificationFailed
+          }
+
+          operation "provision ssl" {
+            satisfies [REQ-DOM-003]
+            on CustomDomain
+            returns CustomDomain
+            emits SslProvisioned
+            emits SslProvisioningFailed
+            precondition "domain-must-be-verified" {
+              verificationStatus = Verified
+              violation "SSL can only be provisioned for verified domains"
+            }
+          }
+
+          operation "deactivate domain" {
+            on CustomDomain
+            returns CustomDomain
+            emits DomainDeactivated
+          }
+        }
+
+        aggregate CustomDomainAggregate {
+          satisfies [REQ-DOM-001]
+          root CustomDomain
+        }
+
+        // --- State Machine ---
+
+        statemachine CustomDomainLifecycle {
+          on CustomDomain
+          start PendingVerification
+
+          state PendingVerification {
+            invariant "has-dns-record" {
+              must { requiredDnsRecord != null }
+              message "A pending domain must have a required DNS record defined"
+            }
+          }
+
+          state Verified {
+            invariant "has-verification-timestamp" {
+              must { verifiedAt != null }
+              message "A verified domain must record when verification completed"
+            }
+          }
+
+          state SslProvisioned {
+            invariant "has-ssl-timestamp" {
+              must { sslProvisionedAt != null }
+              message "An SSL-provisioned domain must record when the certificate was provisioned"
+            }
+          }
+
+          state Active {}
+
+          state Deactivated {}
+
+          transition PendingVerification -> Verified triggered-by "verify domain"
+          transition PendingVerification -> PendingVerification triggered-by "verify domain"
+          transition Verified -> SslProvisioned triggered-by "provision ssl"
+          transition SslProvisioned -> Active triggered-by "provision ssl"
+          transition Active -> Deactivated triggered-by "deactivate domain"
+
+          final Deactivated
+        }
+
+        // --- Commands ---
+
+        command InitiateDomainSetup {
+          satisfies [REQ-DOM-001]
+          :: "Intent to set up a custom domain"
+          correlationId : CommandId
+          publisherId : PublisherId
+          domainName : DomainName
+        }
+
+        command VerifyDomain {
+          satisfies [REQ-DOM-002]
+          :: "Intent to verify a custom domain's DNS configuration"
+          correlationId : CommandId
+          customDomainId : CustomDomainId
+        }
+
+        // --- Events ---
+
+        event DomainSetupInitiated {
+          satisfies [REQ-DOM-001]
+          :: "A custom domain setup was initiated"
+          type internal
+          customDomainId : CustomDomainId
+          publisherId : PublisherId
+          domainName : DomainName
+          requiredDnsRecord : DnsRecord
+          initiatedAt : DateTime
+        }
+
+        event DomainVerified {
+          satisfies [REQ-DOM-002]
+          :: "A custom domain was successfully verified"
+          type internal
+          customDomainId : CustomDomainId
+          verifiedAt : DateTime
+        }
+
+        event DomainVerificationFailed {
+          satisfies [REQ-DOM-002]
+          :: "Domain verification failed — DNS record not found or incorrect"
+          type error
+          customDomainId : CustomDomainId
+          reason : String
+        }
+
+        event SslProvisioned {
+          satisfies [REQ-DOM-003]
+          :: "SSL certificate was automatically provisioned for a custom domain"
+          type internal
+          customDomainId : CustomDomainId
+          provisionedAt : DateTime
+        }
+
+        event SslProvisioningFailed {
+          satisfies [REQ-DOM-003]
+          :: "SSL certificate provisioning failed"
+          type error
+          customDomainId : CustomDomainId
+          reason : String
+        }
+
+        event DomainDeactivated {
+          :: "A custom domain was deactivated"
+          type internal
+          customDomainId : CustomDomainId
+          deactivatedAt : DateTime
+        }
+
+        // --- Reactions ---
+
+        reaction "provision-ssl-after-verification" {
+          satisfies [REQ-DOM-003]
+          :: "When a domain is verified, automatically provision SSL"
+          triggered-by DomainVerified
+          effects ProvisionSsl
+        }
+
+        command ProvisionSsl {
+          satisfies [REQ-DOM-003]
+          :: "Intent to provision an SSL certificate for a verified domain"
+          correlationId : CommandId
+          customDomainId : CustomDomainId
+        }
+
+        // --- Infrastructure Services ---
+
+        infrastructure-service DnsVerificationService {
+          satisfies [REQ-DOM-002]
+          :: "Verifies DNS CNAME records for custom domains"
+          interface DnsVerificationInterface {
+            operation "check cname record" {
+              accepts domainName : String, expectedTarget : String
+              returns Boolean
+            }
+          }
+        }
+
+        infrastructure-service SslCertificateService {
+          satisfies [REQ-DOM-003]
+          :: "Provisions and manages SSL certificates for custom domains"
+          interface SslCertificateInterface {
+            operation "provision certificate" {
+              accepts domainName : String
+              returns Boolean
+            }
+
+            operation "check certificate status" {
+              accepts domainName : String
+              returns SslStatus
+            }
+          }
+        }
+      }
+    }
+
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // MODULE: Team Workspaces
+    // ═══════════════════════════════════════════════════════════════════════
+
+    module "Team Workspaces" {
+      depends on {
+        "Link Shortening"          // ShortLinkId
+        "Auto-Channel Analytics"   // ChannelBreakdown, DateRange for team analytics
+        "Bookmark Collection"      // shared collections bridge (Shared Kernel)
+      }
+
+      module "Workspace Management" {
+
+        // --- Value Types ---
+
+        value MemberRole {
+          :: "The role of a member within a workspace"
+          enum { Lead, Member }
+        }
+
+        value TrialStatus {
+          satisfies [REQ-TEM-011]
+          :: "The status of a workspace's free trial"
+          enum { Active, Expired, Converted }
+        }
+
+        value InvitationStatus {
+          :: "The status of a workspace invitation"
+          enum { Pending, Accepted, Revoked }
+        }
+
+        // --- Entities ---
+
+        entity Workspace {
+          satisfies [REQ-TEM-001, REQ-TEM-011]
+          :: "A shared space for team collaboration on links and analytics"
+          id : WorkspaceId
+          name : String
+          createdBy : PublisherId
+          trialStatus : TrialStatus
+          trialStartedAt : DateTime
+          trialEndsAt : DateTime
+          createdAt : DateTime
+
+          operation "create workspace" {
+            satisfies [REQ-TEM-001, REQ-TEM-011]
+            on Workspace
+            accepts name : String, createdBy : PublisherId
+            returns Workspace
+            emits WorkspaceCreated
+            postcondition "trial-started" {
+              trialStatus = Active and trialEndsAt = createdAt + 14 days
+            }
+          }
+        }
+
+        entity WorkspaceMember {
+          satisfies [REQ-TEM-002, REQ-TEM-004, REQ-TEM-010]
+          :: "A member of a team workspace"
+          id : WorkspaceMemberId
+          workspaceId : WorkspaceId
+          publisherId : PublisherId
+          role : MemberRole
+          joinedAt : DateTime
+          removedAt : DateTime?
+
+          operation "add member" {
+            satisfies [REQ-TEM-002, REQ-TEM-003]
+            on WorkspaceMember
+            accepts workspaceId : WorkspaceId, publisherId : PublisherId, role : MemberRole
+            returns WorkspaceMember
+            emits MemberJoined
+          }
+
+          operation "remove member" {
+            satisfies [REQ-TEM-004]
+            on WorkspaceMember
+            returns WorkspaceMember
+            emits MemberRemoved
+          }
+        }
+
+        entity WorkspaceInvitation {
+          satisfies [REQ-TEM-002]
+          :: "An invitation sent to a potential workspace member"
+          id : InvitationId
+          workspaceId : WorkspaceId
+          email : String
+          status : InvitationStatus
+          invitedBy : PublisherId
+          sentAt : DateTime
+          acceptedAt : DateTime?
+
+          operation "send invitation" {
+            satisfies [REQ-TEM-002]
+            on WorkspaceInvitation
+            accepts workspaceId : WorkspaceId, email : String, invitedBy : PublisherId
+            returns WorkspaceInvitation
+            emits InvitationSent
+          }
+
+          operation "accept invitation" {
+            satisfies [REQ-TEM-002, REQ-TEM-003]
+            on WorkspaceInvitation
+            accepts publisherId : PublisherId
+            returns WorkspaceInvitation
+            emits InvitationAccepted
+          }
+
+          operation "revoke invitation" {
+            on WorkspaceInvitation
+            returns WorkspaceInvitation
+            emits InvitationRevoked
+          }
+        }
+
+        entity SharedCollection {
+          satisfies [REQ-TEM-008, REQ-TEM-009]
+          :: "A collection of links shared across team workspace members"
+          id : SharedCollectionId
+          workspaceId : WorkspaceId
+          name : String
+          createdBy : PublisherId
+          createdAt : DateTime
+
+          operation "create shared collection" {
+            satisfies [REQ-TEM-008]
+            on SharedCollection
+            accepts workspaceId : WorkspaceId, name : String, createdBy : PublisherId
+            returns SharedCollection
+            emits SharedCollectionCreated
+          }
+        }
+
+        entity SharedLink {
+          satisfies [REQ-TEM-009, REQ-TEM-010]
+          :: "A link saved to a shared collection with contributor attribution"
+          id : SharedLinkId
+          sharedCollectionId : SharedCollectionId
+          shortLinkId : ShortLinkId
+          contributorId : PublisherId
+          sharedAt : DateTime
+
+          operation "share link to collection" {
+            satisfies [REQ-TEM-008, REQ-TEM-009, REQ-TEM-010]
+            on SharedLink
+            accepts sharedCollectionId : SharedCollectionId, shortLinkId : ShortLinkId, contributorId : PublisherId
+            returns SharedLink
+            emits LinkSharedToCollection
+          }
+        }
+
+        // --- Aggregates ---
+
+        aggregate WorkspaceAggregate {
+          satisfies [REQ-TEM-001]
+          root Workspace
+          contains WorkspaceMember, WorkspaceInvitation
+        }
+
+        aggregate SharedCollectionAggregate {
+          satisfies [REQ-TEM-008]
+          root SharedCollection
+          contains SharedLink
+        }
+
+        // --- State Machines ---
+
+        statemachine WorkspaceTrialLifecycle {
+          on Workspace
+          start TrialActive
+
+          state TrialActive {
+            invariant "within-trial-period" {
+              must { DateTime.now() <= trialEndsAt }
+              message "Trial must be within the 14-day trial period"
+            }
+          }
+
+          state TrialExpired {}
+
+          state Converted {}
+
+          transition TrialActive -> TrialExpired triggered-by "trial expired"
+          transition TrialActive -> Converted triggered-by "convert to paid"
+          transition TrialExpired -> Converted triggered-by "convert to paid"
+
+          final Converted
+        }
+
+        statemachine InvitationLifecycle {
+          on WorkspaceInvitation
+          start Pending
+
+          state Pending {}
+          state Accepted {}
+          state Revoked {}
+
+          transition Pending -> Accepted triggered-by "accept invitation"
+          transition Pending -> Revoked triggered-by "revoke invitation"
+
+          final Accepted
+          final Revoked
+        }
+
+        // --- Commands ---
+
+        command CreateWorkspace {
+          satisfies [REQ-TEM-001]
+          :: "Intent to create a new team workspace"
+          correlationId : CommandId
+          name : String
+          createdBy : PublisherId
+        }
+
+        command InviteMember {
+          satisfies [REQ-TEM-002]
+          :: "Intent to invite a member to a workspace by email"
+          correlationId : CommandId
+          workspaceId : WorkspaceId
+          email : String
+          invitedBy : PublisherId
+        }
+
+        command RemoveMember {
+          satisfies [REQ-TEM-004]
+          :: "Intent to remove a member from a workspace"
+          correlationId : CommandId
+          workspaceId : WorkspaceId
+          memberId : WorkspaceMemberId
+        }
+
+        command ShareLinkToCollection {
+          satisfies [REQ-TEM-008, REQ-TEM-009]
+          :: "Intent to share a link to a shared collection"
+          correlationId : CommandId
+          sharedCollectionId : SharedCollectionId
+          shortLinkId : ShortLinkId
+          contributorId : PublisherId
+        }
+
+        command ExportAnalyticsCsv {
+          satisfies [REQ-TEM-007]
+          :: "Intent to export team analytics as CSV"
+          correlationId : CommandId
+          workspaceId : WorkspaceId
+          dateRange : DateRange?
+          memberId : PublisherId?
+          sharedCollectionId : SharedCollectionId?
+        }
+
+        // --- Events ---
+
+        event WorkspaceCreated {
+          satisfies [REQ-TEM-001, REQ-TEM-011]
+          :: "A new team workspace was created with a 14-day trial"
+          type internal
+          workspaceId : WorkspaceId
+          name : String
+          createdBy : PublisherId
+          trialEndsAt : DateTime
+          createdAt : DateTime
+        }
+
+        event InvitationSent {
+          satisfies [REQ-TEM-002]
+          :: "An invitation email was sent to a potential workspace member"
+          type internal
+          invitationId : InvitationId
+          workspaceId : WorkspaceId
+          email : String
+          sentAt : DateTime
+        }
+
+        event InvitationAccepted {
+          satisfies [REQ-TEM-002, REQ-TEM-003]
+          :: "A workspace invitation was accepted"
+          type internal
+          invitationId : InvitationId
+          workspaceId : WorkspaceId
+          publisherId : PublisherId
+          acceptedAt : DateTime
+        }
+
+        event InvitationRevoked {
+          :: "A workspace invitation was revoked"
+          type internal
+          invitationId : InvitationId
+          workspaceId : WorkspaceId
+        }
+
+        event MemberJoined {
+          satisfies [REQ-TEM-003]
+          :: "A new member joined a workspace"
+          type internal
+          workspaceMemberId : WorkspaceMemberId
+          workspaceId : WorkspaceId
+          publisherId : PublisherId
+          joinedAt : DateTime
+        }
+
+        event MemberRemoved {
+          satisfies [REQ-TEM-004]
+          :: "A member was removed from a workspace"
+          type internal
+          workspaceMemberId : WorkspaceMemberId
+          workspaceId : WorkspaceId
+          removedAt : DateTime
+        }
+
+        event SharedCollectionCreated {
+          satisfies [REQ-TEM-008]
+          :: "A new shared collection was created in a workspace"
+          type internal
+          sharedCollectionId : SharedCollectionId
+          workspaceId : WorkspaceId
+          name : String
+        }
+
+        event LinkSharedToCollection {
+          satisfies [REQ-TEM-009, REQ-TEM-010]
+          :: "A link was shared to a team collection with contributor attribution"
+          type internal
+          sharedLinkId : SharedLinkId
+          sharedCollectionId : SharedCollectionId
+          shortLinkId : ShortLinkId
+          contributorId : PublisherId
+          sharedAt : DateTime
+        }
+
+        event AnalyticsCsvExported {
+          satisfies [REQ-TEM-007]
+          :: "Team analytics were exported as CSV"
+          type internal
+          workspaceId : WorkspaceId
+          exportedAt : DateTime
+        }
+
+        // --- Temporal Events ---
+
+        event TrialExpired {
+          satisfies [REQ-TEM-011]
+          :: "A workspace's 14-day free trial has expired"
+          type temporal
+          instant Workspace.trialEndsAt
+          guard { trialStatus = Active }
+        }
+
+        // --- Queries ---
+
+        query GetTeamAnalytics {
+          satisfies [REQ-TEM-005, REQ-TEM-006]
+          :: "Retrieve aggregated analytics across all team links"
+          workspaceId : WorkspaceId
+          dateRange : DateRange?
+          memberId : PublisherId?
+          sharedCollectionId : SharedCollectionId?
+          returns TeamAnalyticsSummary
+        }
+
+        value TeamAnalyticsSummary {
+          satisfies [REQ-TEM-005]
+          :: "Aggregated analytics for a team workspace"
+          totalClicks : Integer
+          topPerformingLinks : List<LinkPerformance>
+          channelBreakdown : ChannelBreakdown
+        }
+
+        value LinkPerformance {
+          :: "Performance data for a single link in team analytics"
+          shortLinkId : ShortLinkId
+          totalClicks : Integer
+          contributorId : PublisherId
+        }
+
+        query GetWorkspaceMembers {
+          :: "Retrieve all members of a workspace"
+          workspaceId : WorkspaceId
+          returns List<WorkspaceMember>
+        }
+
+        query GetSharedCollections {
+          satisfies [REQ-TEM-003]
+          :: "Retrieve all shared collections in a workspace"
+          workspaceId : WorkspaceId
+          returns List<SharedCollection>
+        }
+
+        // --- Reactions ---
+
+        reaction "add-member-on-invitation-accepted" {
+          satisfies [REQ-TEM-002, REQ-TEM-003]
+          :: "When an invitation is accepted, add the publisher as a workspace member"
+          triggered-by InvitationAccepted
+          effects AddMemberToWorkspace
+        }
+
+        command AddMemberToWorkspace {
+          satisfies [REQ-TEM-003]
+          :: "Intent to add a member to a workspace after invitation acceptance"
+          correlationId : CommandId
+          workspaceId : WorkspaceId
+          publisherId : PublisherId
+          role : MemberRole
+        }
+
+        // --- Infrastructure Services ---
+
+        infrastructure-service InvitationEmailService {
+          satisfies [REQ-TEM-002]
+          :: "Sends workspace invitation emails"
+          interface InvitationEmailInterface {
+            operation "send invitation email" {
+              accepts email : String, workspaceName : String, joinLink : String
+              returns Boolean
+            }
+          }
+        }
+
+        infrastructure-service CsvExportService {
+          satisfies [REQ-TEM-007]
+          :: "Generates CSV exports of analytics data"
+          interface CsvExportInterface {
+            operation "generate csv" {
+              accepts data : TeamAnalyticsSummary
+              returns Bytes
+            }
+          }
+        }
+      }
+    }
+
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // MODULE: API Access
+    // ═══════════════════════════════════════════════════════════════════════
+
+    module "API Access" {
+      depends on {
+        "Link Shortening"          // ShortenUrl command (API translates HTTP into domain commands)
+        "Auto-Channel Analytics"   // AnalyticsSummary, DateRange (API exposes analytics)
+      }
+
+      module "API Gateway" {
+
+        // --- Value Types ---
+
+        value ApiKey {
+          satisfies [REQ-API-002, REQ-NFR-010]
+          :: "An API key used for authenticating API requests"
+          keyHash : String
+          publisherId : PublisherId
+          createdAt : DateTime
+          revokedAt : DateTime?
+        }
+
+        value RateLimitStatus {
+          satisfies [REQ-API-003]
+          :: "The current rate limit status for a publisher"
+          requestsRemaining : Integer
+          windowResetAt : DateTime
+          limitPerMinute : Integer
+        }
+
+        value PaginationParams {
+          satisfies [REQ-API-007]
+          :: "Pagination parameters for API responses"
+          page : Integer
+          pageSize : Integer
+          totalItems : Integer
+          totalPages : Integer
+        }
+
+        value ApiResponse {
+          satisfies [REQ-API-004]
+          :: "Standardized API response format"
+          shortUrl : String
+          slug : String
+          createdAt : DateTime
+        }
+
+        // --- Entities ---
+
+        entity ApiClient {
+          satisfies [REQ-API-001, REQ-API-002, REQ-API-003]
+          :: "A publisher's API access configuration with key and rate limit tracking"
+          id : ApiClientId
+          publisherId : PublisherId
+          apiKeyHash : String
+          rateLimitPerMinute : Integer
+          requestCountInWindow : Integer
+          windowStartedAt : DateTime
+          createdAt : DateTime
+
+          operation "generate api key" {
+            satisfies [REQ-API-002]
+            on ApiClient
+            accepts publisherId : PublisherId
+            returns ApiClient
+            emits ApiKeyGenerated
+          }
+
+          operation "authenticate request" {
+            satisfies [REQ-API-002]
+            on ApiClient
+            accepts apiKeyHash : String
+            returns Boolean
+            emits ApiRequestAuthenticated
+            emits ApiAuthenticationFailed
+          }
+
+          operation "check rate limit" {
+            satisfies [REQ-API-003]
+            on ApiClient
+            returns RateLimitStatus
+            emits RateLimitExceeded
+          }
+
+          operation "record api request" {
+            satisfies [REQ-API-003]
+            on ApiClient
+            returns ApiClient
+            emits ApiRequestRecorded
+          }
+
+          operation "revoke api key" {
+            on ApiClient
+            returns ApiClient
+            emits ApiKeyRevoked
+          }
+        }
+
+        aggregate ApiClientAggregate {
+          satisfies [REQ-API-001]
+          root ApiClient
+        }
+
+        // --- Commands ---
+
+        command ShortenUrlViaApi {
+          satisfies [REQ-API-001]
+          :: "Intent to shorten a URL through the API"
+          correlationId : CommandId
+          apiKeyHash : String
+          destinationUrl : String
+          customSlug : String?
+        }
+
+        command RetrieveAnalyticsViaApi {
+          satisfies [REQ-API-005]
+          :: "Intent to retrieve link analytics through the API"
+          correlationId : CommandId
+          apiKeyHash : String
+          shortLinkId : ShortLinkId
+          dateRange : DateRange?
+          pagination : PaginationParams?
+        }
+
+        command GenerateApiKey {
+          satisfies [REQ-API-002]
+          :: "Intent to generate a new API key for a publisher"
+          correlationId : CommandId
+          publisherId : PublisherId
+        }
+
+        // --- Events ---
+
+        event ApiKeyGenerated {
+          satisfies [REQ-API-002]
+          :: "A new API key was generated for a publisher"
+          type internal
+          apiClientId : ApiClientId
+          publisherId : PublisherId
+          createdAt : DateTime
+        }
+
+        event ApiKeyRevoked {
+          :: "An API key was revoked"
+          type internal
+          apiClientId : ApiClientId
+          revokedAt : DateTime
+        }
+
+        event ApiRequestAuthenticated {
+          satisfies [REQ-API-002]
+          :: "An API request was successfully authenticated"
+          type internal
+          apiClientId : ApiClientId
+          authenticatedAt : DateTime
+        }
+
+        event ApiAuthenticationFailed {
+          satisfies [REQ-API-002]
+          :: "An API authentication attempt failed"
+          type error
+          apiKeyHash : String
+          reason : String
+          failedAt : DateTime
+        }
+
+        event RateLimitExceeded {
+          satisfies [REQ-API-008]
+          :: "A publisher exceeded their API rate limit"
+          type error
+          apiClientId : ApiClientId
+          publisherId : PublisherId
+          retryAfterSeconds : Integer
+          exceededAt : DateTime
+        }
+
+        event ApiRequestRecorded {
+          satisfies [REQ-API-003]
+          :: "An API request was recorded for rate limiting"
+          type internal
+          apiClientId : ApiClientId
+          recordedAt : DateTime
+        }
+
+        // --- Queries ---
+
+        query GetLinkAnalyticsViaApi {
+          satisfies [REQ-API-005, REQ-API-006, REQ-API-007]
+          :: "Retrieve link analytics via the API with date filtering and pagination"
+          apiClientId : ApiClientId
+          shortLinkId : ShortLinkId
+          dateRange : DateRange?
+          pagination : PaginationParams?
+          returns AnalyticsSummary
+        }
+
+        // --- Invariants ---
+
+        invariant "rate-limit-per-minute" {
+          satisfies [REQ-API-003]
+          :: "API requests must not exceed the rate limit per minute"
+          on ApiClient
+          must { requestCountInWindow <= rateLimitPerMinute }
+          message "API rate limit of 100 requests per minute exceeded"
+          enforcement reject
+        }
+
+        invariant "api-key-stored-hashed" {
+          satisfies [REQ-NFR-010]
+          :: "API keys must be stored using one-way hashing"
+          on ApiClient
+          must { apiKeyHash is one-way hash }
+          message "API keys must never be stored in plaintext"
+          enforcement reject
+        }
+      }
+    }
+
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // CROSS-CONTEXT AGREEMENTS
+    // ═══════════════════════════════════════════════════════════════════════
+
+    agreement "Link-Safety-Consistency" {
+      satisfies [REQ-LNK-008, REQ-SAF-001]
+      :: "Every active short link must have a corresponding safety scan with a Safe verdict"
+      participants ShortLinkAggregate, SafetyScanAggregate
+      predicate { forall ShortLink where status = Active : exists SafetyScan where shortLinkId = ShortLink.id and verdict = Safe }
+
+      reconciliation "safety-scan-reconciliation" {
+        trigger event UrlFlaggedAsUnsafe
+        detection query-based
+        compensation DeactivateLink
+        escalation {
+          step 1 {
+            condition "deactivation failed"
+            action retry
+            max-attempts 3
+          }
+          step 2 {
+            condition "retries exhausted"
+            action alert
+          }
+        }
+      }
+    }
+
+    agreement "Bookmark-Link-Consistency" {
+      satisfies [REQ-BMK-001]
+      :: "Every shortened link must have a corresponding bookmark in the publisher's collection"
+      participants ShortLinkAggregate, BookmarkAggregate
+      predicate { forall ShortLink : exists Bookmark where shortLinkId = ShortLink.id and publisherId = ShortLink.publisherId }
+
+      reconciliation "bookmark-creation-reconciliation" {
+        trigger event LinkShortened
+        detection event-sourced
+        compensation CreateBookmark
+        escalation {
+          step 1 {
+            condition "bookmark creation failed"
+            action retry
+            max-attempts 3
+          }
+          step 2 {
+            condition "retries exhausted"
+            action alert
+          }
+        }
+      }
+    }
+
+    agreement "Analytics-Click-Consistency" {
+      satisfies [REQ-ANA-004]
+      :: "Every recorded click must be reflected in the analytics within 30 seconds"
+      participants ClickAggregate, LinkAnalyticsAggregate
+      predicate { forall Click : exists LinkAnalytics where shortLinkId = Click.shortLinkId and totalClicks >= count(Click where shortLinkId) }
+
+      reconciliation "analytics-update-reconciliation" {
+        trigger event ClickRecorded
+        detection event-sourced
+        compensation UpdateAnalytics
+        escalation {
+          step 1 {
+            condition "analytics update failed"
+            action retry
+            max-attempts 5
+          }
+          step 2 {
+            condition "retries exhausted"
+            action alert
+          }
+        }
+      }
+    }
+
+    agreement "GDPR-Right-To-Erasure" {
+      satisfies [REQ-ANA-009, REQ-NFR-012]
+      :: "When a publisher requests account deletion, all associated data must be erased within 30 days"
+      participants LinkAnalyticsAggregate, BookmarkAggregate, ShortLinkAggregate
+      predicate { forall deleted Publisher : no LinkAnalytics, Bookmark, or ShortLink references publisherId within 30 days }
+
+      reconciliation "gdpr-erasure-reconciliation" {
+        trigger event PublisherDeletionRequested
+        detection query-based
+        compensation DeletePublisherAnalytics, DeletePublisherBookmarks, DeletePublisherLinks
+        escalation {
+          step 1 {
+            condition "deletion incomplete after 7 days"
+            action retry
+            max-attempts 3
+          }
+          step 2 {
+            condition "deletion incomplete after 25 days"
+            action manual-intervention
+          }
+        }
+      }
+    }
+  }
+}

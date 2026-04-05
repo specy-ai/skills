@@ -1,0 +1,1112 @@
+product "Business Loan Module" {
+
+  vision "A modular, rule-driven business lending engine embedded in the Core Banking platform
+         that takes a loan application from submission to full repayment — configurable enough
+         to launch a new loan product in days, compliant enough to satisfy Basel III/IV and
+         IFRS 9 in real time, and fast enough to auto-approve low-risk credit in under 48 hours."
+
+  scope {
+    "Full lifecycle of a business loan: origination, credit analysis, disbursement, servicing, collections, closure"
+    "Loan products: amortizing, bullet (in fine), revolving credit line, leasing, bridge loan"
+    "Regulatory compliance: IFRS 9 provisioning, Basel III/IV RWA, AnaCredit, FINREP, AML/CFT"
+    "Integration with Core Banking modules: Customer, Account, Ledger, Risk Engine, Collateral, Notification, Document Management"
+  }
+
+  non-goals {
+    "Retail / consumer lending — this module serves business borrowers only, consumer credit is a separate product"
+    "Underwriting model development — PD/LGD/EAD models are owned by the Risk team; this module consumes them, it does not build them"
+    "Document management system — we integrate with a DMS, we do not replace it"
+    "Accounting engine — the Ledger module owns the general ledger; we emit accounting events, we do not post entries directly"
+    "Front-office CRM — relationship management is handled by the Customer module; we receive customer data, we do not manage it"
+  }
+
+  problem {
+    situation "Banks process business loan applications through monolithic core banking systems
+              where loan origination, credit decisioning, and servicing are tightly coupled to
+              a single product configuration. Operations teams, credit analysts, and compliance
+              officers all rely on the same rigid workflows regardless of loan type or risk level."
+
+    complication "Time-to-decision averages 5 to 15 working days even for straightforward
+                 applications. Over 40% of applications are abandoned before completion.
+                 Launching a new loan product requires months of development. Regulatory
+                 reporting (IFRS 9, Basel) is computed in batch overnight, leaving risk officers
+                 blind to intra-day exposure changes. Every manual handoff in the credit workflow
+                 introduces compliance risk — decisions lack full audit trails, and delegation
+                 rules are enforced by convention rather than by system."
+
+    question "How can we provide a lending engine that makes credit decisions in hours instead
+             of weeks, launches new products through configuration instead of code, and
+             guarantees full regulatory traceability from application to closure?"
+  }
+
+  evidence "Application abandonment rate" {
+    type analytics
+    summary "Internal funnel analysis shows 43% of business loan applications are abandoned
+             between initial data entry and final submission. Top cited reasons: too many
+             required documents (38%), unclear status during review (27%), excessive delays (22%)."
+    source-reference "Lending Funnel Report Q4-2025, slide 8-12"
+    date 2025-12-15
+    confidence strong
+    supports "Reduce time-to-decision"
+  }
+
+  evidence "Product launch lead time" {
+    type analytics
+    summary "Average lead time to launch a new business loan product is 4.5 months.
+             78% of effort is development and testing; only 22% is product design and
+             regulatory validation."
+    source-reference "Core Banking Change Management Report 2025, section 4.1"
+    date 2025-11-20
+    confidence strong
+    supports "Enable product configurability"
+  }
+
+  evidence "Regulatory audit findings" {
+    type domain-expertise
+    summary "Last ECB audit flagged 12 findings related to credit decision traceability:
+             missing rationale on manual overrides, inconsistent delegation enforcement,
+             and incomplete audit trails on restructured loans."
+    source-reference "ECB Supervisory Review 2025 — Credit Process Findings"
+    date 2025-09-30
+    confidence strong
+    supports "Ensure full audit traceability"
+  }
+
+  evidence "Competitor benchmark" {
+    type market-research
+    summary "Three European neobanks now offer same-day credit decisions for SME loans
+             under 250K EUR. Two of them use rules-engine-driven origination with automated
+             document verification."
+    source-reference "Competitive Analysis — SME Lending, McKinsey 2025"
+    date 2025-10-01
+    confidence moderate
+    supports "Reduce time-to-decision"
+  }
+
+
+  # ──────────────────────────────────────────────
+  #  PERSONAS
+  # ──────────────────────────────────────────────
+
+  persona "Business borrower" {
+    role "An SME owner or CFO seeking financing for investment, working capital, or acquisition"
+    goals {
+      "Obtain a credit decision quickly to seize a business opportunity"
+      "Understand loan terms and total cost before committing"
+      "Track application status without calling the bank"
+    }
+    frustrations {
+      "Opaque review process with no visibility into where the application stands"
+      "Redundant document requests across different departments"
+      "Weeks of silence between submission and decision"
+    }
+    context "Applies via front-office (relationship manager) or digital channel. Time-pressured,
+             needs financing locked in before investment deadlines. Expects self-service status tracking."
+    weight primary
+  }
+
+  persona "Relationship manager" {
+    role "A front-office banker who originates loans and manages the client relationship"
+    goals {
+      "Submit a complete application in one session without back-and-forth"
+      "Get fast decisions to keep the client engaged"
+      "Have clear delegation rules so the right authority signs off without escalation ping-pong"
+    }
+    frustrations {
+      "Checklist requirements vary by product but the system does not guide them"
+      "Manual re-entry of data already captured in the CRM"
+      "No visibility into credit committee pipeline and expected decision dates"
+    }
+    context "Uses the back-office front-end. Handles 10-30 active applications. Compensated partly
+             on loan volume — speed matters."
+    weight primary
+  }
+
+  persona "Credit analyst" {
+    role "A middle-office analyst who evaluates creditworthiness and prepares decision packages"
+    goals {
+      "Receive complete, validated applications — no missing documents"
+      "Access automated financial ratio analysis and scoring before manual review"
+      "Record analysis and recommendations with full traceability"
+    }
+    frustrations {
+      "Incomplete applications consume time on data chasing instead of analysis"
+      "Scoring is done in spreadsheets outside the system"
+      "Decision rationale is captured in free-text emails, not in the loan record"
+    }
+    context "Works in the credit department. Handles 5-15 applications per week. Needs structured
+             decision support, not just raw documents."
+    weight primary
+  }
+
+  persona "Credit committee member" {
+    role "A senior decision-maker who approves or rejects loans above the delegation threshold"
+    goals {
+      "Review a concise decision package with all key metrics pre-computed"
+      "Approve or reject with recorded rationale in one action"
+      "See the full exposure of the borrower and related parties before deciding"
+    }
+    frustrations {
+      "Decision packages arrive incomplete — missing exposure data, outdated financials"
+      "Committee decisions are tracked in meeting minutes, not in the loan system"
+      "No structured override mechanism when deviating from scoring recommendations"
+    }
+    context "Participates in weekly or bi-weekly credit committees. Decides on loans > 500K EUR.
+             Needs a dashboard, not a document dump."
+    weight secondary
+  }
+
+  persona "Compliance officer" {
+    role "A risk & compliance professional who ensures regulatory adherence across the loan book"
+    goals {
+      "Verify that every credit decision has a complete, immutable audit trail"
+      "Generate regulatory reports (IFRS 9, Basel, AnaCredit) on demand"
+      "Detect and escalate breaches in delegation rules or exposure limits"
+    }
+    frustrations {
+      "Audit trail gaps require manual reconstruction from emails and meeting notes"
+      "IFRS 9 staging is computed monthly in batch — no intra-month visibility"
+      "Exposure limits are checked at origination but not monitored during loan life"
+    }
+    context "Monitors the full loan book. Reports to regulators quarterly. Needs real-time
+             dashboards and export-ready regulatory datasets."
+    weight secondary
+  }
+
+  persona "Loan operations officer" {
+    role "A back-office officer who handles disbursement, payment processing, and loan servicing"
+    goals {
+      "Process disbursements with pre-validated conditions (signed contract, registered collateral)"
+      "Automate payment matching and schedule updates"
+      "Handle exceptions (missed payments, early repayments, restructurings) with clear workflows"
+    }
+    frustrations {
+      "Manual payment matching for non-standard references"
+      "Restructuring requires re-creating the loan in the system instead of amending it"
+      "Collateral release is a manual process even after loan closure"
+    }
+    context "Processes 50-200 operations per day. Needs automation for routine tasks and
+             exception-based workflows for edge cases."
+    weight primary
+  }
+
+
+  # ──────────────────────────────────────────────
+  #  GOALS & METRICS
+  # ──────────────────────────────────────────────
+
+  goal "Reduce time-to-decision" {
+    statement "Reduce the median time from application submission to credit decision
+               to under 48 hours for standard loans (< 500K EUR)"
+    horizon short-term
+    owner "Head of Credit Operations"
+    metric {
+      indicator "Median elapsed time from LoanApplicationSubmitted to decision (approved/rejected)"
+      target "< 48 hours for loans < 500K EUR"
+      baseline "8 working days (current)"
+      measurement "Event timestamp delta in production — measured weekly"
+    }
+  }
+
+  goal "Automate low-risk decisions" {
+    statement "Automatically approve at least 30% of eligible applications (score A+ or A,
+               amount < 100K EUR) without human intervention"
+    horizon short-term
+    owner "Head of Credit Operations"
+    metric {
+      indicator "Ratio of auto-approved loans to total eligible applications"
+      target "> 30%"
+      baseline "0% (all decisions are manual today)"
+      measurement "Count of loans with decision_type=AUTO / count eligible — measured monthly"
+    }
+  }
+
+  goal "Enable product configurability" {
+    statement "Launch a new loan product (new amortization type, rate structure, or collateral
+               rule set) through configuration in under 5 working days"
+    horizon mid-term
+    owner "Head of Product — Lending"
+    metric {
+      indicator "Elapsed time from product specification sign-off to first production disbursement"
+      target "< 5 working days"
+      baseline "4.5 months (current)"
+      measurement "Tracked in product launch log — measured per launch"
+    }
+  }
+
+  goal "Ensure full audit traceability" {
+    statement "Every credit decision, override, restructuring, and state transition is recorded
+               with who, what, when, why — immutable and queryable"
+    horizon short-term
+    owner "Chief Risk Officer"
+    metric {
+      indicator "Percentage of loan state transitions with complete audit record"
+      target "100%"
+      baseline "~72% (estimated from last audit)"
+      measurement "Automated audit completeness check — run nightly"
+    }
+  }
+
+  goal "Reduce application abandonment" {
+    statement "Reduce the application abandonment rate (DRAFT not submitted / total created)
+               from 43% to under 20%"
+    horizon mid-term
+    owner "Head of Product — Lending"
+    metric {
+      indicator "Ratio of DRAFT applications never submitted to total applications created"
+      target "< 20%"
+      baseline "43%"
+      measurement "Funnel analysis — measured monthly"
+    }
+  }
+
+  goal "Maintain portfolio quality" {
+    statement "Keep the non-performing loan (NPL) ratio below 3% of total outstanding"
+    horizon long-term
+    owner "Chief Risk Officer"
+    metric {
+      indicator "Outstanding NPL exposure / total outstanding exposure"
+      target "< 3%"
+      baseline "2.1% (current)"
+      measurement "Computed from loan book — measured monthly"
+    }
+  }
+
+
+  # ──────────────────────────────────────────────
+  #  HYPOTHESES
+  # ──────────────────────────────────────────────
+
+  hypothesis "Auto-approval reduces decision time" {
+    intervention "Implement rules-engine-driven auto-approval for applications scoring A+ or A
+                  with amount < 100K EUR"
+    expected-outcome "Median time-to-decision for eligible applications drops from 8 days to < 1 hour"
+    mechanism "Eliminating the human review step for low-risk, small-amount loans removes the
+               queuing delay that accounts for 80% of decision time"
+    validation-method "Pilot in one branch for 3 months — compare decision time distribution
+                       with control branches"
+    status proposed
+    proposes "Auto-approval engine"
+    predicts "Automate low-risk decisions"
+  }
+
+  hypothesis "Guided origination reduces abandonment" {
+    intervention "Replace the static application form with a product-aware guided workflow
+                  that shows required documents upfront and validates completeness in real time"
+    expected-outcome "Application abandonment rate drops by at least 50% (from 43% to < 22%)"
+    mechanism "Borrowers abandon because they discover missing requirements mid-process.
+               Showing the full checklist upfront and preventing submission of incomplete
+               applications eliminates surprise blockers."
+    validation-method "A/B test: legacy form vs guided workflow — measure completion rate over 8 weeks"
+    status proposed
+    proposes "Loan origination"
+    predicts "Reduce application abandonment"
+  }
+
+  hypothesis "Event-sourced audit eliminates traceability gaps" {
+    intervention "Store every loan state mutation as an immutable domain event with actor,
+                  timestamp, and rationale"
+    expected-outcome "Audit trail completeness reaches 100% — zero gaps flagged in next regulatory review"
+    mechanism "Event sourcing makes traceability a structural guarantee rather than a process
+               discipline. You cannot mutate state without producing an event."
+    validation-method "Pre-audit dry run: compliance team attempts to reconstruct full decision
+                       history for 50 random loans using only the event store"
+    status proposed
+    proposes "Audit trail and event history"
+    predicts "Ensure full audit traceability"
+  }
+
+
+  # ──────────────────────────────────────────────
+  #  FEATURES
+  # ──────────────────────────────────────────────
+
+  feature "Loan origination" {
+    summary "Relationship managers and borrowers create and submit loan applications through
+             a guided, product-aware workflow that validates completeness in real time"
+    persona "Relationship manager"
+    value-proposition "Eliminates back-and-forth on missing documents — the application is
+                       complete at submission or not submitted at all"
+    priority must
+    status accepted
+    advances "Reduce application abandonment", "Reduce time-to-decision"
+    tested-by "Guided origination reduces abandonment"
+
+    non-goals {
+      "Self-service digital onboarding for borrowers — origination is initiated by the
+       relationship manager in v1; a borrower-facing portal is a future product"
+      "Document content verification (OCR, fraud detection) — we check presence and type,
+       not content authenticity"
+    }
+
+    stories {
+      "As a relationship manager, I want to select a loan product and see the required
+       checklist immediately, so that I can prepare the full dossier before the client meeting." {
+        acceptance-criteria {
+          "Checklist is product-specific and configurable per product type"
+          "Each checklist item indicates required vs optional"
+          "Checklist updates dynamically when the loan product changes"
+        }
+      }
+      "As a relationship manager, I want the system to block submission until all required
+       fields and documents are present, so that credit analysts receive complete applications." {
+        acceptance-criteria {
+          "Submission is blocked with a clear list of missing items"
+          "Validation runs in real time as fields are filled"
+          "Previously validated fields are not re-validated on each save"
+        }
+      }
+      "As a business borrower, I want to track the status of my application without
+       calling my banker, so that I know when to expect a decision." {
+        acceptance-criteria {
+          "Application status is visible via a read-only portal or notification channel"
+          "Status updates are sent at each major state transition (submitted, under review, approved, rejected)"
+          "Expected decision date is displayed based on current pipeline position"
+        }
+      }
+    }
+  }
+
+  feature "Credit scoring and analysis" {
+    summary "The system computes a composite credit score from financial ratios, client
+             history, sector risk, and external bureau data — then routes the application
+             to the appropriate decision authority based on a configurable delegation matrix"
+    persona "Credit analyst"
+    value-proposition "Analysts receive pre-computed risk assessments instead of building
+                       them manually — their time goes to judgment, not calculation"
+    priority must
+    status accepted
+    advances "Reduce time-to-decision", "Maintain portfolio quality"
+
+    stories {
+      "As a credit analyst, I want to see a pre-computed financial analysis (DSCR,
+       leverage, liquidity, profitability ratios) when I open an application, so that
+       I can focus on qualitative judgment rather than spreadsheet work." {
+        acceptance-criteria {
+          "Ratios are computed automatically from uploaded financial statements"
+          "Source data and computation method are visible for each ratio"
+          "Analyst can override a ratio with recorded justification"
+        }
+      }
+      "As a credit analyst, I want the system to route the application to the correct
+       decision level based on amount and score, so that I don't waste time on
+       escalation procedures." {
+        acceptance-criteria {
+          "Delegation matrix is configurable by amount tier and score band"
+          "Routing is automatic after scoring — no manual assignment needed"
+          "Override of routing level requires recorded justification and higher authority approval"
+        }
+      }
+    }
+  }
+
+  feature "Auto-approval engine" {
+    summary "Applications meeting pre-defined low-risk criteria (score A+/A, amount < 100K EUR)
+             are approved automatically without human review"
+    persona "Relationship manager"
+    value-proposition "Instant decisions for straightforward loans — the client gets an answer
+                       while still in the meeting"
+    priority should
+    status accepted
+    advances "Automate low-risk decisions", "Reduce time-to-decision"
+    tested-by "Auto-approval reduces decision time"
+
+    non-goals {
+      "Auto-rejection — the system auto-approves but never auto-rejects; rejections always
+       require human decision"
+      "Override of auto-approval rules by relationship managers — rule changes go through
+       the product configuration process"
+    }
+
+    stories {
+      "As a relationship manager, I want eligible applications to be approved instantly
+       after submission, so that I can confirm the loan to the client in real time." {
+        acceptance-criteria {
+          "Auto-approval triggers within 60 seconds of submission for eligible applications"
+          "Eligibility criteria are configurable (score threshold, amount ceiling, product type)"
+          "Auto-approved loans carry a system-generated decision rationale referencing the scoring output"
+          "Auto-approval can be disabled per product or per branch via configuration"
+        }
+      }
+    }
+  }
+
+  feature "Disbursement and contract management" {
+    summary "Once approved and signed, the loan is disbursed (single or tranched), the
+             repayment schedule is generated, and accounting entries are posted to the Ledger"
+    persona "Loan operations officer"
+    value-proposition "Disbursement is a one-click operation once pre-conditions are met —
+                       no manual verification of conditions that the system already validated"
+    priority must
+    status accepted
+    advances "Reduce time-to-decision"
+
+    stories {
+      "As a loan operations officer, I want the system to verify all disbursement
+       pre-conditions automatically (signed contract, registered collateral, conditions
+       precedent cleared), so that I can disburse with confidence." {
+        acceptance-criteria {
+          "Pre-conditions checklist is configurable per product"
+          "System blocks disbursement if any pre-condition is not met"
+          "Officer can record a waiver for non-blocking conditions with manager approval"
+        }
+      }
+      "As a loan operations officer, I want to disburse in tranches for construction
+       or investment loans, so that funds are released as project milestones are met." {
+        acceptance-criteria {
+          "Tranche schedule is defined at contract level with amount and conditions per tranche"
+          "Each tranche disbursement generates its own accounting entry"
+          "Undisbursed commitment is tracked and reported as off-balance-sheet exposure"
+        }
+      }
+      "As a business borrower, I want to receive a clear repayment schedule after
+       disbursement, so that I can plan my cash flow." {
+        acceptance-criteria {
+          "Schedule is generated automatically at disbursement"
+          "Supported amortization methods: constant principal, constant annuity (French), bullet, custom/deferred"
+          "Day count conventions supported: Actual/360, Actual/365, 30/360, Actual/Actual"
+          "Schedule is recalculated after any modifying event (early repayment, restructuring, rate reset)"
+        }
+      }
+    }
+  }
+
+  feature "Loan servicing" {
+    summary "Ongoing management of active loans: payment collection, matching, early repayment,
+             restructuring, penalty computation, and schedule recalculation"
+    persona "Loan operations officer"
+    value-proposition "Routine operations are automated; the officer handles exceptions only"
+    priority must
+    status accepted
+    advances "Maintain portfolio quality"
+
+    stories {
+      "As a loan operations officer, I want payments to be matched automatically against
+       the schedule, so that I only deal with exceptions." {
+        acceptance-criteria {
+          "Payments are auto-matched by reference, amount, and due date"
+          "Partial payments are allocated to interest first, then principal (configurable)"
+          "Unmatched payments are queued for manual review with suggested allocations"
+        }
+      }
+      "As a business borrower, I want to make an early full or partial repayment,
+       so that I can reduce my interest cost." {
+        acceptance-criteria {
+          "Early repayment indemnity (IRA) is computed per contractual terms"
+          "Legal cap on IRA is enforced automatically"
+          "Schedule is recalculated after partial early repayment"
+          "Full early repayment triggers loan closure workflow"
+        }
+      }
+      "As a credit analyst, I want to restructure a loan (modify duration, rate, amount,
+       add a grace period) with a full audit trail, so that the borrower's situation
+       is accommodated without losing traceability." {
+        acceptance-criteria {
+          "Restructuring creates a new version of the loan contract, not a new loan"
+          "Original and modified terms are both retained and queryable"
+          "Restructuring triggers IFRS 9 reassessment"
+          "Restructuring event is recorded with rationale and approving authority"
+        }
+      }
+    }
+  }
+
+  feature "Collateral management" {
+    summary "Register, value, monitor, and release collateral (mortgages, pledges, guarantees,
+             liens) linked to loans, with continuous LTV tracking"
+    persona "Credit analyst"
+    value-proposition "LTV is always current — no surprises at review time because the collateral
+                       was last valued three years ago"
+    priority must
+    status accepted
+    advances "Maintain portfolio quality"
+
+    stories {
+      "As a credit analyst, I want to link one or more collateral items to a loan and
+       see the aggregated LTV ratio, so that I can assess security coverage." {
+        acceptance-criteria {
+          "Multiple collateral types supported: mortgage, pledge, guarantee, lien"
+          "LTV is computed as outstanding loan balance / total collateral value"
+          "Collateral can be shared across multiple loans with proportional allocation"
+        }
+      }
+      "As a compliance officer, I want automatic alerts when LTV breaches the
+       contractual threshold, so that we can request additional security." {
+        acceptance-criteria {
+          "LTV threshold is configurable per loan"
+          "Alert is triggered when revaluation or balance change pushes LTV above threshold"
+          "Alert includes current LTV, threshold, and gap amount"
+        }
+      }
+      "As a loan operations officer, I want collateral to be released automatically
+       when the loan is closed, so that I don't have to track manual release processes." {
+        acceptance-criteria {
+          "Loan closure triggers collateral release workflow"
+          "Release is blocked if collateral is shared with another active loan"
+          "Release event is recorded in the audit trail"
+        }
+      }
+    }
+  }
+
+  feature "IFRS 9 provisioning" {
+    summary "Compute expected credit losses (ECL) across three stages, with automatic stage
+             migration based on credit risk deterioration signals"
+    persona "Compliance officer"
+    value-proposition "Provisions are computed continuously, not in monthly batch — risk officers
+                       see the impact of today's events today, not next month"
+    priority must
+    status accepted
+    advances "Ensure full audit traceability", "Maintain portfolio quality"
+
+    non-goals {
+      "PD/LGD/EAD model calibration — models are provided by the Risk team; this feature
+       consumes model outputs, it does not calibrate them"
+    }
+
+    stories {
+      "As a compliance officer, I want each loan to be assigned an IFRS 9 stage
+       (1, 2, or 3) based on configurable deterioration signals, so that provisions
+       reflect current risk." {
+        acceptance-criteria {
+          "Stage 1: no significant deterioration — ECL = 12-month PD x LGD x EAD"
+          "Stage 2: significant deterioration — ECL = lifetime PD x LGD x EAD"
+          "Stage 3: default (> 90 days past due or event-based) — ECL = lifetime, interest on net amount"
+          "Stage transitions are triggered by configurable signals (days past due, rating downgrade, sector shock)"
+          "Each stage transition is recorded as a domain event with trigger details"
+        }
+      }
+      "As a compliance officer, I want to generate IFRS 9 reports (by stage, by product,
+       by segment) on demand, so that I can respond to regulator queries without waiting
+       for month-end batch." {
+        acceptance-criteria {
+          "Reports are available on demand, not only at month-end"
+          "Reports can be filtered by stage, product type, branch, sector"
+          "Report data matches the event-sourced provision history exactly — no reconciliation gap"
+        }
+      }
+    }
+  }
+
+  feature "Regulatory reporting" {
+    summary "Generate Basel III/IV RWA calculations, AnaCredit submissions, FINREP datasets,
+             and Banque de France risk declarations from the loan book"
+    persona "Compliance officer"
+    value-proposition "Regulatory datasets are derived from the same event-sourced loan data
+                       used for operations — no reconciliation between operational and regulatory views"
+    priority must
+    status accepted
+    advances "Ensure full audit traceability"
+
+    stories {
+      "As a compliance officer, I want RWA to be computed automatically using the
+       standardized or IRB approach, so that capital adequacy reporting is always current." {
+        acceptance-criteria {
+          "RWA computation supports both standardized and IRB approaches (configurable per portfolio)"
+          "COREP templates C07, C08, C09 are populated automatically"
+          "Leverage ratio contribution from loan commitments is included"
+        }
+      }
+      "As a compliance officer, I want AnaCredit submissions to be generated from the
+       live loan book, so that I don't have to reconcile a separate reporting database." {
+        acceptance-criteria {
+          "AnaCredit attributes are derived from operational loan data — no separate data entry"
+          "Submission file format conforms to ECB AnaCredit specification"
+          "Data quality checks run before submission with error report"
+        }
+      }
+    }
+  }
+
+  feature "Audit trail and event history" {
+    summary "Every loan state transition, decision, override, and modification is recorded
+             as an immutable event with actor, timestamp, rationale, and before/after state"
+    persona "Compliance officer"
+    value-proposition "Regulatory auditors can reconstruct any loan's full history from the
+                       event store — no gaps, no reconstruction from emails"
+    priority must
+    status accepted
+    advances "Ensure full audit traceability"
+    tested-by "Event-sourced audit eliminates traceability gaps"
+
+    stories {
+      "As a compliance officer, I want to query the complete event history of any loan,
+       so that I can reconstruct the full decision chain for an auditor." {
+        acceptance-criteria {
+          "Every state transition produces an immutable event"
+          "Events include: actor (who), action (what), timestamp (when), rationale (why), before/after state"
+          "Events cannot be modified or deleted after creation"
+          "Event history is queryable by loan, by actor, by date range, by event type"
+        }
+      }
+      "As a credit committee member, I want my approval or rejection to be recorded
+       with my rationale in the loan event history, so that the decision is auditable." {
+        acceptance-criteria {
+          "Decision event includes: decision (approve/reject), conditions, rationale text, committee reference"
+          "Override of scoring recommendation is flagged and requires additional rationale"
+          "Decision event is linked to the scoring output it was based on"
+        }
+      }
+    }
+  }
+
+  feature "Delinquency and collections" {
+    summary "Detect missed payments, compute late penalties, escalate through configurable
+             collection stages, and transition to default per Basel rules"
+    persona "Loan operations officer"
+    value-proposition "Delinquency is detected and escalated automatically — officers act on
+                       exceptions, not monitoring reports"
+    priority should
+    status accepted
+    advances "Maintain portfolio quality"
+
+    stories {
+      "As a loan operations officer, I want the system to detect missed payments on
+       the due date and trigger a configurable escalation chain, so that no delinquency
+       goes unnoticed." {
+        acceptance-criteria {
+          "Missed payment is detected at end-of-day on the due date"
+          "Escalation chain is configurable: notification → reminder → formal notice → collections → default"
+          "Each escalation step has a configurable delay and action"
+          "Late penalty is computed automatically per contractual rate, capped at legal maximum"
+        }
+      }
+      "As a compliance officer, I want loans to transition to Default status
+       automatically when past due exceeds 90 days, so that Basel requirements
+       are met without manual intervention." {
+        acceptance-criteria {
+          "Default threshold is configurable (default: 90 days per Basel definition)"
+          "Default transition triggers IFRS 9 Stage 3 classification"
+          "Default event is recorded with trigger details"
+          "Cure (return to performing) requires configurable cure period and conditions"
+        }
+      }
+    }
+  }
+
+  feature "Product configuration engine" {
+    summary "Define and manage loan product types (amortization method, rate structure,
+             fee schedules, collateral requirements, checklist, delegation rules) through
+             configuration rather than code"
+    persona "Relationship manager"
+    value-proposition "New loan products can be launched in days by the product team —
+                       no development sprint required"
+    priority should
+    status accepted
+    advances "Enable product configurability"
+
+    non-goals {
+      "Visual no-code product builder — configuration is done via structured YAML/JSON
+       definitions reviewed and deployed through the standard change management process"
+    }
+
+    stories {
+      "As a product manager (Head of Product — Lending), I want to define a new loan
+       product by specifying its parameters in a configuration file, so that I can
+       launch it without a development cycle." {
+        acceptance-criteria {
+          "Product definition includes: amortization type, rate structure (fixed/variable/indexed),
+           fee schedule, collateral requirements, eligibility criteria, delegation matrix overrides"
+          "New product configuration is validated against the metamodel before activation"
+          "Product configuration is versioned — changes create a new version, existing loans
+           remain on their origination version"
+        }
+      }
+    }
+  }
+
+  feature "AML/CFT screening" {
+    summary "Screen borrowers and beneficial owners against sanctions lists (OFAC, EU, UN, Tracfin)
+             and detect suspicious patterns at origination and throughout the loan lifecycle"
+    persona "Compliance officer"
+    value-proposition "Sanctions screening is systematic and auditable — no manual list checks"
+    priority must
+    status accepted
+    advances "Ensure full audit traceability"
+
+    stories {
+      "As a compliance officer, I want every loan application to be screened against
+       sanctions lists before submission, so that we never onboard a sanctioned party." {
+        acceptance-criteria {
+          "Screening covers the borrower, all beneficial owners (UBO), and guarantors"
+          "Lists checked: OFAC, EU consolidated, UN Security Council, Tracfin"
+          "Screening results are recorded in the loan event history"
+          "Positive match blocks submission and routes to compliance review"
+        }
+      }
+    }
+  }
+
+
+  # ──────────────────────────────────────────────
+  #  USER JOURNEYS
+  # ──────────────────────────────────────────────
+
+  journey "Standard loan origination to disbursement" for "Relationship manager" {
+    trigger "A business client requests financing for an investment or working capital need"
+    outcome "Loan is disbursed, schedule is generated, borrower receives confirmation"
+
+    steps {
+      step 1 {
+        action "Relationship manager opens a new application, selects the loan product"
+        system-response "Displays product-specific checklist and required fields"
+        channel backoffice
+        emotional-tone confident
+      }
+      step 2 {
+        action "RM fills in borrower details, loan amount, duration, purpose, and uploads documents"
+        system-response "Validates fields in real time, flags missing items, links borrower from Customer module"
+        channel backoffice
+        emotional-tone neutral
+      }
+      step 3 {
+        action "RM submits the application"
+        system-response "Runs AML screening, checks exposure limits, computes credit score, routes to
+                         appropriate decision authority (auto-approve or analyst queue)"
+        channel backoffice
+        emotional-tone confident
+      }
+      step 4 {
+        action "Credit analyst reviews the pre-computed analysis, adds qualitative assessment"
+        system-response "Displays financial ratios, score breakdown, sector risk, exposure summary.
+                         Analyst records recommendation with rationale."
+        channel backoffice
+        emotional-tone neutral
+      }
+      step 5 {
+        action "Decision authority (analyst, committee, or system) approves the loan"
+        system-response "Records decision event, generates loan offer document, notifies RM and borrower"
+        channel backoffice
+        emotional-tone confident
+      }
+      step 6 {
+        action "Borrower reviews and signs the contract"
+        system-response "Signature captured via electronic signature (eIDAS qualified for > 1M EUR)"
+        channel external
+        emotional-tone neutral
+      }
+      step 7 {
+        action "Operations officer verifies pre-conditions and triggers disbursement"
+        system-response "Checks: signed contract, registered collateral, conditions precedent cleared.
+                         Posts accounting entries to Ledger, generates repayment schedule, sends confirmation."
+        channel backoffice
+        emotional-tone confident
+      }
+    }
+  }
+
+  journey "Missed payment to resolution" for "Loan operations officer" {
+    trigger "A scheduled payment is not received by end of day on the due date"
+    outcome "Payment is recovered or loan is escalated through the collections process"
+
+    steps {
+      step 1 {
+        action "End-of-day batch detects missed payment"
+        system-response "Marks installment as overdue, computes late penalty, records PaymentMissed event"
+        channel backoffice
+        emotional-tone neutral
+      }
+      step 2 {
+        action "System sends automatic reminder to borrower (configurable delay: D+1 to D+5)"
+        system-response "Notification via email/SMS with outstanding amount and penalty"
+        channel app
+        emotional-tone neutral
+      }
+      step 3 {
+        action "If payment not received within grace period, formal notice is generated"
+        system-response "Formal notice document generated, sent to borrower, recorded in audit trail"
+        channel backoffice
+        emotional-tone anxious
+      }
+      step 4 {
+        action "Operations officer contacts borrower to arrange payment or restructuring"
+        system-response "Officer records outcome: payment promise, restructuring request, or escalation"
+        channel external
+        emotional-tone anxious
+      }
+      step 5 {
+        action "If past due exceeds 90 days without resolution, system transitions to Default"
+        system-response "Default event recorded, IFRS 9 Stage 3 applied, provision recalculated,
+                         compliance alerted"
+        channel backoffice
+        emotional-tone frustrated
+      }
+    }
+  }
+
+
+  # ──────────────────────────────────────────────
+  #  ASSUMPTIONS
+  # ──────────────────────────────────────────────
+
+  assumption "Customer module API stable" {
+    statement "The Customer module (KYC/KYB) exposes a stable API with borrower identity,
+               beneficial ownership, and KYB validation status before Phase 1 starts"
+    impact-if-wrong "Origination feature cannot validate borrower identity at submission — manual
+                     workaround required, scoring delayed, regulatory risk"
+    validation-plan "API contract review and integration test with Customer team in sprint 0"
+    status unvalidated
+    underpins "Loan origination", "AML/CFT screening"
+  }
+
+  assumption "Ledger supports multi-currency and reversal" {
+    statement "The Ledger module supports multi-currency accounting entries and full reversal
+               (contra-entry) of previously posted entries"
+    impact-if-wrong "Disbursement and payment features require a workaround layer for currency
+                     conversion and error correction — adds complexity and reconciliation risk"
+    validation-plan "Review Ledger API specification; test reversal scenario in integration environment"
+    status unvalidated
+    underpins "Disbursement and contract management", "Loan servicing"
+  }
+
+  assumption "Risk models available" {
+    statement "PD, LGD, and EAD models for all target segments are calibrated, validated by
+               the regulator, and exposed via the Risk Engine API before Phase 1"
+    impact-if-wrong "IFRS 9 provisioning and auto-approval depend on model outputs — without them,
+                     all decisions are manual and provisions are estimated"
+    validation-plan "Risk team provides model delivery timeline; fallback: use standardized approach
+                     for Phase 1 and switch to IRB when models are ready"
+    status unvalidated
+    underpins "Credit scoring and analysis", "Auto-approval engine", "IFRS 9 provisioning"
+  }
+
+  assumption "Infrastructure provisioned" {
+    statement "Target infrastructure (Kubernetes cluster, event store, database, message broker)
+               is provisioned and accessible to the development team before sprint 1"
+    impact-if-wrong "Development blocked — team cannot deploy or test integration scenarios"
+    validation-plan "Infrastructure readiness review with platform team 2 weeks before sprint 1"
+    status unvalidated
+    underpins "Audit trail and event history", "Loan servicing"
+  }
+
+
+  # ──────────────────────────────────────────────
+  #  RISKS
+  # ──────────────────────────────────────────────
+
+  risk "Regulatory complexity underestimated" {
+    statement "IFRS 9 staging rules and Basel RWA calculations are more complex than assumed,
+              requiring specialized knowledge that the team may lack"
+    likelihood medium
+    impact high
+    mitigation mitigate
+    owner "Chief Risk Officer"
+    threatens "IFRS 9 provisioning", "Regulatory reporting"
+  }
+
+  risk "Ledger integration delayed" {
+    statement "The Ledger module may not be ready for integration when disbursement feature
+              development begins, blocking end-to-end testing"
+    likelihood medium
+    impact high
+    mitigation mitigate
+    owner "Head of Engineering"
+    threatens "Disbursement and contract management"
+  }
+
+  risk "Historical data migration" {
+    statement "Migrating existing loan book (legacy system) into the new module may surface
+              data quality issues that require manual remediation"
+    likelihood high
+    impact high
+    mitigation mitigate
+    owner "Head of Data Engineering"
+    threatens "Loan servicing", "IFRS 9 provisioning"
+  }
+
+  risk "Batch performance at scale" {
+    statement "End-of-day batch processing (payment detection, penalty computation, stage
+              reassessment) may exceed the 30-minute SLA when the loan book grows beyond
+              100K active loans"
+    likelihood low
+    impact medium
+    mitigation mitigate
+    owner "Head of Engineering"
+    threatens "Loan servicing", "Delinquency and collections"
+  }
+
+  risk "Auto-approval false positives" {
+    statement "Auto-approval rules may approve loans that a human analyst would have flagged,
+              leading to increased default rates in the auto-approved segment"
+    likelihood medium
+    impact high
+    mitigation mitigate
+    owner "Head of Credit Operations"
+    threatens "Auto-approval engine", "Maintain portfolio quality"
+  }
+
+
+  # ──────────────────────────────────────────────
+  #  CONSTRAINTS
+  # ──────────────────────────────────────────────
+
+  constraint "Basel III/IV capital requirements" {
+    statement "All credit exposures must contribute to Risk-Weighted Assets (RWA) per
+              Basel III/IV standardized or IRB approach. Capital adequacy reporting is
+              mandatory and subject to supervisory review."
+    source regulatory
+    constrains "IFRS 9 provisioning", "Regulatory reporting", "Credit scoring and analysis"
+  }
+
+  constraint "IFRS 9 expected credit loss" {
+    statement "Provisions for credit losses must follow IFRS 9 three-stage model.
+              Stage transitions must be triggered by significant increase in credit risk.
+              ECL must be computed at least monthly."
+    source regulatory
+    constrains "IFRS 9 provisioning"
+  }
+
+  constraint "AML/CFT and sanctions screening" {
+    statement "All borrowers and beneficial owners must be screened against OFAC, EU, UN,
+              and national sanctions lists at origination and periodically throughout the
+              loan lifecycle. Suspicious activity reports must be filed when triggered."
+    source regulatory
+    constrains "Loan origination", "AML/CFT screening"
+  }
+
+  constraint "AnaCredit reporting" {
+    statement "Granular credit data must be reported to the ECB per AnaCredit regulation
+              on a monthly basis."
+    source regulatory
+    constrains "Regulatory reporting"
+  }
+
+  constraint "eIDAS electronic signature" {
+    statement "Loan contracts above 1M EUR require qualified electronic signatures per
+              eIDAS regulation. Contracts below this threshold accept advanced signatures."
+    source regulatory
+    constrains "Disbursement and contract management"
+  }
+
+  constraint "Data encryption and access control" {
+    statement "All financial data must be encrypted at rest (AES-256) and in transit (TLS 1.3).
+              Access control must follow RBAC with granular permissions by product, branch,
+              and amount tier."
+    source regulatory
+    constrains "Audit trail and event history", "Loan origination"
+  }
+
+  constraint "Event sourcing architecture" {
+    statement "The module must use event sourcing for all loan state mutations. This is an
+              organizational architectural decision, not a regulatory requirement."
+    source organizational
+    constrains "Audit trail and event history", "Loan servicing", "Disbursement and contract management"
+  }
+
+
+  # ──────────────────────────────────────────────
+  #  OPEN QUESTIONS
+  # ──────────────────────────────────────────────
+
+  open-question "Auto-approval threshold calibration" {
+    question "What is the right score threshold and amount ceiling for auto-approval that
+             balances speed with acceptable default risk?"
+    context "Setting the threshold too low increases default risk in the auto-approved segment.
+             Setting it too high makes auto-approval meaningless (too few loans qualify).
+             The Risk team needs to model the trade-off."
+    owner "Head of Credit Operations"
+    deadline 2026-06-01
+    status open
+    blocks "Auto-approval engine"
+  }
+
+  open-question "IRB vs standardized approach timeline" {
+    question "Will IRB models be validated by the regulator in time for Phase 3 (regulatory
+             compliance), or should the module launch with the standardized approach only?"
+    context "IRB produces lower RWA for high-quality portfolios but requires regulatory
+             approval. Standardized is always available but more capital-intensive."
+    owner "Chief Risk Officer"
+    deadline 2026-07-01
+    status investigating
+    blocks "Regulatory reporting"
+  }
+
+  open-question "Legacy loan migration scope" {
+    question "Do we migrate the full historical loan book (including closed loans) or only
+             active loans? Historical closed loans are needed for regulatory backtesting
+             but increase migration complexity significantly."
+    context "Full migration provides a complete dataset for IFRS 9 backtesting and
+             regulatory audits. Partial migration (active only) reduces risk but may
+             require maintaining the legacy system for historical queries."
+    owner "Head of Data Engineering"
+    deadline 2026-05-15
+    status open
+    blocks "Loan servicing", "IFRS 9 provisioning"
+  }
+
+  open-question "Borrower self-service portal" {
+    question "Should Phase 1 include a borrower-facing portal for application status
+             tracking, or is notification-only sufficient for MVP?"
+    context "A self-service portal reduces call volume to relationship managers but adds
+             a front-end development stream. Notifications alone may satisfy the tracking
+             need in the short term."
+    owner "Head of Product — Lending"
+    deadline 2026-04-15
+    status open
+    blocks "Loan origination"
+  }
+
+
+  # ──────────────────────────────────────────────
+  #  RELEASES
+  # ──────────────────────────────────────────────
+
+  release "R1 — Core origination and decisioning" {
+    target-date "Q3 2026"
+    theme "End-to-end loan origination from application to disbursement for amortizing loans"
+    status planned
+    includes {
+      "Loan origination"
+      "Credit scoring and analysis"
+      "Disbursement and contract management"
+      "Audit trail and event history"
+      "AML/CFT screening"
+    }
+    exit-criteria {
+      "All must features pass acceptance tests"
+      "No P0/P1 bugs open"
+      "End-to-end flow tested: application → scoring → decision → disbursement → first schedule"
+      "AML screening integrated with at least one sanctions list provider"
+      "Audit trail verified by compliance team on 50 test loans"
+    }
+  }
+
+  release "R2 — Servicing and collections" {
+    target-date "Q4 2026"
+    theme "Full loan lifecycle management — payments, exceptions, delinquency"
+    status planned
+    depends-on "R1 — Core origination and decisioning"
+    includes {
+      "Loan servicing"
+      "Collateral management"
+      "Delinquency and collections"
+      "Auto-approval engine"
+    }
+    exit-criteria {
+      "Payment matching accuracy > 95% on test dataset"
+      "Early repayment and restructuring flows tested end-to-end"
+      "Delinquency escalation chain tested through all stages"
+      "Auto-approval pilot validated on 100+ test applications"
+      "Collateral LTV monitoring active and alerting verified"
+    }
+  }
+
+  release "R3 — Regulatory compliance" {
+    target-date "Q1 2027"
+    theme "IFRS 9, Basel, and regulatory reporting — production-ready for supervisory review"
+    status planned
+    depends-on "R2 — Servicing and collections"
+    includes {
+      "IFRS 9 provisioning"
+      "Regulatory reporting"
+      "Product configuration engine"
+    }
+    exit-criteria {
+      "IFRS 9 staging validated on historical test data — ECL within 5% of benchmark"
+      "AnaCredit submission file passes ECB validation"
+      "Basel RWA computation reconciles with Risk team independent calculation"
+      "At least one new product launched via configuration engine in UAT"
+      "Pen test completed — no critical or high vulnerabilities"
+    }
+  }
+}
