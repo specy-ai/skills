@@ -1,52 +1,60 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1800 2400" font-family="'Helvetica Neue', Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1800 2400" font-family="'IBM Plex Sans Condensed', 'Helvetica Neue', Arial, sans-serif">
   <defs>
+    <!-- Import Google Fonts -->
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,500&amp;family=IBM+Plex+Sans+Condensed:wght@300;400;500;600;700&amp;display=swap');
+      .header { font-family: 'EB Garamond', 'Georgia', serif; }
+      .body { font-family: 'IBM Plex Sans Condensed', 'Helvetica Neue', sans-serif; }
+    </style>
+
+    <!-- Arrow markers adapted for dark theme — brighter strokes -->
     <marker id="arr" viewBox="0 0 10 8" refX="10" refY="4" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
-      <path d="M0,0 L10,4 L0,8 Z" fill="#555"/>
+      <path d="M0,0 L10,4 L0,8 Z" fill="#8A9BB5"/>
     </marker>
     <marker id="arr-bl" viewBox="0 0 10 8" refX="10" refY="4" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
-      <path d="M0,0 L10,4 L0,8 Z" fill="#2980B9"/>
+      <path d="M0,0 L10,4 L0,8 Z" fill="#5DADE2"/>
     </marker>
     <marker id="arr-gn" viewBox="0 0 10 8" refX="10" refY="4" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
-      <path d="M0,0 L10,4 L0,8 Z" fill="#27AE60"/>
+      <path d="M0,0 L10,4 L0,8 Z" fill="#58D68D"/>
     </marker>
     <marker id="arr-am" viewBox="0 0 10 8" refX="10" refY="4" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
-      <path d="M0,0 L10,4 L0,8 Z" fill="#C17D11"/>
+      <path d="M0,0 L10,4 L0,8 Z" fill="#F0C040"/>
     </marker>
     <marker id="arr-rd" viewBox="0 0 10 8" refX="10" refY="4" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
-      <path d="M0,0 L10,4 L0,8 Z" fill="#C0392B"/>
+      <path d="M0,0 L10,4 L0,8 Z" fill="#F07070"/>
     </marker>
     <marker id="arr-pu" viewBox="0 0 10 8" refX="10" refY="4" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
-      <path d="M0,0 L10,4 L0,8 Z" fill="#7D3C98"/>
+      <path d="M0,0 L10,4 L0,8 Z" fill="#BB8FCE"/>
     </marker>
     <marker id="arr-tl" viewBox="0 0 10 8" refX="10" refY="4" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
-      <path d="M0,0 L10,4 L0,8 Z" fill="#1A8870"/>
+      <path d="M0,0 L10,4 L0,8 Z" fill="#48C9B0"/>
     </marker>
     <marker id="arr-or" viewBox="0 0 10 8" refX="10" refY="4" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
-      <path d="M0,0 L10,4 L0,8 Z" fill="#E67E22"/>
+      <path d="M0,0 L10,4 L0,8 Z" fill="#F0A050"/>
     </marker>
     <marker id="arr-trace" viewBox="0 0 10 8" refX="10" refY="4" markerWidth="10" markerHeight="8" orient="auto-start-reverse">
-      <path d="M0,0 L10,4 L0,8 Z" fill="#E74C3C"/>
+      <path d="M0,0 L10,4 L0,8 Z" fill="#F07070"/>
     </marker>
     <marker id="open-gn" viewBox="0 0 10 8" refX="10" refY="4" markerWidth="9" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0,0 L10,4 L0,8" fill="none" stroke="#27AE60" stroke-width="1.2"/>
+      <path d="M0,0 L10,4 L0,8" fill="none" stroke="#58D68D" stroke-width="1.2"/>
     </marker>
     <marker id="open-rd" viewBox="0 0 10 8" refX="10" refY="4" markerWidth="9" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0,0 L10,4 L0,8" fill="none" stroke="#C0392B" stroke-width="1.2"/>
+      <path d="M0,0 L10,4 L0,8" fill="none" stroke="#F07070" stroke-width="1.2"/>
     </marker>
 
-    <!-- Gradient for traceability arrows -->
-    <linearGradient id="trace-grad" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#E74C3C"/>
-      <stop offset="100%" stop-color="#E74C3C" stop-opacity="0.4"/>
+    <!-- Background gradient -->
+    <linearGradient id="bg-grad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2B3E50"/>
+      <stop offset="100%" stop-color="#1A2A3A"/>
     </linearGradient>
   </defs>
 
-  <!-- Background -->
-  <rect width="1800" height="2400" fill="#FAFBFC" rx="8"/>
+  <!-- Background — dark slate gradient -->
+  <rect width="1800" height="2400" fill="url(#bg-grad)" rx="8"/>
 
   <!-- Title -->
-  <text x="900" y="36" text-anchor="middle" font-size="22" font-weight="700" fill="#2C3E50">Specy Metamodel Comparison &amp; Traceability</text>
-  <text x="900" y="58" text-anchor="middle" font-size="13" fill="#7F8C8D">Three layers of precision — from product intent to domain realization</text>
+  <text x="900" y="38" text-anchor="middle" font-size="24" font-weight="700" fill="#F07070" class="header">Specy Metamodel Comparison &amp; Traceability</text>
+  <text x="900" y="60" text-anchor="middle" font-size="13" fill="#8A9BB5" class="body">Three layers of precision — from product intent to domain realization</text>
 
 
   <!-- ═══════════════════════════════════════════════════════════════ -->
@@ -54,223 +62,222 @@
   <!-- ═══════════════════════════════════════════════════════════════ -->
 
   <!-- Layer background -->
-  <rect x="30" y="80" width="1740" height="580" rx="12" fill="#FEF9E7" fill-opacity="0.5" stroke="#F1C40F" stroke-width="2"/>
+  <rect x="30" y="80" width="1740" height="580" rx="12" fill="#263545" fill-opacity="0.7" stroke="#F0C040" stroke-width="1.5"/>
 
   <!-- Layer header -->
-  <rect x="30" y="80" width="1740" height="50" rx="12" fill="#F1C40F" fill-opacity="0.15"/>
-  <rect x="30" y="105" width="1740" height="25" fill="#F1C40F" fill-opacity="0.15"/>
-  <text x="60" y="108" font-size="16" font-weight="700" fill="#7D6608">PRODUCT-REQ-METAMODEL</text>
-  <text x="440" y="108" font-size="13" fill="#9A7D0A" font-style="italic">"What &amp; Why &amp; For Whom"</text>
-  <text x="60" y="125" font-size="10" fill="#9A7D0A">Audience: PM, Design, Leadership  |  File: .prd.md  |  Language: Personas, Goals, Features, Metrics</text>
+  <rect x="30" y="80" width="1740" height="50" rx="12" fill="#F0C040" fill-opacity="0.08"/>
+  <rect x="30" y="105" width="1740" height="25" fill="#F0C040" fill-opacity="0.05"/>
+  <text x="60" y="108" font-size="17" font-weight="700" fill="#F0C040" class="header">PRODUCT-REQ-METAMODEL</text>
+  <text x="440" y="108" font-size="14" fill="#F0C040" font-style="italic" class="header">"What &amp; Why &amp; For Whom"</text>
+  <text x="60" y="125" font-size="10" fill="#8A9BB5" class="body">Audience: PM, Design, Leadership  |  File: .prd.md  |  Language: Personas, Goals, Features, Metrics</text>
 
   <!-- ── RELATIONS (behind boxes) ── -->
 
   <!-- Product → Problem Statement -->
-  <line x1="235" y1="192" x2="235" y2="238" stroke="#C17D11" stroke-width="1.6" marker-end="url(#arr-am)"/>
-  <text x="248" y="220" font-size="8.5" fill="#C17D11" font-weight="500">1..1 addresses</text>
+  <line x1="235" y1="192" x2="235" y2="238" stroke="#F0C040" stroke-width="1.6" marker-end="url(#arr-am)"/>
+  <text x="248" y="220" font-size="8.5" fill="#F0C040" font-weight="500" class="body">1..1 addresses</text>
 
   <!-- Product → Persona -->
-  <path d="M 300,172 Q 380,172 445,198" fill="none" stroke="#2980B9" stroke-width="1.5" marker-end="url(#arr-bl)"/>
-  <text x="355" y="167" font-size="8.5" fill="#2980B9" font-weight="500">1..n serves</text>
+  <path d="M 300,172 Q 380,172 445,198" fill="none" stroke="#5DADE2" stroke-width="1.5" marker-end="url(#arr-bl)"/>
+  <text x="355" y="167" font-size="8.5" fill="#5DADE2" font-weight="500" class="body">1..n serves</text>
 
   <!-- Product → Goal -->
-  <path d="M 300,185 Q 510,195 620,198" fill="none" stroke="#27AE60" stroke-width="1.5" marker-end="url(#arr-gn)"/>
-  <text x="450" y="194" font-size="8.5" fill="#27AE60" font-weight="500">1..n pursues</text>
+  <path d="M 300,185 Q 510,195 620,198" fill="none" stroke="#58D68D" stroke-width="1.5" marker-end="url(#arr-gn)"/>
+  <text x="450" y="194" font-size="8.5" fill="#58D68D" font-weight="500" class="body">1..n pursues</text>
 
   <!-- Product → Feature -->
-  <path d="M 235,195 Q 235,350 355,370" fill="none" stroke="#7D3C98" stroke-width="1.5" marker-end="url(#arr-pu)"/>
-  <text x="248" y="340" font-size="8.5" fill="#7D3C98" font-weight="500">0..n offers</text>
+  <path d="M 235,195 Q 235,350 355,370" fill="none" stroke="#BB8FCE" stroke-width="1.5" marker-end="url(#arr-pu)"/>
+  <text x="248" y="340" font-size="8.5" fill="#BB8FCE" font-weight="500" class="body">0..n offers</text>
 
   <!-- Product → Release -->
-  <path d="M 170,195 Q 140,420 155,518" fill="none" stroke="#555" stroke-width="1.3" marker-end="url(#arr)"/>
-  <text x="120" y="420" font-size="8.5" fill="#555" font-weight="500">0..n plans</text>
+  <path d="M 170,195 Q 140,420 155,518" fill="none" stroke="#8A9BB5" stroke-width="1.3" marker-end="url(#arr)"/>
+  <text x="120" y="420" font-size="8.5" fill="#8A9BB5" font-weight="500" class="body">0..n plans</text>
 
   <!-- Product → Assumption -->
-  <path d="M 300,180 Q 1100,155 1180,198" fill="none" stroke="#555" stroke-width="1.2" marker-end="url(#arr)"/>
-  <text x="750" y="158" font-size="8.5" fill="#888" font-weight="500">0..n assumes / faces / bounded by / raises</text>
+  <path d="M 300,180 Q 1100,155 1180,198" fill="none" stroke="#8A9BB5" stroke-width="1.2" marker-end="url(#arr)"/>
+  <text x="750" y="158" font-size="8.5" fill="#6B7B8D" font-weight="500" class="body">0..n assumes / faces / bounded by / raises</text>
 
   <!-- Goal → Success Metric -->
-  <line x1="710" y1="248" x2="710" y2="288" stroke="#27AE60" stroke-width="1.4" marker-end="url(#arr-gn)"/>
-  <text x="722" y="272" font-size="8.5" fill="#27AE60" font-weight="500">1..n measured by</text>
+  <line x1="710" y1="248" x2="710" y2="288" stroke="#58D68D" stroke-width="1.4" marker-end="url(#arr-gn)"/>
+  <text x="722" y="272" font-size="8.5" fill="#58D68D" font-weight="500" class="body">1..n measured by</text>
 
   <!-- Feature → User Story -->
-  <line x1="510" y1="408" x2="510" y2="448" stroke="#7D3C98" stroke-width="1.4" marker-end="url(#arr-pu)"/>
-  <text x="522" y="432" font-size="8.5" fill="#7D3C98" font-weight="500">1..n described by</text>
+  <line x1="510" y1="408" x2="510" y2="448" stroke="#BB8FCE" stroke-width="1.4" marker-end="url(#arr-pu)"/>
+  <text x="522" y="432" font-size="8.5" fill="#BB8FCE" font-weight="500" class="body">1..n described by</text>
 
   <!-- Feature → User Journey -->
-  <path d="M 580,395 Q 700,420 775,448" fill="none" stroke="#7D3C98" stroke-width="1.3" marker-end="url(#arr-pu)"/>
-  <text x="665" y="420" font-size="8.5" fill="#7D3C98" font-weight="500">0..n illustrated by</text>
+  <path d="M 580,395 Q 700,420 775,448" fill="none" stroke="#BB8FCE" stroke-width="1.3" marker-end="url(#arr-pu)"/>
+  <text x="665" y="420" font-size="8.5" fill="#BB8FCE" font-weight="500" class="body">0..n illustrated by</text>
 
   <!-- Feature → Goal -->
-  <path d="M 530,370 Q 610,320 660,248" fill="none" stroke="#27AE60" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arr-gn)"/>
-  <text x="605" y="310" font-size="8" fill="#27AE60" font-style="italic">advances</text>
+  <path d="M 530,370 Q 610,320 660,248" fill="none" stroke="#58D68D" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arr-gn)"/>
+  <text x="605" y="310" font-size="8" fill="#58D68D" font-style="italic" class="body">advances</text>
 
   <!-- Feature → Hypothesis -->
-  <path d="M 580,380 Q 780,345 870,320" fill="none" stroke="#E67E22" stroke-width="1.3" marker-end="url(#arr-or)"/>
-  <text x="720" y="350" font-size="8.5" fill="#E67E22" font-weight="500">0..1 tested by</text>
+  <path d="M 580,380 Q 780,345 870,320" fill="none" stroke="#F0A050" stroke-width="1.3" marker-end="url(#arr-or)"/>
+  <text x="720" y="350" font-size="8.5" fill="#F0A050" font-weight="500" class="body">0..1 tested by</text>
 
   <!-- Hypothesis → Goal -->
-  <path d="M 940,290 Q 820,268 760,248" fill="none" stroke="#E67E22" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arr-or)"/>
-  <text x="850" y="272" font-size="8" fill="#E67E22" font-style="italic">predicts</text>
+  <path d="M 940,290 Q 820,268 760,248" fill="none" stroke="#F0A050" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arr-or)"/>
+  <text x="850" y="272" font-size="8" fill="#F0A050" font-style="italic" class="body">predicts</text>
 
   <!-- Persona → User Story -->
-  <path d="M 500,248 Q 510,360 510,448" fill="none" stroke="#2980B9" stroke-width="1.1" stroke-dasharray="3,3" marker-end="url(#arr-bl)"/>
-  <text x="515" y="360" font-size="7.5" fill="#2980B9" font-style="italic">perspective</text>
+  <path d="M 500,248 Q 510,360 510,448" fill="none" stroke="#5DADE2" stroke-width="1.1" stroke-dasharray="3,3" marker-end="url(#arr-bl)"/>
+  <text x="515" y="360" font-size="7.5" fill="#5DADE2" font-style="italic" class="body">perspective</text>
 
-  <!-- User Story → Acceptance Criteria (annotation) -->
-  <line x1="510" y1="488" x2="510" y2="518" stroke="#7D3C98" stroke-width="1.2" marker-end="url(#arr-pu)"/>
+  <!-- User Story → Acceptance Criteria -->
+  <line x1="510" y1="488" x2="510" y2="518" stroke="#BB8FCE" stroke-width="1.2" marker-end="url(#arr-pu)"/>
 
-  <!-- Evidence → Problem / Goals / Features (supports, dashed) -->
-  <path d="M 370,300 Q 310,278 280,270" fill="none" stroke="#C17D11" stroke-width="1.1" stroke-dasharray="3,3" marker-end="url(#arr-am)"/>
-  <text x="390" y="306" font-size="7.5" fill="#C17D11" font-style="italic">supports</text>
+  <!-- Evidence → Problem -->
+  <path d="M 370,300 Q 310,278 280,270" fill="none" stroke="#F0C040" stroke-width="1.1" stroke-dasharray="3,3" marker-end="url(#arr-am)"/>
+  <text x="390" y="306" font-size="7.5" fill="#F0C040" font-style="italic" class="body">supports</text>
+
+  <!-- Feature → Release -->
+  <path d="M 370,400 Q 280,470 240,520" fill="none" stroke="#5DADE2" stroke-width="1.1" stroke-dasharray="3,3" marker-end="url(#arr-bl)"/>
+  <text x="285" y="470" font-size="8" fill="#5DADE2" font-style="italic" class="body">0..1 planned in</text>
 
 
   <!-- ── CONCEPT BOXES ── -->
 
   <!-- Product -->
   <g>
-    <rect x="155" y="150" width="145" height="45" rx="7" fill="#FEF9E7" stroke="#F1C40F" stroke-width="2"/>
-    <text x="228" y="172" text-anchor="middle" font-size="14" font-weight="700" fill="#7D6608">Product</text>
-    <text x="228" y="186" text-anchor="middle" font-size="8" fill="#9A7D0A">vision, scope, non-goals</text>
+    <rect x="155" y="150" width="145" height="45" rx="7" fill="#2B3E50" stroke="#F0C040" stroke-width="2"/>
+    <text x="228" y="172" text-anchor="middle" font-size="15" font-weight="700" fill="#F0C040" class="header">Product</text>
+    <text x="228" y="186" text-anchor="middle" font-size="8" fill="#C5CED8" class="body">vision, scope, non-goals</text>
   </g>
 
   <!-- Problem Statement -->
   <g>
-    <rect x="155" y="238" width="160" height="40" rx="6" fill="#FEF9E7" stroke="#C17D11" stroke-width="1.6"/>
-    <text x="235" y="258" text-anchor="middle" font-size="12" font-weight="600" fill="#7D6608">Problem Statement</text>
-    <text x="235" y="272" text-anchor="middle" font-size="8" fill="#9A7D0A">situation, complication, question</text>
+    <rect x="155" y="238" width="160" height="40" rx="6" fill="#2B3E50" stroke="#F0C040" stroke-width="1.4"/>
+    <text x="235" y="258" text-anchor="middle" font-size="12" font-weight="600" fill="#FFFFFF" class="header">Problem Statement</text>
+    <text x="235" y="272" text-anchor="middle" font-size="8" fill="#8A9BB5" class="body">situation, complication, question</text>
   </g>
 
   <!-- Persona -->
   <g>
-    <rect x="410" y="198" width="120" height="50" rx="6" fill="#D6EAF8" stroke="#2980B9" stroke-width="1.6"/>
-    <text x="470" y="220" text-anchor="middle" font-size="12" font-weight="600" fill="#1A5276">Persona</text>
-    <text x="470" y="233" text-anchor="middle" font-size="8" fill="#2980B9">role, goals, frustrations</text>
-    <text x="470" y="243" text-anchor="middle" font-size="8" fill="#2980B9">context, weight</text>
+    <rect x="410" y="198" width="120" height="50" rx="6" fill="#1E3248" stroke="#5DADE2" stroke-width="1.6"/>
+    <text x="470" y="220" text-anchor="middle" font-size="13" font-weight="600" fill="#FFFFFF" class="header">Persona</text>
+    <text x="470" y="233" text-anchor="middle" font-size="8" fill="#5DADE2" class="body">role, goals, frustrations</text>
+    <text x="470" y="243" text-anchor="middle" font-size="8" fill="#5DADE2" class="body">context, weight</text>
   </g>
 
   <!-- Goal -->
   <g>
-    <rect x="610" y="198" width="140" height="50" rx="6" fill="#D5F5E3" stroke="#27AE60" stroke-width="1.6"/>
-    <text x="680" y="220" text-anchor="middle" font-size="12" font-weight="600" fill="#1E6F3E">Goal</text>
-    <text x="680" y="233" text-anchor="middle" font-size="8" fill="#27AE60">statement, horizon, owner</text>
+    <rect x="610" y="198" width="140" height="50" rx="6" fill="#1E3530" stroke="#58D68D" stroke-width="1.6"/>
+    <text x="680" y="220" text-anchor="middle" font-size="13" font-weight="600" fill="#FFFFFF" class="header">Goal</text>
+    <text x="680" y="233" text-anchor="middle" font-size="8" fill="#58D68D" class="body">statement, horizon, owner</text>
   </g>
 
   <!-- Success Metric -->
   <g>
-    <rect x="620" y="288" width="160" height="40" rx="6" fill="#D5F5E3" stroke="#27AE60" stroke-width="1.4"/>
-    <text x="700" y="308" text-anchor="middle" font-size="11" font-weight="600" fill="#1E6F3E">Success Metric</text>
-    <text x="700" y="321" text-anchor="middle" font-size="8" fill="#27AE60">indicator, target, baseline</text>
+    <rect x="620" y="288" width="160" height="40" rx="6" fill="#1E3530" stroke="#58D68D" stroke-width="1.3"/>
+    <text x="700" y="308" text-anchor="middle" font-size="11" font-weight="600" fill="#FFFFFF" class="header">Success Metric</text>
+    <text x="700" y="321" text-anchor="middle" font-size="8" fill="#58D68D" class="body">indicator, target, baseline</text>
   </g>
 
   <!-- Hypothesis -->
   <g>
-    <rect x="870" y="288" width="160" height="40" rx="6" fill="#FDEBD0" stroke="#E67E22" stroke-width="1.5"/>
-    <text x="950" y="308" text-anchor="middle" font-size="11" font-weight="600" fill="#A04000">Hypothesis</text>
-    <text x="950" y="321" text-anchor="middle" font-size="8" fill="#E67E22">intervention, outcome, status</text>
+    <rect x="870" y="288" width="160" height="40" rx="6" fill="#3A2E1E" stroke="#F0A050" stroke-width="1.5"/>
+    <text x="950" y="308" text-anchor="middle" font-size="11" font-weight="600" fill="#FFFFFF" class="header">Hypothesis</text>
+    <text x="950" y="321" text-anchor="middle" font-size="8" fill="#F0A050" class="body">intervention, outcome, status</text>
   </g>
 
   <!-- Evidence -->
   <g>
-    <rect x="370" y="288" width="160" height="40" rx="6" fill="#FEF9E7" stroke="#C17D11" stroke-width="1.4"/>
-    <text x="450" y="305" text-anchor="middle" font-size="11" font-weight="600" fill="#7D6608">Supporting Evidence</text>
-    <text x="450" y="321" text-anchor="middle" font-size="8" fill="#9A7D0A">type, summary, confidence</text>
+    <rect x="370" y="288" width="160" height="40" rx="6" fill="#2B3E50" stroke="#F0C040" stroke-width="1.3"/>
+    <text x="450" y="305" text-anchor="middle" font-size="11" font-weight="600" fill="#FFFFFF" class="header">Supporting Evidence</text>
+    <text x="450" y="321" text-anchor="middle" font-size="8" fill="#F0C040" class="body">type, summary, confidence</text>
   </g>
 
   <!-- Feature -->
   <g>
-    <rect x="370" y="368" width="210" height="40" rx="6" fill="#E8DAEF" stroke="#7D3C98" stroke-width="1.8"/>
-    <text x="475" y="388" text-anchor="middle" font-size="13" font-weight="700" fill="#5B2C6F">Feature</text>
-    <text x="475" y="401" text-anchor="middle" font-size="8" fill="#7D3C98">summary, priority (MoSCoW), status, non-goals</text>
+    <rect x="370" y="368" width="210" height="40" rx="6" fill="#2E2040" stroke="#BB8FCE" stroke-width="1.8"/>
+    <text x="475" y="388" text-anchor="middle" font-size="14" font-weight="700" fill="#FFFFFF" class="header">Feature</text>
+    <text x="475" y="401" text-anchor="middle" font-size="8" fill="#BB8FCE" class="body">summary, priority (MoSCoW), status, non-goals</text>
   </g>
 
   <!-- User Story -->
   <g>
-    <rect x="410" y="448" width="170" height="40" rx="6" fill="#E8DAEF" stroke="#7D3C98" stroke-width="1.4"/>
-    <text x="495" y="468" text-anchor="middle" font-size="11" font-weight="600" fill="#5B2C6F">User Story</text>
-    <text x="495" y="481" text-anchor="middle" font-size="8" fill="#7D3C98">As a..., I want..., so that...</text>
+    <rect x="410" y="448" width="170" height="40" rx="6" fill="#2E2040" stroke="#BB8FCE" stroke-width="1.3"/>
+    <text x="495" y="468" text-anchor="middle" font-size="11" font-weight="600" fill="#FFFFFF" class="header">User Story</text>
+    <text x="495" y="481" text-anchor="middle" font-size="8" fill="#BB8FCE" class="body">As a..., I want..., so that...</text>
   </g>
 
   <!-- Acceptance Criteria -->
   <g>
-    <rect x="420" y="518" width="170" height="32" rx="5" fill="#F5EEF8" stroke="#7D3C98" stroke-width="1.2"/>
-    <text x="505" y="538" text-anchor="middle" font-size="10" font-weight="500" fill="#7D3C98">Acceptance Criteria</text>
+    <rect x="420" y="518" width="170" height="32" rx="5" fill="#2E2040" stroke="#BB8FCE" stroke-width="1"/>
+    <text x="505" y="538" text-anchor="middle" font-size="10" font-weight="500" fill="#BB8FCE" class="body">Acceptance Criteria</text>
   </g>
 
   <!-- User Journey -->
   <g>
-    <rect x="710" y="448" width="170" height="40" rx="6" fill="#E8DAEF" stroke="#7D3C98" stroke-width="1.4"/>
-    <text x="795" y="468" text-anchor="middle" font-size="11" font-weight="600" fill="#5B2C6F">User Journey</text>
-    <text x="795" y="481" text-anchor="middle" font-size="8" fill="#7D3C98">trigger, outcome, steps</text>
+    <rect x="710" y="448" width="170" height="40" rx="6" fill="#2E2040" stroke="#BB8FCE" stroke-width="1.3"/>
+    <text x="795" y="468" text-anchor="middle" font-size="11" font-weight="600" fill="#FFFFFF" class="header">User Journey</text>
+    <text x="795" y="481" text-anchor="middle" font-size="8" fill="#BB8FCE" class="body">trigger, outcome, steps</text>
   </g>
 
   <!-- Assumption -->
   <g>
-    <rect x="1150" y="198" width="140" height="40" rx="6" fill="#FADBD8" stroke="#C0392B" stroke-width="1.3"/>
-    <text x="1220" y="218" text-anchor="middle" font-size="11" font-weight="600" fill="#922B21">Assumption</text>
-    <text x="1220" y="231" text-anchor="middle" font-size="8" fill="#C0392B">statement, status</text>
+    <rect x="1150" y="198" width="140" height="40" rx="6" fill="#3A2020" stroke="#F07070" stroke-width="1.3"/>
+    <text x="1220" y="218" text-anchor="middle" font-size="11" font-weight="600" fill="#FFFFFF" class="header">Assumption</text>
+    <text x="1220" y="231" text-anchor="middle" font-size="8" fill="#F07070" class="body">statement, status</text>
   </g>
 
   <!-- Risk -->
   <g>
-    <rect x="1320" y="198" width="140" height="40" rx="6" fill="#FADBD8" stroke="#C0392B" stroke-width="1.3"/>
-    <text x="1390" y="218" text-anchor="middle" font-size="11" font-weight="600" fill="#922B21">Risk</text>
-    <text x="1390" y="231" text-anchor="middle" font-size="8" fill="#C0392B">likelihood, impact, mitigation</text>
+    <rect x="1320" y="198" width="140" height="40" rx="6" fill="#3A2020" stroke="#F07070" stroke-width="1.3"/>
+    <text x="1390" y="218" text-anchor="middle" font-size="11" font-weight="600" fill="#FFFFFF" class="header">Risk</text>
+    <text x="1390" y="231" text-anchor="middle" font-size="8" fill="#F07070" class="body">likelihood, impact, mitigation</text>
   </g>
 
   <!-- Constraint -->
   <g>
-    <rect x="1490" y="198" width="140" height="40" rx="6" fill="#FADBD8" stroke="#C0392B" stroke-width="1.3"/>
-    <text x="1560" y="218" text-anchor="middle" font-size="11" font-weight="600" fill="#922B21">Constraint</text>
-    <text x="1560" y="231" text-anchor="middle" font-size="8" fill="#C0392B">source, impact</text>
+    <rect x="1490" y="198" width="140" height="40" rx="6" fill="#3A2020" stroke="#F07070" stroke-width="1.3"/>
+    <text x="1560" y="218" text-anchor="middle" font-size="11" font-weight="600" fill="#FFFFFF" class="header">Constraint</text>
+    <text x="1560" y="231" text-anchor="middle" font-size="8" fill="#F07070" class="body">source, impact</text>
   </g>
 
   <!-- Open Question -->
   <g>
-    <rect x="1150" y="268" width="150" height="40" rx="6" fill="#FADBD8" stroke="#C0392B" stroke-width="1.3"/>
-    <text x="1225" y="288" text-anchor="middle" font-size="11" font-weight="600" fill="#922B21">Open Question</text>
-    <text x="1225" y="301" text-anchor="middle" font-size="8" fill="#C0392B">owner, deadline, status</text>
+    <rect x="1150" y="268" width="150" height="40" rx="6" fill="#3A2020" stroke="#F07070" stroke-width="1.3"/>
+    <text x="1225" y="288" text-anchor="middle" font-size="11" font-weight="600" fill="#FFFFFF" class="header">Open Question</text>
+    <text x="1225" y="301" text-anchor="middle" font-size="8" fill="#F07070" class="body">owner, deadline, status</text>
   </g>
 
   <!-- Release -->
   <g>
-    <rect x="100" y="518" width="140" height="40" rx="6" fill="#D6EAF8" stroke="#2980B9" stroke-width="1.4"/>
-    <text x="170" y="538" text-anchor="middle" font-size="11" font-weight="600" fill="#1A5276">Release</text>
-    <text x="170" y="551" text-anchor="middle" font-size="8" fill="#2980B9">target-date, theme, status</text>
+    <rect x="100" y="518" width="140" height="40" rx="6" fill="#1E3248" stroke="#5DADE2" stroke-width="1.3"/>
+    <text x="170" y="538" text-anchor="middle" font-size="11" font-weight="600" fill="#FFFFFF" class="header">Release</text>
+    <text x="170" y="551" text-anchor="middle" font-size="8" fill="#5DADE2" class="body">target-date, theme, status</text>
   </g>
-
-  <!-- Feature → Release -->
-  <path d="M 370,400 Q 280,470 240,520" fill="none" stroke="#2980B9" stroke-width="1.1" stroke-dasharray="3,3" marker-end="url(#arr-bl)"/>
-  <text x="285" y="470" font-size="8" fill="#2980B9" font-style="italic">0..1 planned in</text>
 
   <!-- PRD Concerns summary -->
   <g>
-    <rect x="1150" y="380" width="590" height="120" rx="8" fill="white" stroke="#F1C40F" stroke-width="1.2"/>
-    <text x="1170" y="400" font-size="11" font-weight="600" fill="#7D6608">Concerns</text>
-    <text x="1170" y="418" font-size="10" fill="#555">Who are the users? (Persona)</text>
-    <text x="1170" y="434" font-size="10" fill="#555">What pain do they have? (Problem Statement)</text>
-    <text x="1170" y="450" font-size="10" fill="#555">What capabilities does the product offer? (Feature)</text>
-    <text x="1170" y="466" font-size="10" fill="#555">How do we measure success? (Goal + Success Metric)</text>
-    <text x="1170" y="482" font-size="10" fill="#555">What are the bets? (Hypothesis)</text>
+    <rect x="1150" y="380" width="590" height="120" rx="8" fill="#1A2A3A" stroke="#F0C040" stroke-width="1"/>
+    <text x="1170" y="400" font-size="12" font-weight="600" fill="#F0C040" class="header">Concerns</text>
+    <text x="1170" y="418" font-size="10" fill="#C5CED8" class="body">Who are the users? (Persona)</text>
+    <text x="1170" y="434" font-size="10" fill="#C5CED8" class="body">What pain do they have? (Problem Statement)</text>
+    <text x="1170" y="450" font-size="10" fill="#C5CED8" class="body">What capabilities does the product offer? (Feature)</text>
+    <text x="1170" y="466" font-size="10" fill="#C5CED8" class="body">How do we measure success? (Goal + Success Metric)</text>
+    <text x="1170" y="482" font-size="10" fill="#C5CED8" class="body">What are the bets? (Hypothesis)</text>
   </g>
 
   <!-- Annotation: primary candidates -->
-  <text x="605" y="540" font-size="8" fill="#7D3C98" font-style="italic">primary candidates for EARS formalization ↓</text>
+  <text x="605" y="540" font-size="8" fill="#BB8FCE" font-style="italic" class="body">primary candidates for EARS formalization ↓</text>
 
 
   <!-- ═══════════════════════════════════════════════════════════════ -->
   <!-- TRACEABILITY BRIDGE: PRD → SYSTEM REQ                          -->
   <!-- ═══════════════════════════════════════════════════════════════ -->
 
-  <!-- Large trace arrow -->
-  <path d="M 505,560 L 505,660 Q 505,670 505,680" fill="none" stroke="#E74C3C" stroke-width="3" marker-end="url(#arr-trace)"/>
-  <rect x="390" y="615" width="250" height="42" rx="6" fill="white" stroke="#E74C3C" stroke-width="1.5"/>
-  <text x="515" y="632" text-anchor="middle" font-size="11" font-weight="700" fill="#E74C3C">source (provenance)</text>
-  <text x="515" y="648" text-anchor="middle" font-size="9" fill="#E74C3C">"Feature: X — Story: Y — AC: Z"</text>
+  <path d="M 505,560 L 505,660 Q 505,670 505,680" fill="none" stroke="#F07070" stroke-width="3" marker-end="url(#arr-trace)"/>
+  <rect x="390" y="615" width="250" height="42" rx="6" fill="#3A2020" stroke="#F07070" stroke-width="1.5"/>
+  <text x="515" y="632" text-anchor="middle" font-size="11" font-weight="700" fill="#F07070" class="header">source (provenance)</text>
+  <text x="515" y="648" text-anchor="middle" font-size="9" fill="#F07070" class="body">"Feature: X — Story: Y — AC: Z"</text>
 
   <!-- Also from constraint -->
-  <path d="M 1560,238 Q 1560,630 640,640" fill="none" stroke="#E74C3C" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr-trace)"/>
-  <text x="1350" y="630" font-size="8.5" fill="#E74C3C" font-style="italic">source "Constraint: ..."</text>
+  <path d="M 1560,238 Q 1560,630 640,640" fill="none" stroke="#F07070" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr-trace)"/>
+  <text x="1350" y="630" font-size="8.5" fill="#F07070" font-style="italic" class="body">source "Constraint: ..."</text>
 
 
   <!-- ═══════════════════════════════════════════════════════════════ -->
@@ -278,132 +285,132 @@
   <!-- ═══════════════════════════════════════════════════════════════ -->
 
   <!-- Layer background -->
-  <rect x="30" y="690" width="1740" height="560" rx="12" fill="#EBF5FB" fill-opacity="0.5" stroke="#2980B9" stroke-width="2"/>
+  <rect x="30" y="690" width="1740" height="560" rx="12" fill="#1E3248" fill-opacity="0.7" stroke="#5DADE2" stroke-width="1.5"/>
 
   <!-- Layer header -->
-  <rect x="30" y="690" width="1740" height="50" rx="12" fill="#2980B9" fill-opacity="0.12"/>
-  <rect x="30" y="715" width="1740" height="25" fill="#2980B9" fill-opacity="0.12"/>
-  <text x="60" y="718" font-size="16" font-weight="700" fill="#1A5276">SYSTEM-REQ-METAMODEL</text>
-  <text x="420" y="718" font-size="13" fill="#2471A3" font-style="italic">"What the System Shall Do"</text>
-  <text x="60" y="735" font-size="10" fill="#2471A3">Audience: Engineers, QA, Architects  |  File: .req  |  Language: EARS patterns, Shall statements, MoSCoW</text>
+  <rect x="30" y="690" width="1740" height="50" rx="12" fill="#5DADE2" fill-opacity="0.08"/>
+  <rect x="30" y="715" width="1740" height="25" fill="#5DADE2" fill-opacity="0.05"/>
+  <text x="60" y="718" font-size="17" font-weight="700" fill="#5DADE2" class="header">SYSTEM-REQ-METAMODEL</text>
+  <text x="420" y="718" font-size="14" fill="#5DADE2" font-style="italic" class="header">"What the System Shall Do"</text>
+  <text x="60" y="735" font-size="10" fill="#8A9BB5" class="body">Audience: Engineers, QA, Architects  |  File: .req  |  Language: EARS patterns, Shall statements, MoSCoW</text>
 
   <!-- ── RELATIONS ── -->
 
   <!-- Requirement Set → Requirement -->
-  <line x1="260" y1="820" x2="425" y2="820" stroke="#2980B9" stroke-width="1.6" marker-end="url(#arr-bl)"/>
-  <text x="320" y="813" font-size="9" fill="#2980B9" font-weight="500">1..n contains</text>
+  <line x1="260" y1="820" x2="425" y2="820" stroke="#5DADE2" stroke-width="1.6" marker-end="url(#arr-bl)"/>
+  <text x="320" y="813" font-size="9" fill="#5DADE2" font-weight="500" class="body">1..n contains</text>
 
   <!-- Requirement → Satisfaction Link -->
-  <line x1="620" y1="855" x2="620" y2="920" stroke="#27AE60" stroke-width="1.8" marker-end="url(#arr-gn)"/>
-  <text x="635" y="895" font-size="9" fill="#27AE60" font-weight="700">satisfied-by</text>
+  <line x1="620" y1="855" x2="620" y2="920" stroke="#58D68D" stroke-width="1.8" marker-end="url(#arr-gn)"/>
+  <text x="635" y="895" font-size="9" fill="#58D68D" font-weight="700" class="body">satisfied-by</text>
 
   <!-- Requirement self-loop (depends-on) -->
-  <path d="M 780,785 C 830,760 830,835 780,825" fill="none" stroke="#555" stroke-width="1.2" marker-end="url(#arr)"/>
-  <text x="838" y="795" font-size="8" fill="#555" font-style="italic">depends-on</text>
-  <text x="838" y="808" font-size="8" fill="#555" font-style="italic">conflicts-with</text>
+  <path d="M 780,785 C 830,760 830,835 780,825" fill="none" stroke="#8A9BB5" stroke-width="1.2" marker-end="url(#arr)"/>
+  <text x="838" y="795" font-size="8" fill="#8A9BB5" font-style="italic" class="body">depends-on</text>
+  <text x="838" y="808" font-size="8" fill="#8A9BB5" font-style="italic" class="body">conflicts-with</text>
 
   <!-- Requirement → decomposed-into -->
-  <path d="M 780,845 C 840,870 840,900 780,855" fill="none" stroke="#555" stroke-width="1.1" stroke-dasharray="3,3" marker-end="url(#arr)"/>
-  <text x="838" y="868" font-size="8" fill="#555" font-style="italic">decomposed-into</text>
+  <path d="M 780,845 C 840,870 840,900 780,855" fill="none" stroke="#8A9BB5" stroke-width="1.1" stroke-dasharray="3,3" marker-end="url(#arr)"/>
+  <text x="838" y="868" font-size="8" fill="#8A9BB5" font-style="italic" class="body">decomposed-into</text>
 
   <!-- ── CONCEPT BOXES ── -->
 
   <!-- Requirement Set -->
   <g>
-    <rect x="65" y="790" width="195" height="50" rx="7" fill="#D6EAF8" stroke="#2980B9" stroke-width="1.8"/>
-    <text x="162" y="812" text-anchor="middle" font-size="13" font-weight="700" fill="#1A5276">Requirement Set</text>
-    <text x="162" y="828" text-anchor="middle" font-size="9" fill="#2980B9">scoped to Bounded Context</text>
+    <rect x="65" y="790" width="195" height="50" rx="7" fill="#1E3248" stroke="#5DADE2" stroke-width="1.8"/>
+    <text x="162" y="812" text-anchor="middle" font-size="14" font-weight="700" fill="#FFFFFF" class="header">Requirement Set</text>
+    <text x="162" y="828" text-anchor="middle" font-size="9" fill="#5DADE2" class="body">scoped to Bounded Context</text>
   </g>
 
   <!-- Requirement -->
   <g>
-    <rect x="425" y="770" width="355" height="85" rx="7" fill="#D6EAF8" stroke="#2980B9" stroke-width="2"/>
-    <text x="602" y="793" text-anchor="middle" font-size="14" font-weight="700" fill="#1A5276">Requirement</text>
-    <line x1="440" y1="800" x2="765" y2="800" stroke="#2980B9" stroke-width="0.6"/>
-    <text x="445" y="815" font-size="10" fill="#2471A3" font-weight="500">id:</text>
-    <text x="470" y="815" font-size="10" fill="#555">REQ-XXX-NNN</text>
-    <text x="600" y="815" font-size="10" fill="#2471A3" font-weight="500">pattern:</text>
-    <text x="655" y="815" font-size="9" fill="#555">ubiq | state | event | unwanted | opt | complex</text>
-    <text x="445" y="832" font-size="10" fill="#2471A3" font-weight="500">statement:</text>
-    <text x="520" y="832" font-size="10" fill="#555">EARS sentence (shall ...)</text>
-    <text x="445" y="848" font-size="10" fill="#2471A3" font-weight="500">priority:</text>
-    <text x="505" y="848" font-size="10" fill="#555">must | should | could | wont</text>
+    <rect x="425" y="770" width="355" height="85" rx="7" fill="#1E3248" stroke="#5DADE2" stroke-width="2"/>
+    <text x="602" y="793" text-anchor="middle" font-size="15" font-weight="700" fill="#FFFFFF" class="header">Requirement</text>
+    <line x1="440" y1="800" x2="765" y2="800" stroke="#5DADE2" stroke-width="0.5" stroke-opacity="0.4"/>
+    <text x="445" y="815" font-size="10" fill="#5DADE2" font-weight="500" class="body">id:</text>
+    <text x="470" y="815" font-size="10" fill="#C5CED8" class="body">REQ-XXX-NNN</text>
+    <text x="600" y="815" font-size="10" fill="#5DADE2" font-weight="500" class="body">pattern:</text>
+    <text x="655" y="815" font-size="9" fill="#C5CED8" class="body">ubiq | state | event | unwanted | opt | complex</text>
+    <text x="445" y="832" font-size="10" fill="#5DADE2" font-weight="500" class="body">statement:</text>
+    <text x="520" y="832" font-size="10" fill="#C5CED8" class="body">EARS sentence (shall ...)</text>
+    <text x="445" y="848" font-size="10" fill="#5DADE2" font-weight="500" class="body">priority:</text>
+    <text x="505" y="848" font-size="10" fill="#C5CED8" class="body">must | should | could | wont</text>
   </g>
 
   <!-- source label on requirement -->
-  <rect x="435" y="755" width="180" height="18" rx="4" fill="#FADBD8" stroke="#E74C3C" stroke-width="1"/>
-  <text x="525" y="768" text-anchor="middle" font-size="9" font-weight="600" fill="#E74C3C">source: ← PRD provenance</text>
+  <rect x="435" y="755" width="180" height="18" rx="4" fill="#3A2020" stroke="#F07070" stroke-width="1"/>
+  <text x="525" y="768" text-anchor="middle" font-size="9" font-weight="600" fill="#F07070" class="body">source: ← PRD provenance</text>
 
   <!-- EARS Patterns box -->
   <g>
-    <rect x="65" y="880" width="395" height="160" rx="8" fill="white" stroke="#2980B9" stroke-width="1.2"/>
-    <text x="85" y="900" font-size="12" font-weight="600" fill="#1A5276">EARS Patterns</text>
-    <line x1="75" y1="907" x2="445" y2="907" stroke="#D6EAF8" stroke-width="1"/>
+    <rect x="65" y="880" width="395" height="160" rx="8" fill="#1A2A3A" stroke="#5DADE2" stroke-width="1"/>
+    <text x="85" y="900" font-size="13" font-weight="600" fill="#FFFFFF" class="header">EARS Patterns</text>
+    <line x1="75" y1="907" x2="445" y2="907" stroke="#8A9BB5" stroke-width="0.5" stroke-opacity="0.3"/>
 
-    <text x="85" y="924" font-size="10" font-weight="600" fill="#2471A3">Ubiquitous</text>
-    <text x="185" y="924" font-size="9.5" fill="#555">The &lt;system&gt; shall &lt;response&gt;.</text>
+    <text x="85" y="924" font-size="10" font-weight="600" fill="#F07070" class="body">Ubiquitous</text>
+    <text x="185" y="924" font-size="9.5" fill="#C5CED8" class="body">The &lt;system&gt; shall &lt;response&gt;.</text>
 
-    <text x="85" y="944" font-size="10" font-weight="600" fill="#2471A3">State-driven</text>
-    <text x="185" y="944" font-size="9.5" fill="#555">While &lt;state&gt;, the &lt;system&gt; shall ...</text>
+    <text x="85" y="944" font-size="10" font-weight="600" fill="#F07070" class="body">State-driven</text>
+    <text x="185" y="944" font-size="9.5" fill="#C5CED8" class="body">While &lt;state&gt;, the &lt;system&gt; shall ...</text>
 
-    <text x="85" y="964" font-size="10" font-weight="600" fill="#2471A3">Event-driven</text>
-    <text x="185" y="964" font-size="9.5" fill="#555">When &lt;trigger&gt;, the &lt;system&gt; shall ...</text>
+    <text x="85" y="964" font-size="10" font-weight="600" fill="#F07070" class="body">Event-driven</text>
+    <text x="185" y="964" font-size="9.5" fill="#C5CED8" class="body">When &lt;trigger&gt;, the &lt;system&gt; shall ...</text>
 
-    <text x="85" y="984" font-size="10" font-weight="600" fill="#2471A3">Unwanted</text>
-    <text x="185" y="984" font-size="9.5" fill="#555">If &lt;condition&gt;, then the &lt;system&gt; shall ...</text>
+    <text x="85" y="984" font-size="10" font-weight="600" fill="#F07070" class="body">Unwanted</text>
+    <text x="185" y="984" font-size="9.5" fill="#C5CED8" class="body">If &lt;condition&gt;, then the &lt;system&gt; shall ...</text>
 
-    <text x="85" y="1004" font-size="10" font-weight="600" fill="#2471A3">Optional</text>
-    <text x="185" y="1004" font-size="9.5" fill="#555">Where &lt;feature&gt;, the &lt;system&gt; shall ...</text>
+    <text x="85" y="1004" font-size="10" font-weight="600" fill="#F07070" class="body">Optional</text>
+    <text x="185" y="1004" font-size="9.5" fill="#C5CED8" class="body">Where &lt;feature&gt;, the &lt;system&gt; shall ...</text>
 
-    <text x="85" y="1024" font-size="10" font-weight="600" fill="#2471A3">Complex</text>
-    <text x="185" y="1024" font-size="9.5" fill="#555">While ... When/If/Where ... shall ...</text>
+    <text x="85" y="1024" font-size="10" font-weight="600" fill="#F07070" class="body">Complex</text>
+    <text x="185" y="1024" font-size="9.5" fill="#C5CED8" class="body">While ... When/If/Where ... shall ...</text>
   </g>
 
   <!-- Satisfaction Link -->
   <g>
-    <rect x="500" y="920" width="355" height="120" rx="7" fill="#D5F5E3" stroke="#27AE60" stroke-width="1.8"/>
-    <text x="677" y="943" text-anchor="middle" font-size="13" font-weight="700" fill="#1E6F3E">Satisfaction Link</text>
-    <line x1="515" y1="950" x2="840" y2="950" stroke="#27AE60" stroke-width="0.6"/>
+    <rect x="500" y="920" width="355" height="120" rx="7" fill="#1E3530" stroke="#58D68D" stroke-width="1.8"/>
+    <text x="677" y="943" text-anchor="middle" font-size="14" font-weight="700" fill="#FFFFFF" class="header">Satisfaction Link</text>
+    <line x1="515" y1="950" x2="840" y2="950" stroke="#58D68D" stroke-width="0.5" stroke-opacity="0.4"/>
 
-    <text x="520" y="968" font-size="10" fill="#1E6F3E" font-weight="600">role:</text>
-    <text x="555" y="968" font-size="9.5" fill="#555">structured-by | enforced-by | implemented-by</text>
-    <text x="555" y="984" font-size="9.5" fill="#555">reconciled-by | detected-by</text>
-    <text x="555" y="1000" font-size="9.5" fill="#555">quality-constrained-by | satisfied-by-infrastructure</text>
+    <text x="520" y="968" font-size="10" fill="#58D68D" font-weight="600" class="body">role:</text>
+    <text x="555" y="968" font-size="9.5" fill="#C5CED8" class="body">structured-by | enforced-by | implemented-by</text>
+    <text x="555" y="984" font-size="9.5" fill="#C5CED8" class="body">reconciled-by | detected-by</text>
+    <text x="555" y="1000" font-size="9.5" fill="#C5CED8" class="body">quality-constrained-by | satisfied-by-infrastructure</text>
 
-    <text x="520" y="1020" font-size="10" fill="#1E6F3E" font-weight="600">coverage:</text>
-    <text x="585" y="1020" font-size="9.5" fill="#555">full | partial</text>
+    <text x="520" y="1020" font-size="10" fill="#58D68D" font-weight="600" class="body">coverage:</text>
+    <text x="585" y="1020" font-size="9.5" fill="#C5CED8" class="body">full | partial</text>
 
-    <text x="520" y="1034" font-size="10" fill="#1E6F3E" font-weight="600">target:</text>
-    <text x="570" y="1034" font-size="9.5" fill="#555">→ domain model element</text>
+    <text x="520" y="1034" font-size="10" fill="#58D68D" font-weight="600" class="body">target:</text>
+    <text x="570" y="1034" font-size="9.5" fill="#C5CED8" class="body">→ domain model element</text>
   </g>
 
   <!-- SysReq Concerns summary -->
   <g>
-    <rect x="1050" y="780" width="650" height="130" rx="8" fill="white" stroke="#2980B9" stroke-width="1.2"/>
-    <text x="1070" y="800" font-size="11" font-weight="600" fill="#1A5276">Concerns</text>
-    <text x="1070" y="818" font-size="10" fill="#555">What shall the system do? (EARS statement)</text>
-    <text x="1070" y="834" font-size="10" fill="#555">Under what conditions? (While, When, If, Where clauses)</text>
-    <text x="1070" y="850" font-size="10" fill="#555">How is each obligation traced? (Satisfaction Link)</text>
-    <text x="1070" y="866" font-size="10" fill="#555">What are the gaps? (unsatisfied reqs, orphaned elements)</text>
-    <text x="1070" y="882" font-size="10" fill="#555">How do requirements relate? (depends-on, conflicts-with, decomposed-into)</text>
-    <text x="1070" y="898" font-size="10" fill="#555">Where did this come from? (source → PRD)</text>
+    <rect x="1050" y="780" width="650" height="130" rx="8" fill="#1A2A3A" stroke="#5DADE2" stroke-width="1"/>
+    <text x="1070" y="800" font-size="12" font-weight="600" fill="#5DADE2" class="header">Concerns</text>
+    <text x="1070" y="818" font-size="10" fill="#C5CED8" class="body">What shall the system do? (EARS statement)</text>
+    <text x="1070" y="834" font-size="10" fill="#C5CED8" class="body">Under what conditions? (While, When, If, Where clauses)</text>
+    <text x="1070" y="850" font-size="10" fill="#C5CED8" class="body">How is each obligation traced? (Satisfaction Link)</text>
+    <text x="1070" y="866" font-size="10" fill="#C5CED8" class="body">What are the gaps? (unsatisfied reqs, orphaned elements)</text>
+    <text x="1070" y="882" font-size="10" fill="#C5CED8" class="body">How do requirements relate? (depends-on, conflicts-with, decomposed-into)</text>
+    <text x="1070" y="898" font-size="10" fill="#C5CED8" class="body">Where did this come from? (source → PRD)</text>
   </g>
 
   <!-- EARS → DDD Realization mapping -->
   <g>
-    <rect x="1050" y="930" width="650" height="110" rx="8" fill="white" stroke="#27AE60" stroke-width="1.2"/>
-    <text x="1070" y="950" font-size="11" font-weight="600" fill="#1E6F3E">EARS → DDD Realization Mapping</text>
-    <line x1="1060" y1="957" x2="1685" y2="957" stroke="#D5F5E3" stroke-width="1"/>
-    <text x="1080" y="973" font-size="9.5" fill="#555" font-weight="500">Ubiquitous</text>
-    <text x="1200" y="973" font-size="9.5" fill="#777">→ Invariant, Value Type  (enforced-by, structured-by)</text>
-    <text x="1080" y="989" font-size="9.5" fill="#555" font-weight="500">State-driven</text>
-    <text x="1200" y="989" font-size="9.5" fill="#777">→ State machine, precondition  (enforced-by)</text>
-    <text x="1080" y="1005" font-size="9.5" fill="#555" font-weight="500">Event-driven</text>
-    <text x="1200" y="1005" font-size="9.5" fill="#777">→ Command → Operation → Event  (implemented-by)</text>
-    <text x="1080" y="1021" font-size="9.5" fill="#555" font-weight="500">Unwanted</text>
-    <text x="1200" y="1021" font-size="9.5" fill="#777">→ Error Event, Policy  (detected-by, enforced-by)</text>
-    <text x="1080" y="1037" font-size="9.5" fill="#555" font-weight="500">Optional</text>
-    <text x="1200" y="1037" font-size="9.5" fill="#777">→ Module, conditional Operation  (structured-by)</text>
+    <rect x="1050" y="930" width="650" height="110" rx="8" fill="#1A2A3A" stroke="#58D68D" stroke-width="1"/>
+    <text x="1070" y="950" font-size="12" font-weight="600" fill="#58D68D" class="header">EARS → DDD Realization Mapping</text>
+    <line x1="1060" y1="957" x2="1685" y2="957" stroke="#8A9BB5" stroke-width="0.5" stroke-opacity="0.3"/>
+    <text x="1080" y="973" font-size="9.5" fill="#F07070" font-weight="500" class="body">Ubiquitous</text>
+    <text x="1200" y="973" font-size="9.5" fill="#8A9BB5" class="body">→ Invariant, Value Type  (enforced-by, structured-by)</text>
+    <text x="1080" y="989" font-size="9.5" fill="#F07070" font-weight="500" class="body">State-driven</text>
+    <text x="1200" y="989" font-size="9.5" fill="#8A9BB5" class="body">→ State machine, precondition  (enforced-by)</text>
+    <text x="1080" y="1005" font-size="9.5" fill="#F07070" font-weight="500" class="body">Event-driven</text>
+    <text x="1200" y="1005" font-size="9.5" fill="#8A9BB5" class="body">→ Command → Operation → Event  (implemented-by)</text>
+    <text x="1080" y="1021" font-size="9.5" fill="#F07070" font-weight="500" class="body">Unwanted</text>
+    <text x="1200" y="1021" font-size="9.5" fill="#8A9BB5" class="body">→ Error Event, Policy  (detected-by, enforced-by)</text>
+    <text x="1080" y="1037" font-size="9.5" fill="#F07070" font-weight="500" class="body">Optional</text>
+    <text x="1200" y="1037" font-size="9.5" fill="#8A9BB5" class="body">→ Module, conditional Operation  (structured-by)</text>
   </g>
 
 
@@ -411,11 +418,10 @@
   <!-- TRACEABILITY BRIDGE: SYSTEM REQ → DOMAIN MODEL                 -->
   <!-- ═══════════════════════════════════════════════════════════════ -->
 
-  <!-- Large trace arrow -->
-  <path d="M 677,1040 L 677,1100 Q 677,1110 677,1120" fill="none" stroke="#E74C3C" stroke-width="3" marker-end="url(#arr-trace)"/>
-  <rect x="545" y="1065" width="285" height="42" rx="6" fill="white" stroke="#E74C3C" stroke-width="1.5"/>
-  <text x="687" y="1082" text-anchor="middle" font-size="11" font-weight="700" fill="#E74C3C">satisfied-by { role Target.element }</text>
-  <text x="687" y="1098" text-anchor="middle" font-size="9" fill="#E74C3C">typed links to domain constructs</text>
+  <path d="M 677,1040 L 677,1100 Q 677,1110 677,1120" fill="none" stroke="#F07070" stroke-width="3" marker-end="url(#arr-trace)"/>
+  <rect x="545" y="1065" width="285" height="42" rx="6" fill="#3A2020" stroke="#F07070" stroke-width="1.5"/>
+  <text x="687" y="1082" text-anchor="middle" font-size="11" font-weight="700" fill="#F07070" class="header">satisfied-by { role Target.element }</text>
+  <text x="687" y="1098" text-anchor="middle" font-size="9" fill="#F07070" class="body">typed links to domain constructs</text>
 
 
   <!-- ═══════════════════════════════════════════════════════════════ -->
@@ -423,251 +429,249 @@
   <!-- ═══════════════════════════════════════════════════════════════ -->
 
   <!-- Layer background -->
-  <rect x="30" y="1130" width="1740" height="890" rx="12" fill="#EAFAF1" fill-opacity="0.4" stroke="#27AE60" stroke-width="2"/>
+  <rect x="30" y="1130" width="1740" height="890" rx="12" fill="#1E3530" fill-opacity="0.6" stroke="#58D68D" stroke-width="1.5"/>
 
   <!-- Layer header -->
-  <rect x="30" y="1130" width="1740" height="50" rx="12" fill="#27AE60" fill-opacity="0.12"/>
-  <rect x="30" y="1155" width="1740" height="25" fill="#27AE60" fill-opacity="0.12"/>
-  <text x="60" y="1158" font-size="16" font-weight="700" fill="#1E6F3E">DOMAIN-METAMODEL</text>
-  <text x="370" y="1158" font-size="13" fill="#27AE60" font-style="italic">"How the System Is Structured &amp; Behaves"</text>
-  <text x="60" y="1175" font-size="10" fill="#27AE60">Audience: Engineers, Domain Experts  |  File: .domain.specy  |  Language: DDD — Entities, Aggregates, Events, Policies</text>
+  <rect x="30" y="1130" width="1740" height="50" rx="12" fill="#58D68D" fill-opacity="0.08"/>
+  <rect x="30" y="1155" width="1740" height="25" fill="#58D68D" fill-opacity="0.05"/>
+  <text x="60" y="1158" font-size="17" font-weight="700" fill="#58D68D" class="header">DOMAIN-METAMODEL</text>
+  <text x="370" y="1158" font-size="14" fill="#58D68D" font-style="italic" class="header">"How the System Is Structured &amp; Behaves"</text>
+  <text x="60" y="1175" font-size="10" fill="#8A9BB5" class="body">Audience: Engineers, Domain Experts  |  File: .domain.specy  |  Language: DDD — Entities, Aggregates, Events, Policies</text>
 
   <!-- ── STRUCTURAL TIER ── -->
 
   <!-- Organization → BC -->
-  <line x1="225" y1="1235" x2="225" y2="1290" stroke="#2980B9" stroke-width="1.6" marker-end="url(#arr-bl)"/>
-  <text x="238" y="1268" font-size="8.5" fill="#2980B9" font-weight="500">1..n has</text>
+  <line x1="225" y1="1235" x2="225" y2="1290" stroke="#5DADE2" stroke-width="1.6" marker-end="url(#arr-bl)"/>
+  <text x="238" y="1268" font-size="8.5" fill="#5DADE2" font-weight="500" class="body">1..n has</text>
 
   <!-- BC → Module -->
-  <path d="M 300,1320 Q 370,1350 420,1370" fill="none" stroke="#2980B9" stroke-width="1.5" marker-end="url(#arr-bl)"/>
-  <text x="340" y="1340" font-size="8.5" fill="#2980B9" font-weight="500">0..n has</text>
+  <path d="M 300,1320 Q 370,1350 420,1370" fill="none" stroke="#5DADE2" stroke-width="1.5" marker-end="url(#arr-bl)"/>
+  <text x="340" y="1340" font-size="8.5" fill="#5DADE2" font-weight="500" class="body">0..n has</text>
 
   <!-- BC self-loop (context map) -->
-  <path d="M 295,1300 C 360,1265 420,1310 295,1330" fill="none" stroke="#2980B9" stroke-width="1.3" marker-end="url(#arr-bl)"/>
-  <text x="372" y="1290" font-size="8" fill="#2980B9" font-style="italic">context map</text>
+  <path d="M 295,1300 C 360,1265 420,1310 295,1330" fill="none" stroke="#5DADE2" stroke-width="1.3" marker-end="url(#arr-bl)"/>
+  <text x="372" y="1290" font-size="8" fill="#5DADE2" font-style="italic" class="body">context map</text>
 
   <!-- Module → Interface -->
-  <path d="M 485,1400 Q 485,1430 485,1460" fill="none" stroke="#2980B9" stroke-width="1.4" marker-end="url(#arr-bl)"/>
-  <text x="495" y="1440" font-size="8.5" fill="#2980B9" font-weight="500">exposes</text>
+  <path d="M 485,1400 Q 485,1430 485,1460" fill="none" stroke="#5DADE2" stroke-width="1.4" marker-end="url(#arr-bl)"/>
+  <text x="495" y="1440" font-size="8.5" fill="#5DADE2" font-weight="500" class="body">exposes</text>
 
   <!-- Module → Entity (contains) -->
-  <path d="M 520,1400 Q 620,1430 680,1460" fill="none" stroke="#27AE60" stroke-width="1.4" marker-end="url(#arr-gn)"/>
-
-  <!-- ── DOMAIN CONCEPTS ── -->
+  <path d="M 520,1400 Q 620,1430 680,1460" fill="none" stroke="#58D68D" stroke-width="1.4" marker-end="url(#arr-gn)"/>
 
   <!-- Interface → Operation -->
-  <path d="M 485,1500 Q 400,1530 340,1555" fill="none" stroke="#C17D11" stroke-width="1.4" marker-end="url(#arr-am)"/>
-  <text x="390" y="1530" font-size="8.5" fill="#C17D11" font-weight="500">exposes</text>
+  <path d="M 485,1500 Q 400,1530 340,1555" fill="none" stroke="#F0C040" stroke-width="1.4" marker-end="url(#arr-am)"/>
+  <text x="390" y="1530" font-size="8.5" fill="#F0C040" font-weight="500" class="body">exposes</text>
 
   <!-- Entity → Operation -->
-  <path d="M 700,1500 Q 500,1540 340,1575" fill="none" stroke="#27AE60" stroke-width="1.5" marker-end="url(#arr-gn)"/>
-  <text x="520" y="1540" font-size="8.5" fill="#27AE60" font-weight="500">0..n owns</text>
+  <path d="M 700,1500 Q 500,1540 340,1575" fill="none" stroke="#58D68D" stroke-width="1.5" marker-end="url(#arr-gn)"/>
+  <text x="520" y="1540" font-size="8.5" fill="#58D68D" font-weight="500" class="body">0..n owns</text>
 
   <!-- Entity → State Machine -->
-  <line x1="770" y1="1500" x2="770" y2="1555" stroke="#C17D11" stroke-width="1.4" marker-end="url(#arr-am)"/>
-  <text x="783" y="1535" font-size="8.5" fill="#C17D11" font-weight="500">0..n has</text>
+  <line x1="770" y1="1500" x2="770" y2="1555" stroke="#F0C040" stroke-width="1.4" marker-end="url(#arr-am)"/>
+  <text x="783" y="1535" font-size="8.5" fill="#F0C040" font-weight="500" class="body">0..n has</text>
 
   <!-- Aggregate is-a Entity -->
-  <path d="M 950,1475 Q 830,1475 770,1490" fill="none" stroke="#27AE60" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#open-gn)"/>
-  <text x="865" y="1468" font-size="8.5" fill="#27AE60" font-style="italic">is-a</text>
+  <path d="M 950,1475 Q 830,1475 770,1490" fill="none" stroke="#58D68D" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#open-gn)"/>
+  <text x="865" y="1468" font-size="8.5" fill="#58D68D" font-style="italic" class="body">is-a</text>
 
   <!-- Operation → Event -->
-  <path d="M 310,1600 Q 310,1640 310,1670" fill="none" stroke="#C0392B" stroke-width="1.5" marker-end="url(#arr-rd)"/>
-  <text x="325" y="1645" font-size="8.5" fill="#C0392B" font-weight="500">0..n emits</text>
+  <path d="M 310,1600 Q 310,1640 310,1670" fill="none" stroke="#F07070" stroke-width="1.5" marker-end="url(#arr-rd)"/>
+  <text x="325" y="1645" font-size="8.5" fill="#F07070" font-weight="500" class="body">0..n emits</text>
 
   <!-- Command → Operation -->
-  <path d="M 170,1600 Q 220,1590 260,1580" fill="none" stroke="#C0392B" stroke-width="1.4" marker-end="url(#arr-rd)"/>
-  <text x="195" y="1585" font-size="8" fill="#C0392B" font-weight="500">triggers</text>
+  <path d="M 170,1600 Q 220,1590 260,1580" fill="none" stroke="#F07070" stroke-width="1.4" marker-end="url(#arr-rd)"/>
+  <text x="195" y="1585" font-size="8" fill="#F07070" font-weight="500" class="body">triggers</text>
 
   <!-- Event subtypes -->
-  <path d="M 280,1720 L 180,1765" fill="none" stroke="#C0392B" stroke-width="1.1" stroke-dasharray="5,3" marker-end="url(#open-rd)"/>
-  <line x1="310" y1="1720" x2="340" y2="1765" stroke="#C0392B" stroke-width="1.1" stroke-dasharray="5,3" marker-end="url(#open-rd)"/>
-  <path d="M 340,1720 L 510,1765" fill="none" stroke="#C0392B" stroke-width="1.1" stroke-dasharray="5,3" marker-end="url(#open-rd)"/>
-  <path d="M 365,1720 L 680,1765" fill="none" stroke="#C0392B" stroke-width="1.1" stroke-dasharray="5,3" marker-end="url(#open-rd)"/>
+  <path d="M 280,1720 L 180,1765" fill="none" stroke="#F07070" stroke-width="1.1" stroke-dasharray="5,3" marker-end="url(#open-rd)"/>
+  <line x1="310" y1="1720" x2="340" y2="1765" stroke="#F07070" stroke-width="1.1" stroke-dasharray="5,3" marker-end="url(#open-rd)"/>
+  <path d="M 340,1720 L 510,1765" fill="none" stroke="#F07070" stroke-width="1.1" stroke-dasharray="5,3" marker-end="url(#open-rd)"/>
+  <path d="M 365,1720 L 680,1765" fill="none" stroke="#F07070" stroke-width="1.1" stroke-dasharray="5,3" marker-end="url(#open-rd)"/>
 
   <!-- Internal Event → Policy -->
-  <path d="M 340,1805 Q 350,1850 365,1880" fill="none" stroke="#1A8870" stroke-width="1.4" marker-end="url(#arr-tl)"/>
-  <text x="355" y="1845" font-size="8.5" fill="#1A8870" font-weight="500">triggers</text>
+  <path d="M 340,1805 Q 350,1850 365,1880" fill="none" stroke="#48C9B0" stroke-width="1.4" marker-end="url(#arr-tl)"/>
+  <text x="355" y="1845" font-size="8.5" fill="#48C9B0" font-weight="500" class="body">triggers</text>
 
   <!-- Policy → Command -->
-  <path d="M 380,1920 Q 280,1940 155,1625" fill="none" stroke="#1A8870" stroke-width="1.3" marker-end="url(#arr-tl)"/>
-  <text x="230" y="1810" font-size="8.5" fill="#1A8870" font-weight="500">effect (command)</text>
+  <path d="M 380,1920 Q 280,1940 155,1625" fill="none" stroke="#48C9B0" stroke-width="1.3" marker-end="url(#arr-tl)"/>
+  <text x="230" y="1810" font-size="8.5" fill="#48C9B0" font-weight="500" class="body">effect (command)</text>
 
   <!-- Entity → Invariant -->
-  <path d="M 700,1505 Q 620,1850 590,1880" fill="none" stroke="#1A8870" stroke-width="1.2" stroke-dasharray="3,3" marker-end="url(#arr-tl)"/>
-  <text x="650" y="1770" font-size="8" fill="#1A8870" font-style="italic">constrained by</text>
+  <path d="M 700,1505 Q 620,1850 590,1880" fill="none" stroke="#48C9B0" stroke-width="1.2" stroke-dasharray="3,3" marker-end="url(#arr-tl)"/>
+  <text x="650" y="1770" font-size="8" fill="#48C9B0" font-style="italic" class="body">constrained by</text>
 
   <!-- Agreement → Reconciliation -->
-  <line x1="855" y1="1900" x2="990" y2="1900" stroke="#1A8870" stroke-width="1.4" marker-end="url(#arr-tl)"/>
-  <text x="905" y="1893" font-size="8" fill="#1A8870" font-weight="500">maintained by</text>
+  <line x1="855" y1="1900" x2="990" y2="1900" stroke="#48C9B0" stroke-width="1.4" marker-end="url(#arr-tl)"/>
+  <text x="905" y="1893" font-size="8" fill="#48C9B0" font-weight="500" class="body">maintained by</text>
 
   <!-- ── CONCEPT BOXES ── -->
 
   <!-- Organization -->
   <g>
-    <rect x="145" y="1200" width="160" height="35" rx="6" fill="#D6EAF8" stroke="#2980B9" stroke-width="1.6"/>
-    <text x="225" y="1222" text-anchor="middle" font-size="12" font-weight="600" fill="#1A5276">Organization</text>
+    <rect x="145" y="1200" width="160" height="35" rx="6" fill="#1E3248" stroke="#5DADE2" stroke-width="1.6"/>
+    <text x="225" y="1222" text-anchor="middle" font-size="13" font-weight="600" fill="#FFFFFF" class="header">Organization</text>
   </g>
 
   <!-- Bounded Context -->
   <g>
-    <rect x="115" y="1290" width="185" height="40" rx="6" fill="#D6EAF8" stroke="#2980B9" stroke-width="1.6"/>
-    <text x="207" y="1312" text-anchor="middle" font-size="12" font-weight="600" fill="#1A5276">Bounded Context</text>
-    <text x="207" y="1325" text-anchor="middle" font-size="8" fill="#2980B9">shortname, context map</text>
+    <rect x="115" y="1290" width="185" height="40" rx="6" fill="#1E3248" stroke="#5DADE2" stroke-width="1.6"/>
+    <text x="207" y="1312" text-anchor="middle" font-size="13" font-weight="600" fill="#FFFFFF" class="header">Bounded Context</text>
+    <text x="207" y="1325" text-anchor="middle" font-size="8" fill="#5DADE2" class="body">shortname, context map</text>
   </g>
 
   <!-- Module -->
   <g>
-    <rect x="400" y="1370" width="140" height="35" rx="6" fill="#D6EAF8" stroke="#2980B9" stroke-width="1.5"/>
-    <text x="470" y="1392" text-anchor="middle" font-size="12" font-weight="600" fill="#1A5276">Module</text>
+    <rect x="400" y="1370" width="140" height="35" rx="6" fill="#1E3248" stroke="#5DADE2" stroke-width="1.5"/>
+    <text x="470" y="1392" text-anchor="middle" font-size="13" font-weight="600" fill="#FFFFFF" class="header">Module</text>
   </g>
 
   <!-- Interface -->
   <g>
-    <rect x="400" y="1460" width="130" height="40" rx="6" fill="#D6EAF8" stroke="#2980B9" stroke-width="1.5"/>
-    <text x="465" y="1484" text-anchor="middle" font-size="12" font-weight="600" fill="#1A5276">Interface</text>
+    <rect x="400" y="1460" width="130" height="40" rx="6" fill="#1E3248" stroke="#5DADE2" stroke-width="1.5"/>
+    <text x="465" y="1484" text-anchor="middle" font-size="13" font-weight="600" fill="#FFFFFF" class="header">Interface</text>
   </g>
 
   <!-- Entity -->
   <g>
-    <rect x="635" y="1460" width="140" height="40" rx="6" fill="#D5F5E3" stroke="#27AE60" stroke-width="1.8"/>
-    <text x="705" y="1480" text-anchor="middle" font-size="13" font-weight="700" fill="#1E6F3E">Entity</text>
-    <text x="705" y="1494" text-anchor="middle" font-size="8" fill="#27AE60">fields, identity, lifecycle</text>
+    <rect x="635" y="1460" width="140" height="40" rx="6" fill="#1E3530" stroke="#58D68D" stroke-width="1.8"/>
+    <text x="705" y="1480" text-anchor="middle" font-size="14" font-weight="700" fill="#FFFFFF" class="header">Entity</text>
+    <text x="705" y="1494" text-anchor="middle" font-size="8" fill="#58D68D" class="body">fields, identity, lifecycle</text>
   </g>
 
   <!-- Aggregate -->
   <g>
-    <rect x="925" y="1460" width="140" height="40" rx="6" fill="#D5F5E3" stroke="#27AE60" stroke-width="1.8"/>
-    <text x="995" y="1480" text-anchor="middle" font-size="13" font-weight="700" fill="#1E6F3E">Aggregate</text>
-    <text x="995" y="1494" text-anchor="middle" font-size="8" fill="#27AE60">root, boundary, invariants</text>
+    <rect x="925" y="1460" width="140" height="40" rx="6" fill="#1E3530" stroke="#58D68D" stroke-width="1.8"/>
+    <text x="995" y="1480" text-anchor="middle" font-size="14" font-weight="700" fill="#FFFFFF" class="header">Aggregate</text>
+    <text x="995" y="1494" text-anchor="middle" font-size="8" fill="#58D68D" class="body">root, boundary, invariants</text>
   </g>
 
   <!-- Value Type -->
   <g>
-    <rect x="1120" y="1460" width="130" height="40" rx="6" fill="#D5F5E3" stroke="#27AE60" stroke-width="1.5"/>
-    <text x="1185" y="1484" text-anchor="middle" font-size="12" font-weight="600" fill="#1E6F3E">Value Type</text>
+    <rect x="1120" y="1460" width="130" height="40" rx="6" fill="#1E3530" stroke="#58D68D" stroke-width="1.5"/>
+    <text x="1185" y="1484" text-anchor="middle" font-size="13" font-weight="600" fill="#FFFFFF" class="header">Value Type</text>
   </g>
 
   <!-- Operation -->
   <g>
-    <rect x="220" y="1555" width="140" height="45" rx="6" fill="#FEF5E7" stroke="#D4A017" stroke-width="1.6"/>
-    <text x="290" y="1577" text-anchor="middle" font-size="13" font-weight="700" fill="#7D6608">Operation</text>
-    <text x="290" y="1592" text-anchor="middle" font-size="8" fill="#C17D11">safe/unsafe, idempotent</text>
+    <rect x="220" y="1555" width="140" height="45" rx="6" fill="#2E2E1E" stroke="#F0C040" stroke-width="1.6"/>
+    <text x="290" y="1577" text-anchor="middle" font-size="14" font-weight="700" fill="#FFFFFF" class="header">Operation</text>
+    <text x="290" y="1592" text-anchor="middle" font-size="8" fill="#F0C040" class="body">safe/unsafe, idempotent</text>
   </g>
 
   <!-- State Machine -->
   <g>
-    <rect x="690" y="1555" width="160" height="40" rx="6" fill="#FEF5E7" stroke="#D4A017" stroke-width="1.5"/>
-    <text x="770" y="1579" text-anchor="middle" font-size="12" font-weight="600" fill="#7D6608">State Machine</text>
+    <rect x="690" y="1555" width="160" height="40" rx="6" fill="#2E2E1E" stroke="#F0C040" stroke-width="1.5"/>
+    <text x="770" y="1579" text-anchor="middle" font-size="13" font-weight="600" fill="#FFFFFF" class="header">State Machine</text>
   </g>
 
   <!-- Command -->
   <g>
-    <rect x="70" y="1565" width="100" height="35" rx="6" fill="#FADBD8" stroke="#C0392B" stroke-width="1.5"/>
-    <text x="120" y="1587" text-anchor="middle" font-size="12" font-weight="600" fill="#922B21">Command</text>
+    <rect x="70" y="1565" width="100" height="35" rx="6" fill="#3A2020" stroke="#F07070" stroke-width="1.5"/>
+    <text x="120" y="1587" text-anchor="middle" font-size="13" font-weight="600" fill="#FFFFFF" class="header">Command</text>
   </g>
 
   <!-- Event -->
   <g>
-    <rect x="230" y="1680" width="140" height="40" rx="6" fill="#FADBD8" stroke="#C0392B" stroke-width="1.6"/>
-    <text x="300" y="1704" text-anchor="middle" font-size="13" font-weight="700" fill="#922B21">Event</text>
+    <rect x="230" y="1680" width="140" height="40" rx="6" fill="#3A2020" stroke="#F07070" stroke-width="1.6"/>
+    <text x="300" y="1704" text-anchor="middle" font-size="14" font-weight="700" fill="#FFFFFF" class="header">Event</text>
   </g>
 
   <!-- Internal Event -->
   <g>
-    <rect x="260" y="1765" width="145" height="40" rx="5" fill="#FADBD8" stroke="#C0392B" stroke-width="1.3"/>
-    <text x="332" y="1789" text-anchor="middle" font-size="10" font-weight="500" fill="#922B21">Internal Event</text>
+    <rect x="260" y="1765" width="145" height="40" rx="5" fill="#3A2020" stroke="#F07070" stroke-width="1.2"/>
+    <text x="332" y="1789" text-anchor="middle" font-size="10" font-weight="500" fill="#F07070" class="body">Internal Event</text>
   </g>
 
   <!-- External Event -->
   <g>
-    <rect x="90" y="1765" width="145" height="40" rx="5" fill="#FADBD8" stroke="#C0392B" stroke-width="1.3"/>
-    <text x="162" y="1789" text-anchor="middle" font-size="10" font-weight="500" fill="#922B21">External Event</text>
+    <rect x="90" y="1765" width="145" height="40" rx="5" fill="#3A2020" stroke="#F07070" stroke-width="1.2"/>
+    <text x="162" y="1789" text-anchor="middle" font-size="10" font-weight="500" fill="#F07070" class="body">External Event</text>
   </g>
 
   <!-- Error Event -->
   <g>
-    <rect x="430" y="1765" width="130" height="40" rx="5" fill="#FADBD8" stroke="#C0392B" stroke-width="1.3"/>
-    <text x="495" y="1789" text-anchor="middle" font-size="10" font-weight="500" fill="#922B21">Error Event</text>
+    <rect x="430" y="1765" width="130" height="40" rx="5" fill="#3A2020" stroke="#F07070" stroke-width="1.2"/>
+    <text x="495" y="1789" text-anchor="middle" font-size="10" font-weight="500" fill="#F07070" class="body">Error Event</text>
   </g>
 
   <!-- Temporal Event -->
   <g>
-    <rect x="600" y="1765" width="165" height="40" rx="5" fill="#FADBD8" stroke="#C0392B" stroke-width="1.3"/>
-    <text x="682" y="1785" text-anchor="middle" font-size="10" font-weight="500" fill="#922B21">Temporal Event</text>
-    <text x="682" y="1799" text-anchor="middle" font-size="7.5" fill="#C0392B">relative | absolute | recurring</text>
+    <rect x="600" y="1765" width="165" height="40" rx="5" fill="#3A2020" stroke="#F07070" stroke-width="1.2"/>
+    <text x="682" y="1785" text-anchor="middle" font-size="10" font-weight="500" fill="#F07070" class="body">Temporal Event</text>
+    <text x="682" y="1799" text-anchor="middle" font-size="7.5" fill="#8A9BB5" class="body">relative | absolute | recurring</text>
   </g>
 
   <!-- Query -->
   <g>
-    <rect x="440" y="1555" width="100" height="35" rx="6" fill="#FADBD8" stroke="#C0392B" stroke-width="1.3"/>
-    <text x="490" y="1577" text-anchor="middle" font-size="12" font-weight="600" fill="#922B21">Query</text>
+    <rect x="440" y="1555" width="100" height="35" rx="6" fill="#3A2020" stroke="#F07070" stroke-width="1.3"/>
+    <text x="490" y="1577" text-anchor="middle" font-size="13" font-weight="600" fill="#FFFFFF" class="header">Query</text>
   </g>
 
   <!-- Policy -->
   <g>
-    <rect x="310" y="1880" width="120" height="40" rx="6" fill="#D1F2EB" stroke="#1A8870" stroke-width="1.6"/>
-    <text x="370" y="1904" text-anchor="middle" font-size="12" font-weight="600" fill="#0E6655">Policy</text>
+    <rect x="310" y="1880" width="120" height="40" rx="6" fill="#1A3535" stroke="#48C9B0" stroke-width="1.6"/>
+    <text x="370" y="1904" text-anchor="middle" font-size="13" font-weight="600" fill="#FFFFFF" class="header">Policy</text>
   </g>
 
   <!-- Invariant -->
   <g>
-    <rect x="520" y="1880" width="120" height="40" rx="6" fill="#D1F2EB" stroke="#1A8870" stroke-width="1.6"/>
-    <text x="580" y="1904" text-anchor="middle" font-size="12" font-weight="600" fill="#0E6655">Invariant</text>
+    <rect x="520" y="1880" width="120" height="40" rx="6" fill="#1A3535" stroke="#48C9B0" stroke-width="1.6"/>
+    <text x="580" y="1904" text-anchor="middle" font-size="13" font-weight="600" fill="#FFFFFF" class="header">Invariant</text>
   </g>
 
   <!-- Agreement -->
   <g>
-    <rect x="740" y="1880" width="120" height="40" rx="6" fill="#D1F2EB" stroke="#1A8870" stroke-width="1.5"/>
-    <text x="800" y="1904" text-anchor="middle" font-size="12" font-weight="600" fill="#0E6655">Agreement</text>
+    <rect x="740" y="1880" width="120" height="40" rx="6" fill="#1A3535" stroke="#48C9B0" stroke-width="1.5"/>
+    <text x="800" y="1904" text-anchor="middle" font-size="13" font-weight="600" fill="#FFFFFF" class="header">Agreement</text>
   </g>
 
   <!-- Reconciliation -->
   <g>
-    <rect x="960" y="1880" width="160" height="40" rx="6" fill="#D1F2EB" stroke="#1A8870" stroke-width="1.5"/>
-    <text x="1040" y="1904" text-anchor="middle" font-size="12" font-weight="600" fill="#0E6655">Reconciliation</text>
+    <rect x="960" y="1880" width="160" height="40" rx="6" fill="#1A3535" stroke="#48C9B0" stroke-width="1.5"/>
+    <text x="1040" y="1904" text-anchor="middle" font-size="13" font-weight="600" fill="#FFFFFF" class="header">Reconciliation</text>
   </g>
 
   <!-- Services -->
   <g>
-    <rect x="1300" y="1555" width="170" height="35" rx="6" fill="#E8DAEF" stroke="#7D3C98" stroke-width="1.5"/>
-    <text x="1385" y="1577" text-anchor="middle" font-size="12" font-weight="600" fill="#5B2C6F">Domain Service</text>
+    <rect x="1300" y="1555" width="170" height="35" rx="6" fill="#2E2040" stroke="#BB8FCE" stroke-width="1.5"/>
+    <text x="1385" y="1577" text-anchor="middle" font-size="12" font-weight="600" fill="#FFFFFF" class="header">Domain Service</text>
   </g>
   <g>
-    <rect x="1300" y="1610" width="170" height="35" rx="6" fill="#E8DAEF" stroke="#7D3C98" stroke-width="1.5"/>
-    <text x="1385" y="1632" text-anchor="middle" font-size="12" font-weight="600" fill="#5B2C6F">Application Service</text>
+    <rect x="1300" y="1610" width="170" height="35" rx="6" fill="#2E2040" stroke="#BB8FCE" stroke-width="1.5"/>
+    <text x="1385" y="1632" text-anchor="middle" font-size="12" font-weight="600" fill="#FFFFFF" class="header">Application Service</text>
   </g>
   <g>
-    <rect x="1300" y="1665" width="170" height="35" rx="6" fill="#E8DAEF" stroke="#7D3C98" stroke-width="1.5"/>
-    <text x="1385" y="1687" text-anchor="middle" font-size="12" font-weight="600" fill="#5B2C6F">Infrastructure Service</text>
+    <rect x="1300" y="1665" width="170" height="35" rx="6" fill="#2E2040" stroke="#BB8FCE" stroke-width="1.5"/>
+    <text x="1385" y="1687" text-anchor="middle" font-size="12" font-weight="600" fill="#FFFFFF" class="header">Infrastructure Service</text>
   </g>
 
   <!-- Reactive loop highlight -->
-  <rect x="55" y="1545" width="540" height="400" rx="10" fill="none" stroke="#E0E0E0" stroke-width="1.2" stroke-dasharray="6,4"/>
-  <text x="325" y="1938" text-anchor="middle" font-size="9" fill="#AAA" font-style="italic">Reactive loop: Command → Operation → Event → Policy → Command</text>
+  <rect x="55" y="1545" width="540" height="400" rx="10" fill="none" stroke="#8A9BB5" stroke-width="0.8" stroke-dasharray="6,4" stroke-opacity="0.3"/>
+  <text x="325" y="1938" text-anchor="middle" font-size="9" fill="#6B7B8D" font-style="italic" class="body">Reactive loop: Command → Operation → Event → Policy → Command</text>
 
   <!-- Domain Concerns summary -->
   <g>
-    <rect x="1200" y="1780" width="530" height="120" rx="8" fill="white" stroke="#27AE60" stroke-width="1.2"/>
-    <text x="1220" y="1800" font-size="11" font-weight="600" fill="#1E6F3E">Concerns</text>
-    <text x="1220" y="1818" font-size="10" fill="#555">What are the domain concepts? (Entity, Aggregate, Value Type)</text>
-    <text x="1220" y="1834" font-size="10" fill="#555">How do they behave? (Operation, State Machine, Command → Event)</text>
-    <text x="1220" y="1850" font-size="10" fill="#555">What rules must hold? (Invariant, Policy, Precondition)</text>
-    <text x="1220" y="1866" font-size="10" fill="#555">How do aggregates coordinate? (Agreement, Reconciliation)</text>
-    <text x="1220" y="1882" font-size="10" fill="#555">What events flow? (Internal, External, Error, Temporal)</text>
+    <rect x="1200" y="1780" width="530" height="120" rx="8" fill="#1A2A3A" stroke="#58D68D" stroke-width="1"/>
+    <text x="1220" y="1800" font-size="12" font-weight="600" fill="#58D68D" class="header">Concerns</text>
+    <text x="1220" y="1818" font-size="10" fill="#C5CED8" class="body">What are the domain concepts? (Entity, Aggregate, Value Type)</text>
+    <text x="1220" y="1834" font-size="10" fill="#C5CED8" class="body">How do they behave? (Operation, State Machine, Command → Event)</text>
+    <text x="1220" y="1850" font-size="10" fill="#C5CED8" class="body">What rules must hold? (Invariant, Policy, Precondition)</text>
+    <text x="1220" y="1866" font-size="10" fill="#C5CED8" class="body">How do aggregates coordinate? (Agreement, Reconciliation)</text>
+    <text x="1220" y="1882" font-size="10" fill="#C5CED8" class="body">What events flow? (Internal, External, Error, Temporal)</text>
   </g>
 
   <!-- Context map patterns annotation -->
   <g>
-    <rect x="1200" y="1200" width="530" height="100" rx="8" fill="white" stroke="#2980B9" stroke-width="1"/>
-    <text x="1220" y="1220" font-size="11" font-weight="600" fill="#1A5276">Context Map Patterns</text>
-    <text x="1220" y="1238" font-size="9.5" fill="#555" font-weight="500">Upstream:</text>
-    <text x="1290" y="1238" font-size="9.5" fill="#777">Open Host Service (OHS)</text>
-    <text x="1220" y="1254" font-size="9.5" fill="#555" font-weight="500">Downstream:</text>
-    <text x="1300" y="1254" font-size="9.5" fill="#777">Customer/Supplier, Conformist, ACL</text>
-    <text x="1220" y="1270" font-size="9.5" fill="#555" font-weight="500">Symmetric:</text>
-    <text x="1295" y="1270" font-size="9.5" fill="#777">Shared Kernel, Published Language, Partnership</text>
-    <text x="1295" y="1286" font-size="9.5" fill="#777">Separate Ways</text>
+    <rect x="1200" y="1200" width="530" height="100" rx="8" fill="#1A2A3A" stroke="#5DADE2" stroke-width="1"/>
+    <text x="1220" y="1220" font-size="12" font-weight="600" fill="#5DADE2" class="header">Context Map Patterns</text>
+    <text x="1220" y="1238" font-size="9.5" fill="#F07070" font-weight="500" class="body">Upstream:</text>
+    <text x="1290" y="1238" font-size="9.5" fill="#8A9BB5" class="body">Open Host Service (OHS)</text>
+    <text x="1220" y="1254" font-size="9.5" fill="#F07070" font-weight="500" class="body">Downstream:</text>
+    <text x="1300" y="1254" font-size="9.5" fill="#8A9BB5" class="body">Customer/Supplier, Conformist, ACL</text>
+    <text x="1220" y="1270" font-size="9.5" fill="#F07070" font-weight="500" class="body">Symmetric:</text>
+    <text x="1295" y="1270" font-size="9.5" fill="#8A9BB5" class="body">Shared Kernel, Published Language, Partnership</text>
+    <text x="1295" y="1286" font-size="9.5" fill="#8A9BB5" class="body">Separate Ways</text>
   </g>
 
 
@@ -675,109 +679,113 @@
   <!-- TRACEABILITY BRIDGE: DOMAIN → CODE                             -->
   <!-- ═══════════════════════════════════════════════════════════════ -->
 
-  <path d="M 900,2020 L 900,2055" fill="none" stroke="#E74C3C" stroke-width="3" marker-end="url(#arr-trace)"/>
-  <rect x="810" y="2060" width="180" height="30" rx="6" fill="#ECF0F1" stroke="#BDC3C7" stroke-width="1.2"/>
-  <text x="900" y="2080" text-anchor="middle" font-size="12" font-weight="700" fill="#7F8C8D">Code</text>
-  <text x="900" y="2040" text-anchor="middle" font-size="9" fill="#E74C3C">realized in</text>
+  <path d="M 900,2020 L 900,2055" fill="none" stroke="#F07070" stroke-width="3" marker-end="url(#arr-trace)"/>
+  <rect x="810" y="2060" width="180" height="30" rx="6" fill="#2B3E50" stroke="#8A9BB5" stroke-width="1.2"/>
+  <text x="900" y="2080" text-anchor="middle" font-size="13" font-weight="700" fill="#C5CED8" class="header">Code</text>
+  <text x="900" y="2040" text-anchor="middle" font-size="9" fill="#F07070" class="body">realized in</text>
 
 
   <!-- ═══════════════════════════════════════════════════════════════ -->
   <!-- FULL CHANGE PROPAGATION CHAIN (bottom)                         -->
   <!-- ═══════════════════════════════════════════════════════════════ -->
 
-  <rect x="30" y="2120" width="1740" height="250" rx="12" fill="white" stroke="#E74C3C" stroke-width="1.5"/>
-  <text x="900" y="2148" text-anchor="middle" font-size="16" font-weight="700" fill="#E74C3C">Change Propagation &amp; Gap Analysis</text>
+  <rect x="30" y="2120" width="1740" height="250" rx="12" fill="#1A2A3A" stroke="#F07070" stroke-width="1.5"/>
+  <text x="900" y="2148" text-anchor="middle" font-size="18" font-weight="700" fill="#F07070" class="header">Change Propagation &amp; Gap Analysis</text>
 
   <!-- Change propagation arrows -->
   <g transform="translate(80, 2170)">
-    <rect x="0" y="0" width="250" height="35" rx="6" fill="#FEF9E7" stroke="#F1C40F" stroke-width="1.5"/>
-    <text x="125" y="22" text-anchor="middle" font-size="11" font-weight="600" fill="#7D6608">Product decision changes</text>
+    <rect x="0" y="0" width="250" height="35" rx="6" fill="#263545" stroke="#F0C040" stroke-width="1.2"/>
+    <text x="125" y="22" text-anchor="middle" font-size="11" font-weight="600" fill="#F0C040" class="body">Product decision changes</text>
 
-    <line x1="250" y1="17" x2="310" y2="17" stroke="#E74C3C" stroke-width="2" marker-end="url(#arr-trace)"/>
+    <line x1="250" y1="17" x2="310" y2="17" stroke="#F07070" stroke-width="2" marker-end="url(#arr-trace)"/>
 
-    <rect x="310" y="0" width="260" height="35" rx="6" fill="#FEF9E7" stroke="#F1C40F" stroke-width="1.2"/>
-    <text x="440" y="22" text-anchor="middle" font-size="11" fill="#555">Which features are affected?</text>
+    <rect x="310" y="0" width="260" height="35" rx="6" fill="#263545" stroke="#F0C040" stroke-width="1"/>
+    <text x="440" y="22" text-anchor="middle" font-size="11" fill="#C5CED8" class="body">Which features are affected?</text>
 
-    <line x1="570" y1="17" x2="630" y2="17" stroke="#E74C3C" stroke-width="2" marker-end="url(#arr-trace)"/>
-    <text x="600" y="10" text-anchor="middle" font-size="8" fill="#E74C3C">source</text>
+    <line x1="570" y1="17" x2="630" y2="17" stroke="#F07070" stroke-width="2" marker-end="url(#arr-trace)"/>
+    <text x="600" y="10" text-anchor="middle" font-size="8" fill="#F07070" class="body">source</text>
 
-    <rect x="630" y="0" width="300" height="35" rx="6" fill="#EBF5FB" stroke="#2980B9" stroke-width="1.2"/>
-    <text x="780" y="22" text-anchor="middle" font-size="11" fill="#555">Which EARS reqs reference them?</text>
+    <rect x="630" y="0" width="300" height="35" rx="6" fill="#1E3248" stroke="#5DADE2" stroke-width="1"/>
+    <text x="780" y="22" text-anchor="middle" font-size="11" fill="#C5CED8" class="body">Which EARS reqs reference them?</text>
 
-    <line x1="930" y1="17" x2="990" y2="17" stroke="#E74C3C" stroke-width="2" marker-end="url(#arr-trace)"/>
-    <text x="960" y="10" text-anchor="middle" font-size="8" fill="#E74C3C">satisfied-by</text>
+    <line x1="930" y1="17" x2="990" y2="17" stroke="#F07070" stroke-width="2" marker-end="url(#arr-trace)"/>
+    <text x="960" y="10" text-anchor="middle" font-size="8" fill="#F07070" class="body">satisfied-by</text>
 
-    <rect x="990" y="0" width="300" height="35" rx="6" fill="#EAFAF1" stroke="#27AE60" stroke-width="1.2"/>
-    <text x="1140" y="22" text-anchor="middle" font-size="11" fill="#555">Which domain elements satisfy?</text>
+    <rect x="990" y="0" width="300" height="35" rx="6" fill="#1E3530" stroke="#58D68D" stroke-width="1"/>
+    <text x="1140" y="22" text-anchor="middle" font-size="11" fill="#C5CED8" class="body">Which domain elements satisfy?</text>
 
-    <line x1="1290" y1="17" x2="1350" y2="17" stroke="#E74C3C" stroke-width="2" marker-end="url(#arr-trace)"/>
+    <line x1="1290" y1="17" x2="1350" y2="17" stroke="#F07070" stroke-width="2" marker-end="url(#arr-trace)"/>
 
-    <rect x="1350" y="0" width="250" height="35" rx="6" fill="#ECF0F1" stroke="#BDC3C7" stroke-width="1.2"/>
-    <text x="1475" y="22" text-anchor="middle" font-size="11" fill="#555">Which code realizes them?</text>
+    <rect x="1350" y="0" width="250" height="35" rx="6" fill="#2B3E50" stroke="#8A9BB5" stroke-width="1"/>
+    <text x="1475" y="22" text-anchor="middle" font-size="11" fill="#C5CED8" class="body">Which code realizes them?</text>
   </g>
 
   <!-- Gap signals table -->
   <g transform="translate(80, 2230)">
     <!-- Headers -->
-    <rect x="0" y="0" width="540" height="25" rx="4" fill="#FEF9E7" stroke="#F1C40F" stroke-width="1"/>
-    <text x="10" y="17" font-size="10" font-weight="700" fill="#7D6608">PRD Layer — Gap Signal</text>
-    <rect x="550" y="0" width="540" height="25" rx="4" fill="#EBF5FB" stroke="#2980B9" stroke-width="1"/>
-    <text x="560" y="17" font-size="10" font-weight="700" fill="#1A5276">SysReq Layer — Gap Signal</text>
-    <rect x="1100" y="0" width="500" height="25" rx="4" fill="#EAFAF1" stroke="#27AE60" stroke-width="1"/>
-    <text x="1110" y="17" font-size="10" font-weight="700" fill="#1E6F3E">Domain Layer — Gap Signal</text>
+    <rect x="0" y="0" width="540" height="25" rx="4" fill="#263545" stroke="#F0C040" stroke-width="0.8"/>
+    <text x="10" y="17" font-size="10" font-weight="700" fill="#F0C040" class="body">PRD Layer — Gap Signal</text>
+
+    <rect x="550" y="0" width="540" height="25" rx="4" fill="#1E3248" stroke="#5DADE2" stroke-width="0.8"/>
+    <text x="560" y="17" font-size="10" font-weight="700" fill="#5DADE2" class="body">SysReq Layer — Gap Signal</text>
+
+    <rect x="1100" y="0" width="500" height="25" rx="4" fill="#1E3530" stroke="#58D68D" stroke-width="0.8"/>
+    <text x="1110" y="17" font-size="10" font-weight="700" fill="#58D68D" class="body">Domain Layer — Gap Signal</text>
 
     <!-- Values -->
-    <rect x="0" y="28" width="540" height="40" rx="4" fill="white" stroke="#F1C40F" stroke-width="0.8"/>
-    <text x="10" y="45" font-size="10" fill="#555">Feature with no sourced-by reqs = </text>
-    <text x="240" y="45" font-size="10" fill="#C0392B" font-weight="600">not yet formalized</text>
-    <text x="10" y="60" font-size="10" fill="#555">Hypothesis invalidated = </text>
-    <text x="185" y="60" font-size="10" fill="#C0392B" font-weight="600">feature reconsideration needed</text>
+    <rect x="0" y="28" width="540" height="40" rx="4" fill="#1A2A3A" stroke="#F0C040" stroke-width="0.5"/>
+    <text x="10" y="45" font-size="10" fill="#C5CED8" class="body">Feature with no sourced-by reqs = </text>
+    <text x="240" y="45" font-size="10" fill="#F07070" font-weight="600" class="body">not yet formalized</text>
+    <text x="10" y="60" font-size="10" fill="#C5CED8" class="body">Hypothesis invalidated = </text>
+    <text x="185" y="60" font-size="10" fill="#F07070" font-weight="600" class="body">feature reconsideration needed</text>
 
-    <rect x="550" y="28" width="540" height="40" rx="4" fill="white" stroke="#2980B9" stroke-width="0.8"/>
-    <text x="560" y="45" font-size="10" fill="#555">Req with 0 satisfaction links = </text>
-    <text x="745" y="45" font-size="10" fill="#C0392B" font-weight="600">unsatisfied (domain gap)</text>
-    <text x="560" y="60" font-size="10" fill="#555">Req with 5+ partial links = </text>
-    <text x="730" y="60" font-size="10" fill="#C0392B" font-weight="600">fragmented (cohesion smell)</text>
+    <rect x="550" y="28" width="540" height="40" rx="4" fill="#1A2A3A" stroke="#5DADE2" stroke-width="0.5"/>
+    <text x="560" y="45" font-size="10" fill="#C5CED8" class="body">Req with 0 satisfaction links = </text>
+    <text x="745" y="45" font-size="10" fill="#F07070" font-weight="600" class="body">unsatisfied (domain gap)</text>
+    <text x="560" y="60" font-size="10" fill="#C5CED8" class="body">Req with 5+ partial links = </text>
+    <text x="730" y="60" font-size="10" fill="#F07070" font-weight="600" class="body">fragmented (cohesion smell)</text>
 
-    <rect x="1100" y="28" width="500" height="40" rx="4" fill="white" stroke="#27AE60" stroke-width="0.8"/>
-    <text x="1110" y="45" font-size="10" fill="#555">Element with 0 satisfaction links = </text>
-    <text x="1340" y="45" font-size="10" fill="#C0392B" font-weight="600">orphan</text>
-    <text x="1110" y="60" font-size="10" fill="#555">Conflicting reqs on same element = </text>
-    <text x="1355" y="60" font-size="10" fill="#C0392B" font-weight="600">unresolved tension</text>
+    <rect x="1100" y="28" width="500" height="40" rx="4" fill="#1A2A3A" stroke="#58D68D" stroke-width="0.5"/>
+    <text x="1110" y="45" font-size="10" fill="#C5CED8" class="body">Element with 0 satisfaction links = </text>
+    <text x="1340" y="45" font-size="10" fill="#F07070" font-weight="600" class="body">orphan</text>
+    <text x="1110" y="60" font-size="10" fill="#C5CED8" class="body">Conflicting reqs on same element = </text>
+    <text x="1355" y="60" font-size="10" fill="#F07070" font-weight="600" class="body">unresolved tension</text>
   </g>
 
   <!-- Comparison table -->
   <g transform="translate(80, 2310)">
     <!-- Table headers -->
-    <rect x="0" y="0" width="200" height="22" rx="3" fill="#ECF0F1"/>
-    <text x="100" y="15" text-anchor="middle" font-size="10" font-weight="700" fill="#555"></text>
+    <rect x="0" y="0" width="200" height="22" rx="3" fill="#2B3E50"/>
 
-    <rect x="200" y="0" width="350" height="22" rx="3" fill="#FEF9E7"/>
-    <text x="375" y="15" text-anchor="middle" font-size="10" font-weight="700" fill="#7D6608">PRODUCT-REQ</text>
+    <rect x="200" y="0" width="350" height="22" rx="3" fill="#263545"/>
+    <text x="375" y="15" text-anchor="middle" font-size="10" font-weight="700" fill="#F0C040" class="body">PRODUCT-REQ</text>
 
-    <rect x="550" y="0" width="450" height="22" rx="3" fill="#EBF5FB"/>
-    <text x="775" y="15" text-anchor="middle" font-size="10" font-weight="700" fill="#1A5276">SYSTEM-REQ</text>
+    <rect x="550" y="0" width="450" height="22" rx="3" fill="#1E3248"/>
+    <text x="775" y="15" text-anchor="middle" font-size="10" font-weight="700" fill="#5DADE2" class="body">SYSTEM-REQ</text>
 
-    <rect x="1000" y="0" width="600" height="22" rx="3" fill="#EAFAF1"/>
-    <text x="1300" y="15" text-anchor="middle" font-size="10" font-weight="700" fill="#1E6F3E">DOMAIN</text>
+    <rect x="1000" y="0" width="600" height="22" rx="3" fill="#1E3530"/>
+    <text x="1300" y="15" text-anchor="middle" font-size="10" font-weight="700" fill="#58D68D" class="body">DOMAIN</text>
 
     <!-- Row: Question -->
-    <text x="10" y="40" font-size="9.5" fill="#555" font-weight="600">Question</text>
-    <text x="210" y="40" font-size="9.5" fill="#7D6608">What &amp; why &amp; for whom?</text>
-    <text x="560" y="40" font-size="9.5" fill="#1A5276">What shall the system do?</text>
-    <text x="1010" y="40" font-size="9.5" fill="#1E6F3E">How is it structured &amp; how does it behave?</text>
+    <text x="10" y="40" font-size="9.5" fill="#8A9BB5" font-weight="600" class="body">Question</text>
+    <text x="210" y="40" font-size="9.5" fill="#F0C040" class="body">What &amp; why &amp; for whom?</text>
+    <text x="560" y="40" font-size="9.5" fill="#5DADE2" class="body">What shall the system do?</text>
+    <text x="1010" y="40" font-size="9.5" fill="#58D68D" class="body">How is it structured &amp; how does it behave?</text>
 
     <!-- Row: Unit -->
-    <text x="10" y="58" font-size="9.5" fill="#555" font-weight="600">Primary unit</text>
-    <text x="210" y="58" font-size="9.5" fill="#7D6608">Feature</text>
-    <text x="560" y="58" font-size="9.5" fill="#1A5276">EARS Requirement (shall + pattern)</text>
-    <text x="1010" y="58" font-size="9.5" fill="#1E6F3E">Entity / Aggregate</text>
+    <text x="10" y="58" font-size="9.5" fill="#8A9BB5" font-weight="600" class="body">Primary unit</text>
+    <text x="210" y="58" font-size="9.5" fill="#F0C040" class="body">Feature</text>
+    <text x="560" y="58" font-size="9.5" fill="#5DADE2" class="body">EARS Requirement (shall + pattern)</text>
+    <text x="1010" y="58" font-size="9.5" fill="#58D68D" class="body">Entity / Aggregate</text>
 
     <!-- Row: Precision -->
-    <text x="10" y="76" font-size="9.5" fill="#555" font-weight="600">Precision</text>
-    <text x="210" y="76" font-size="9.5" fill="#7D6608">Narrative (stories, journeys)</text>
-    <text x="560" y="76" font-size="9.5" fill="#1A5276">Testable (shall + patterns)</text>
-    <text x="1010" y="76" font-size="9.5" fill="#1E6F3E">Implementable (types, ops, events, rules)</text>
+    <text x="10" y="76" font-size="9.5" fill="#8A9BB5" font-weight="600" class="body">Precision</text>
+    <text x="210" y="76" font-size="9.5" fill="#F0C040" class="body">Narrative (stories, journeys)</text>
+    <text x="560" y="76" font-size="9.5" fill="#5DADE2" class="body">Testable (shall + patterns)</text>
+    <text x="1010" y="76" font-size="9.5" fill="#58D68D" class="body">Implementable (types, ops, events, rules)</text>
   </g>
+
+  <!-- Divider line à la Defsquare -->
+  <line x1="80" y1="2105" x2="1720" y2="2105" stroke="#8A9BB5" stroke-width="1" stroke-opacity="0.4"/>
 
 </svg>
