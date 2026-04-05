@@ -1,0 +1,189 @@
+// =============================================================================
+// Specy — System Requirement Grammar (.sysreq)
+// EBNF (ISO 14977 style)
+//
+// A .sysreq file captures system requirements using the EARS syntax (Easy Approach
+// to Requirements Syntax). It sits between the PRD (upstream) and the domain
+// model (downstream) in the traceability chain.
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// Top-level structure
+// -----------------------------------------------------------------------------
+
+reqFile          = { comment | requirementSetDef } ;
+
+// -----------------------------------------------------------------------------
+// Requirement Set — groups requirements scoped to a bounded context
+// or organization
+// -----------------------------------------------------------------------------
+
+requirementSetDef = "requirements" , stringLiteral , "scoped-to" , typeName , "{" ,
+                  { comment
+                  | prdSourceDecl
+                  | requirementDef
+                  } , "}" ;
+
+// -----------------------------------------------------------------------------
+// PRD Source — provenance link to the product requirement file
+// Multiple prd-source declarations are allowed.
+// -----------------------------------------------------------------------------
+
+prdSourceDecl    = "prd-source" , stringLiteral ;
+
+// -----------------------------------------------------------------------------
+// Requirement — a named EARS statement
+//
+// Structure:
+//   REQ-ID "name" : pattern
+//     :: "rationale"
+//     "EARS statement"
+//     priority <level>
+//     [source "reference"]
+//     [depends-on REQ-ID, ...]
+//     [conflicts-with REQ-ID, ...]
+//     [decomposed-into { REQ-IDs }]
+// -----------------------------------------------------------------------------
+
+requirementDef   = requirementId , stringLiteral , ":" , earsPattern ,
+                 [ rationale ] ,
+                 earsStatement ,
+                 "priority" , moscowPriority ,
+                 [ sourceDecl ] ,
+                 [ dependsOnDecl ] ,
+                 [ conflictsWithDecl ] ,
+                 [ decomposedIntoBlock ] ;
+
+// -----------------------------------------------------------------------------
+// Requirement ID — stable identifier with context prefix
+// Format: REQ-<CONTEXT>-<NUMBER> (e.g., REQ-ORD-001, REQ-NFR-001)
+// -----------------------------------------------------------------------------
+
+requirementId    = "REQ" , "-" , idSegment , "-" , idNumber ;
+
+idSegment        = upperLetter , { upperLetter | digit | "-" } ;
+
+idNumber         = digit , digit , digit ;
+
+// -----------------------------------------------------------------------------
+// EARS Patterns — the six requirement patterns
+// -----------------------------------------------------------------------------
+
+earsPattern      = "ubiquitous"
+                 | "state-driven"
+                 | "event-driven"
+                 | "unwanted"
+                 | "optional"
+                 | "complex" ;
+
+// -----------------------------------------------------------------------------
+// EARS Statement — the full requirement sentence in quotes
+//
+// Follows the EARS structure:
+//   [While <precondition(s)>,] [When|If|Where <trigger or condition>,]
+//   the <system name> shall <system response(s)>.
+//
+// May span multiple lines within the string literal.
+// -----------------------------------------------------------------------------
+
+earsStatement    = stringLiteral ;
+
+// -----------------------------------------------------------------------------
+// Rationale — :: operator (same as domain model justification)
+// Attaches a business reason. Does not change semantics.
+// -----------------------------------------------------------------------------
+
+rationale        = "::" , stringLiteral ;
+
+// -----------------------------------------------------------------------------
+// Priority — MoSCoW classification
+// -----------------------------------------------------------------------------
+
+moscowPriority   = "must" | "should" | "could" | "wont" ;
+
+// -----------------------------------------------------------------------------
+// Source — provenance reference to a PRD element
+//
+// Free-text reference following the convention:
+//   source "Feature: <name>"
+//   source "Feature: <name> — Story: <summary>"
+//   source "Feature: <name> — AC: <criterion>"
+//   source "Job: <name>"
+//   source "Job: <name> — Outcome: <statement>"
+//   source "Constraint: <name>"
+//   source "Goal: <name>"
+// -----------------------------------------------------------------------------
+
+sourceDecl       = "source" , stringLiteral ;
+
+// -----------------------------------------------------------------------------
+// Depends-on — logical prerequisite between requirements
+// Requirement B cannot be satisfied unless A is satisfied first.
+// -----------------------------------------------------------------------------
+
+dependsOnDecl    = "depends-on" , requirementId , { "," , requirementId } ;
+
+// -----------------------------------------------------------------------------
+// Conflicts-with — explicit tension between requirements
+// Both cannot be fully satisfied simultaneously.
+// -----------------------------------------------------------------------------
+
+conflictsWithDecl = "conflicts-with" , requirementId , { "," , requirementId } ;
+
+// -----------------------------------------------------------------------------
+// Decomposed-into — organization-level requirement creates derived
+// context-level obligations
+// -----------------------------------------------------------------------------
+
+decomposedIntoBlock = "decomposed-into" , "{" ,
+                    requirementId , { requirementId } ,
+                    "}" ;
+
+// -----------------------------------------------------------------------------
+// Literals and identifiers
+// -----------------------------------------------------------------------------
+
+literalValue     = stringLiteral | number | "true" | "false" ;
+
+stringLiteral    = '"' , { character } , '"' ;
+
+number           = [ "-" ] , digit , { digit } , [ "." , digit , { digit } ] ;
+
+integer          = [ "-" ] , digit , { digit } ;
+
+typeName         = pascalCaseId ;
+
+identifier       = camelCaseId | pascalCaseId ;
+
+pascalCaseId     = upperLetter , { letter | digit } ;
+
+camelCaseId      = lowerLetter , { letter | digit } ;
+
+// -----------------------------------------------------------------------------
+// Comments
+// -----------------------------------------------------------------------------
+
+comment          = "//" , { character } , newline ;
+
+// -----------------------------------------------------------------------------
+// Character classes
+// -----------------------------------------------------------------------------
+
+upperLetter      = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I"
+                 | "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R"
+                 | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" ;
+
+lowerLetter      = "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i"
+                 | "j" | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r"
+                 | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" ;
+
+letter           = upperLetter | lowerLetter ;
+
+digit            = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+
+character        = letter | digit | " " | "!" | "@" | "#" | "$" | "%" | "^"
+                 | "&" | "*" | "(" | ")" | "-" | "_" | "=" | "+" | "["
+                 | "]" | "{" | "}" | "|" | "\\" | ":" | ";" | "'" | ","
+                 | "." | "<" | ">" | "/" | "?" | "~" | "`" ;
+
+newline          = "\n" ;
