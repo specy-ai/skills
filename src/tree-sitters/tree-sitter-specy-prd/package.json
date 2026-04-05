@@ -1,0 +1,27 @@
+{
+  "name": "tree-sitter-specy-prd",
+  "version": "0.1.0",
+  "description": "Tree-sitter grammar for the Specy PRD language (.prd)",
+  "main": "bindings/node",
+  "keywords": ["tree-sitter", "specy", "prd", "product-requirements"],
+  "license": "MIT",
+  "dependencies": {
+    "nan": "^2.18.0"
+  },
+  "devDependencies": {
+    "tree-sitter-cli": "^0.22.0"
+  },
+  "scripts": {
+    "generate": "tree-sitter generate",
+    "build": "tree-sitter build",
+    "test": "tree-sitter test"
+  },
+  "tree-sitter": [
+    {
+      "scope": "source.specy_prd",
+      "file-types": ["prd.md"],
+      "highlights": "queries/highlights.scm",
+      "injection-regex": "specy_prd"
+    }
+  ]
+}

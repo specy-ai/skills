@@ -1,0 +1,26 @@
+{
+  "name": "tree-sitter-specy-domain",
+  "version": "1.0.0",
+  "description": "Tree-sitter grammar for Specy Domain Model (.domain)",
+  "main": "bindings/node",
+  "keywords": [
+    "tree-sitter",
+    "parser",
+    "specy",
+    "domain",
+    "ddd"
+  ],
+  "tree-sitter": [
+    {
+      "scope": "source.specy_domain",
+      "file-types": [
+        "domain.specy"
+      ],
+      "highlights": "queries/highlights.scm"
+    }
+  ],
+  "dependencies": {},
+  "devDependencies": {
+    "tree-sitter-cli": ">=0.20.0"
+  }
+}

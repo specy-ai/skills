@@ -1,0 +1,5344 @@
+[
+  {
+    "type": "absolute_temporal_event",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "dot_path",
+          "named": true
+        },
+        {
+          "type": "expression",
+          "named": true
+        },
+        {
+          "type": "fields_block",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "satisfies_decl",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "accepts_clause",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "param_decl_opt",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "add_expr",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "mul_expr",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "aggregate_contains_decl",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "type_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "aggregate_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "aggregate_contains_decl",
+          "named": true
+        },
+        {
+          "type": "aggregate_entities_decl",
+          "named": true
+        },
+        {
+          "type": "aggregate_root_decl",
+          "named": true
+        },
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "duplicate_detection",
+          "named": true
+        },
+        {
+          "type": "field_decl",
+          "named": true
+        },
+        {
+          "type": "fields_block",
+          "named": true
+        },
+        {
+          "type": "identity_decl",
+          "named": true
+        },
+        {
+          "type": "invariants_block",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "operations_block",
+          "named": true
+        },
+        {
+          "type": "policies_block",
+          "named": true
+        },
+        {
+          "type": "references_block",
+          "named": true
+        },
+        {
+          "type": "satisfies_decl",
+          "named": true
+        },
+        {
+          "type": "states_block",
+          "named": true
+        },
+        {
+          "type": "transitions_block",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "aggregate_entities_decl",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "type_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "aggregate_root_decl",
+    "named": true,
+    "fields": {
+      "root": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "agreement_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          },
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "participants_clause",
+          "named": true
+        },
+        {
+          "type": "predicate_block",
+          "named": true
+        },
+        {
+          "type": "reconciliation_def",
+          "named": true
+        },
+        {
+          "type": "satisfies_decl",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "and_expr",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "not_expr",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "application_service_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "interface_def",
+          "named": true
+        },
+        {
+          "type": "invariants_block",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "named_operation_def",
+          "named": true
+        },
+        {
+          "type": "operations_block",
+          "named": true
+        },
+        {
+          "type": "policies_block",
+          "named": true
+        },
+        {
+          "type": "satisfies_decl",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "arg_list",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "expression",
+          "named": true
+        },
+        {
+          "type": "named_arg_list",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "array_index",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "expression",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "array_literal",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "array_literal",
+          "named": true
+        },
+        {
+          "type": "expression",
+          "named": true
+        },
+        {
+          "type": "service_call_expr",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "assignment_clause",
+    "named": true,
+    "fields": {
+      "field": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "array_literal",
+          "named": true
+        },
+        {
+          "type": "expression",
+          "named": true
+        },
+        {
+          "type": "service_call_expr",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "boolean",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "collection_type",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "field_type",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "command_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "field_decl",
+          "named": true
+        },
+        {
+          "type": "fields_block",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "satisfies_decl",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "command_triggered_op",
+    "named": true,
+    "fields": {
+      "command": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      },
+      "label": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "creates_clause",
+          "named": true
+        },
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "emits_clause",
+          "named": true
+        },
+        {
+          "type": "foreach_clause",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "policy_call_clause",
+          "named": true
+        },
+        {
+          "type": "postcondition_clause",
+          "named": true
+        },
+        {
+          "type": "precondition_clause",
+          "named": true
+        },
+        {
+          "type": "resolves_clause",
+          "named": true
+        },
+        {
+          "type": "returns_clause",
+          "named": true
+        },
+        {
+          "type": "satisfies_decl",
+          "named": true
+        },
+        {
+          "type": "scoped_policy_def",
+          "named": true
+        },
+        {
+          "type": "service_call_clause",
+          "named": true
+        },
+        {
+          "type": "sets_clause",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "comp_op",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "comparison",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "add_expr",
+          "named": true
+        },
+        {
+          "type": "array_literal",
+          "named": true
+        },
+        {
+          "type": "comp_op",
+          "named": true
+        },
+        {
+          "type": "dot_path",
+          "named": true
+        },
+        {
+          "type": "expression",
+          "named": true
+        },
+        {
+          "type": "regex_literal",
+          "named": true
+        },
+        {
+          "type": "service_call_expr",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "constraint",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "literal_value",
+          "named": true
+        },
+        {
+          "type": "number",
+          "named": true
+        },
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "context_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          },
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "aggregate_def",
+          "named": true
+        },
+        {
+          "type": "agreement_def",
+          "named": true
+        },
+        {
+          "type": "application_service_def",
+          "named": true
+        },
+        {
+          "type": "command_def",
+          "named": true
+        },
+        {
+          "type": "context_map_block",
+          "named": true
+        },
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "domain_service_def",
+          "named": true
+        },
+        {
+          "type": "entity_def",
+          "named": true
+        },
+        {
+          "type": "enum_def",
+          "named": true
+        },
+        {
+          "type": "error_event_def",
+          "named": true
+        },
+        {
+          "type": "event_def",
+          "named": true
+        },
+        {
+          "type": "external_event_def",
+          "named": true
+        },
+        {
+          "type": "infrastructure_service_def",
+          "named": true
+        },
+        {
+          "type": "invariant_def",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "module_def",
+          "named": true
+        },
+        {
+          "type": "policy_def",
+          "named": true
+        },
+        {
+          "type": "prd_source_decl",
+          "named": true
+        },
+        {
+          "type": "query_def",
+          "named": true
+        },
+        {
+          "type": "reaction_def",
+          "named": true
+        },
+        {
+          "type": "requirements_source_decl",
+          "named": true
+        },
+        {
+          "type": "scoped_policy_def",
+          "named": true
+        },
+        {
+          "type": "service_def",
+          "named": true
+        },
+        {
+          "type": "shortname",
+          "named": true
+        },
+        {
+          "type": "statemachine_def",
+          "named": true
+        },
+        {
+          "type": "temporal_event_def",
+          "named": true
+        },
+        {
+          "type": "value_def",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "context_map_block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "context_relation",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "context_relation",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "downstream_relation",
+          "named": true
+        },
+        {
+          "type": "symmetric_relation",
+          "named": true
+        },
+        {
+          "type": "upstream_relation",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "coordination_style",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "creates_clause",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "assignment_clause",
+          "named": true
+        },
+        {
+          "type": "type_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "depends_block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "string_literal",
+          "named": true
+        },
+        {
+          "type": "type_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "description",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "detection_strategy",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "domain_service_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "interface_def",
+          "named": true
+        },
+        {
+          "type": "invariants_block",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "named_operation_def",
+          "named": true
+        },
+        {
+          "type": "operations_block",
+          "named": true
+        },
+        {
+          "type": "policies_block",
+          "named": true
+        },
+        {
+          "type": "satisfies_decl",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "dot_path",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "array_index",
+          "named": true
+        },
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "string_literal",
+          "named": true
+        },
+        {
+          "type": "type_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "downstream_pattern",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "downstream_relation",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "downstream_pattern",
+          "named": true
+        },
+        {
+          "type": "type_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "duplicate_detection",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "expression",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "duration_literal",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "number",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "effects_clause",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "type_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "emits_clause",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "assignment_clause",
+          "named": true
+        },
+        {
+          "type": "type_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "enforcement_strategy",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": false,
+      "types": [
+        {
+          "type": "type_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "entity_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "duplicate_detection",
+          "named": true
+        },
+        {
+          "type": "field_decl",
+          "named": true
+        },
+        {
+          "type": "fields_block",
+          "named": true
+        },
+        {
+          "type": "identity_decl",
+          "named": true
+        },
+        {
+          "type": "inline_invariant",
+          "named": true
+        },
+        {
+          "type": "invariants_block",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "named_operation_def",
+          "named": true
+        },
+        {
+          "type": "operations_block",
+          "named": true
+        },
+        {
+          "type": "policies_block",
+          "named": true
+        },
+        {
+          "type": "references_block",
+          "named": true
+        },
+        {
+          "type": "satisfies_decl",
+          "named": true
+        },
+        {
+          "type": "states_block",
+          "named": true
+        },
+        {
+          "type": "transitions_block",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "entity_transition",
+    "named": true,
+    "fields": {
+      "target": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "string_literal",
+          "named": true
+        },
+        {
+          "type": "transition_source",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "enum_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "enum_value",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "satisfies_decl",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "enum_value",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "identifier",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "error_event_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "dot_path",
+          "named": true
+        },
+        {
+          "type": "event_type_classifier",
+          "named": true
+        },
+        {
+          "type": "expression",
+          "named": true
+        },
+        {
+          "type": "field_decl",
+          "named": true
+        },
+        {
+          "type": "fields_block",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "satisfies_decl",
+          "named": true
+        },
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "escalation_action",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "number",
+          "named": true
+        },
+        {
+          "type": "string_literal",
+          "named": true
+        },
+        {
+          "type": "type_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "escalation_chain_def",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "escalation_step",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "escalation_step",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "number",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "escalation_action",
+          "named": true
+        },
+        {
+          "type": "expression",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "number",
+          "named": true
+        },
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "event_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "dot_path",
+          "named": true
+        },
+        {
+          "type": "event_type_classifier",
+          "named": true
+        },
+        {
+          "type": "expression",
+          "named": true
+        },
+        {
+          "type": "field_decl",
+          "named": true
+        },
+        {
+          "type": "fields_block",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "satisfies_decl",
+          "named": true
+        },
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "event_triggered_op",
+    "named": true,
+    "fields": {
+      "command": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      },
+      "event": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      },
+      "label": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "creates_clause",
+          "named": true
+        },
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "emits_clause",
+          "named": true
+        },
+        {
+          "type": "foreach_clause",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "policy_call_clause",
+          "named": true
+        },
+        {
+          "type": "postcondition_clause",
+          "named": true
+        },
+        {
+          "type": "precondition_clause",
+          "named": true
+        },
+        {
+          "type": "resolves_clause",
+          "named": true
+        },
+        {
+          "type": "returns_clause",
+          "named": true
+        },
+        {
+          "type": "satisfies_decl",
+          "named": true
+        },
+        {
+          "type": "scoped_policy_def",
+          "named": true
+        },
+        {
+          "type": "service_call_clause",
+          "named": true
+        },
+        {
+          "type": "sets_clause",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "event_type_classifier",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "every_expr",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "dot_path",
+          "named": true
+        },
+        {
+          "type": "expression",
+          "named": true
+        },
+        {
+          "type": "type_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "exists_pred",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "expression",
+          "named": true
+        },
+        {
+          "type": "type_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "exposes_clause",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "dot_path",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "expression",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "or_expr",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "external_event_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "satisfies_decl",
+          "named": true
+        },
+        {
+          "type": "type_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "field_decl",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "id",
+            "named": false
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "optional",
+            "named": false
+          },
+          {
+            "type": "required",
+            "named": false
+          },
+          {
+            "type": "status",
+            "named": false
+          },
+          {
+            "type": "type",
+            "named": false
+          },
+          {
+            "type": "value",
+            "named": false
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "constraint",
+          "named": true
+        },
+        {
+          "type": "field_type_opt",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "field_type",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "collection_type",
+          "named": true
+        },
+        {
+          "type": "generic_type",
+          "named": true
+        },
+        {
+          "type": "primitive_type",
+          "named": true
+        },
+        {
+          "type": "type_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "field_type_opt",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "field_type",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "fields_block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "field_decl",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "final_state",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "type_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "forall_pred",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "exists_pred",
+          "named": true
+        },
+        {
+          "type": "expression",
+          "named": true
+        },
+        {
+          "type": "type_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "foreach_clause",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "dot_path",
+          "named": true
+        },
+        {
+          "type": "emits_clause",
+          "named": true
+        },
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "policy_call_clause",
+          "named": true
+        },
+        {
+          "type": "resolves_clause",
+          "named": true
+        },
+        {
+          "type": "service_call_clause",
+          "named": true
+        },
+        {
+          "type": "sets_clause",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "function_call",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "function_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": false,
+      "required": false,
+      "types": [
+        {
+          "type": "arg_list",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "function_name",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "generic_type",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "field_type",
+          "named": true
+        },
+        {
+          "type": "type_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "identity_decl",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "field_type",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "if_expr",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "expression",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "in_expr",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "dot_path",
+          "named": true
+        },
+        {
+          "type": "value_list",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "infrastructure_service_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "interface_def",
+          "named": true
+        },
+        {
+          "type": "invariants_block",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "named_operation_def",
+          "named": true
+        },
+        {
+          "type": "operations_block",
+          "named": true
+        },
+        {
+          "type": "policies_block",
+          "named": true
+        },
+        {
+          "type": "satisfies_decl",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "inline_enum_block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "type_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "inline_invariant",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "must_block",
+          "named": true
+        },
+        {
+          "type": "on_clause",
+          "named": true
+        },
+        {
+          "type": "satisfies_decl",
+          "named": true
+        },
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "interface_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "exposes_clause",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "named_operation_def",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "internal_op",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "string_literal",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "creates_clause",
+          "named": true
+        },
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "emits_clause",
+          "named": true
+        },
+        {
+          "type": "field_type",
+          "named": true
+        },
+        {
+          "type": "foreach_clause",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "param_list",
+          "named": true
+        },
+        {
+          "type": "policy_call_clause",
+          "named": true
+        },
+        {
+          "type": "postcondition_clause",
+          "named": true
+        },
+        {
+          "type": "precondition_clause",
+          "named": true
+        },
+        {
+          "type": "resolves_clause",
+          "named": true
+        },
+        {
+          "type": "returns_clause",
+          "named": true
+        },
+        {
+          "type": "satisfies_decl",
+          "named": true
+        },
+        {
+          "type": "scoped_policy_def",
+          "named": true
+        },
+        {
+          "type": "service_call_clause",
+          "named": true
+        },
+        {
+          "type": "sets_clause",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "invariant_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          },
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "enforcement_strategy",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "must_block",
+          "named": true
+        },
+        {
+          "type": "on_clause",
+          "named": true
+        },
+        {
+          "type": "satisfies_decl",
+          "named": true
+        },
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "invariants_block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "scoped_invariant_def",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "is_defined_expr",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "dot_path",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "is_not_defined_expr",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "dot_path",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "literal",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "literal_value",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "literal_value",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "boolean",
+          "named": true
+        },
+        {
+          "type": "number",
+          "named": true
+        },
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "metadata_block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "metadata_entry",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "metadata_entry",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "literal_value",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "module_body",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "aggregate_def",
+          "named": true
+        },
+        {
+          "type": "agreement_def",
+          "named": true
+        },
+        {
+          "type": "application_service_def",
+          "named": true
+        },
+        {
+          "type": "command_def",
+          "named": true
+        },
+        {
+          "type": "depends_block",
+          "named": true
+        },
+        {
+          "type": "domain_service_def",
+          "named": true
+        },
+        {
+          "type": "entity_def",
+          "named": true
+        },
+        {
+          "type": "enum_def",
+          "named": true
+        },
+        {
+          "type": "error_event_def",
+          "named": true
+        },
+        {
+          "type": "event_def",
+          "named": true
+        },
+        {
+          "type": "external_event_def",
+          "named": true
+        },
+        {
+          "type": "infrastructure_service_def",
+          "named": true
+        },
+        {
+          "type": "interface_def",
+          "named": true
+        },
+        {
+          "type": "invariant_def",
+          "named": true
+        },
+        {
+          "type": "module_def",
+          "named": true
+        },
+        {
+          "type": "policy_def",
+          "named": true
+        },
+        {
+          "type": "query_def",
+          "named": true
+        },
+        {
+          "type": "reaction_def",
+          "named": true
+        },
+        {
+          "type": "scoped_policy_def",
+          "named": true
+        },
+        {
+          "type": "service_def",
+          "named": true
+        },
+        {
+          "type": "statemachine_def",
+          "named": true
+        },
+        {
+          "type": "temporal_event_def",
+          "named": true
+        },
+        {
+          "type": "value_def",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "module_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          },
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "module_body",
+          "named": true
+        },
+        {
+          "type": "requirements_source_decl",
+          "named": true
+        },
+        {
+          "type": "uses_decl",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "mul_expr",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "unary_expr",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "must_block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "expression",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "named_arg",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "array_literal",
+          "named": true
+        },
+        {
+          "type": "expression",
+          "named": true
+        },
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "service_call_expr",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "named_arg_list",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "named_arg",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "named_operation_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "accepts_clause",
+          "named": true
+        },
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "emits_clause",
+          "named": true
+        },
+        {
+          "type": "named_postcondition",
+          "named": true
+        },
+        {
+          "type": "named_precondition",
+          "named": true
+        },
+        {
+          "type": "on_clause",
+          "named": true
+        },
+        {
+          "type": "returns_decl",
+          "named": true
+        },
+        {
+          "type": "satisfies_decl",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "named_postcondition",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "expression",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "named_precondition",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "expression",
+          "named": true
+        },
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "no_field_contains_expr",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "dot_path",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "not_expr",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "comparison",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "not_in_expr",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "dot_path",
+          "named": true
+        },
+        {
+          "type": "value_list",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "on_clause",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "type_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "operation_def",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "command_triggered_op",
+          "named": true
+        },
+        {
+          "type": "event_triggered_op",
+          "named": true
+        },
+        {
+          "type": "internal_op",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "operations_block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "operation_def",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "or_expr",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "and_expr",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "organization_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          },
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "context_def",
+          "named": true
+        },
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "prd_source_decl",
+          "named": true
+        },
+        {
+          "type": "requirements_source_decl",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "param_decl",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "field_type",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "param_decl_opt",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "field_type_opt",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "param_list",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "param_decl",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "paren_expr",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "expression",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "participants_clause",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "type_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "policies_block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "scoped_invariant_def",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "policy_call_clause",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "arg_list",
+          "named": true
+        },
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "expression",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "policy_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "expression",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "satisfies_decl",
+          "named": true
+        },
+        {
+          "type": "type_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "postcondition_clause",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "expression",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "prd_source_decl",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "precondition_clause",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "expression",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "predicate_block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "predicate_expr",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "predicate_expr",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "expression",
+          "named": true
+        },
+        {
+          "type": "forall_pred",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "primitive_type",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "query_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "field_decl",
+          "named": true
+        },
+        {
+          "type": "fields_block",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "returns_decl",
+          "named": true
+        },
+        {
+          "type": "satisfies_decl",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "reaction_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "effects_clause",
+          "named": true
+        },
+        {
+          "type": "satisfies_decl",
+          "named": true
+        },
+        {
+          "type": "triggered_by_clause",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "reconciliation_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          },
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "coordination_style",
+          "named": true
+        },
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "detection_strategy",
+          "named": true
+        },
+        {
+          "type": "escalation_chain_def",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "reconciliation_trigger",
+          "named": true
+        },
+        {
+          "type": "type_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "reconciliation_trigger",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "string_literal",
+          "named": true
+        },
+        {
+          "type": "type_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "recurring_temporal_event",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "expression",
+          "named": true
+        },
+        {
+          "type": "fields_block",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "satisfies_decl",
+          "named": true
+        },
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "reference_decl",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "cardinality",
+          "named": true
+        },
+        {
+          "type": "type_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "references_block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "reference_decl",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "relative_temporal_event",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "array_literal",
+          "named": true
+        },
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "expression",
+          "named": true
+        },
+        {
+          "type": "fields_block",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "satisfies_decl",
+          "named": true
+        },
+        {
+          "type": "service_call_expr",
+          "named": true
+        },
+        {
+          "type": "type_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "requirements_source_decl",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "resolves_clause",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "dot_path",
+          "named": true
+        },
+        {
+          "type": "type_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "returns_clause",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "array_literal",
+          "named": true
+        },
+        {
+          "type": "expression",
+          "named": true
+        },
+        {
+          "type": "field_type",
+          "named": true
+        },
+        {
+          "type": "service_call_expr",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "returns_decl",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "field_type_opt",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "satisfies_decl",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "requirement_id",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "scoped_invariant_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "expression",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "satisfies_decl",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "scoped_policy_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "expression",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "satisfies_decl",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "service_call_clause",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "arg_list",
+          "named": true
+        },
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "dot_path",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "service_call_expr",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "arg_list",
+          "named": true
+        },
+        {
+          "type": "dot_path",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "service_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "interface_def",
+          "named": true
+        },
+        {
+          "type": "invariants_block",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "named_operation_def",
+          "named": true
+        },
+        {
+          "type": "operations_block",
+          "named": true
+        },
+        {
+          "type": "policies_block",
+          "named": true
+        },
+        {
+          "type": "satisfies_decl",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "sets_clause",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "assignment_clause",
+          "named": true
+        },
+        {
+          "type": "type_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "shortname",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "identifier",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "source_file",
+    "named": true,
+    "root": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "aggregate_def",
+          "named": true
+        },
+        {
+          "type": "agreement_def",
+          "named": true
+        },
+        {
+          "type": "application_service_def",
+          "named": true
+        },
+        {
+          "type": "command_def",
+          "named": true
+        },
+        {
+          "type": "context_def",
+          "named": true
+        },
+        {
+          "type": "domain_service_def",
+          "named": true
+        },
+        {
+          "type": "entity_def",
+          "named": true
+        },
+        {
+          "type": "enum_def",
+          "named": true
+        },
+        {
+          "type": "error_event_def",
+          "named": true
+        },
+        {
+          "type": "event_def",
+          "named": true
+        },
+        {
+          "type": "external_event_def",
+          "named": true
+        },
+        {
+          "type": "infrastructure_service_def",
+          "named": true
+        },
+        {
+          "type": "invariant_def",
+          "named": true
+        },
+        {
+          "type": "module_def",
+          "named": true
+        },
+        {
+          "type": "organization_def",
+          "named": true
+        },
+        {
+          "type": "policy_def",
+          "named": true
+        },
+        {
+          "type": "query_def",
+          "named": true
+        },
+        {
+          "type": "reaction_def",
+          "named": true
+        },
+        {
+          "type": "scoped_policy_def",
+          "named": true
+        },
+        {
+          "type": "service_def",
+          "named": true
+        },
+        {
+          "type": "statemachine_def",
+          "named": true
+        },
+        {
+          "type": "temporal_event_def",
+          "named": true
+        },
+        {
+          "type": "value_def",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "state_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "state_invariant_def",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "state_def_simple",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "inline_invariant",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "state_invariant_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "expression",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "state_machine_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "state_def",
+          "named": true
+        },
+        {
+          "type": "transition_def",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "statemachine_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "final_state",
+          "named": true
+        },
+        {
+          "type": "on_clause",
+          "named": true
+        },
+        {
+          "type": "state_def_simple",
+          "named": true
+        },
+        {
+          "type": "statemachine_start",
+          "named": true
+        },
+        {
+          "type": "transition_inline",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "statemachine_start",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "type_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "states_block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "state_machine_def",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "symmetric_pattern",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "symmetric_relation",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "symmetric_pattern",
+          "named": true
+        },
+        {
+          "type": "type_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "temporal_event_def",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "absolute_temporal_event",
+          "named": true
+        },
+        {
+          "type": "recurring_temporal_event",
+          "named": true
+        },
+        {
+          "type": "relative_temporal_event",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "transition_def",
+    "named": true,
+    "fields": {
+      "target": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "trigger": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "expression",
+          "named": true
+        },
+        {
+          "type": "transition_source",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "transition_inline",
+    "named": true,
+    "fields": {
+      "from": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      },
+      "to": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      },
+      "trigger": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "transition_source",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": false,
+      "types": [
+        {
+          "type": "identifier",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "transitions_block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "entity_transition",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "triggered_by_clause",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "type_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "unary_expr",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "dot_path",
+          "named": true
+        },
+        {
+          "type": "duration_literal",
+          "named": true
+        },
+        {
+          "type": "every_expr",
+          "named": true
+        },
+        {
+          "type": "function_call",
+          "named": true
+        },
+        {
+          "type": "if_expr",
+          "named": true
+        },
+        {
+          "type": "in_expr",
+          "named": true
+        },
+        {
+          "type": "is_defined_expr",
+          "named": true
+        },
+        {
+          "type": "is_not_defined_expr",
+          "named": true
+        },
+        {
+          "type": "literal",
+          "named": true
+        },
+        {
+          "type": "no_field_contains_expr",
+          "named": true
+        },
+        {
+          "type": "not_in_expr",
+          "named": true
+        },
+        {
+          "type": "paren_expr",
+          "named": true
+        },
+        {
+          "type": "service_call_expr",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "upstream_relation",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "type_name",
+          "named": true
+        },
+        {
+          "type": "upstream_pattern",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "uses_decl",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "type_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "value_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "field_decl",
+          "named": true
+        },
+        {
+          "type": "fields_block",
+          "named": true
+        },
+        {
+          "type": "inline_enum_block",
+          "named": true
+        },
+        {
+          "type": "inline_invariant",
+          "named": true
+        },
+        {
+          "type": "invariants_block",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "satisfies_decl",
+          "named": true
+        },
+        {
+          "type": "value_operations_block",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "value_list",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "array_literal",
+          "named": true
+        },
+        {
+          "type": "expression",
+          "named": true
+        },
+        {
+          "type": "service_call_expr",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "value_op_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "field_type",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "param_list",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "value_operations_block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "value_op_def",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "!=",
+    "named": false
+  },
+  {
+    "type": "(",
+    "named": false
+  },
+  {
+    "type": ")",
+    "named": false
+  },
+  {
+    "type": "*",
+    "named": false
+  },
+  {
+    "type": "+",
+    "named": false
+  },
+  {
+    "type": ",",
+    "named": false
+  },
+  {
+    "type": "-",
+    "named": false
+  },
+  {
+    "type": "-->",
+    "named": false
+  },
+  {
+    "type": "->",
+    "named": false
+  },
+  {
+    "type": ".",
+    "named": false
+  },
+  {
+    "type": "/",
+    "named": false
+  },
+  {
+    "type": ":",
+    "named": false
+  },
+  {
+    "type": "::",
+    "named": false
+  },
+  {
+    "type": "<",
+    "named": false
+  },
+  {
+    "type": "<=",
+    "named": false
+  },
+  {
+    "type": "=",
+    "named": false
+  },
+  {
+    "type": ">",
+    "named": false
+  },
+  {
+    "type": ">=",
+    "named": false
+  },
+  {
+    "type": "?",
+    "named": false
+  },
+  {
+    "type": "ACL",
+    "named": false
+  },
+  {
+    "type": "CS",
+    "named": false
+  },
+  {
+    "type": "Conformist",
+    "named": false
+  },
+  {
+    "type": "Partnership",
+    "named": false
+  },
+  {
+    "type": "PublishedLanguage",
+    "named": false
+  },
+  {
+    "type": "SeparateWays",
+    "named": false
+  },
+  {
+    "type": "SharedKernel",
+    "named": false
+  },
+  {
+    "type": "[",
+    "named": false
+  },
+  {
+    "type": "[*]",
+    "named": false
+  },
+  {
+    "type": "]",
+    "named": false
+  },
+  {
+    "type": "accepts",
+    "named": false
+  },
+  {
+    "type": "action",
+    "named": false
+  },
+  {
+    "type": "aggregate",
+    "named": false
+  },
+  {
+    "type": "agreement",
+    "named": false
+  },
+  {
+    "type": "alert",
+    "named": false
+  },
+  {
+    "type": "and",
+    "named": false
+  },
+  {
+    "type": "append",
+    "named": false
+  },
+  {
+    "type": "application",
+    "named": false
+  },
+  {
+    "type": "application-service",
+    "named": false
+  },
+  {
+    "type": "as",
+    "named": false
+  },
+  {
+    "type": "boolean",
+    "named": false
+  },
+  {
+    "type": "cardinality",
+    "named": true
+  },
+  {
+    "type": "choreography",
+    "named": false
+  },
+  {
+    "type": "command",
+    "named": false
+  },
+  {
+    "type": "comment",
+    "named": true,
+    "extra": true
+  },
+  {
+    "type": "compensate",
+    "named": false
+  },
+  {
+    "type": "compensation",
+    "named": false
+  },
+  {
+    "type": "condition",
+    "named": false
+  },
+  {
+    "type": "contain",
+    "named": false
+  },
+  {
+    "type": "contains",
+    "named": false
+  },
+  {
+    "type": "context",
+    "named": false
+  },
+  {
+    "type": "coordination",
+    "named": false
+  },
+  {
+    "type": "count",
+    "named": false
+  },
+  {
+    "type": "creates",
+    "named": false
+  },
+  {
+    "type": "date",
+    "named": false
+  },
+  {
+    "type": "datetime",
+    "named": false
+  },
+  {
+    "type": "days",
+    "named": false
+  },
+  {
+    "type": "decimal",
+    "named": false
+  },
+  {
+    "type": "default",
+    "named": false
+  },
+  {
+    "type": "defined",
+    "named": false
+  },
+  {
+    "type": "depends",
+    "named": false
+  },
+  {
+    "type": "detection",
+    "named": false
+  },
+  {
+    "type": "does",
+    "named": false
+  },
+  {
+    "type": "domain",
+    "named": false
+  },
+  {
+    "type": "domain-service",
+    "named": false
+  },
+  {
+    "type": "downstream",
+    "named": false
+  },
+  {
+    "type": "duplicate",
+    "named": false
+  },
+  {
+    "type": "duration",
+    "named": false
+  },
+  {
+    "type": "effect",
+    "named": false
+  },
+  {
+    "type": "effects",
+    "named": false
+  },
+  {
+    "type": "emits",
+    "named": false
+  },
+  {
+    "type": "enforcement",
+    "named": false
+  },
+  {
+    "type": "entities",
+    "named": false
+  },
+  {
+    "type": "entity",
+    "named": false
+  },
+  {
+    "type": "enum",
+    "named": false
+  },
+  {
+    "type": "error",
+    "named": false
+  },
+  {
+    "type": "escalation",
+    "named": false
+  },
+  {
+    "type": "event",
+    "named": false
+  },
+  {
+    "type": "event-sourced",
+    "named": false
+  },
+  {
+    "type": "every",
+    "named": false
+  },
+  {
+    "type": "exists",
+    "named": false
+  },
+  {
+    "type": "exposes",
+    "named": false
+  },
+  {
+    "type": "external",
+    "named": false
+  },
+  {
+    "type": "false",
+    "named": false
+  },
+  {
+    "type": "field",
+    "named": false
+  },
+  {
+    "type": "fields",
+    "named": false
+  },
+  {
+    "type": "final",
+    "named": false
+  },
+  {
+    "type": "forall",
+    "named": false
+  },
+  {
+    "type": "foreach",
+    "named": false
+  },
+  {
+    "type": "from",
+    "named": false
+  },
+  {
+    "type": "future",
+    "named": false
+  },
+  {
+    "type": "futureOrPresent",
+    "named": false
+  },
+  {
+    "type": "guard",
+    "named": false
+  },
+  {
+    "type": "hours",
+    "named": false
+  },
+  {
+    "type": "id",
+    "named": false
+  },
+  {
+    "type": "identifier",
+    "named": false
+  },
+  {
+    "type": "identifier",
+    "named": true
+  },
+  {
+    "type": "identity",
+    "named": false
+  },
+  {
+    "type": "if",
+    "named": false
+  },
+  {
+    "type": "immutable",
+    "named": false
+  },
+  {
+    "type": "in",
+    "named": false
+  },
+  {
+    "type": "infrastructure",
+    "named": false
+  },
+  {
+    "type": "infrastructure-service",
+    "named": false
+  },
+  {
+    "type": "instant",
+    "named": false
+  },
+  {
+    "type": "int",
+    "named": false
+  },
+  {
+    "type": "interface",
+    "named": false
+  },
+  {
+    "type": "internal",
+    "named": false
+  },
+  {
+    "type": "invariant",
+    "named": false
+  },
+  {
+    "type": "invariants",
+    "named": false
+  },
+  {
+    "type": "is",
+    "named": false
+  },
+  {
+    "type": "isEmpty",
+    "named": false
+  },
+  {
+    "type": "isNotEmpty",
+    "named": false
+  },
+  {
+    "type": "list",
+    "named": false
+  },
+  {
+    "type": "long",
+    "named": false
+  },
+  {
+    "type": "machine",
+    "named": false
+  },
+  {
+    "type": "manual",
+    "named": false
+  },
+  {
+    "type": "manual-intervention",
+    "named": false
+  },
+  {
+    "type": "map",
+    "named": false
+  },
+  {
+    "type": "matches",
+    "named": false
+  },
+  {
+    "type": "max",
+    "named": false
+  },
+  {
+    "type": "max-attempts",
+    "named": false
+  },
+  {
+    "type": "maxLength",
+    "named": false
+  },
+  {
+    "type": "message",
+    "named": false
+  },
+  {
+    "type": "meta",
+    "named": false
+  },
+  {
+    "type": "min",
+    "named": false
+  },
+  {
+    "type": "minLength",
+    "named": false
+  },
+  {
+    "type": "minutes",
+    "named": false
+  },
+  {
+    "type": "module",
+    "named": false
+  },
+  {
+    "type": "months",
+    "named": false
+  },
+  {
+    "type": "must",
+    "named": false
+  },
+  {
+    "type": "no",
+    "named": false
+  },
+  {
+    "type": "not",
+    "named": false
+  },
+  {
+    "type": "now",
+    "named": false
+  },
+  {
+    "type": "number",
+    "named": true
+  },
+  {
+    "type": "offset",
+    "named": false
+  },
+  {
+    "type": "on",
+    "named": false
+  },
+  {
+    "type": "operation",
+    "named": false
+  },
+  {
+    "type": "operations",
+    "named": false
+  },
+  {
+    "type": "optional",
+    "named": false
+  },
+  {
+    "type": "or",
+    "named": false
+  },
+  {
+    "type": "orchestration",
+    "named": false
+  },
+  {
+    "type": "ordered",
+    "named": false
+  },
+  {
+    "type": "organization",
+    "named": false
+  },
+  {
+    "type": "participants",
+    "named": false
+  },
+  {
+    "type": "past",
+    "named": false
+  },
+  {
+    "type": "pastOrPresent",
+    "named": false
+  },
+  {
+    "type": "pattern",
+    "named": false
+  },
+  {
+    "type": "policies",
+    "named": false
+  },
+  {
+    "type": "policy",
+    "named": false
+  },
+  {
+    "type": "postcondition",
+    "named": false
+  },
+  {
+    "type": "prd-source",
+    "named": false
+  },
+  {
+    "type": "precondition",
+    "named": false
+  },
+  {
+    "type": "predicate",
+    "named": false
+  },
+  {
+    "type": "query",
+    "named": false
+  },
+  {
+    "type": "query-based",
+    "named": false
+  },
+  {
+    "type": "range",
+    "named": false
+  },
+  {
+    "type": "reaction",
+    "named": false
+  },
+  {
+    "type": "reconciliation",
+    "named": false
+  },
+  {
+    "type": "reference",
+    "named": false
+  },
+  {
+    "type": "references",
+    "named": false
+  },
+  {
+    "type": "regex_literal",
+    "named": true
+  },
+  {
+    "type": "reject",
+    "named": false
+  },
+  {
+    "type": "rejection",
+    "named": false
+  },
+  {
+    "type": "rejects",
+    "named": false
+  },
+  {
+    "type": "required",
+    "named": false
+  },
+  {
+    "type": "requirement_id",
+    "named": true
+  },
+  {
+    "type": "requirements-source",
+    "named": false
+  },
+  {
+    "type": "resolves",
+    "named": false
+  },
+  {
+    "type": "retry",
+    "named": false
+  },
+  {
+    "type": "returns",
+    "named": false
+  },
+  {
+    "type": "root",
+    "named": false
+  },
+  {
+    "type": "satisfies",
+    "named": false
+  },
+  {
+    "type": "schedule",
+    "named": false
+  },
+  {
+    "type": "seconds",
+    "named": false
+  },
+  {
+    "type": "service",
+    "named": false
+  },
+  {
+    "type": "set",
+    "named": false
+  },
+  {
+    "type": "sets",
+    "named": false
+  },
+  {
+    "type": "size",
+    "named": false
+  },
+  {
+    "type": "start",
+    "named": false
+  },
+  {
+    "type": "state",
+    "named": false
+  },
+  {
+    "type": "statemachine",
+    "named": false
+  },
+  {
+    "type": "states",
+    "named": false
+  },
+  {
+    "type": "status",
+    "named": false
+  },
+  {
+    "type": "step",
+    "named": false
+  },
+  {
+    "type": "string",
+    "named": false
+  },
+  {
+    "type": "string_literal",
+    "named": true
+  },
+  {
+    "type": "sum",
+    "named": false
+  },
+  {
+    "type": "suspend",
+    "named": false
+  },
+  {
+    "type": "symmetric",
+    "named": false
+  },
+  {
+    "type": "temporal",
+    "named": false
+  },
+  {
+    "type": "then",
+    "named": false
+  },
+  {
+    "type": "time",
+    "named": false
+  },
+  {
+    "type": "today",
+    "named": false
+  },
+  {
+    "type": "transition",
+    "named": false
+  },
+  {
+    "type": "transitions",
+    "named": false
+  },
+  {
+    "type": "trigger",
+    "named": false
+  },
+  {
+    "type": "triggered-by",
+    "named": false
+  },
+  {
+    "type": "triggers",
+    "named": false
+  },
+  {
+    "type": "true",
+    "named": false
+  },
+  {
+    "type": "type",
+    "named": false
+  },
+  {
+    "type": "type_name",
+    "named": true
+  },
+  {
+    "type": "unique",
+    "named": false
+  },
+  {
+    "type": "upstream",
+    "named": false
+  },
+  {
+    "type": "upstream_pattern",
+    "named": true
+  },
+  {
+    "type": "uses",
+    "named": false
+  },
+  {
+    "type": "uuid",
+    "named": false
+  },
+  {
+    "type": "value",
+    "named": false
+  },
+  {
+    "type": "violation",
+    "named": false
+  },
+  {
+    "type": "void",
+    "named": false
+  },
+  {
+    "type": "warn",
+    "named": false
+  },
+  {
+    "type": "weeks",
+    "named": false
+  },
+  {
+    "type": "when",
+    "named": false
+  },
+  {
+    "type": "where",
+    "named": false
+  },
+  {
+    "type": "years",
+    "named": false
+  },
+  {
+    "type": "{",
+    "named": false
+  },
+  {
+    "type": "}",
+    "named": false
+  }
+]

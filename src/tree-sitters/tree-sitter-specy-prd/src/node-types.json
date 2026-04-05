@@ -1,0 +1,1750 @@
+[
+  {
+    "type": "addresses_clause",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "advances_clause",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "assumption_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "assumption_status",
+          "named": true
+        },
+        {
+          "type": "string_literal",
+          "named": true
+        },
+        {
+          "type": "underpins_clause",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "assumption_status",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "blocks_clause",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "channel_type",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "confidence_level",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "constrains_clause",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "constraint_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "constrains_clause",
+          "named": true
+        },
+        {
+          "type": "constraint_source",
+          "named": true
+        },
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "constraint_source",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "depends_on_clause",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "design_reference",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "design_references_block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "design_reference",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "desired_outcome_def",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "outcome_level",
+          "named": true
+        },
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "desired_outcomes_block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "desired_outcome_def",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "emotional_tone",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "entry_criteria_block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "evidence_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "confidence_level",
+          "named": true
+        },
+        {
+          "type": "date_literal",
+          "named": true
+        },
+        {
+          "type": "evidence_type",
+          "named": true
+        },
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "evidence_type",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "exit_criteria_block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "feature_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "addresses_clause",
+          "named": true
+        },
+        {
+          "type": "advances_clause",
+          "named": true
+        },
+        {
+          "type": "design_references_block",
+          "named": true
+        },
+        {
+          "type": "feature_status",
+          "named": true
+        },
+        {
+          "type": "moscow_priority",
+          "named": true
+        },
+        {
+          "type": "non_goals_block",
+          "named": true
+        },
+        {
+          "type": "stories_block",
+          "named": true
+        },
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "feature_status",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "goal_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "goal_horizon",
+          "named": true
+        },
+        {
+          "type": "metric_block",
+          "named": true
+        },
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "goal_horizon",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "hypothesis_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "hypothesis_status",
+          "named": true
+        },
+        {
+          "type": "string_literal",
+          "named": true
+        },
+        {
+          "type": "supported_by_clause",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "hypothesis_status",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "impact_level",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "includes_block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "job_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "desired_outcomes_block",
+          "named": true
+        },
+        {
+          "type": "job_importance",
+          "named": true
+        },
+        {
+          "type": "job_satisfaction",
+          "named": true
+        },
+        {
+          "type": "job_type",
+          "named": true
+        },
+        {
+          "type": "related_to_clause",
+          "named": true
+        },
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "job_importance",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "job_satisfaction",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "job_type",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "journey_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          }
+        ]
+      },
+      "persona": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "design_references_block",
+          "named": true
+        },
+        {
+          "type": "steps_block",
+          "named": true
+        },
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "likelihood_level",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "metric_block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "mitigation_strategy",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "moscow_priority",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "non_goals_block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "open_question_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "blocks_clause",
+          "named": true
+        },
+        {
+          "type": "date_literal",
+          "named": true
+        },
+        {
+          "type": "question_status",
+          "named": true
+        },
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "outcome_level",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "persona_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "persona_weight",
+          "named": true
+        },
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "persona_weight",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "problem_block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "product_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "assumption_def",
+          "named": true
+        },
+        {
+          "type": "constraint_def",
+          "named": true
+        },
+        {
+          "type": "evidence_def",
+          "named": true
+        },
+        {
+          "type": "feature_def",
+          "named": true
+        },
+        {
+          "type": "goal_def",
+          "named": true
+        },
+        {
+          "type": "hypothesis_def",
+          "named": true
+        },
+        {
+          "type": "job_def",
+          "named": true
+        },
+        {
+          "type": "journey_def",
+          "named": true
+        },
+        {
+          "type": "non_goals_block",
+          "named": true
+        },
+        {
+          "type": "open_question_def",
+          "named": true
+        },
+        {
+          "type": "persona_def",
+          "named": true
+        },
+        {
+          "type": "problem_block",
+          "named": true
+        },
+        {
+          "type": "release_def",
+          "named": true
+        },
+        {
+          "type": "risk_def",
+          "named": true
+        },
+        {
+          "type": "scope_block",
+          "named": true
+        },
+        {
+          "type": "vision_decl",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "question_status",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "related_to_clause",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "release_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "depends_on_clause",
+          "named": true
+        },
+        {
+          "type": "entry_criteria_block",
+          "named": true
+        },
+        {
+          "type": "exit_criteria_block",
+          "named": true
+        },
+        {
+          "type": "includes_block",
+          "named": true
+        },
+        {
+          "type": "release_status",
+          "named": true
+        },
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "release_status",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "risk_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "impact_level",
+          "named": true
+        },
+        {
+          "type": "likelihood_level",
+          "named": true
+        },
+        {
+          "type": "mitigation_strategy",
+          "named": true
+        },
+        {
+          "type": "string_literal",
+          "named": true
+        },
+        {
+          "type": "threatens_clause",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "scope_block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "source_file",
+    "named": true,
+    "root": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "comment",
+          "named": true
+        },
+        {
+          "type": "product_def",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "step_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "integer",
+            "named": true
+          },
+          {
+            "type": "string_literal",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "channel_type",
+          "named": true
+        },
+        {
+          "type": "emotional_tone",
+          "named": true
+        },
+        {
+          "type": "integer",
+          "named": true
+        },
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "steps_block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "step_def",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "stories_block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "story_def",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "story_def",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "supported_by_clause",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "threatens_clause",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "underpins_clause",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "vision_decl",
+    "named": true,
+    "fields": {
+      "value": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": ",",
+    "named": false
+  },
+  {
+    "type": "->",
+    "named": false
+  },
+  {
+    "type": "accept",
+    "named": false
+  },
+  {
+    "type": "acceptance-criteria",
+    "named": false
+  },
+  {
+    "type": "accepted",
+    "named": false
+  },
+  {
+    "type": "action",
+    "named": false
+  },
+  {
+    "type": "addresses",
+    "named": false
+  },
+  {
+    "type": "adequately-served",
+    "named": false
+  },
+  {
+    "type": "advances",
+    "named": false
+  },
+  {
+    "type": "analytics",
+    "named": false
+  },
+  {
+    "type": "anxious",
+    "named": false
+  },
+  {
+    "type": "app",
+    "named": false
+  },
+  {
+    "type": "assumption",
+    "named": false
+  },
+  {
+    "type": "avoid",
+    "named": false
+  },
+  {
+    "type": "backoffice",
+    "named": false
+  },
+  {
+    "type": "baseline",
+    "named": false
+  },
+  {
+    "type": "blocks",
+    "named": false
+  },
+  {
+    "type": "cancelled",
+    "named": false
+  },
+  {
+    "type": "channel",
+    "named": false
+  },
+  {
+    "type": "comment",
+    "named": true,
+    "extra": true
+  },
+  {
+    "type": "complication",
+    "named": false
+  },
+  {
+    "type": "confidence",
+    "named": false
+  },
+  {
+    "type": "confident",
+    "named": false
+  },
+  {
+    "type": "constrains",
+    "named": false
+  },
+  {
+    "type": "constraint",
+    "named": false
+  },
+  {
+    "type": "context",
+    "named": false
+  },
+  {
+    "type": "contractual",
+    "named": false
+  },
+  {
+    "type": "could",
+    "named": false
+  },
+  {
+    "type": "critical",
+    "named": false
+  },
+  {
+    "type": "current-satisfaction",
+    "named": false
+  },
+  {
+    "type": "customer-feedback",
+    "named": false
+  },
+  {
+    "type": "date",
+    "named": false
+  },
+  {
+    "type": "date_literal",
+    "named": true
+  },
+  {
+    "type": "deadline",
+    "named": false
+  },
+  {
+    "type": "deferred",
+    "named": false
+  },
+  {
+    "type": "delighted",
+    "named": false
+  },
+  {
+    "type": "delivered",
+    "named": false
+  },
+  {
+    "type": "depends-on",
+    "named": false
+  },
+  {
+    "type": "design-references",
+    "named": false
+  },
+  {
+    "type": "desired-outcomes",
+    "named": false
+  },
+  {
+    "type": "domain-expertise",
+    "named": false
+  },
+  {
+    "type": "email",
+    "named": false
+  },
+  {
+    "type": "emotional",
+    "named": false
+  },
+  {
+    "type": "emotional-tone",
+    "named": false
+  },
+  {
+    "type": "entry-criteria",
+    "named": false
+  },
+  {
+    "type": "evidence",
+    "named": false
+  },
+  {
+    "type": "excluded",
+    "named": false
+  },
+  {
+    "type": "exit-criteria",
+    "named": false
+  },
+  {
+    "type": "expected-outcome",
+    "named": false
+  },
+  {
+    "type": "external",
+    "named": false
+  },
+  {
+    "type": "feature",
+    "named": false
+  },
+  {
+    "type": "for",
+    "named": false
+  },
+  {
+    "type": "frustrated",
+    "named": false
+  },
+  {
+    "type": "frustrations",
+    "named": false
+  },
+  {
+    "type": "functional",
+    "named": false
+  },
+  {
+    "type": "goal",
+    "named": false
+  },
+  {
+    "type": "goals",
+    "named": false
+  },
+  {
+    "type": "high",
+    "named": false
+  },
+  {
+    "type": "horizon",
+    "named": false
+  },
+  {
+    "type": "hypothesis",
+    "named": false
+  },
+  {
+    "type": "impact",
+    "named": false
+  },
+  {
+    "type": "impact-if-wrong",
+    "named": false
+  },
+  {
+    "type": "importance",
+    "named": false
+  },
+  {
+    "type": "important",
+    "named": false
+  },
+  {
+    "type": "in-progress",
+    "named": false
+  },
+  {
+    "type": "includes",
+    "named": false
+  },
+  {
+    "type": "inconclusive",
+    "named": false
+  },
+  {
+    "type": "indicator",
+    "named": false
+  },
+  {
+    "type": "integer",
+    "named": true
+  },
+  {
+    "type": "intervention",
+    "named": false
+  },
+  {
+    "type": "invalidated",
+    "named": false
+  },
+  {
+    "type": "investigating",
+    "named": false
+  },
+  {
+    "type": "job",
+    "named": false
+  },
+  {
+    "type": "journey",
+    "named": false
+  },
+  {
+    "type": "likelihood",
+    "named": false
+  },
+  {
+    "type": "long-term",
+    "named": false
+  },
+  {
+    "type": "low",
+    "named": false
+  },
+  {
+    "type": "market",
+    "named": false
+  },
+  {
+    "type": "market-research",
+    "named": false
+  },
+  {
+    "type": "measurement",
+    "named": false
+  },
+  {
+    "type": "mechanism",
+    "named": false
+  },
+  {
+    "type": "medium",
+    "named": false
+  },
+  {
+    "type": "metric",
+    "named": false
+  },
+  {
+    "type": "mid-term",
+    "named": false
+  },
+  {
+    "type": "mitigate",
+    "named": false
+  },
+  {
+    "type": "mitigation",
+    "named": false
+  },
+  {
+    "type": "moderate",
+    "named": false
+  },
+  {
+    "type": "must",
+    "named": false
+  },
+  {
+    "type": "neutral",
+    "named": false
+  },
+  {
+    "type": "nice-to-have",
+    "named": false
+  },
+  {
+    "type": "non-goals",
+    "named": false
+  },
+  {
+    "type": "open",
+    "named": false
+  },
+  {
+    "type": "open-question",
+    "named": false
+  },
+  {
+    "type": "order",
+    "named": false
+  },
+  {
+    "type": "organizational",
+    "named": false
+  },
+  {
+    "type": "outcome",
+    "named": false
+  },
+  {
+    "type": "overserved",
+    "named": false
+  },
+  {
+    "type": "owner",
+    "named": false
+  },
+  {
+    "type": "persona",
+    "named": false
+  },
+  {
+    "type": "physical",
+    "named": false
+  },
+  {
+    "type": "planned",
+    "named": false
+  },
+  {
+    "type": "predicts",
+    "named": false
+  },
+  {
+    "type": "primary",
+    "named": false
+  },
+  {
+    "type": "priority",
+    "named": false
+  },
+  {
+    "type": "problem",
+    "named": false
+  },
+  {
+    "type": "product",
+    "named": false
+  },
+  {
+    "type": "proposed",
+    "named": false
+  },
+  {
+    "type": "proposes",
+    "named": false
+  },
+  {
+    "type": "question",
+    "named": false
+  },
+  {
+    "type": "regulatory",
+    "named": false
+  },
+  {
+    "type": "rejected",
+    "named": false
+  },
+  {
+    "type": "related-to",
+    "named": false
+  },
+  {
+    "type": "release",
+    "named": false
+  },
+  {
+    "type": "resolution",
+    "named": false
+  },
+  {
+    "type": "resolved",
+    "named": false
+  },
+  {
+    "type": "risk",
+    "named": false
+  },
+  {
+    "type": "role",
+    "named": false
+  },
+  {
+    "type": "satisfaction",
+    "named": false
+  },
+  {
+    "type": "scope",
+    "named": false
+  },
+  {
+    "type": "secondary",
+    "named": false
+  },
+  {
+    "type": "shipped",
+    "named": false
+  },
+  {
+    "type": "short-term",
+    "named": false
+  },
+  {
+    "type": "should",
+    "named": false
+  },
+  {
+    "type": "situation",
+    "named": false
+  },
+  {
+    "type": "sms",
+    "named": false
+  },
+  {
+    "type": "social",
+    "named": false
+  },
+  {
+    "type": "source",
+    "named": false
+  },
+  {
+    "type": "source-reference",
+    "named": false
+  },
+  {
+    "type": "statement",
+    "named": false
+  },
+  {
+    "type": "status",
+    "named": false
+  },
+  {
+    "type": "step",
+    "named": false
+  },
+  {
+    "type": "steps",
+    "named": false
+  },
+  {
+    "type": "stories",
+    "named": false
+  },
+  {
+    "type": "string_literal",
+    "named": true
+  },
+  {
+    "type": "strong",
+    "named": false
+  },
+  {
+    "type": "summary",
+    "named": false
+  },
+  {
+    "type": "supported-by",
+    "named": false
+  },
+  {
+    "type": "supports",
+    "named": false
+  },
+  {
+    "type": "system-response",
+    "named": false
+  },
+  {
+    "type": "target",
+    "named": false
+  },
+  {
+    "type": "target-date",
+    "named": false
+  },
+  {
+    "type": "technical",
+    "named": false
+  },
+  {
+    "type": "tested-by",
+    "named": false
+  },
+  {
+    "type": "testing",
+    "named": false
+  },
+  {
+    "type": "theme",
+    "named": false
+  },
+  {
+    "type": "threatens",
+    "named": false
+  },
+  {
+    "type": "transfer",
+    "named": false
+  },
+  {
+    "type": "trigger",
+    "named": false
+  },
+  {
+    "type": "type",
+    "named": false
+  },
+  {
+    "type": "underpins",
+    "named": false
+  },
+  {
+    "type": "underserved",
+    "named": false
+  },
+  {
+    "type": "unserved",
+    "named": false
+  },
+  {
+    "type": "unvalidated",
+    "named": false
+  },
+  {
+    "type": "user-research",
+    "named": false
+  },
+  {
+    "type": "validated",
+    "named": false
+  },
+  {
+    "type": "validation-method",
+    "named": false
+  },
+  {
+    "type": "validation-plan",
+    "named": false
+  },
+  {
+    "type": "value-proposition",
+    "named": false
+  },
+  {
+    "type": "vision",
+    "named": false
+  },
+  {
+    "type": "weak",
+    "named": false
+  },
+  {
+    "type": "web",
+    "named": false
+  },
+  {
+    "type": "weight",
+    "named": false
+  },
+  {
+    "type": "wont",
+    "named": false
+  },
+  {
+    "type": "{",
+    "named": false
+  },
+  {
+    "type": "}",
+    "named": false
+  }
+]

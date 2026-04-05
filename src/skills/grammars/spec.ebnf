@@ -1,0 +1,204 @@
+// =============================================================================
+// Specy — Specification Grammar (.spec)
+// EBNF (ISO 14977 style)
+//
+// A .spec file captures a business specification formalized against existing
+// .domain models. It references — but never modifies — those models.
+// The changes block contains projected modifications in native Specy v3 syntax
+// (as defined in domain.ebnf).
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// Top-level structure
+// -----------------------------------------------------------------------------
+
+specFile         = { comment }
+                 , specDecl
+                 , againstDecl
+                 , [ realizedDecl ]
+                 , usesDecl , { usesDecl }
+                 , narrativeBlock
+                 , conceptsBlock
+                 , confrontationBlock
+                 , { changesBlock }
+                 , [ impactBlock ] ;
+
+// -----------------------------------------------------------------------------
+// Header
+// -----------------------------------------------------------------------------
+
+specDecl         = "spec" , stringLiteral ;
+
+againstDecl      = "against" , stringLiteral , "version" , stringLiteral
+                 , "at" , stringLiteral ;
+
+realizedDecl     = "realized" , "version" , stringLiteral
+                 , "at" , stringLiteral ;
+
+usesDecl         = "uses" , stringLiteral ;
+
+// -----------------------------------------------------------------------------
+// Narrative — original requirement in prose
+// -----------------------------------------------------------------------------
+
+narrativeBlock   = "narrative" , "{" , stringLiteral , { stringLiteral } , "}" ;
+
+// -----------------------------------------------------------------------------
+// Concepts — decomposition and anchoring
+// -----------------------------------------------------------------------------
+
+conceptsBlock    = "concepts" , "{" , { comment | conceptEntry } , "}" ;
+
+conceptEntry     = conceptType , conceptName , "[" , conceptLabel , "]" ;
+
+conceptType      = "entity"
+                 | "aggregate"
+                 | "value"
+                 | "enum"
+                 | "command"
+                 | "query"
+                 | "event"
+                 | "external event"
+                 | "error event"
+                 | "temporal event"
+                 | "operation"
+                 | "policy"
+                 | "invariant"
+                 | "domain service"
+                 | "application service"
+                 | "infrastructure service"
+                 | "agreement"
+                 | "reconciliation"
+                 | "precondition"
+                 | "postcondition"
+                 | "state machine"
+                 | "interface"
+                 | "field" ;
+
+conceptName      = identifier , { "." , identifier } ;
+
+conceptLabel     = "existing"
+                 | "new"
+                 | "ambiguous" ;
+
+// -----------------------------------------------------------------------------
+// Confrontation — validation results
+// -----------------------------------------------------------------------------
+
+confrontationBlock = "confrontation" , "{" , { comment | confrontationEntry } , "}" ;
+
+confrontationEntry = confrontationType , stringLiteral , [ confrontationBody ] ;
+
+confrontationType  = "compatible"
+                   | "contradiction"
+                   | "impact"
+                   | "gap"
+                   | "coverage" ;
+
+confrontationBody  = "{" , stringLiteral , { stringLiteral } , "}" ;
+
+// -----------------------------------------------------------------------------
+// Changes — projected modifications
+//
+// Each changes block targets a specific .domain file.
+// The content of add/modify operators is native Specy v3 syntax
+// as defined in domain.ebnf.
+// -----------------------------------------------------------------------------
+
+changesBlock     = "changes" , stringLiteral , "{" , { comment | changeEntry } , "}" ;
+
+changeEntry      = addChange
+                 | modifyChange
+                 | removeChange ;
+
+addChange        = "add" , definition ;
+
+modifyChange     = "modify" , definition ;
+
+removeChange     = "remove" , definitionKind , typeName ;
+
+// References to domain.ebnf grammar — all v3 domain constructs
+definition       = entityDef
+                 | aggregateDef
+                 | valueDef
+                 | enumDef
+                 | commandDef
+                 | queryDef
+                 | eventDef
+                 | externalEventDef
+                 | errorEventDef
+                 | temporalEventDef
+                 | domainServiceDef
+                 | applicationServiceDef
+                 | infrastructureServiceDef
+                 | policyDef
+                 | invariantDef
+                 | agreementDef ;
+
+definitionKind   = "entity"
+                 | "aggregate"
+                 | "value"
+                 | "enum"
+                 | "command"
+                 | "query"
+                 | "event"
+                 | "external event"
+                 | "error event"
+                 | "temporal event"
+                 | "operation"
+                 | "domain service"
+                 | "application service"
+                 | "infrastructure service"
+                 | "policy"
+                 | "invariant"
+                 | "agreement"
+                 | "state machine"
+                 | "interface" ;
+
+// -----------------------------------------------------------------------------
+// Impact — analysis of effects on existing constructs
+// -----------------------------------------------------------------------------
+
+impactBlock      = "impact" , "{" , { comment | impactEntry } , "}" ;
+
+impactEntry      = impactTarget , "->" , impactLevel , stringLiteral ;
+
+impactTarget     = definitionKind , ( identifier | stringLiteral ) ;
+
+impactLevel      = "none"
+                 | "affected" ;
+
+// -----------------------------------------------------------------------------
+// Shared terminals (same as domain.ebnf)
+// -----------------------------------------------------------------------------
+
+stringLiteral    = '"' , { character } , '"' ;
+
+typeName         = pascalCaseId ;
+
+identifier       = camelCaseId | pascalCaseId ;
+
+pascalCaseId     = upperLetter , { letter | digit } ;
+
+camelCaseId      = lowerLetter , { letter | digit } ;
+
+comment          = "//" , { character } , newline ;
+
+upperLetter      = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I"
+                 | "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R"
+                 | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" ;
+
+lowerLetter      = "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i"
+                 | "j" | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r"
+                 | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" ;
+
+letter           = upperLetter | lowerLetter ;
+
+digit            = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+
+character        = letter | digit | " " | "!" | "@" | "#" | "$" | "%" | "^"
+                 | "&" | "*" | "(" | ")" | "-" | "_" | "=" | "+" | "["
+                 | "]" | "{" | "}" | "|" | "\\" | ":" | ";" | "'" | ","
+                 | "." | "<" | ">" | "/" | "?" | "~" | "`" ;
+
+newline          = "\n" ;

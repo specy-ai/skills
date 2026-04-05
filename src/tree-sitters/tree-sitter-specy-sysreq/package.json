@@ -1,0 +1,27 @@
+{
+  "name": "tree-sitter-specy-sysreq",
+  "version": "0.1.0",
+  "description": "Tree-sitter grammar for the Specy System Requirements language (.sysreq)",
+  "main": "bindings/node",
+  "keywords": ["tree-sitter", "specy", "system-requirements", "ears", "parser"],
+  "license": "MIT",
+  "dependencies": {
+    "nan": "^2.18.0"
+  },
+  "devDependencies": {
+    "tree-sitter-cli": "^0.22.0"
+  },
+  "scripts": {
+    "generate": "tree-sitter generate",
+    "build": "tree-sitter build",
+    "test": "tree-sitter test"
+  },
+  "tree-sitter": [
+    {
+      "scope": "source.specy_sysreq",
+      "file-types": ["req"],
+      "highlights": "queries/highlights.scm",
+      "injection-regex": "specy_sysreq"
+    }
+  ]
+}

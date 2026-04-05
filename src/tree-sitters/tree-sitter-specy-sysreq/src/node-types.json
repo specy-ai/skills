@@ -1,0 +1,574 @@
+[
+  {
+    "type": "conflicts_with_decl",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "requirement_id",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "decomposed_into_block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "requirement_id",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "depends_on_decl",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "requirement_id",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "detected_by_clause",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "domain_ref",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "domain_ref",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "string_literal",
+          "named": true
+        },
+        {
+          "type": "type_name",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "ears_pattern",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "ears_statement",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "enforced_by_clause",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "domain_ref",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "implemented_by_clause",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "domain_ref",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "module_block",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "requirement_def",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "moscow_priority",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "prd_source_decl",
+    "named": true,
+    "fields": {
+      "path": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "quality_constrained_by_clause",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "domain_ref",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "rationale",
+    "named": true,
+    "fields": {
+      "text": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "requirement_def",
+    "named": true,
+    "fields": {
+      "id": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "requirement_id",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          }
+        ]
+      },
+      "pattern": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "ears_pattern",
+            "named": true
+          }
+        ]
+      },
+      "priority": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "moscow_priority",
+            "named": true
+          }
+        ]
+      },
+      "statement": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "ears_statement",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "conflicts_with_decl",
+          "named": true
+        },
+        {
+          "type": "decomposed_into_block",
+          "named": true
+        },
+        {
+          "type": "depends_on_decl",
+          "named": true
+        },
+        {
+          "type": "rationale",
+          "named": true
+        },
+        {
+          "type": "satisfied_by_block",
+          "named": true
+        },
+        {
+          "type": "source_decl",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "requirement_set_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          }
+        ]
+      },
+      "scope": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "module_block",
+          "named": true
+        },
+        {
+          "type": "prd_source_decl",
+          "named": true
+        },
+        {
+          "type": "requirement_def",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "satisfied_by_block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "detected_by_clause",
+          "named": true
+        },
+        {
+          "type": "enforced_by_clause",
+          "named": true
+        },
+        {
+          "type": "implemented_by_clause",
+          "named": true
+        },
+        {
+          "type": "quality_constrained_by_clause",
+          "named": true
+        },
+        {
+          "type": "satisfied_by_infrastructure",
+          "named": true
+        },
+        {
+          "type": "structured_by_clause",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "source_decl",
+    "named": true,
+    "fields": {
+      "reference": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "source_file",
+    "named": true,
+    "root": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "requirement_set_def",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "structured_by_clause",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "domain_ref",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": ",",
+    "named": false
+  },
+  {
+    "type": ".",
+    "named": false
+  },
+  {
+    "type": ":",
+    "named": false
+  },
+  {
+    "type": "::",
+    "named": false
+  },
+  {
+    "type": "comment",
+    "named": true,
+    "extra": true
+  },
+  {
+    "type": "complex",
+    "named": false
+  },
+  {
+    "type": "conflicts-with",
+    "named": false
+  },
+  {
+    "type": "could",
+    "named": false
+  },
+  {
+    "type": "decomposed-into",
+    "named": false
+  },
+  {
+    "type": "depends-on",
+    "named": false
+  },
+  {
+    "type": "detected-by",
+    "named": false
+  },
+  {
+    "type": "enforced-by",
+    "named": false
+  },
+  {
+    "type": "event-driven",
+    "named": false
+  },
+  {
+    "type": "identifier",
+    "named": true
+  },
+  {
+    "type": "implemented-by",
+    "named": false
+  },
+  {
+    "type": "module",
+    "named": false
+  },
+  {
+    "type": "must",
+    "named": false
+  },
+  {
+    "type": "optional",
+    "named": false
+  },
+  {
+    "type": "prd-source",
+    "named": false
+  },
+  {
+    "type": "priority",
+    "named": false
+  },
+  {
+    "type": "quality-constrained-by",
+    "named": false
+  },
+  {
+    "type": "requirement_id",
+    "named": true
+  },
+  {
+    "type": "requirements",
+    "named": false
+  },
+  {
+    "type": "satisfied-by",
+    "named": false
+  },
+  {
+    "type": "satisfied_by_infrastructure",
+    "named": true
+  },
+  {
+    "type": "scoped-to",
+    "named": false
+  },
+  {
+    "type": "should",
+    "named": false
+  },
+  {
+    "type": "source",
+    "named": false
+  },
+  {
+    "type": "state-driven",
+    "named": false
+  },
+  {
+    "type": "string_literal",
+    "named": true
+  },
+  {
+    "type": "structured-by",
+    "named": false
+  },
+  {
+    "type": "type_name",
+    "named": true
+  },
+  {
+    "type": "ubiquitous",
+    "named": false
+  },
+  {
+    "type": "unwanted",
+    "named": false
+  },
+  {
+    "type": "wont",
+    "named": false
+  },
+  {
+    "type": "{",
+    "named": false
+  },
+  {
+    "type": "}",
+    "named": false
+  }
+]

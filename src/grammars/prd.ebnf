@@ -1,0 +1,381 @@
+// =============================================================================
+// Specy — Product Requirement Grammar (.prd)
+// EBNF (ISO 14977 style)
+//
+// A .prd file captures a Product Requirement Document: what the product
+// should be, for whom, and why. It is upstream of system requirements
+// (SYSTEM-REQ-METAMODEL.md) and independent of the domain model.
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// Top-level structure
+// -----------------------------------------------------------------------------
+
+prdFile          = { comment | productDef } ;
+
+// -----------------------------------------------------------------------------
+// Product — top-level container
+// -----------------------------------------------------------------------------
+
+productDef       = "product" , stringLiteral , "{" ,
+                 { comment
+                 | visionDecl
+                 | scopeBlock
+                 | nonGoalsBlock
+                 | problemBlock
+                 | evidenceDef
+                 | personaDef
+                 | jobDef
+                 | goalDef
+                 | hypothesisDef
+                 | featureDef
+                 | assumptionDef
+                 | riskDef
+                 | constraintDef
+                 | openQuestionDef
+                 | releaseDef
+                 | journeyDef
+                 } , "}" ;
+
+// -----------------------------------------------------------------------------
+// Vision
+// -----------------------------------------------------------------------------
+
+visionDecl       = "vision" , stringLiteral ;
+
+// -----------------------------------------------------------------------------
+// Scope — what is included and excluded
+// -----------------------------------------------------------------------------
+
+scopeBlock       = "scope" , "{" , stringLiteral , { stringLiteral } , "}" ;
+
+// -----------------------------------------------------------------------------
+// Non-goals — strategic exclusions
+// -----------------------------------------------------------------------------
+
+nonGoalsBlock    = "non-goals" , "{" , stringLiteral , { stringLiteral } , "}" ;
+
+// -----------------------------------------------------------------------------
+// Problem Statement — SCQ framework
+// -----------------------------------------------------------------------------
+
+problemBlock     = "problem" , "{" ,
+                 "situation" , stringLiteral ,
+                 "complication" , stringLiteral ,
+                 "question" , stringLiteral ,
+                 "}" ;
+
+// -----------------------------------------------------------------------------
+// Supporting Evidence
+// -----------------------------------------------------------------------------
+
+evidenceDef      = "evidence" , stringLiteral , "{" ,
+                 "type" , evidenceType ,
+                 "summary" , stringLiteral ,
+                 "source-reference" , stringLiteral ,
+                 "date" , dateLiteral ,
+                 "confidence" , confidenceLevel ,
+                 "supports" , stringLiteral ,
+                 "}" ;
+
+evidenceType     = "user-research"
+                 | "analytics"
+                 | "market-research"
+                 | "customer-feedback"
+                 | "domain-expertise" ;
+
+confidenceLevel  = "strong" | "moderate" | "weak" ;
+
+// -----------------------------------------------------------------------------
+// Persona
+// -----------------------------------------------------------------------------
+
+personaDef       = "persona" , stringLiteral , "{" ,
+                 "role" , stringLiteral ,
+                 "goals" , "{" , stringLiteral , { stringLiteral } , "}" ,
+                 "frustrations" , "{" , stringLiteral , { stringLiteral } , "}" ,
+                 "context" , stringLiteral ,
+                 "weight" , personaWeight ,
+                 "}" ;
+
+personaWeight    = "primary" | "secondary" | "excluded" ;
+
+// -----------------------------------------------------------------------------
+// Job — situation-triggered task a persona is trying to accomplish
+// -----------------------------------------------------------------------------
+
+jobDef           = "job" , stringLiteral , "{" ,
+                 "persona" , stringLiteral ,
+                 "statement" , stringLiteral ,
+                 "type" , jobType ,
+                 "importance" , jobImportance ,
+                 "satisfaction" , jobSatisfaction ,
+                 [ "related-to" , stringLiteral , { "," , stringLiteral } ] ,
+                 [ desiredOutcomesBlock ] ,
+                 "}" ;
+
+jobType          = "functional" | "emotional" | "social" ;
+
+jobImportance    = "critical" | "important" | "nice-to-have" ;
+
+jobSatisfaction  = "unserved" | "underserved" | "adequately-served" | "overserved" ;
+
+desiredOutcomesBlock = "desired-outcomes" , "{" ,
+                     desiredOutcomeDef , { desiredOutcomeDef } ,
+                     "}" ;
+
+desiredOutcomeDef = stringLiteral , "{" ,
+                  "importance" , outcomeImportance ,
+                  "current-satisfaction" , outcomeSatisfaction ,
+                  "}" ;
+
+outcomeImportance    = "high" | "medium" | "low" ;
+
+outcomeSatisfaction  = "low" | "medium" | "high" ;
+
+// -----------------------------------------------------------------------------
+// Goal — measurable business objective
+// -----------------------------------------------------------------------------
+
+goalDef          = "goal" , stringLiteral , "{" ,
+                 "statement" , stringLiteral ,
+                 "horizon" , goalHorizon ,
+                 "owner" , stringLiteral ,
+                 [ metricBlock ] ,
+                 "}" ;
+
+goalHorizon      = "short-term" | "mid-term" | "long-term" ;
+
+metricBlock      = "metric" , "{" ,
+                 "indicator" , stringLiteral ,
+                 "target" , stringLiteral ,
+                 [ "baseline" , stringLiteral ] ,
+                 "measurement" , stringLiteral ,
+                 "}" ;
+
+// -----------------------------------------------------------------------------
+// Success Metric — standalone metric not embedded in a goal
+// (same structure as metricBlock, used when referenced independently)
+// -----------------------------------------------------------------------------
+
+// Inline in goalDef via metricBlock.
+
+// -----------------------------------------------------------------------------
+// Hypothesis — testable causal claim linking a feature to a goal
+// -----------------------------------------------------------------------------
+
+hypothesisDef    = "hypothesis" , stringLiteral , "{" ,
+                 "intervention" , stringLiteral ,
+                 "expected-outcome" , stringLiteral ,
+                 "mechanism" , stringLiteral ,
+                 "validation-method" , stringLiteral ,
+                 "status" , hypothesisStatus ,
+                 "proposes" , stringLiteral ,
+                 "predicts" , stringLiteral ,
+                 [ "supported-by" , stringLiteral , { "," , stringLiteral } ] ,
+                 "}" ;
+
+hypothesisStatus = "proposed" | "testing" | "validated" | "invalidated" | "inconclusive" ;
+
+// -----------------------------------------------------------------------------
+// Feature — named capability the product offers
+// -----------------------------------------------------------------------------
+
+featureDef       = "feature" , stringLiteral , "{" ,
+                 "summary" , stringLiteral ,
+                 "persona" , stringLiteral ,
+                 "value-proposition" , stringLiteral ,
+                 "priority" , moscowPriority ,
+                 "status" , featureStatus ,
+                 [ "addresses" , stringLiteral , { "," , stringLiteral } ] ,
+                 [ "advances" , stringLiteral , { "," , stringLiteral } ] ,
+                 [ "tested-by" , stringLiteral ] ,
+                 [ designReferencesBlock ] ,
+                 [ nonGoalsBlock ] ,
+                 [ storiesBlock ] ,
+                 "}" ;
+
+moscowPriority   = "must" | "should" | "could" | "wont" ;
+
+featureStatus    = "proposed" | "accepted" | "in-progress"
+                 | "delivered" | "deferred" | "rejected" ;
+
+// -----------------------------------------------------------------------------
+// Design References — pointers to visual artifacts
+// -----------------------------------------------------------------------------
+
+designReferencesBlock = "design-references" , "{" ,
+                      designReference , { designReference } ,
+                      "}" ;
+
+designReference  = stringLiteral , "->" , stringLiteral ;
+
+// -----------------------------------------------------------------------------
+// User Stories — embedded within a feature
+// -----------------------------------------------------------------------------
+
+storiesBlock     = "stories" , "{" , storyDef , { storyDef } , "}" ;
+
+storyDef         = stringLiteral , "{" ,
+                 "acceptance-criteria" , "{" ,
+                 stringLiteral , { stringLiteral } ,
+                 "}" ,
+                 "}" ;
+
+// -----------------------------------------------------------------------------
+// User Journey
+// -----------------------------------------------------------------------------
+
+journeyDef       = "journey" , stringLiteral , "for" , stringLiteral , "{" ,
+                 "trigger" , stringLiteral ,
+                 "outcome" , stringLiteral ,
+                 [ designReferencesBlock ] ,
+                 [ stepsBlock ] ,
+                 "}" ;
+
+stepsBlock       = "steps" , "{" , stepDef , { stepDef } , "}" ;
+
+stepDef          = "step" , stringLiteral , "{" ,
+                 "action" , stringLiteral ,
+                 [ "system-response" , stringLiteral ] ,
+                 "channel" , channelType ,
+                 [ "emotional-tone" , emotionalTone ] ,
+                 "order" , integer ,
+                 "}" ;
+
+channelType      = "app" | "web" | "sms" | "email"
+                 | "physical" | "backoffice" | "external" ;
+
+emotionalTone    = "confident" | "anxious" | "frustrated"
+                 | "delighted" | "neutral" ;
+
+// -----------------------------------------------------------------------------
+// Assumption
+// -----------------------------------------------------------------------------
+
+assumptionDef    = "assumption" , stringLiteral , "{" ,
+                 "statement" , stringLiteral ,
+                 "impact-if-wrong" , stringLiteral ,
+                 "validation-plan" , stringLiteral ,
+                 "status" , assumptionStatus ,
+                 [ "underpins" , stringLiteral , { "," , stringLiteral } ] ,
+                 "}" ;
+
+assumptionStatus = "unvalidated" | "validated" | "invalidated" ;
+
+// -----------------------------------------------------------------------------
+// Risk
+// -----------------------------------------------------------------------------
+
+riskDef          = "risk" , stringLiteral , "{" ,
+                 "statement" , stringLiteral ,
+                 "likelihood" , likelihoodLevel ,
+                 "impact" , impactLevel ,
+                 "mitigation" , mitigationStrategy ,
+                 "owner" , stringLiteral ,
+                 [ "threatens" , stringLiteral , { "," , stringLiteral } ] ,
+                 "}" ;
+
+likelihoodLevel      = "low" | "medium" | "high" ;
+
+impactLevel          = "low" | "medium" | "high" | "critical" ;
+
+mitigationStrategy   = "accept" | "mitigate" | "avoid" | "transfer" ;
+
+// -----------------------------------------------------------------------------
+// Constraint
+// -----------------------------------------------------------------------------
+
+constraintDef    = "constraint" , stringLiteral , "{" ,
+                 "statement" , stringLiteral ,
+                 "source" , constraintSource ,
+                 [ "constrains" , stringLiteral , { "," , stringLiteral } ] ,
+                 "}" ;
+
+constraintSource = "regulatory" | "contractual" | "technical"
+                 | "organizational" | "market" ;
+
+// -----------------------------------------------------------------------------
+// Open Question
+// -----------------------------------------------------------------------------
+
+openQuestionDef  = "open-question" , stringLiteral , "{" ,
+                 "question" , stringLiteral ,
+                 "context" , stringLiteral ,
+                 "owner" , stringLiteral ,
+                 "deadline" , dateLiteral ,
+                 "status" , questionStatus ,
+                 [ "blocks" , stringLiteral , { "," , stringLiteral } ] ,
+                 [ "resolution" , stringLiteral ] ,
+                 "}" ;
+
+questionStatus   = "open" | "investigating" | "resolved" | "deferred" ;
+
+// -----------------------------------------------------------------------------
+// Release
+// -----------------------------------------------------------------------------
+
+releaseDef       = "release" , stringLiteral , "{" ,
+                 "target-date" , stringLiteral ,
+                 "theme" , stringLiteral ,
+                 "status" , releaseStatus ,
+                 [ "depends-on" , stringLiteral , { "," , stringLiteral } ] ,
+                 [ "includes" , "{" , stringLiteral , { stringLiteral } , "}" ] ,
+                 [ "entry-criteria" , "{" , stringLiteral , { stringLiteral } , "}" ] ,
+                 [ "exit-criteria" , "{" , stringLiteral , { stringLiteral } , "}" ] ,
+                 "}" ;
+
+releaseStatus    = "planned" | "in-progress" | "shipped" | "cancelled" ;
+
+// -----------------------------------------------------------------------------
+// Literals and identifiers
+// -----------------------------------------------------------------------------
+
+literalValue     = stringLiteral | number | "true" | "false" ;
+
+stringLiteral    = '"' , { character } , '"' ;
+
+dateLiteral      = digit , digit , digit , digit , "-" ,
+                   digit , digit , "-" , digit , digit ;
+                   // YYYY-MM-DD format
+
+number           = [ "-" ] , digit , { digit } , [ "." , digit , { digit } ] ;
+
+integer          = [ "-" ] , digit , { digit } ;
+
+typeName         = pascalCaseId ;
+
+identifier       = camelCaseId | pascalCaseId ;
+
+pascalCaseId     = upperLetter , { letter | digit } ;
+
+camelCaseId      = lowerLetter , { letter | digit } ;
+
+// -----------------------------------------------------------------------------
+// Comments
+// -----------------------------------------------------------------------------
+
+comment          = "//" , { character } , newline ;
+
+// -----------------------------------------------------------------------------
+// Character classes
+// -----------------------------------------------------------------------------
+
+upperLetter      = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I"
+                 | "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R"
+                 | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" ;
+
+lowerLetter      = "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i"
+                 | "j" | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r"
+                 | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" ;
+
+letter           = upperLetter | lowerLetter ;
+
+digit            = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+
+character        = letter | digit | " " | "!" | "@" | "#" | "$" | "%" | "^"
+                 | "&" | "*" | "(" | ")" | "-" | "_" | "=" | "+" | "["
+                 | "]" | "{" | "}" | "|" | "\\" | ":" | ";" | "'" | ","
+                 | "." | "<" | ">" | "/" | "?" | "~" | "`" ;
+
+newline          = "\n" ;

@@ -1,0 +1,18 @@
+{
+  "grammars": [
+    {
+      "name": "specy_domain",
+      "camelCase": "specyDomain",
+      "scope": "source.specy_domain",
+      "path": ".",
+      "file-types": [
+        "domain"
+      ],
+      "highlights": "queries/highlights.scm"
+    }
+  ],
+  "metadata": {
+    "version": "1.0.0",
+    "links": {}
+  }
+}
