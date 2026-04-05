@@ -1,0 +1,1 @@
+{"eval_id": 1, "eval_name": "loan-from-req", "prompt": "Build a domain model from the system requirements at examples/business-loan/business-loan.sysreq.md. Cover the LoanOriginationContext only.", "assertions": []}

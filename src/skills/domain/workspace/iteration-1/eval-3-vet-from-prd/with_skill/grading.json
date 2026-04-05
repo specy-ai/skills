@@ -1,0 +1,14 @@
+{"expectations": [
+  {"text": "Uses .domain structured syntax", "passed": true, "evidence": "File uses structured blocks: module, entity, value, command, event, aggregate, enum, reaction, temporal-event keywords throughout"},
+  {"text": "At least 2 entities", "passed": true, "evidence": "11 entities: Clinic, Veterinarian, AvailabilitySlot, Appointment, PetOwner, Pet, Consultation, MedicalRecordShare, ClinicSearchResult, Review, NotificationRecord"},
+  {"text": "At least 1 aggregate", "passed": true, "evidence": "4 aggregates: ClinicAggregate (line 429), AppointmentAggregate (line 869), PetOwnerAggregate (line 1433), PetHealthAggregate (line 1439)"},
+  {"text": "At least 2 value types", "passed": true, "evidence": "Multiple value types: Address, GeoCoordinate, TimeSlot, ContactInfo, Rating, OpeningHours, Specialty, TeamMember, RecurrencePattern, CancellationDetail, VaccinationRecord, ConsultationSummary"},
+  {"text": "Commands use PascalCase verb+noun", "passed": true, "evidence": "RegisterClinic, PublishClinicProfile, BookAppointment, CancelAppointment, RegisterPetOwner, CompleteAppointment, MarkAppointmentNoShow, etc."},
+  {"text": "Events use past participle", "passed": true, "evidence": "ClinicRegistered, ClinicProfilePublished, AppointmentBooked, AppointmentCancelled, AppointmentCompleted, PetOwnerRegistered, VeterinarianRegistered, etc."},
+  {"text": "At least 1 state machine", "passed": false, "evidence": "No 'statemachine' blocks found. Transitions are defined inline within entity blocks using 'transitions {}' syntax (lines 267, 421, 860), which is a different pattern — not a standalone statemachine block"},
+  {"text": "At least 1 invariant", "passed": true, "evidence": "Multiple invariants: publishedClinicHasRequiredFields, slotDateInFuture, bookedSlotCannotBeModified, cancelledAppointmentHasDetail, completedAppointmentHasTimestamp, cancellationWindowRespected, ownerMustConsentToGdpr"},
+  {"text": "Error paths exist", "passed": true, "evidence": "Error events: BookingFailed (line 1078), CancellationRejected (line 1086), PetOwnerRegistrationFailed; preconditions on cancellation (24h window)"},
+  {"text": "No technical jargon in names", "passed": true, "evidence": "No 'database', 'API', or 'DTO' found in entity or value type names"},
+  {"text": "satisfies empty/absent", "passed": true, "evidence": "All satisfies clauses are empty arrays: 'satisfies []' throughout the file, consistent with source being a PRD with no formal requirement IDs"},
+  {"text": "Multiple bounded contexts", "passed": true, "evidence": "5 bounded contexts as modules: ClinicManagement, AppointmentBooking, PetHealthRecord, ClinicDiscovery, Notification"}
+]}

@@ -1,0 +1,6 @@
+{
+  "eval_id": 3,
+  "eval_name": "expense-enrichment",
+  "prompt": "Here's a rough product brief my PM wrote for an internal employee expense management tool. Turn it into a proper PRD: Employees submit expenses with receipts. Managers approve or reject. Finance processes reimbursements. We need OCR for receipt scanning. Integration with SAP for accounting. Mobile app required. Budget: expenses > 500 EUR need VP approval. Compliance: French tax rules for meal allowances (19.40 EUR max). We want to reduce the average reimbursement time from 3 weeks to 5 days.",
+  "assertions": []
+}

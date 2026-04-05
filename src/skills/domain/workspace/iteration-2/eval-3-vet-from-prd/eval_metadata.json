@@ -1,0 +1,1 @@
+{"eval_id": 3, "eval_name": "vet-from-prd-iter2", "prompt": "Build a domain model directly from the PRD at skills/prd-workspace/iteration-1/eval-2-vetbooking-oneshot/with_skill/outputs/vetbooking.prd. No system requirements exist yet — leave satisfies empty.", "assertions": []}

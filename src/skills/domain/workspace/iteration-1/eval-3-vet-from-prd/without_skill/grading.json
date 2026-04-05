@@ -1,0 +1,8 @@
+{"expectations": [
+  {"text": "Uses .domain structured syntax", "passed": false, "evidence": "File is markdown with headings (##, ###), bullet lists, and tables — no structured entity/value/command/event blocks"},
+  {"text": "At least 2 entities", "passed": true, "evidence": "Many entities across 6 bounded contexts: Clinic, VetProfile, ClinicSchedule, AvailabilityPattern, SlotOverride, Appointment, PetOwner, Pet, PetMedicalRecord, MedicalEntry, NotificationSchedule, PlannedNotification, ClinicReviewCollection, Review"},
+  {"text": "At least 1 aggregate", "passed": true, "evidence": "Aggregates labeled in each context: Clinic (Aggregate Root), Appointment (Aggregate Root), PetOwner (Aggregate Root), Pet (Aggregate Root), PetMedicalRecord (Aggregate Root), ClinicSchedule (Aggregate Root), NotificationSchedule (Aggregate Root), ClinicReviewCollection (Aggregate Root)"},
+  {"text": "At least 1 state machine", "passed": false, "evidence": "No state machines defined — the file has no state machine section, lifecycle diagram, or transition table. Statuses are listed as enumerations (AppointmentStatus, ClinicStatus) but no lifecycle transitions are specified"},
+  {"text": "At least 1 invariant", "passed": false, "evidence": "No invariants section. Business rules are listed as 'Key Business Rules' in prose but not formalized as invariants with names and enforcement semantics"},
+  {"text": "Error paths exist", "passed": false, "evidence": "No error events or error paths defined. Domain events are listed (e.g. AppointmentCancelled) but no failure/error events or precondition failure paths are documented"}
+]}

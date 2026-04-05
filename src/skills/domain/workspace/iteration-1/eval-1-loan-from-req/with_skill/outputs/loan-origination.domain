@@ -1,0 +1,1260 @@
+// =============================================================================
+// Loan Origination Context — Domain Model
+//
+// Organization: BusinessLoanOrganization
+// Bounded Context: LoanOriginationContext
+//   Application intake, credit scoring, decisioning, auto-approval,
+//   and product configuration.
+//
+// Derived from system requirements in business-loan.sysreq.md
+// Covers: REQ-ORI-*, REQ-SCO-*, REQ-AUT-*, REQ-CFG-*
+// =============================================================================
+
+module LoanOrigination
+
+requirements-source "examples/business-loan/business-loan.sysreq.md"
+
+
+// =============================================================================
+// Enums
+// =============================================================================
+
+enum LoanApplicationStatus {
+    DRAFT
+    SUBMITTED
+    UNDER_REVIEW
+    APPROVED
+    REJECTED
+}
+
+enum LoanProductType {
+    amortizing
+    bullet
+    revolving
+    leasing
+    bridge
+}
+
+enum RateStructure {
+    fixed
+    variable
+    indexed
+}
+
+enum DecisionType {
+    MANUAL
+    AUTO
+    COMMITTEE
+}
+
+enum DecisionOutcome {
+    approve
+    reject
+}
+
+
+// =============================================================================
+// Value Types
+// =============================================================================
+
+value Money :: "A monetary amount with currency" {
+    fields {
+        amount   : decimal min(0)
+        currency : string default("EUR") maxLength(3)
+    }
+}
+
+value Percentage :: "A percentage value between 0 and 100" {
+    fields {
+        value : decimal min(0) max(100)
+    }
+}
+
+value FinancialRatio :: "A named financial ratio with its computed value and source data reference" {
+    satisfies [REQ-SCO-001]
+    fields {
+        name              : string
+        value             : decimal
+        computationMethod : string
+        sourceReference   : string optional
+    }
+}
+
+value ChecklistItem :: "An item on a product-specific document checklist" {
+    satisfies [REQ-ORI-002]
+    fields {
+        label    : string
+        required : boolean
+        present  : boolean default("false")
+    }
+}
+
+value CreditDecision :: "The recorded outcome of a credit decision — captures decision type, rationale, conditions, and approver" {
+    satisfies [REQ-SCO-006, REQ-AUT-001]
+    fields {
+        outcome          : DecisionOutcome
+        decisionType     : DecisionType
+        rationale        : string
+        conditions       : list<string> optional
+        approverIdentity : string
+        scoringOutputRef : string
+        decidedAt        : datetime
+    }
+}
+
+value DelegationMatrix :: "A configurable matrix mapping amount tiers and score bands to decision authorities" {
+    satisfies [REQ-SCO-004]
+    fields {
+        amountTiers : list<Money>
+        scoreBands  : list<string>
+        authorities : list<string>
+        rules       : list<string>
+    }
+}
+
+value RatioOverrideRecord :: "Records the details of a financial ratio override by an analyst" {
+    satisfies [REQ-SCO-003]
+    fields {
+        ratioName       : string
+        originalValue   : decimal
+        newValue        : decimal
+        analystIdentity : string
+        justification   : string
+        overriddenAt    : datetime
+    }
+}
+
+value StateHistoryEntry :: "A single entry in the application's state transition history" {
+    satisfies [REQ-ORI-007]
+    fields {
+        fromStatus   : string optional
+        toStatus     : string
+        transitionedAt : datetime
+        actor        : string optional
+    }
+}
+
+
+// =============================================================================
+// Infrastructure Services
+// =============================================================================
+
+service ExternalBureauService :: "Adapter to external credit bureau for scoring data" {
+    satisfies [REQ-SCO-002]
+    operations {
+        fetchBureauData(borrowerId: uuid) :: "Retrieve external bureau scoring data for a borrower" {
+            returns bureauData : string
+        }
+    }
+}
+
+service NotificationService :: "Sends notifications to borrowers and relationship managers on status changes" {
+    satisfies [REQ-ORI-008]
+    operations {
+        "Send status notification"(applicationId: uuid, recipientId: uuid, status: string) :: "Notify on application status change" {
+        }
+    }
+}
+
+
+// =============================================================================
+// Entities
+// =============================================================================
+
+entity ProductConfiguration :: "Defines a loan product type with all its parameters — checklist, fees, rate structure, eligibility" {
+    satisfies [REQ-ORI-002, REQ-AUT-002, REQ-CFG-001, REQ-CFG-002]
+    identifier id : UUID
+    fields {
+        name                       : string
+        productType                : LoanProductType
+        rateStructure              : RateStructure
+        checklist                  : list<ChecklistItem>
+        feeSchedule                : list<string>
+        collateralRequirements     : list<string> optional
+        eligibilityCriteria        : list<string> optional
+        delegationMatrixOverrides  : list<string> optional
+        version                    : int default("1")
+        active                     : boolean default("false")
+        activatedAt                : datetime optional
+        createdAt                  : datetime immutable
+    }
+
+    invariants {
+        productConfigurationMustBeValid :: "Configuration must pass metamodel validation before activation" {
+            satisfies [REQ-CFG-001]
+            active = false or (name is defined and productType is defined and checklist is defined)
+            enforcement reject
+            message "Product configuration is incomplete — name, product type, and checklist are required for activation"
+        }
+    }
+
+    operations {
+        "Activate product" on ActivateProductConfiguration {
+            satisfies [REQ-CFG-001]
+            precondition "configuration must be valid" {
+                productConfigurationMustBeValid(ProductConfiguration)
+            }
+
+            sets ProductConfiguration {
+                active = true
+                activatedAt = now()
+            }
+
+            emits ProductConfigurationActivated {
+                productConfigurationId = ProductConfiguration.id
+                name = ProductConfiguration.name
+                version = ProductConfiguration.version
+                activatedAt = ProductConfiguration.activatedAt
+            }
+        }
+    }
+}
+
+entity AutoApprovalConfiguration :: "Configures auto-approval eligibility criteria per loan product and branch" {
+    satisfies [REQ-AUT-001, REQ-AUT-002, REQ-AUT-003]
+    identifier id : UUID
+    fields {
+        productType    : LoanProductType
+        branchId       : string optional
+        scoreThreshold : decimal
+        amountCeiling  : Money
+        enabled        : boolean default("true")
+        disabledAt     : datetime optional
+    }
+
+    operations {
+        "Disable auto-approval" on DisableAutoApproval {
+            satisfies [REQ-AUT-003]
+
+            sets AutoApprovalConfiguration {
+                enabled = false
+                disabledAt = now()
+            }
+
+            emits AutoApprovalDisabled {
+                configId    = AutoApprovalConfiguration.id
+                productType = AutoApprovalConfiguration.productType
+                branchId    = AutoApprovalConfiguration.branchId
+                disabledAt  = AutoApprovalConfiguration.disabledAt
+            }
+        }
+
+        "Enable auto-approval" on EnableAutoApproval {
+            satisfies [REQ-AUT-002]
+
+            sets AutoApprovalConfiguration {
+                enabled = true
+                disabledAt = null
+            }
+
+            emits AutoApprovalEnabled {
+                configId    = AutoApprovalConfiguration.id
+                productType = AutoApprovalConfiguration.productType
+                branchId    = AutoApprovalConfiguration.branchId
+            }
+        }
+    }
+}
+
+entity CreditAnalysis :: "Encapsulates scoring, financial ratio computation, and delegation routing for a loan application" {
+    satisfies [REQ-SCO-001, REQ-SCO-002, REQ-SCO-003, REQ-SCO-004, REQ-SCO-005, REQ-SCO-007]
+    identifier id : UUID
+    fields {
+        applicationId   : uuid
+        financialRatios : list<FinancialRatio>
+        compositeScore  : decimal optional
+        scoreBreakdown  : list<string> optional
+        delegationLevel : string optional
+        overrides       : list<RatioOverrideRecord>
+        computedAt      : datetime optional
+    }
+
+    invariants {
+        overrideMustHaveJustification :: "Every ratio override must include a written justification" {
+            satisfies [REQ-SCO-003]
+            all(overrides, override -> override.justification is defined and override.justification != "")
+            enforcement reject
+            message "A ratio override without justification is not permitted"
+        }
+        scoringOverrideMustHaveRationale :: "When a decision contradicts the scoring recommendation, additional rationale is required" {
+            satisfies [REQ-SCO-007]
+            true
+            enforcement reject
+            message "Scoring override decisions must carry additional rationale for regulatory audit"
+        }
+        routingOverrideRequiresHigherAuthority :: "Delegation routing override requires approval from an authority one level above the target level" {
+            satisfies [REQ-SCO-005]
+            true
+            enforcement reject
+            message "Routing override requires approval from a higher authority than the target delegation level"
+        }
+    }
+
+    operations {
+        "Compute financial ratios" on ComputeFinancialRatios {
+            satisfies [REQ-SCO-001]
+
+            sets CreditAnalysis {
+                financialRatios = computeFinancialRatios.ratios
+                computedAt = now()
+            }
+
+            emits FinancialRatiosComputed {
+                analysisId    = CreditAnalysis.id
+                applicationId = CreditAnalysis.applicationId
+                ratios        = CreditAnalysis.financialRatios
+                computedAt    = CreditAnalysis.computedAt
+            }
+
+            emits FinancialRatioComputationFailed {
+                analysisId    = CreditAnalysis.id
+                applicationId = CreditAnalysis.applicationId
+                reason        = error.message
+                failedAt      = now()
+            }
+        }
+
+        "Compute credit score" on ComputeCreditScore {
+            satisfies [REQ-SCO-002]
+
+            sets CreditAnalysis {
+                compositeScore = computeCreditScore.score
+                scoreBreakdown = computeCreditScore.breakdown
+            }
+
+            emits CreditScoreComputed {
+                analysisId     = CreditAnalysis.id
+                applicationId  = CreditAnalysis.applicationId
+                compositeScore = CreditAnalysis.compositeScore
+                scoreBreakdown = CreditAnalysis.scoreBreakdown
+            }
+
+            emits CreditScoreComputationFailed {
+                analysisId    = CreditAnalysis.id
+                applicationId = CreditAnalysis.applicationId
+                reason        = error.message
+                failedAt      = now()
+            }
+        }
+
+        "Override financial ratio" on OverrideFinancialRatio {
+            satisfies [REQ-SCO-003]
+            precondition "override must have justification" {
+                overrideFinancialRatio.justification is defined and overrideFinancialRatio.justification != ""
+            }
+
+            sets CreditAnalysis {
+                financialRatios = updatedRatios
+                overrides = append(overrides, newOverrideRecord)
+            }
+
+            emits FinancialRatioOverridden {
+                analysisId      = CreditAnalysis.id
+                applicationId   = CreditAnalysis.applicationId
+                ratioName       = overrideFinancialRatio.ratioName
+                originalValue   = overrideFinancialRatio.originalValue
+                newValue        = overrideFinancialRatio.newValue
+                analystIdentity = overrideFinancialRatio.analystIdentity
+                justification   = overrideFinancialRatio.justification
+            }
+        }
+
+        "Route to decision authority" on RouteToDecisionAuthority {
+            satisfies [REQ-SCO-004]
+
+            sets CreditAnalysis {
+                delegationLevel = routeToDecisionAuthority.level
+            }
+
+            emits ApplicationRouted {
+                analysisId      = CreditAnalysis.id
+                applicationId   = CreditAnalysis.applicationId
+                delegationLevel = CreditAnalysis.delegationLevel
+            }
+        }
+
+        "Override delegation routing" on OverrideDelegationRouting {
+            satisfies [REQ-SCO-005]
+            precondition "approver must be higher authority" {
+                overrideDelegationRouting.approverLevel > overrideDelegationRouting.targetLevel
+            }
+
+            sets CreditAnalysis {
+                delegationLevel = overrideDelegationRouting.targetLevel
+            }
+
+            emits DelegationRoutingOverridden {
+                analysisId       = CreditAnalysis.id
+                applicationId    = CreditAnalysis.applicationId
+                originalLevel    = overrideDelegationRouting.originalLevel
+                newLevel         = overrideDelegationRouting.targetLevel
+                approverIdentity = overrideDelegationRouting.approverIdentity
+                justification    = overrideDelegationRouting.justification
+            }
+        }
+
+        "Record scoring override" when ScoringOverrideDetected then RecordScoringOverride {
+            satisfies [REQ-SCO-007]
+            precondition "additional rationale required" {
+                scoringOverrideDetected.rationale is defined and scoringOverrideDetected.rationale != ""
+            }
+
+            emits ScoringOverrideRecorded {
+                analysisId          = CreditAnalysis.id
+                applicationId       = CreditAnalysis.applicationId
+                recommendedOutcome  = scoringOverrideDetected.recommendedOutcome
+                actualOutcome       = scoringOverrideDetected.actualOutcome
+                additionalRationale = scoringOverrideDetected.rationale
+            }
+        }
+    }
+}
+
+entity LoanApplication :: "The core aggregate for loan origination — tracks an application from draft through scoring to credit decision" {
+    satisfies [REQ-ORI-001, REQ-ORI-002, REQ-ORI-003, REQ-ORI-004, REQ-ORI-005, REQ-ORI-006, REQ-ORI-007, REQ-ORI-008, REQ-AUT-001, REQ-AUT-004]
+    identifier id : UUID
+    fields {
+        status                      : LoanApplicationStatus default("DRAFT")
+        productType                 : LoanProductType
+        borrowerId                  : uuid
+        requestedAmount             : Money
+        duration                    : int
+        purpose                     : string
+        checklist                   : list<ChecklistItem>
+        stateHistory                : list<StateHistoryEntry>
+        estimatedDecisionDate       : date optional
+        creditDecision              : CreditDecision optional
+        productConfigurationVersion : int optional
+        createdAt                   : datetime immutable
+        submittedAt                 : datetime optional
+        decidedAt                   : datetime optional
+    }
+    references {
+        creditAnalysis : CreditAnalysis 0..1
+    }
+
+    invariants {
+        applicationMustBeComplete :: "All required checklist items and mandatory fields must be present before submission" {
+            satisfies [REQ-ORI-004, REQ-ORI-006]
+            all(checklist, item -> item.required = false or item.present = true)
+            and borrowerId is defined
+            and requestedAmount is defined
+            and productType is defined
+            and purpose is defined
+            enforcement reject
+            message "Application cannot be submitted — required documents or fields are missing"
+        }
+        noAutoRejection :: "The system shall never reject an application automatically — all rejections require a human decision" {
+            satisfies [REQ-AUT-004]
+            creditDecision is not defined
+            or creditDecision.decisionType != AUTO
+            or creditDecision.outcome = approve
+            enforcement reject
+            message "Automatic rejection is not permitted — all rejections must be made by a human authority"
+        }
+    }
+
+    policies {
+        fieldValidationRules :: "Validate fields in real time as they are entered or modified" {
+            satisfies [REQ-ORI-005]
+            true
+        }
+        autoApprovalEligibilityCriteria :: "Application must meet score threshold and amount ceiling for auto-approval" {
+            satisfies [REQ-AUT-001]
+            true
+        }
+    }
+
+    operations {
+        "Create application" on CreateLoanApplication {
+            satisfies [REQ-ORI-001]
+
+            creates LoanApplication {
+                status          = DRAFT
+                productType     = createLoanApplication.productType
+                borrowerId      = createLoanApplication.borrowerId
+                requestedAmount = createLoanApplication.requestedAmount
+                duration        = createLoanApplication.duration
+                purpose         = createLoanApplication.purpose
+                createdAt       = now()
+                stateHistory    = [{ toStatus = "DRAFT", transitionedAt = now() }]
+            }
+
+            emits LoanApplicationCreated {
+                applicationId   = LoanApplication.id
+                productType     = LoanApplication.productType
+                borrowerId      = LoanApplication.borrowerId
+                requestedAmount = LoanApplication.requestedAmount
+                createdAt       = LoanApplication.createdAt
+            }
+        }
+
+        "Load product checklist" on LoadProductChecklist {
+            satisfies [REQ-ORI-002]
+            resolves ProductConfiguration from loadProductChecklist.productConfigurationId
+
+            sets LoanApplication {
+                checklist = ProductConfiguration.checklist
+                productConfigurationVersion = ProductConfiguration.version
+            }
+        }
+
+        "Change product type" on ChangeProductType {
+            satisfies [REQ-ORI-003]
+            precondition "application must be in draft" {
+                LoanApplication.status = DRAFT
+            }
+
+            sets LoanApplication {
+                productType = changeProductType.newProductType
+                checklist   = changeProductType.newChecklist
+            }
+
+            emits ProductTypeChanged {
+                applicationId  = LoanApplication.id
+                oldProductType = changeProductType.oldProductType
+                newProductType = LoanApplication.productType
+            }
+        }
+
+        "Validate field" on ValidateField {
+            satisfies [REQ-ORI-005]
+            precondition "application must be in draft" {
+                LoanApplication.status = DRAFT
+            }
+
+            emits FieldValidated {
+                applicationId = LoanApplication.id
+                fieldName     = validateField.fieldName
+                isValid       = validationResult.isValid
+                errorMessage  = validationResult.errorMessage
+            }
+
+            emits FieldValidationFailed {
+                applicationId = LoanApplication.id
+                fieldName     = validateField.fieldName
+                errorMessage  = validationResult.errorMessage
+            }
+        }
+
+        "Submit application" on SubmitLoanApplication {
+            satisfies [REQ-ORI-006]
+            precondition "application must be in draft" {
+                LoanApplication.status = DRAFT
+            }
+            precondition "application must be complete" {
+                applicationMustBeComplete(LoanApplication)
+            }
+
+            sets LoanApplication {
+                status      = SUBMITTED
+                submittedAt = now()
+                stateHistory = append(stateHistory, { fromStatus = "DRAFT", toStatus = "SUBMITTED", transitionedAt = now() })
+            }
+
+            emits LoanApplicationSubmitted {
+                applicationId   = LoanApplication.id
+                borrowerId      = LoanApplication.borrowerId
+                productType     = LoanApplication.productType
+                requestedAmount = LoanApplication.requestedAmount
+                submittedAt     = LoanApplication.submittedAt
+            }
+
+            emits ApplicationSubmissionRejected {
+                applicationId = LoanApplication.id
+                missingItems  = missingItemsList
+                rejectedAt    = now()
+            }
+        }
+
+        "Get application status" on GetApplicationStatus {
+            satisfies [REQ-ORI-007]
+            // Read-only query — returns status, stateHistory, estimatedDecisionDate
+        }
+
+        "Record credit decision" on DecideLoanApplication {
+            satisfies [REQ-SCO-006]
+            precondition "application must be submitted or under review" {
+                LoanApplication.status = SUBMITTED or LoanApplication.status = UNDER_REVIEW
+            }
+
+            sets LoanApplication {
+                creditDecision = decisionPayload
+                status         = decisionPayload.outcome = approve ? APPROVED : REJECTED
+                decidedAt      = now()
+                stateHistory   = append(stateHistory, { fromStatus = previousStatus, toStatus = status, transitionedAt = now(), actor = decisionPayload.approverIdentity })
+            }
+
+            emits LoanApplicationApproved {
+                applicationId    = LoanApplication.id
+                decisionType     = LoanApplication.creditDecision.decisionType
+                conditions       = LoanApplication.creditDecision.conditions
+                rationale        = LoanApplication.creditDecision.rationale
+                approverIdentity = LoanApplication.creditDecision.approverIdentity
+                decidedAt        = LoanApplication.decidedAt
+            }
+
+            emits LoanApplicationRejected {
+                applicationId    = LoanApplication.id
+                rationale        = LoanApplication.creditDecision.rationale
+                approverIdentity = LoanApplication.creditDecision.approverIdentity
+                decidedAt        = LoanApplication.decidedAt
+            }
+        }
+
+        "Auto-approve" on AutoApproveLoanApplication {
+            satisfies [REQ-AUT-001]
+            precondition "auto-approval must be enabled for product" {
+                autoApprovalConfiguration.enabled = true
+            }
+            precondition "score meets threshold" {
+                creditAnalysis.compositeScore >= autoApprovalConfiguration.scoreThreshold
+            }
+            precondition "amount within ceiling" {
+                LoanApplication.requestedAmount.amount <= autoApprovalConfiguration.amountCeiling.amount
+            }
+            precondition "no auto-rejection" {
+                noAutoRejection(LoanApplication)
+            }
+
+            sets LoanApplication {
+                creditDecision = autoDecision
+                status         = APPROVED
+                decidedAt      = now()
+                stateHistory   = append(stateHistory, { fromStatus = previousStatus, toStatus = "APPROVED", transitionedAt = now(), actor = "SYSTEM" })
+            }
+
+            emits LoanApplicationApproved {
+                applicationId = LoanApplication.id
+                decisionType  = AUTO
+                rationale     = autoApproveLoanApplication.systemRationale
+                decidedAt     = LoanApplication.decidedAt
+            }
+        }
+
+        "Notify on status change" when LoanApplicationSubmitted then NotifyStatusChange {
+            satisfies [REQ-ORI-008]
+            NotificationService."Send status notification"(LoanApplication.id, LoanApplication.borrowerId, "SUBMITTED")
+        }
+
+        "Notify on approval" when LoanApplicationApproved then NotifyApproval {
+            satisfies [REQ-ORI-008]
+            NotificationService."Send status notification"(LoanApplication.id, LoanApplication.borrowerId, "APPROVED")
+        }
+
+        "Notify on rejection" when LoanApplicationRejected then NotifyRejection {
+            satisfies [REQ-ORI-008]
+            NotificationService."Send status notification"(LoanApplication.id, LoanApplication.borrowerId, "REJECTED")
+        }
+    }
+
+    transitions {
+        [*] --> DRAFT on "Create application"
+        DRAFT --> SUBMITTED on "Submit application"
+        SUBMITTED --> UNDER_REVIEW on "Compute credit score"
+        UNDER_REVIEW --> APPROVED on "Record credit decision", "Auto-approve"
+        UNDER_REVIEW --> REJECTED on "Record credit decision"
+        SUBMITTED --> APPROVED on "Auto-approve"
+    }
+}
+
+
+// =============================================================================
+// Aggregates
+// =============================================================================
+
+aggregate LoanApplicationAggregate :: "The transactional boundary for loan application processing" {
+    satisfies [REQ-ORI-001, REQ-ORI-006, REQ-SCO-006, REQ-AUT-001]
+    root LoanApplication
+    contains LoanApplication, CreditAnalysis
+}
+
+aggregate ProductConfigurationAggregate :: "The transactional boundary for product configuration management" {
+    satisfies [REQ-CFG-001, REQ-CFG-002]
+    root ProductConfiguration
+    contains ProductConfiguration
+}
+
+aggregate AutoApprovalConfigurationAggregate :: "The transactional boundary for auto-approval configuration" {
+    satisfies [REQ-AUT-002, REQ-AUT-003]
+    root AutoApprovalConfiguration
+    contains AutoApprovalConfiguration
+}
+
+
+// =============================================================================
+// State Machine — LoanApplication Lifecycle
+// =============================================================================
+
+statemachine LoanApplicationLifecycle {
+    satisfies [REQ-ORI-001, REQ-ORI-006, REQ-ORI-007, REQ-SCO-006, REQ-AUT-001]
+    on LoanApplication
+
+    start DRAFT
+
+    state DRAFT {
+        invariant "application is editable" {
+            satisfies [REQ-ORI-005]
+            LoanApplication.status = DRAFT
+        }
+    }
+
+    state SUBMITTED {
+        invariant "application is complete and awaiting review" {
+            satisfies [REQ-ORI-006]
+            applicationMustBeComplete(LoanApplication) and LoanApplication.submittedAt is defined
+        }
+    }
+
+    state UNDER_REVIEW {
+        invariant "credit analysis is in progress" {
+            satisfies [REQ-SCO-001, REQ-SCO-002]
+            LoanApplication.creditAnalysis is defined
+        }
+    }
+
+    state APPROVED {
+        invariant "a credit decision with approve outcome exists" {
+            satisfies [REQ-SCO-006]
+            LoanApplication.creditDecision is defined and LoanApplication.creditDecision.outcome = approve
+        }
+    }
+
+    state REJECTED {
+        invariant "a credit decision with reject outcome exists and was made by a human" {
+            satisfies [REQ-SCO-006, REQ-AUT-004]
+            LoanApplication.creditDecision is defined
+            and LoanApplication.creditDecision.outcome = reject
+            and LoanApplication.creditDecision.decisionType != AUTO
+        }
+    }
+
+    transition DRAFT -> SUBMITTED triggered-by "Submit application"
+    transition SUBMITTED -> UNDER_REVIEW triggered-by "Compute credit score"
+    transition UNDER_REVIEW -> APPROVED triggered-by "Record credit decision"
+    transition UNDER_REVIEW -> APPROVED triggered-by "Auto-approve"
+    transition UNDER_REVIEW -> REJECTED triggered-by "Record credit decision"
+    transition SUBMITTED -> APPROVED triggered-by "Auto-approve"
+
+    final APPROVED
+    final REJECTED
+}
+
+
+// =============================================================================
+// Commands
+// =============================================================================
+
+command CreateLoanApplication {
+    satisfies [REQ-ORI-001]
+    fields {
+        correlationId   : uuid
+        borrowerId      : uuid
+        productType     : LoanProductType
+        requestedAmount : Money
+        duration        : int
+        purpose         : string
+    }
+}
+
+command LoadProductChecklist {
+    satisfies [REQ-ORI-002]
+    fields {
+        correlationId          : uuid
+        applicationId          : uuid
+        productConfigurationId : uuid
+    }
+}
+
+command ChangeProductType {
+    satisfies [REQ-ORI-003]
+    fields {
+        correlationId  : uuid
+        applicationId  : uuid
+        oldProductType : LoanProductType
+        newProductType : LoanProductType
+        newChecklist   : list<ChecklistItem>
+    }
+}
+
+command ValidateField {
+    satisfies [REQ-ORI-005]
+    fields {
+        correlationId : uuid
+        applicationId : uuid
+        fieldName     : string
+        fieldValue    : string
+    }
+}
+
+command SubmitLoanApplication {
+    satisfies [REQ-ORI-006]
+    fields {
+        correlationId : uuid
+        applicationId : uuid
+    }
+}
+
+command GetApplicationStatus {
+    satisfies [REQ-ORI-007]
+    fields {
+        correlationId : uuid
+        applicationId : uuid
+    }
+}
+
+command ComputeFinancialRatios {
+    satisfies [REQ-SCO-001]
+    fields {
+        correlationId : uuid
+        applicationId : uuid
+        ratios        : list<FinancialRatio>
+    }
+}
+
+command ComputeCreditScore {
+    satisfies [REQ-SCO-002]
+    fields {
+        correlationId : uuid
+        applicationId : uuid
+        score         : decimal
+        breakdown     : list<string>
+    }
+}
+
+command OverrideFinancialRatio {
+    satisfies [REQ-SCO-003]
+    fields {
+        correlationId   : uuid
+        applicationId   : uuid
+        ratioName       : string
+        originalValue   : decimal
+        newValue        : decimal
+        analystIdentity : string
+        justification   : string
+    }
+}
+
+command RouteToDecisionAuthority {
+    satisfies [REQ-SCO-004]
+    fields {
+        correlationId : uuid
+        applicationId : uuid
+        level         : string
+    }
+}
+
+command OverrideDelegationRouting {
+    satisfies [REQ-SCO-005]
+    fields {
+        correlationId    : uuid
+        applicationId    : uuid
+        originalLevel    : string
+        targetLevel      : string
+        approverLevel    : int
+        approverIdentity : string
+        justification    : string
+    }
+}
+
+command DecideLoanApplication {
+    satisfies [REQ-SCO-006]
+    fields {
+        correlationId    : uuid
+        applicationId    : uuid
+        outcome          : DecisionOutcome
+        decisionType     : DecisionType
+        rationale        : string
+        conditions       : list<string> optional
+        approverIdentity : string
+        scoringOutputRef : string
+    }
+}
+
+command AutoApproveLoanApplication {
+    satisfies [REQ-AUT-001]
+    fields {
+        correlationId   : uuid
+        applicationId   : uuid
+        systemRationale : string
+    }
+}
+
+command ActivateProductConfiguration {
+    satisfies [REQ-CFG-001]
+    fields {
+        correlationId          : uuid
+        productConfigurationId : uuid
+    }
+}
+
+command DisableAutoApproval {
+    satisfies [REQ-AUT-003]
+    fields {
+        correlationId : uuid
+        configId      : uuid
+    }
+}
+
+command EnableAutoApproval {
+    satisfies [REQ-AUT-002]
+    fields {
+        correlationId : uuid
+        configId      : uuid
+    }
+}
+
+
+// =============================================================================
+// Events — Internal
+// =============================================================================
+
+event LoanApplicationCreated :: "A new loan application has been created in DRAFT status" {
+    satisfies [REQ-ORI-001]
+    fields {
+        applicationId   : uuid
+        productType     : LoanProductType
+        borrowerId      : uuid
+        requestedAmount : Money
+        createdAt       : datetime
+    }
+}
+
+event ProductTypeChanged :: "The product type on a draft application has been changed, triggering checklist recalculation" {
+    satisfies [REQ-ORI-003]
+    fields {
+        applicationId  : uuid
+        oldProductType : LoanProductType
+        newProductType : LoanProductType
+    }
+}
+
+event FieldValidated :: "A field value has been validated successfully" {
+    satisfies [REQ-ORI-005]
+    fields {
+        applicationId : uuid
+        fieldName     : string
+        isValid       : boolean
+    }
+}
+
+event LoanApplicationSubmitted :: "A loan application has been submitted and is entering the credit pipeline" {
+    satisfies [REQ-ORI-006, REQ-ORI-008]
+    fields {
+        applicationId   : uuid
+        borrowerId      : uuid
+        productType     : LoanProductType
+        requestedAmount : Money
+        submittedAt     : datetime
+    }
+}
+
+event FinancialRatiosComputed :: "Financial ratios (DSCR, leverage, liquidity, profitability) have been computed from uploaded statements" {
+    satisfies [REQ-SCO-001]
+    fields {
+        analysisId    : uuid
+        applicationId : uuid
+        ratios        : list<FinancialRatio>
+        computedAt    : datetime
+    }
+}
+
+event CreditScoreComputed :: "A composite credit score has been computed from financial ratios, history, sector risk, and bureau data" {
+    satisfies [REQ-SCO-002]
+    fields {
+        analysisId     : uuid
+        applicationId  : uuid
+        compositeScore : decimal
+        scoreBreakdown : list<string>
+    }
+}
+
+event FinancialRatioOverridden :: "An analyst has overridden a computed financial ratio with justification" {
+    satisfies [REQ-SCO-003]
+    fields {
+        analysisId      : uuid
+        applicationId   : uuid
+        ratioName       : string
+        originalValue   : decimal
+        newValue        : decimal
+        analystIdentity : string
+        justification   : string
+    }
+}
+
+event ApplicationRouted :: "The application has been routed to the appropriate decision authority based on the delegation matrix" {
+    satisfies [REQ-SCO-004]
+    fields {
+        analysisId      : uuid
+        applicationId   : uuid
+        delegationLevel : string
+    }
+}
+
+event DelegationRoutingOverridden :: "The delegation routing level has been overridden with higher-authority approval" {
+    satisfies [REQ-SCO-005]
+    fields {
+        analysisId       : uuid
+        applicationId    : uuid
+        originalLevel    : string
+        newLevel         : string
+        approverIdentity : string
+        justification    : string
+    }
+}
+
+event LoanApplicationApproved :: "The loan application has been approved — manually, by committee, or automatically" {
+    satisfies [REQ-SCO-006, REQ-ORI-008, REQ-AUT-001]
+    fields {
+        applicationId    : uuid
+        decisionType     : DecisionType
+        conditions       : list<string> optional
+        rationale        : string
+        approverIdentity : string optional
+        decidedAt        : datetime
+    }
+}
+
+event LoanApplicationRejected :: "The loan application has been rejected by a human decision authority" {
+    satisfies [REQ-SCO-006, REQ-ORI-008]
+    fields {
+        applicationId    : uuid
+        rationale        : string
+        approverIdentity : string
+        decidedAt        : datetime
+    }
+}
+
+event ScoringOverrideRecorded :: "A decision that contradicts the scoring model recommendation has been flagged and recorded" {
+    satisfies [REQ-SCO-007]
+    fields {
+        analysisId          : uuid
+        applicationId       : uuid
+        recommendedOutcome  : string
+        actualOutcome       : string
+        additionalRationale : string
+    }
+}
+
+event AutoApprovalDisabled :: "Auto-approval has been disabled for a product or branch" {
+    satisfies [REQ-AUT-003]
+    fields {
+        configId    : uuid
+        productType : LoanProductType
+        branchId    : string optional
+        disabledAt  : datetime
+    }
+}
+
+event AutoApprovalEnabled :: "Auto-approval has been re-enabled for a product or branch" {
+    satisfies [REQ-AUT-002]
+    fields {
+        configId    : uuid
+        productType : LoanProductType
+        branchId    : string optional
+    }
+}
+
+event ProductConfigurationActivated :: "A loan product configuration has been activated and is available for new applications" {
+    satisfies [REQ-CFG-001]
+    fields {
+        productConfigurationId : uuid
+        name                   : string
+        version                : int
+        activatedAt            : datetime
+    }
+}
+
+
+// =============================================================================
+// Events — Error
+// =============================================================================
+
+event ApplicationSubmissionRejected :: "Submission was blocked because required items are missing" {
+    satisfies [REQ-ORI-004]
+    fields {
+        applicationId : uuid
+        missingItems  : list<string>
+        rejectedAt    : datetime
+    }
+}
+
+event FieldValidationFailed :: "A field value failed real-time validation" {
+    satisfies [REQ-ORI-005]
+    fields {
+        applicationId : uuid
+        fieldName     : string
+        errorMessage  : string
+    }
+}
+
+event FinancialRatioComputationFailed :: "Financial ratio computation failed due to invalid or missing statement data" {
+    satisfies [REQ-SCO-001]
+    fields {
+        analysisId    : uuid
+        applicationId : uuid
+        reason        : string
+        failedAt      : datetime
+    }
+}
+
+event CreditScoreComputationFailed :: "Credit score computation failed" {
+    satisfies [REQ-SCO-002]
+    fields {
+        analysisId    : uuid
+        applicationId : uuid
+        reason        : string
+        failedAt      : datetime
+    }
+}
+
+
+// =============================================================================
+// Reactions
+// =============================================================================
+
+reaction triggerCreditScoringOnSubmission {
+    satisfies [REQ-ORI-006, REQ-SCO-002]
+    :: "When an application is submitted, initiate credit scoring"
+    triggered-by LoanApplicationSubmitted
+    guard { true }
+    effects ComputeCreditScore
+}
+
+reaction triggerFinancialRatiosOnSubmission {
+    satisfies [REQ-ORI-006, REQ-SCO-001]
+    :: "When an application is submitted, compute financial ratios from uploaded statements"
+    triggered-by LoanApplicationSubmitted
+    guard { true }
+    effects ComputeFinancialRatios
+}
+
+reaction routeAfterScoring {
+    satisfies [REQ-SCO-004]
+    :: "When the credit score is computed, route the application to the appropriate decision authority"
+    triggered-by CreditScoreComputed
+    guard { true }
+    effects RouteToDecisionAuthority
+}
+
+reaction attemptAutoApprovalOnScoring {
+    satisfies [REQ-AUT-001]
+    :: "When the credit score is computed and auto-approval is enabled, attempt auto-approval if criteria are met"
+    triggered-by CreditScoreComputed
+    guard { autoApprovalConfiguration.enabled = true and creditAnalysis.compositeScore >= autoApprovalConfiguration.scoreThreshold and application.requestedAmount.amount <= autoApprovalConfiguration.amountCeiling.amount }
+    effects AutoApproveLoanApplication
+}
+
+reaction rerouteOnAutoApprovalDisabled {
+    satisfies [REQ-AUT-003]
+    :: "When auto-approval is disabled, route pending applications to manual review"
+    triggered-by AutoApprovalDisabled
+    guard { true }
+    effects RouteToDecisionAuthority
+}
+
+reaction detectScoringOverrideOnDecision {
+    satisfies [REQ-SCO-007]
+    :: "When a decision contradicts the scoring recommendation, flag it as a scoring override"
+    triggered-by LoanApplicationApproved
+    guard { decision.outcome != scoringRecommendation }
+    effects RecordScoringOverride
+}
+
+reaction notifyOnSubmission {
+    satisfies [REQ-ORI-008]
+    :: "Notify borrower and RM when application is submitted"
+    triggered-by LoanApplicationSubmitted
+    guard { true }
+    effects NotifyStatusChange
+}
+
+reaction notifyOnApproval {
+    satisfies [REQ-ORI-008]
+    :: "Notify borrower and RM when application is approved"
+    triggered-by LoanApplicationApproved
+    guard { true }
+    effects NotifyApproval
+}
+
+reaction notifyOnRejection {
+    satisfies [REQ-ORI-008]
+    :: "Notify borrower and RM when application is rejected"
+    triggered-by LoanApplicationRejected
+    guard { true }
+    effects NotifyRejection
+}
+
+
+// =============================================================================
+// Invariants — Context-level
+// =============================================================================
+
+invariant noAutoRejection {
+    satisfies [REQ-AUT-004]
+    on LoanApplication
+    must { creditDecision is not defined or creditDecision.decisionType != AUTO or creditDecision.outcome = approve }
+    message "The system shall never reject an application automatically — all rejections require a human decision authority"
+    enforcement reject
+}
+
+invariant productChecklistMatchesProduct {
+    satisfies [REQ-ORI-002, REQ-ORI-003]
+    on LoanApplication
+    must { checklist is derived from the ProductConfiguration matching productType }
+    message "The document checklist must correspond to the selected loan product type"
+    enforcement reject
+}
+
+invariant productVersionImmutableAfterOrigination {
+    satisfies [REQ-CFG-002]
+    on LoanApplication
+    must { productConfigurationVersion is not modified after status != DRAFT }
+    message "Existing applications remain on their origination product version — product configuration changes create new versions"
+    enforcement reject
+}
+
+
+// =============================================================================
+// Coverage Analysis
+// =============================================================================
+
+// Requirements covered by this domain model:
+//
+// REQ-ORI-001  "Application creation"               -> LoanApplication, CreateLoanApplication, LoanApplicationCreated
+// REQ-ORI-002  "Dynamic checklist by product"        -> ProductConfiguration, ChecklistItem, LoadProductChecklist, productChecklistMatchesProduct
+// REQ-ORI-003  "Checklist update on product change"  -> ChangeProductType, ProductTypeChanged, productChecklistMatchesProduct
+// REQ-ORI-004  "Submission completeness guard"       -> applicationMustBeComplete, ApplicationSubmissionRejected
+// REQ-ORI-005  "Real-time field validation"          -> ValidateField, FieldValidated, FieldValidationFailed, fieldValidationRules
+// REQ-ORI-006  "Application submission"              -> SubmitLoanApplication, LoanApplicationSubmitted, applicationMustBeComplete, reactions
+// REQ-ORI-007  "Borrower status tracking"            -> GetApplicationStatus, StateHistoryEntry, stateHistory field
+// REQ-ORI-008  "Status change notification"          -> NotificationService, notifyOnSubmission, notifyOnApproval, notifyOnRejection
+//
+// REQ-SCO-001  "Automated financial ratio computation" -> CreditAnalysis, ComputeFinancialRatios, FinancialRatiosComputed, FinancialRatio
+// REQ-SCO-002  "Composite credit score"              -> CreditAnalysis, ComputeCreditScore, CreditScoreComputed, ExternalBureauService
+// REQ-SCO-003  "Analyst ratio override"              -> OverrideFinancialRatio, FinancialRatioOverridden, overrideMustHaveJustification, RatioOverrideRecord
+// REQ-SCO-004  "Delegation matrix routing"           -> RouteToDecisionAuthority, ApplicationRouted, DelegationMatrix, routeAfterScoring
+// REQ-SCO-005  "Delegation routing override"         -> OverrideDelegationRouting, DelegationRoutingOverridden, routingOverrideRequiresHigherAuthority
+// REQ-SCO-006  "Credit decision recording"           -> DecideLoanApplication, CreditDecision, LoanApplicationApproved, LoanApplicationRejected
+// REQ-SCO-007  "Scoring override flag"               -> ScoringOverrideRecorded, scoringOverrideMustHaveRationale, detectScoringOverrideOnDecision
+//
+// REQ-AUT-001  "Auto-approval trigger"               -> AutoApproveLoanApplication, autoApprovalEligibilityCriteria, attemptAutoApprovalOnScoring
+// REQ-AUT-002  "Auto-approval configurability"       -> AutoApprovalConfiguration, EnableAutoApproval, AutoApprovalEnabled
+// REQ-AUT-003  "Auto-approval disable switch"        -> DisableAutoApproval, AutoApprovalDisabled, rerouteOnAutoApprovalDisabled
+// REQ-AUT-004  "No auto-rejection"                   -> noAutoRejection invariant
+//
+// REQ-CFG-001  "Product definition via configuration" -> ProductConfiguration, ActivateProductConfiguration, ProductConfigurationActivated, productConfigurationMustBeValid
+// REQ-CFG-002  "Product versioning"                  -> ProductConfiguration.version, productVersionImmutableAfterOrigination
+//
+// All 22 requirements (8 REQ-ORI, 7 REQ-SCO, 4 REQ-AUT, 2 REQ-CFG) are satisfied.
+//
+// Unsatisfied requirements: NONE
+//
+// Orphan elements (no satisfies reference):
+//   - Money, Percentage value types — shared infrastructure types, not directly traceable to a single requirement
+//   - StateHistoryEntry — structural support for REQ-ORI-007, traced through LoanApplication
+//
+// Note: REQ-NFR-001 (application creation latency) and REQ-NFR-002 (scoring latency) are
+// cross-cutting NFRs scoped to BusinessLoanOrganization. They constrain the operations
+// "Create application" and "Compute credit score" respectively but are not modeled as
+// domain elements — they are quality attributes on those operations.

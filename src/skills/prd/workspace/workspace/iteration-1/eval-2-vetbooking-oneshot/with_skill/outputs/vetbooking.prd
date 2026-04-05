@@ -1,0 +1,950 @@
+product "VetBooking" {
+
+  vision "The first online appointment booking platform dedicated to veterinary care in France,
+         connecting pet owners with nearby clinics for seamless scheduling, reminders, and
+         medical history access — the Doctolib of veterinary medicine."
+
+  problem {
+    situation "Pet owners in France need regular and urgent veterinary care for their animals.
+               There are approximately 20 million pet-owning households and over 6,500 veterinary
+               clinics. Appointment booking relies on phone calls during business hours, and
+               medical records are siloed within each clinic."
+    complication "Phone-based booking creates friction: owners cannot see availability in real time,
+                  clinics waste staff time answering scheduling calls, missed appointments go
+                  untracked, and pet medical history is inaccessible when switching vets or visiting
+                  emergency clinics. While human healthcare has Doctolib, no equivalent exists for
+                  veterinary care."
+    question "How can we give pet owners instant visibility into nearby vet availability and
+              a frictionless booking experience, while giving clinics efficient schedule management
+              and a shared view of patient records?"
+  }
+
+  persona "Pet owner" {
+    role "An individual who owns one or more pets and needs regular or urgent veterinary care"
+    goals {
+      "Find a nearby vet with available slots quickly"
+      "Book appointments without calling during business hours"
+      "Receive reminders so no vaccination or checkup is missed"
+      "Access their pet's medical history in one place"
+    }
+    frustrations {
+      "Calling clinics during work hours is inconvenient"
+      "No visibility into real-time availability"
+      "Forgetting vaccination schedules and annual checkups"
+      "Losing paper records when switching vets"
+      "No way to compare clinics or read reviews"
+    }
+    context "Uses smartphone daily, often books outside business hours (evenings, weekends),
+             has 1-3 pets, values convenience and trust in the vet"
+    weight primary
+  }
+
+  persona "Clinic manager" {
+    role "A veterinary clinic staff member responsible for managing the schedule, patient flow,
+         and administrative operations"
+    goals {
+      "Fill appointment slots efficiently with minimal phone time"
+      "Reduce no-shows through automated reminders"
+      "Maintain accurate and accessible patient records"
+      "Attract new clients in the local area"
+    }
+    frustrations {
+      "Phone lines tied up with scheduling calls"
+      "High no-show rate with no automated reminder system"
+      "Manual record-keeping across paper and fragmented software"
+      "Difficulty acquiring new clients beyond word-of-mouth"
+    }
+    context "Works in a clinic with 2-10 veterinarians, uses desktop for administration,
+             varies in technical literacy, handles 20-60 appointments per day"
+    weight primary
+  }
+
+  persona "Veterinarian" {
+    role "A licensed veterinary professional who examines and treats animals"
+    goals {
+      "See a complete medical history before each consultation"
+      "Spend time on care, not on administrative tasks"
+      "Maintain continuity of care across visits"
+    }
+    frustrations {
+      "Incomplete patient history when animal is seen for the first time"
+      "Time wasted reconstructing records from paper files"
+      "No digital way to share notes with pet owners"
+    }
+    context "Uses clinic software during consultations, needs quick access to records,
+             time-constrained between appointments"
+    weight secondary
+  }
+
+  job "Book a vet appointment without calling" {
+    persona "Pet owner"
+    statement "When my pet needs a vet visit and I cannot call during business hours,
+               I want to find available slots and book online at any time,
+               so I can secure an appointment without disrupting my workday."
+    type functional
+    importance critical
+    satisfaction underserved
+    related-to "Get reminders for upcoming pet care"
+    desired-outcomes {
+      "Minimize the time it takes to find a nearby vet with an available slot" {
+        importance high
+        current-satisfaction low
+      }
+      "Minimize the number of steps required to confirm a booking" {
+        importance high
+        current-satisfaction low
+      }
+      "Minimize the likelihood of arriving at a clinic that has no record of my appointment" {
+        importance medium
+        current-satisfaction medium
+      }
+    }
+  }
+
+  job "Find a trusted vet nearby" {
+    persona "Pet owner"
+    statement "When I move to a new area or my usual vet is unavailable,
+               I want to discover nearby clinics with ratings and specialties,
+               so I can choose a vet I trust for my pet."
+    type functional
+    importance important
+    satisfaction underserved
+    desired-outcomes {
+      "Minimize the time it takes to identify a suitable clinic within my area" {
+        importance high
+        current-satisfaction low
+      }
+      "Maximize the confidence that the clinic can handle my pet's specific needs" {
+        importance medium
+        current-satisfaction low
+      }
+    }
+  }
+
+  job "Get reminders for upcoming pet care" {
+    persona "Pet owner"
+    statement "When my pet has an upcoming vaccination, checkup, or booked appointment,
+               I want to receive timely reminders,
+               so I can keep my pet's health on track without relying on memory."
+    type functional
+    importance important
+    satisfaction underserved
+    desired-outcomes {
+      "Minimize the likelihood of missing a scheduled appointment or vaccination deadline" {
+        importance high
+        current-satisfaction low
+      }
+      "Minimize the effort required to reschedule if I cannot make the appointment" {
+        importance medium
+        current-satisfaction low
+      }
+    }
+  }
+
+  job "Access my pet's medical history" {
+    persona "Pet owner"
+    statement "When I visit a new vet or need to recall past treatments,
+               I want to access my pet's complete medical record,
+               so I can ensure continuity of care and informed decisions."
+    type functional
+    importance important
+    satisfaction unserved
+    desired-outcomes {
+      "Minimize the time it takes to retrieve past consultation notes and treatments" {
+        importance high
+        current-satisfaction low
+      }
+      "Maximize the completeness of the medical history available across clinics" {
+        importance high
+        current-satisfaction low
+      }
+    }
+  }
+
+  job "Feel reassured about my pet's care" {
+    persona "Pet owner"
+    statement "When my pet is sick or I am unsure about symptoms,
+               I want to feel that professional help is accessible quickly,
+               so I can reduce my anxiety about my pet's wellbeing."
+    type emotional
+    importance critical
+    satisfaction underserved
+    desired-outcomes {
+      "Minimize the anxiety caused by not knowing how quickly I can see a vet" {
+        importance high
+        current-satisfaction low
+      }
+    }
+  }
+
+  job "Fill the schedule efficiently" {
+    persona "Clinic manager"
+    statement "When the clinic has open appointment slots,
+               I want bookings to flow in without staff spending time on the phone,
+               so I can maximize clinic utilization and reduce administrative overhead."
+    type functional
+    importance critical
+    satisfaction underserved
+    desired-outcomes {
+      "Minimize the staff time spent on phone-based scheduling per appointment" {
+        importance high
+        current-satisfaction low
+      }
+      "Minimize the percentage of unfilled appointment slots" {
+        importance high
+        current-satisfaction medium
+      }
+    }
+  }
+
+  job "Reduce no-shows" {
+    persona "Clinic manager"
+    statement "When appointments are booked,
+               I want owners to be reminded automatically,
+               so I can reduce the no-show rate and its revenue impact."
+    type functional
+    importance critical
+    satisfaction underserved
+    desired-outcomes {
+      "Minimize the no-show rate for booked appointments" {
+        importance high
+        current-satisfaction low
+      }
+      "Minimize the time between a cancellation and refilling the slot" {
+        importance medium
+        current-satisfaction low
+      }
+    }
+  }
+
+  job "Maintain accessible patient records" {
+    persona "Clinic manager"
+    statement "When a pet comes in for a visit,
+               I want its full history readily accessible to the vet,
+               so I can ensure quality care and avoid redundant exams."
+    type functional
+    importance important
+    satisfaction underserved
+    desired-outcomes {
+      "Minimize the time it takes to pull up a patient's record before a consultation" {
+        importance high
+        current-satisfaction medium
+      }
+    }
+  }
+
+  non-goals {
+    "Provide telemedicine or remote diagnosis — we facilitate in-person appointments, not replace them"
+    "Become a veterinary practice management system — we integrate with existing PMS, not replace them"
+    "Handle payment processing for consultations — billing stays with the clinic"
+    "Serve livestock or farm animals — we focus on companion animals (dogs, cats, NACs)"
+    "Expand outside France before achieving product-market fit domestically"
+  }
+
+  evidence "Doctolib adoption in human healthcare" {
+    type market-research
+    summary "Doctolib has onboarded over 340,000 health practitioners in France, demonstrating
+             strong demand for online medical appointment booking. No equivalent platform exists
+             for veterinary care, despite a comparable volume of annual consultations."
+    source-reference "Doctolib company reports 2024, veterinary market gap analysis"
+    date 2025-06-01
+    confidence moderate
+    supports "Onboard 500 clinics in 12 months"
+  }
+
+  evidence "Pet ownership growth in France" {
+    type market-research
+    summary "France has over 80 million companion animals across 20 million households.
+             The pet care market grew 5% in 2024, with increasing spend on preventive care.
+             Owners increasingly expect digital convenience for pet services."
+    source-reference "FACCO/Kantar pet population survey 2024"
+    date 2024-11-01
+    confidence strong
+    supports "Onboard 500 clinics in 12 months"
+  }
+
+  evidence "Clinic scheduling pain" {
+    type customer-feedback
+    summary "Interviews with 15 veterinary clinics in Ile-de-France revealed that staff
+             spend an average of 2 hours per day handling phone bookings. 80% expressed
+             interest in an online booking tool. No-show rates reported between 10-20%."
+    source-reference "VetBooking founder interviews, Jan-Feb 2026"
+    date 2026-02-15
+    confidence moderate
+    supports "Fill the schedule efficiently", "Reduce no-shows"
+  }
+
+  evidence "Pet owner booking frustration" {
+    type user-research
+    summary "Survey of 200 pet owners in urban France: 72% have missed calling their vet
+             during business hours at least once. 65% would prefer online booking.
+             41% have postponed a visit because booking was inconvenient."
+    source-reference "VetBooking online survey, Feb 2026"
+    date 2026-02-20
+    confidence moderate
+    supports "Book a vet appointment without calling"
+  }
+
+  goal "Onboard 500 clinics in 12 months" {
+    statement "Onboard 500 veterinary clinics on the platform within 12 months of launch,
+               establishing a critical mass of supply in key French metro areas"
+    horizon mid-term
+    owner "Head of Growth"
+    metric {
+      indicator "Number of active clinics with published availability"
+      target "500 clinics"
+      baseline "0 (pre-launch)"
+      measurement "Count of clinics with at least one bookable slot in the last 7 days"
+    }
+  }
+
+  goal "Reduce clinic phone booking time" {
+    statement "Reduce the time clinic staff spend on phone-based appointment scheduling
+               by at least 50% for onboarded clinics"
+    horizon mid-term
+    owner "Head of Product"
+    metric {
+      indicator "Average daily staff time spent on phone scheduling"
+      target "< 1 hour per day (down from 2 hours)"
+      baseline "~2 hours per day (from clinic interviews)"
+      measurement "Self-reported clinic survey at 3 and 6 months post-onboarding"
+    }
+  }
+
+  goal "Achieve pet owner booking adoption" {
+    statement "Reach 10,000 monthly active pet owners making bookings through the platform"
+    horizon mid-term
+    owner "Head of Growth"
+    metric {
+      indicator "Monthly active users (pet owners) who complete at least one booking"
+      target "10,000 MAU"
+      baseline "0 (pre-launch)"
+      measurement "Product analytics — unique users with completed booking event per month"
+    }
+  }
+
+  goal "Reduce clinic no-show rate" {
+    statement "Reduce the no-show rate for appointments booked through the platform to under 5%"
+    horizon short-term
+    owner "Head of Product"
+    metric {
+      indicator "Percentage of booked appointments marked as no-show"
+      target "< 5%"
+      baseline "10-20% (reported by clinics for phone-booked appointments)"
+      measurement "Clinic-confirmed appointment status in the platform"
+    }
+  }
+
+  goal "GDPR compliance" {
+    statement "Achieve and maintain full GDPR compliance for all personal data processed
+               by the platform, including pet owner data and clinic patient records"
+    horizon short-term
+    owner "Head of Legal / DPO"
+    metric {
+      indicator "GDPR compliance audit pass rate"
+      target "100% of audit criteria met"
+      baseline "N/A (greenfield)"
+      measurement "External DPO audit before launch, then quarterly"
+    }
+  }
+
+  hypothesis "Online booking reduces phone load" {
+    intervention "Provide clinics with an online booking widget that pet owners can use 24/7"
+    expected-outcome "Clinic phone scheduling time drops by 50% within 3 months of adoption"
+    mechanism "Pet owners self-serve for standard appointments, freeing staff from
+               repetitive scheduling calls"
+    validation-method "Compare self-reported phone time before and 3 months after onboarding
+                       for first 50 clinics"
+    status proposed
+    proposes "Online appointment booking"
+    predicts "Reduce clinic phone booking time"
+  }
+
+  hypothesis "Automated reminders reduce no-shows" {
+    intervention "Send SMS and push reminders 48h and 2h before each appointment"
+    expected-outcome "No-show rate drops below 5% for platform-booked appointments"
+    mechanism "Timely reminders prompt owners to show up or cancel in advance,
+               allowing the clinic to refill the slot"
+    validation-method "Compare no-show rate for reminder-enabled vs. non-reminder appointments
+                       in first 3 months"
+    status proposed
+    proposes "Appointment reminders"
+    predicts "Reduce clinic no-show rate"
+  }
+
+  hypothesis "Vet search drives new patient acquisition for clinics" {
+    intervention "Let pet owners search for nearby vets by location, specialty, and availability"
+    expected-outcome "30% of bookings in the first 6 months come from new patients
+                      (first visit at that clinic)"
+    mechanism "Discoverability of clinics beyond word-of-mouth expands the patient funnel,
+               especially for owners new to an area or seeking specialists"
+    validation-method "Track percentage of bookings where the pet has no prior visit history
+                       at the clinic"
+    status proposed
+    proposes "Vet search and discovery"
+    predicts "Onboard 500 clinics in 12 months"
+  }
+
+  feature "Online appointment booking" {
+    summary "Pet owners can browse available slots and book appointments with nearby clinics online"
+    persona "Pet owner"
+    value-proposition "Eliminates the need to call during business hours — book anytime, anywhere"
+    priority must
+    status accepted
+    addresses "Book a vet appointment without calling", "Feel reassured about my pet's care"
+    advances "Achieve pet owner booking adoption", "Reduce clinic phone booking time"
+    tested-by "Online booking reduces phone load"
+    non-goals {
+      "Support walk-in queue management — this is for scheduled appointments only"
+      "Handle emergency triage — emergencies should call the clinic directly"
+    }
+    stories {
+      "As a pet owner, I want to see available time slots for a clinic,
+       so that I can pick a time that fits my schedule." {
+        acceptance-criteria {
+          "Available slots are displayed for at least 14 days ahead"
+          "Slots show date, time, duration, and consultation type"
+          "Already-booked slots are not shown"
+        }
+      }
+      "As a pet owner, I want to confirm a booking and receive a confirmation,
+       so that I know my appointment is secured." {
+        acceptance-criteria {
+          "Booking confirmation is displayed immediately after submission"
+          "Confirmation email and/or push notification is sent within 1 minute"
+          "Booking appears in the pet owner's upcoming appointments list"
+          "Clinic's calendar is updated in real time"
+        }
+      }
+      "As a pet owner, I want to cancel or reschedule my appointment,
+       so that I can adjust plans without wasting the clinic's time." {
+        acceptance-criteria {
+          "Cancellation is possible up to 24 hours before the appointment"
+          "Rescheduling offers alternative available slots"
+          "Clinic is notified immediately of cancellation or reschedule"
+          "Freed slot becomes available for other pet owners"
+        }
+      }
+    }
+  }
+
+  feature "Vet search and discovery" {
+    summary "Pet owners can search for veterinary clinics by location, specialty, availability,
+             and ratings"
+    persona "Pet owner"
+    value-proposition "Helps pet owners find the right vet nearby — no more guessing or
+                       relying solely on word of mouth"
+    priority must
+    status accepted
+    addresses "Find a trusted vet nearby"
+    advances "Onboard 500 clinics in 12 months", "Achieve pet owner booking adoption"
+    tested-by "Vet search drives new patient acquisition for clinics"
+    non-goals {
+      "Provide clinic rankings or paid placement — search results are organic only"
+      "Show pricing for consultations — pricing is at the clinic's discretion"
+    }
+    stories {
+      "As a pet owner, I want to search for vets near my location,
+       so that I can find a convenient clinic." {
+        acceptance-criteria {
+          "Search uses geolocation or manual address entry"
+          "Results show clinics within a configurable radius (default 10 km)"
+          "Results display clinic name, address, distance, rating, and next available slot"
+        }
+      }
+      "As a pet owner, I want to filter clinics by specialty or animal type,
+       so that I find a vet qualified for my pet's needs." {
+        acceptance-criteria {
+          "Filters include animal type (dog, cat, NAC), specialty (dermatology, surgery, etc.)"
+          "Filter results update in real time"
+        }
+      }
+      "As a pet owner, I want to view a clinic profile with details and reviews,
+       so that I can decide if I trust this clinic." {
+        acceptance-criteria {
+          "Profile shows address, opening hours, team, specialties, and photos"
+          "Reviews from other pet owners are displayed with ratings"
+          "A direct 'Book appointment' action is available from the profile"
+        }
+      }
+    }
+  }
+
+  feature "Appointment reminders" {
+    summary "Automated reminders are sent to pet owners before upcoming appointments via SMS
+             and push notification"
+    persona "Pet owner"
+    value-proposition "Prevents forgotten appointments, reducing no-shows for clinics and
+                       missed care for pets"
+    priority must
+    status accepted
+    addresses "Get reminders for upcoming pet care", "Reduce no-shows"
+    advances "Reduce clinic no-show rate"
+    tested-by "Automated reminders reduce no-shows"
+    non-goals {
+      "Replace clinic-initiated communication — reminders are platform-generated, clinics can still contact owners directly"
+    }
+    stories {
+      "As a pet owner, I want to receive a reminder 48 hours before my appointment,
+       so that I can confirm or cancel in time." {
+        acceptance-criteria {
+          "Reminder is sent via SMS and push notification 48 hours before"
+          "Reminder includes date, time, clinic name, and pet name"
+          "Owner can confirm or cancel directly from the reminder"
+        }
+      }
+      "As a pet owner, I want a same-day reminder 2 hours before my appointment,
+       so that I don't forget when the moment comes." {
+        acceptance-criteria {
+          "Reminder is sent 2 hours before the appointment"
+          "Reminder includes directions to the clinic"
+        }
+      }
+      "As a clinic manager, I want to see which owners have confirmed via reminders,
+       so that I can anticipate no-shows and act early." {
+        acceptance-criteria {
+          "Dashboard shows confirmation status per appointment"
+          "Unconfirmed appointments are highlighted 24 hours before"
+        }
+      }
+    }
+  }
+
+  feature "Clinic schedule management" {
+    summary "Clinics can define their availability, manage bookings, and view their appointment
+             calendar in a back-office dashboard"
+    persona "Clinic manager"
+    value-proposition "Gives clinics control over their online availability and a unified view
+                       of all bookings — phone and online"
+    priority must
+    status accepted
+    addresses "Fill the schedule efficiently"
+    advances "Reduce clinic phone booking time", "Onboard 500 clinics in 12 months"
+    non-goals {
+      "Replace the clinic's existing practice management system — we sync, not replace"
+      "Handle staff HR scheduling — this is patient appointment scheduling only"
+    }
+    stories {
+      "As a clinic manager, I want to define available time slots per veterinarian,
+       so that only bookable slots are shown to pet owners." {
+        acceptance-criteria {
+          "Slots can be created by day, time, duration, and vet"
+          "Recurring availability patterns can be defined (e.g., every Tuesday 9-12)"
+          "Individual slots can be blocked or modified"
+        }
+      }
+      "As a clinic manager, I want to view all appointments in a calendar view,
+       so that I can manage the daily schedule at a glance." {
+        acceptance-criteria {
+          "Calendar shows day, week, and month views"
+          "Appointments show pet name, owner name, type of visit, and status"
+          "Online and manually-added appointments are visually distinguished"
+        }
+      }
+      "As a clinic manager, I want to receive notifications for new bookings and cancellations,
+       so that I can react in real time." {
+        acceptance-criteria {
+          "Email and/or push notification sent for each new booking"
+          "Notification sent for each cancellation"
+          "Notifications are configurable (can be turned off)"
+        }
+      }
+    }
+  }
+
+  feature "Pet medical history" {
+    summary "Pet owners can view their pet's medical history including past consultations,
+             vaccinations, and treatments across all clinics on the platform"
+    persona "Pet owner"
+    value-proposition "A single place to see your pet's health record — no more lost paper files
+                       or repeating history at every new vet"
+    priority should
+    status accepted
+    addresses "Access my pet's medical history", "Maintain accessible patient records"
+    advances "Achieve pet owner booking adoption"
+    non-goals {
+      "Store diagnostic images (X-rays, ultrasounds) — only text-based records for V1"
+      "Allow pet owners to edit medical records — only vets can write clinical data"
+    }
+    stories {
+      "As a pet owner, I want to see a timeline of my pet's consultations and treatments,
+       so that I can track their health history." {
+        acceptance-criteria {
+          "Timeline displays consultations in reverse chronological order"
+          "Each entry shows date, clinic, vet, reason for visit, and summary"
+          "Vaccination records are highlighted with next-due dates"
+        }
+      }
+      "As a pet owner, I want to share my pet's record with a new vet,
+       so that they have full context before the first visit." {
+        acceptance-criteria {
+          "Owner can generate a shareable link or PDF of the pet's record"
+          "Shared record includes all consultations and vaccinations"
+          "Sharing requires explicit owner consent (GDPR)"
+        }
+      }
+      "As a veterinarian, I want to view a pet's history before the consultation,
+       so that I can prepare and avoid redundant exams." {
+        acceptance-criteria {
+          "Full history is accessible from the appointment detail view"
+          "History includes records from other clinics on the platform"
+          "Vet can add consultation notes after the visit"
+        }
+      }
+    }
+  }
+
+  feature "Clinic profile and onboarding" {
+    summary "Clinics can create and manage their public profile with information, photos,
+             specialties, and team details"
+    persona "Clinic manager"
+    value-proposition "An online presence that attracts new clients and builds trust
+                       through transparency"
+    priority must
+    status accepted
+    addresses "Fill the schedule efficiently", "Find a trusted vet nearby"
+    advances "Onboard 500 clinics in 12 months"
+    non-goals {
+      "Provide a full clinic website — this is a profile within the platform, not a website builder"
+    }
+    stories {
+      "As a clinic manager, I want to set up my clinic profile with address, hours,
+       and specialties, so that pet owners can find and evaluate my clinic." {
+        acceptance-criteria {
+          "Profile creation takes less than 15 minutes"
+          "Required fields: name, address, phone, opening hours, animal types served"
+          "Optional: photos, team bios, specialties, languages spoken"
+        }
+      }
+      "As a clinic manager, I want to see how many views and bookings my profile generates,
+       so that I can assess the platform's value." {
+        acceptance-criteria {
+          "Dashboard shows profile views, booking requests, and confirmed appointments"
+          "Data is available for the last 30, 90, and 365 days"
+        }
+      }
+    }
+  }
+
+  feature "Vaccination and care reminders" {
+    summary "Pet owners receive proactive reminders for upcoming vaccinations, deworming,
+             and annual checkups based on their pet's health calendar"
+    persona "Pet owner"
+    value-proposition "Keeps pets healthy by ensuring preventive care is never forgotten"
+    priority should
+    status proposed
+    addresses "Get reminders for upcoming pet care"
+    advances "Achieve pet owner booking adoption", "Reduce clinic no-show rate"
+    stories {
+      "As a pet owner, I want to receive a reminder when my pet's vaccination is due,
+       so that I can book a vet visit in time." {
+        acceptance-criteria {
+          "Reminder sent 2 weeks before vaccination due date"
+          "Reminder includes a direct link to book at the pet's usual clinic"
+          "Due dates are derived from the pet's medical record"
+        }
+      }
+    }
+  }
+
+  feature "Pet owner reviews" {
+    summary "Pet owners can leave ratings and written reviews for clinics they have visited"
+    persona "Pet owner"
+    value-proposition "Helps other owners choose the right vet, and gives clinics feedback
+                       to improve"
+    priority could
+    status proposed
+    addresses "Find a trusted vet nearby"
+    advances "Achieve pet owner booking adoption"
+    non-goals {
+      "Allow anonymous reviews — all reviews are tied to verified visits"
+    }
+    stories {
+      "As a pet owner, I want to leave a review after my visit,
+       so that I can help other pet owners choose wisely." {
+        acceptance-criteria {
+          "Review is only possible after a confirmed and completed appointment"
+          "Review includes a 1-5 star rating and optional text"
+          "Clinic can respond to reviews publicly"
+        }
+      }
+    }
+  }
+
+  assumption "Clinics will adopt an online booking tool" {
+    statement "Veterinary clinics in France are willing to adopt an online booking platform
+               if it reduces their phone scheduling burden and brings new clients"
+    impact-if-wrong "Insufficient supply-side adoption makes the platform useless for pet owners,
+                     creating a chicken-and-egg failure"
+    validation-plan "Pilot with 30 clinics in Ile-de-France — measure onboarding completion rate,
+                     weekly active usage, and qualitative satisfaction at 1 and 3 months"
+    status unvalidated
+    underpins "Online appointment booking", "Clinic schedule management", "Clinic profile and onboarding"
+  }
+
+  assumption "Pet owners will switch from phone to online booking" {
+    statement "Pet owners will prefer online booking over calling once the option is available,
+               based on the behavioral shift observed in human healthcare with Doctolib"
+    impact-if-wrong "Low demand-side adoption despite clinic availability — platform has supply
+                     but no demand"
+    validation-plan "Track booking channel split (online vs. phone) for onboarded clinics at
+                     1, 3, and 6 months post-onboarding"
+    status unvalidated
+    underpins "Online appointment booking", "Vet search and discovery"
+  }
+
+  assumption "SMS reminders are effective for pet owners" {
+    statement "SMS and push reminders will significantly reduce no-show rates, similar to their
+               proven effect in human healthcare"
+    impact-if-wrong "Reminder feature delivers no measurable value, undermining a key
+                     selling point to clinics"
+    validation-plan "A/B test: 50% of appointments get reminders, 50% don't — compare no-show
+                     rates after 500 appointments"
+    status unvalidated
+    underpins "Appointment reminders"
+  }
+
+  assumption "Clinics will input medical records" {
+    statement "Veterinarians or clinic staff will enter consultation summaries into the platform
+               after visits, providing data for the pet medical history feature"
+    impact-if-wrong "Medical history feature has no data and delivers no value to pet owners"
+    validation-plan "Measure record completion rate in pilot clinics at 1 and 3 months —
+                     target: >60% of consultations have a summary entered"
+    status unvalidated
+    underpins "Pet medical history"
+  }
+
+  risk "Chicken-and-egg marketplace cold start" {
+    statement "Pet owners won't use the platform without enough clinics, and clinics won't
+               join without enough pet owners — classic two-sided marketplace failure"
+    likelihood high
+    impact critical
+    mitigation mitigate
+    owner "Head of Growth"
+    threatens "Onboard 500 clinics in 12 months", "Achieve pet owner booking adoption"
+  }
+
+  risk "GDPR non-compliance penalty" {
+    statement "Mishandling personal data (pet owner PII, medical records) could result in
+               GDPR fines of up to 4% of annual turnover and reputational damage"
+    likelihood low
+    impact critical
+    mitigation mitigate
+    owner "Head of Legal / DPO"
+    threatens "GDPR compliance"
+  }
+
+  risk "Incumbent PMS vendor competition" {
+    statement "Existing veterinary practice management software vendors (Vetocom, Gmvet)
+               may add online booking features, leveraging their installed base"
+    likelihood medium
+    impact high
+    mitigation mitigate
+    owner "Head of Product"
+    threatens "Onboard 500 clinics in 12 months"
+  }
+
+  risk "Low clinic engagement post-onboarding" {
+    statement "Clinics sign up but do not actively maintain their availability or adopt the tool,
+               leading to stale listings and a poor pet owner experience"
+    likelihood medium
+    impact high
+    mitigation mitigate
+    owner "Head of Customer Success"
+    threatens "Reduce clinic phone booking time", "Achieve pet owner booking adoption"
+  }
+
+  constraint "GDPR compliance for personal data" {
+    statement "All personal data (pet owner identity, contact details, pet medical records)
+               must comply with GDPR. This includes consent management, right to access,
+               right to erasure, data portability, and breach notification within 72 hours."
+    source regulatory
+    constrains "Online appointment booking", "Pet medical history", "Appointment reminders",
+               "Vet search and discovery", "Pet owner reviews"
+  }
+
+  constraint "Health data sensitivity" {
+    statement "Pet medical records, while not human health data under GDPR's special categories,
+               contain personal data (owner identity linked to pet health). Processing must
+               have a clear legal basis and data minimization must be enforced."
+    source regulatory
+    constrains "Pet medical history"
+  }
+
+  constraint "SMS regulations (France)" {
+    statement "SMS reminders must comply with French anti-spam regulations (CNIL guidelines).
+               Opt-in consent is required before sending any commercial or reminder SMS."
+    source regulatory
+    constrains "Appointment reminders", "Vaccination and care reminders"
+  }
+
+  constraint "France-first launch" {
+    statement "Initial launch is restricted to France. All UX, legal compliance, and
+               go-to-market efforts are focused on the French market."
+    source organizational
+    constrains "Vet search and discovery", "Clinic profile and onboarding"
+  }
+
+  open-question "Business model and pricing" {
+    question "What is the pricing model for clinics? Freemium, monthly subscription,
+              per-booking commission, or hybrid?"
+    context "Pricing directly impacts clinic onboarding velocity and revenue sustainability.
+             A free tier may accelerate adoption but delay monetization."
+    owner "CEO / Head of Growth"
+    deadline 2026-05-01
+    status open
+    blocks "Clinic profile and onboarding"
+  }
+
+  open-question "PMS integration strategy" {
+    question "Should we build integrations with existing veterinary practice management
+              systems (Vetocom, Gmvet, etc.) for V1, or launch standalone?"
+    context "Integration reduces double-entry friction for clinics but adds technical
+             complexity and dependency on third-party APIs. Standalone is faster to build
+             but may deter clinics already invested in a PMS."
+    owner "Head of Product"
+    deadline 2026-05-15
+    status open
+    blocks "Clinic schedule management", "Pet medical history"
+  }
+
+  open-question "Medical record data ownership" {
+    question "Who owns the pet medical record data — the pet owner, the clinic, or the platform?
+              What happens to records if a clinic leaves the platform?"
+    context "This has legal (GDPR), ethical, and product implications. Data portability and
+             retention policies must be defined before launch."
+    owner "Head of Legal / DPO"
+    deadline 2026-04-15
+    status open
+    blocks "Pet medical history"
+  }
+
+  open-question "Cold start strategy for marketplace" {
+    question "What is the geographic and tactical strategy for solving the cold-start problem?
+              City-by-city launch? Clinic-first with manual pet owner acquisition?"
+    context "The marketplace needs both supply (clinics) and demand (pet owners) to be useful.
+             Launching everywhere at once risks thin supply. A focused geographic launch
+             (e.g., Paris first) may build density."
+    owner "Head of Growth"
+    deadline 2026-04-01
+    status open
+    blocks "Onboard 500 clinics in 12 months"
+  }
+
+  journey "Pet owner books an appointment" for "Pet owner" {
+    trigger "Pet owner notices their dog is due for annual vaccination"
+    outcome "Appointment is confirmed, owner has a reminder set, and clinic's calendar is updated"
+    steps {
+      1 "Opens the VetBooking app on their phone" {
+        system-response "Displays home screen with nearby clinics and upcoming appointments"
+        channel app
+        emotional-tone neutral
+      }
+      2 "Searches for their usual clinic or browses nearby options" {
+        system-response "Shows clinic list with ratings, distance, and next available slot"
+        channel app
+        emotional-tone confident
+      }
+      3 "Selects a clinic and views available slots" {
+        system-response "Displays calendar with bookable time slots for the selected clinic"
+        channel app
+        emotional-tone confident
+      }
+      4 "Picks a slot and selects their pet and visit reason" {
+        system-response "Shows booking summary: date, time, clinic, pet, visit type"
+        channel app
+        emotional-tone confident
+      }
+      5 "Confirms the booking" {
+        system-response "Displays confirmation with appointment details; sends confirmation
+                         email and push notification; updates clinic calendar"
+        channel app
+        emotional-tone delighted
+      }
+      6 "Receives a reminder 48 hours before the appointment" {
+        system-response "Sends SMS and push notification with appointment details and
+                         confirm/cancel options"
+        channel sms
+        emotional-tone neutral
+      }
+      7 "Goes to the clinic for the appointment" {
+        channel external
+        emotional-tone neutral
+      }
+    }
+  }
+
+  journey "Clinic manager sets up and manages schedule" for "Clinic manager" {
+    trigger "Clinic decides to join VetBooking to reduce phone scheduling"
+    outcome "Clinic profile is live, availability is published, and bookings flow in"
+    steps {
+      1 "Receives onboarding invitation and creates account" {
+        system-response "Guided onboarding flow: clinic details, team, opening hours"
+        channel web
+        emotional-tone neutral
+      }
+      2 "Configures available appointment slots and types" {
+        system-response "Calendar interface to define recurring and one-off availability"
+        channel web
+        emotional-tone neutral
+      }
+      3 "Publishes the clinic profile" {
+        system-response "Profile goes live and becomes discoverable by pet owners"
+        channel web
+        emotional-tone confident
+      }
+      4 "Receives first online booking notification" {
+        system-response "Email and dashboard notification with booking details"
+        channel web
+        emotional-tone delighted
+      }
+      5 "Views daily schedule with online and manual appointments" {
+        system-response "Calendar view with all appointments, color-coded by source"
+        channel web
+        emotional-tone confident
+      }
+      6 "Reviews no-show and confirmation analytics" {
+        system-response "Dashboard shows no-show rate, confirmation rate, and booking trends"
+        channel web
+        emotional-tone confident
+      }
+    }
+  }
+
+  release "R1 — Core Booking Loop" {
+    target-date "Q3 2026"
+    theme "Minimum viable marketplace: search, book, manage, remind"
+    status planned
+    includes {
+      "Online appointment booking"
+      "Vet search and discovery"
+      "Appointment reminders"
+      "Clinic schedule management"
+      "Clinic profile and onboarding"
+    }
+    exit-criteria {
+      "All must features pass acceptance testing"
+      "No P0 bugs open"
+      "30 pilot clinics onboarded and actively publishing availability"
+      "GDPR compliance audit passed"
+      "Booking flow end-to-end tested with 100 pet owners in pilot"
+    }
+  }
+
+  release "R2 — Trust and Retention" {
+    target-date "Q4 2026"
+    theme "Medical history and reviews to deepen engagement and trust"
+    status planned
+    depends-on "R1 — Core Booking Loop"
+    includes {
+      "Pet medical history"
+      "Pet owner reviews"
+      "Vaccination and care reminders"
+    }
+    exit-criteria {
+      "Pet medical history accessible for pilot clinic patients"
+      "Review system moderation workflow operational"
+      "Vaccination reminder logic validated against real pet records"
+    }
+  }
+}

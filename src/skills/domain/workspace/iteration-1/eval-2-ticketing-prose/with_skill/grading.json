@@ -1,0 +1,12 @@
+{"expectations": [
+  {"text": "Uses .domain structured syntax", "passed": true, "evidence": "File uses structured blocks: value, entity, aggregate, statemachine, module, enum, service, reaction, temporal-event, reconciliation, agreement keywords throughout"},
+  {"text": "At least 2 entities", "passed": true, "evidence": "8 entities: Organizer, Event, TicketTier, Buyer, Ticket, WaitlistEntry, Payment (7 entity blocks plus implicit via aggregate)"},
+  {"text": "At least 1 aggregate", "passed": true, "evidence": "aggregate EventAggregate defined at line 455 with root Event containing Event and TicketTier"},
+  {"text": "At least 2 value types", "passed": true, "evidence": "7 value types: Money, Percentage, DateRange, Address, RefundScale, AttendeeInfo, TransferRecord"},
+  {"text": "Commands use PascalCase verb+noun", "passed": true, "evidence": "CreateEvent, PublishEvent, ReserveTicket, ConfirmTicketPurchase, TransferTicket, RequestTicketRefund, JoinWaitlist, InitiatePayment, etc."},
+  {"text": "Events use past participle", "passed": true, "evidence": "EventCreated, EventPublished, TicketReserved, TicketPurchased, TicketTransferred, TicketRefunded, WaitlistJoined, PaymentInitiated, PaymentCompleted, etc."},
+  {"text": "At least 1 state machine", "passed": true, "evidence": "3 state machines: EventLifecycle (line 307), TicketLifecycle (line 706), WaitlistEntryLifecycle (line 854), PaymentLifecycle (line 1128)"},
+  {"text": "At least 1 invariant", "passed": true, "evidence": "Multiple invariants: eventDateMustBeFuture, refundPolicyMustBeOrdered, mustHaveAtLeastOneTier, soldCannotExceedCapacity, salesWindowValid, transferredTicketRetainsEvent, checkinOnlyForPurchased, offerMustHaveExpiry, refundCannotExceedPayment"},
+  {"text": "Error paths exist", "passed": true, "evidence": "Error blocks on operations: EventCancellationFailed, TicketReservationFailed, TicketTransferFailed, TicketRefundRequestFailed, TicketCheckInFailed, PaymentFailed, RefundPaymentFailed"},
+  {"text": "No technical jargon in names", "passed": true, "evidence": "No 'database', 'API', or 'DTO' found in entity or value type names"}
+]}

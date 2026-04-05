@@ -1,0 +1,2804 @@
+// =============================================================================
+// VetBooking — Domain Model
+//
+// Organization: VetBooking
+// Bounded Contexts:
+//   ClinicManagement       — clinic profiles, veterinarian roster, onboarding
+//   ScheduleManagement     — availability slots, recurring patterns, calendar
+//   AppointmentBooking     — booking lifecycle: request, confirm, cancel, reschedule, no-show
+//   PetHealthRecord        — pet registry, medical history, consultations, vaccinations
+//   ClinicDiscovery        — search, filtering, clinic ratings and reviews
+//   Notification           — reminders, confirmations, alerts across channels
+//
+// Source: vetbooking.prd (no system requirements — satisfies left empty)
+//
+// Context Map:
+//   ScheduleManagement  -[C/S]->  ClinicManagement
+//   AppointmentBooking  -[C/S]->  ScheduleManagement
+//   AppointmentBooking  -[C/S]->  PetHealthRecord
+//   ClinicDiscovery     -[ACL]->  ClinicManagement
+//   ClinicDiscovery     -[ACL]->  AppointmentBooking
+//   Notification        -[ACL]->  AppointmentBooking
+//   Notification        -[ACL]->  PetHealthRecord
+//   PetHealthRecord     -[C/S]->  AppointmentBooking
+// =============================================================================
+
+
+// #############################################################################
+//  SHARED VALUE TYPES
+// #############################################################################
+
+value Address :: "A postal address in France" {
+    fields {
+        street     : string
+        city       : string
+        postalCode : string maxLength(5)
+        country    : string default("FR") maxLength(2)
+        latitude   : decimal optional min(-90) max(90)
+        longitude  : decimal optional min(-180) max(180)
+    }
+}
+
+value GeoCoordinate :: "A geographic point used for proximity search" {
+    fields {
+        latitude  : decimal min(-90) max(90)
+        longitude : decimal min(-180) max(180)
+    }
+}
+
+value TimeSlot :: "A bookable time window defined by start and duration" {
+    fields {
+        startTime       : datetime
+        durationMinutes : int min(5)
+    }
+    invariants {
+        positiveDuration :: "Duration must be positive" {
+            durationMinutes > 0
+        }
+    }
+}
+
+value ContactInfo :: "Contact details for a pet owner or clinic" {
+    fields {
+        email : string
+        phone : string optional
+    }
+}
+
+value Rating :: "A numeric rating on a 1-to-5 scale" {
+    fields {
+        score : int min(1) max(5)
+    }
+}
+
+value DateRange :: "A period defined by a start and end date" {
+    fields {
+        startDate : date
+        endDate   : date
+    }
+    invariants {
+        startBeforeEnd :: "Start date must precede or equal end date" {
+            startDate <= endDate
+        }
+    }
+}
+
+
+// #############################################################################
+//  CLINIC MANAGEMENT CONTEXT
+// #############################################################################
+
+module ClinicManagement
+
+// =============================================================================
+// Enums — Clinic Management
+// =============================================================================
+
+enum ClinicStatus {
+    draft
+    published
+    suspended
+}
+
+enum AnimalType {
+    dog
+    cat
+    nac
+}
+
+// =============================================================================
+// Value Types — Clinic Management
+// =============================================================================
+
+value OpeningHours :: "Weekly opening hours for a clinic" {
+    fields {
+        dayOfWeek : string
+        openTime  : string
+        closeTime : string
+    }
+    invariants {
+        openBeforeClose :: "Opening time must precede closing time" {
+            openTime < closeTime
+        }
+    }
+}
+
+value Specialty :: "A veterinary specialty offered by a clinic" {
+    fields {
+        name : string
+    }
+}
+
+value TeamMember :: "A veterinarian or staff member displayed on the clinic profile" {
+    fields {
+        name      : string
+        role      : string
+        biography : string optional
+    }
+}
+
+// =============================================================================
+// Entities — Clinic Management
+// =============================================================================
+
+entity Clinic :: "A veterinary clinic registered on the platform" {
+    satisfies []
+    identifier id : UUID
+    fields {
+        name           : string
+        address        : Address
+        phone          : string
+        status         : ClinicStatus default("draft")
+        animalTypes    : list<AnimalType>
+        specialties    : list<Specialty>
+        openingHours   : list<OpeningHours>
+        team           : list<TeamMember>
+        photos         : list<string> optional
+        languages      : list<string> optional
+        averageRating  : decimal optional min(0) max(5)
+        totalReviews   : int default("0") min(0)
+        profileViews   : int default("0") min(0)
+        createdAt      : datetime immutable
+        updatedAt      : datetime
+    }
+    references {
+        veterinarians : Veterinarian 1..N
+    }
+
+    invariants {
+        publishedClinicHasRequiredFields :: "A published clinic must have name, address, phone, hours, and animal types" {
+            if status = published {
+                name is defined and address is defined and phone is defined
+                and openingHours is defined and animalTypes is defined
+            }
+        }
+    }
+
+    operations {
+        "Register clinic" on RegisterClinic {
+            satisfies []
+
+            creates Clinic {
+                name         = registerClinic.name
+                address      = registerClinic.address
+                phone        = registerClinic.phone
+                status       = draft
+                animalTypes  = registerClinic.animalTypes
+                openingHours = registerClinic.openingHours
+                createdAt    = now()
+                updatedAt    = now()
+            }
+
+            emits ClinicRegistered {
+                clinicId  = Clinic.id
+                name      = Clinic.name
+                createdAt = Clinic.createdAt
+            }
+        }
+
+        "Update clinic profile" on UpdateClinicProfile {
+            satisfies []
+            resolves Clinic from updateClinicProfile.clinicId
+
+            sets Clinic {
+                name         = updateClinicProfile.name
+                address      = updateClinicProfile.address
+                phone        = updateClinicProfile.phone
+                animalTypes  = updateClinicProfile.animalTypes
+                specialties  = updateClinicProfile.specialties
+                openingHours = updateClinicProfile.openingHours
+                team         = updateClinicProfile.team
+                photos       = updateClinicProfile.photos
+                languages    = updateClinicProfile.languages
+                updatedAt    = now()
+            }
+
+            emits ClinicProfileUpdated {
+                clinicId  = Clinic.id
+                updatedAt = Clinic.updatedAt
+            }
+        }
+
+        "Publish clinic" on PublishClinic {
+            satisfies []
+            resolves Clinic from publishClinic.clinicId
+
+            precondition "Clinic must have required fields" {
+                Clinic.name is defined and Clinic.address is defined
+                and Clinic.phone is defined and Clinic.openingHours is defined
+                and Clinic.animalTypes is defined
+                violation "Cannot publish clinic without required profile information"
+            }
+
+            precondition "Clinic must be in draft or suspended status" {
+                Clinic.status = draft or Clinic.status = suspended
+                violation "Clinic is already published"
+            }
+
+            sets Clinic {
+                status    = published
+                updatedAt = now()
+            }
+
+            emits ClinicPublished {
+                clinicId    = Clinic.id
+                publishedAt = now()
+            }
+        }
+
+        "Suspend clinic" on SuspendClinic {
+            satisfies []
+            resolves Clinic from suspendClinic.clinicId
+
+            precondition "Clinic must be published" {
+                Clinic.status = published
+                violation "Only published clinics can be suspended"
+            }
+
+            sets Clinic {
+                status    = suspended
+                updatedAt = now()
+            }
+
+            emits ClinicSuspended {
+                clinicId    = Clinic.id
+                suspendedAt = now()
+                reason      = suspendClinic.reason
+            }
+        }
+
+        "Record profile view" on RecordProfileView {
+            satisfies []
+            resolves Clinic from recordProfileView.clinicId
+
+            sets Clinic {
+                profileViews = Clinic.profileViews + 1
+            }
+
+            emits ClinicProfileViewed {
+                clinicId = Clinic.id
+                viewedAt = now()
+            }
+        }
+    }
+}
+
+statemachine ClinicLifecycle {
+    on Clinic
+    start draft
+    state draft {}
+    state published {
+        invariant publishedClinicHasRequiredFields
+    }
+    state suspended {}
+    transition draft -> published triggered-by "Publish clinic"
+    transition suspended -> published triggered-by "Publish clinic"
+    transition published -> suspended triggered-by "Suspend clinic"
+    final suspended
+}
+
+entity Veterinarian :: "A licensed veterinary professional attached to a clinic" {
+    satisfies []
+    identifier id : UUID
+    fields {
+        firstName   : string
+        lastName    : string
+        specialties : list<Specialty>
+        clinicId    : UUID
+        createdAt   : datetime immutable
+    }
+    references {
+        clinic : Clinic 1..1
+    }
+
+    operations {
+        "Register veterinarian" on RegisterVeterinarian {
+            satisfies []
+
+            creates Veterinarian {
+                firstName   = registerVeterinarian.firstName
+                lastName    = registerVeterinarian.lastName
+                specialties = registerVeterinarian.specialties
+                clinicId    = registerVeterinarian.clinicId
+                createdAt   = now()
+            }
+
+            emits VeterinarianRegistered {
+                veterinarianId = Veterinarian.id
+                clinicId       = Veterinarian.clinicId
+                firstName      = Veterinarian.firstName
+                lastName       = Veterinarian.lastName
+            }
+        }
+
+        "Update veterinarian profile" on UpdateVeterinarianProfile {
+            satisfies []
+            resolves Veterinarian from updateVeterinarianProfile.veterinarianId
+
+            sets Veterinarian {
+                firstName   = updateVeterinarianProfile.firstName
+                lastName    = updateVeterinarianProfile.lastName
+                specialties = updateVeterinarianProfile.specialties
+            }
+
+            emits VeterinarianProfileUpdated {
+                veterinarianId = Veterinarian.id
+                updatedAt      = now()
+            }
+        }
+    }
+}
+
+// =============================================================================
+// Aggregates — Clinic Management
+// =============================================================================
+
+aggregate ClinicAggregate :: "Clinic with its veterinarians" {
+    satisfies []
+    root Clinic
+    contains Clinic, Veterinarian
+}
+
+// =============================================================================
+// Commands — Clinic Management
+// =============================================================================
+
+command RegisterClinic :: "Intent to register a new clinic on the platform" {
+    satisfies []
+    fields {
+        correlationId : UUID
+        name          : string
+        address       : Address
+        phone         : string
+        animalTypes   : list<AnimalType>
+        openingHours  : list<OpeningHours>
+    }
+}
+
+command UpdateClinicProfile :: "Intent to update a clinic's profile information" {
+    satisfies []
+    fields {
+        correlationId : UUID
+        clinicId      : UUID
+        name          : string
+        address       : Address
+        phone         : string
+        animalTypes   : list<AnimalType>
+        specialties   : list<Specialty>
+        openingHours  : list<OpeningHours>
+        team          : list<TeamMember>
+        photos        : list<string> optional
+        languages     : list<string> optional
+    }
+}
+
+command PublishClinic :: "Intent to make a clinic discoverable by pet owners" {
+    satisfies []
+    fields {
+        correlationId : UUID
+        clinicId      : UUID
+    }
+}
+
+command SuspendClinic :: "Intent to temporarily remove a clinic from public visibility" {
+    satisfies []
+    fields {
+        correlationId : UUID
+        clinicId      : UUID
+        reason        : string
+    }
+}
+
+command RegisterVeterinarian :: "Intent to add a veterinarian to a clinic" {
+    satisfies []
+    fields {
+        correlationId : UUID
+        clinicId      : UUID
+        firstName     : string
+        lastName      : string
+        specialties   : list<Specialty>
+    }
+}
+
+command UpdateVeterinarianProfile :: "Intent to update a veterinarian's details" {
+    satisfies []
+    fields {
+        correlationId    : UUID
+        veterinarianId   : UUID
+        firstName        : string
+        lastName         : string
+        specialties      : list<Specialty>
+    }
+}
+
+command RecordProfileView :: "Intent to record that a pet owner viewed a clinic profile" {
+    satisfies []
+    fields {
+        correlationId : UUID
+        clinicId      : UUID
+    }
+}
+
+// =============================================================================
+// Events — Clinic Management
+// =============================================================================
+
+event ClinicRegistered :: "A new clinic was registered on the platform" {
+    satisfies []
+    fields {
+        clinicId  : UUID
+        name      : string
+        createdAt : datetime
+    }
+}
+
+event ClinicProfileUpdated :: "A clinic's profile information was changed" {
+    satisfies []
+    fields {
+        clinicId  : UUID
+        updatedAt : datetime
+    }
+}
+
+event ClinicPublished :: "A clinic became publicly visible and discoverable" {
+    satisfies []
+    fields {
+        clinicId    : UUID
+        publishedAt : datetime
+    }
+}
+
+event ClinicSuspended :: "A clinic was suspended from public visibility" {
+    satisfies []
+    fields {
+        clinicId    : UUID
+        suspendedAt : datetime
+        reason      : string
+    }
+}
+
+event ClinicProfileViewed :: "A pet owner viewed a clinic's profile" {
+    satisfies []
+    fields {
+        clinicId : UUID
+        viewedAt : datetime
+    }
+}
+
+event VeterinarianRegistered :: "A veterinarian was added to a clinic" {
+    satisfies []
+    fields {
+        veterinarianId : UUID
+        clinicId       : UUID
+        firstName      : string
+        lastName       : string
+    }
+}
+
+event VeterinarianProfileUpdated :: "A veterinarian's details were changed" {
+    satisfies []
+    fields {
+        veterinarianId : UUID
+        updatedAt      : datetime
+    }
+}
+
+
+// #############################################################################
+//  SCHEDULE MANAGEMENT CONTEXT
+// #############################################################################
+
+module ScheduleManagement
+uses module ClinicManagement
+
+// =============================================================================
+// Enums — Schedule Management
+// =============================================================================
+
+enum SlotStatus {
+    available
+    booked
+    blocked
+}
+
+enum AvailabilityPatternType {
+    recurring
+    oneOff
+}
+
+// =============================================================================
+// Value Types — Schedule Management
+// =============================================================================
+
+value RecurrencePattern :: "A recurring availability pattern (e.g. every Tuesday 9-12)" {
+    fields {
+        dayOfWeek           : string
+        startTime           : string
+        endTime             : string
+        slotDurationMinutes : int min(5)
+    }
+}
+
+value ConsultationType :: "A type of consultation offered (e.g. general checkup, vaccination)" {
+    fields {
+        name            : string
+        durationMinutes : int min(5)
+    }
+}
+
+// =============================================================================
+// Entities — Schedule Management
+// =============================================================================
+
+entity AvailabilityPattern :: "A template defining when a veterinarian is bookable" {
+    satisfies []
+    identifier id : UUID
+    fields {
+        clinicId        : UUID
+        veterinarianId  : UUID
+        patternType     : AvailabilityPatternType
+        recurrence      : RecurrencePattern optional
+        oneOffSlot      : TimeSlot optional
+        consultationTypes : list<ConsultationType>
+        validFrom       : date
+        validUntil      : date optional
+        createdAt       : datetime immutable
+    }
+    references {
+        clinic        : Clinic 1..1
+        veterinarian  : Veterinarian 1..1
+    }
+
+    invariants {
+        recurringMustHavePattern :: "A recurring pattern must define a recurrence" {
+            if patternType = recurring { recurrence is defined }
+        }
+        oneOffMustHaveSlot :: "A one-off pattern must define a time slot" {
+            if patternType = oneOff { oneOffSlot is defined }
+        }
+    }
+
+    operations {
+        "Define availability pattern" on DefineAvailabilityPattern {
+            satisfies []
+
+            creates AvailabilityPattern {
+                clinicId          = defineAvailabilityPattern.clinicId
+                veterinarianId    = defineAvailabilityPattern.veterinarianId
+                patternType       = defineAvailabilityPattern.patternType
+                recurrence        = defineAvailabilityPattern.recurrence
+                oneOffSlot        = defineAvailabilityPattern.oneOffSlot
+                consultationTypes = defineAvailabilityPattern.consultationTypes
+                validFrom         = defineAvailabilityPattern.validFrom
+                validUntil        = defineAvailabilityPattern.validUntil
+                createdAt         = now()
+            }
+
+            emits AvailabilityPatternDefined {
+                patternId      = AvailabilityPattern.id
+                clinicId       = AvailabilityPattern.clinicId
+                veterinarianId = AvailabilityPattern.veterinarianId
+                patternType    = AvailabilityPattern.patternType
+                createdAt      = AvailabilityPattern.createdAt
+            }
+        }
+
+        "Remove availability pattern" on RemoveAvailabilityPattern {
+            satisfies []
+            resolves AvailabilityPattern from removeAvailabilityPattern.patternId
+
+            emits AvailabilityPatternRemoved {
+                patternId      = AvailabilityPattern.id
+                clinicId       = AvailabilityPattern.clinicId
+                veterinarianId = AvailabilityPattern.veterinarianId
+                removedAt      = now()
+            }
+        }
+    }
+}
+
+entity Slot :: "A concrete bookable time slot generated from an availability pattern" {
+    satisfies []
+    identifier id : UUID
+    fields {
+        clinicId          : UUID
+        veterinarianId    : UUID
+        timeSlot          : TimeSlot
+        consultationType  : ConsultationType
+        status            : SlotStatus default("available")
+        patternId         : UUID optional
+        appointmentId     : UUID optional
+        createdAt         : datetime immutable
+    }
+    references {
+        clinic       : Clinic 1..1
+        veterinarian : Veterinarian 1..1
+    }
+
+    invariants {
+        bookedSlotHasAppointment :: "A booked slot must reference an appointment" {
+            if status = booked { appointmentId is defined }
+        }
+    }
+
+    operations {
+        "Create slot" on CreateSlot {
+            satisfies []
+
+            creates Slot {
+                clinicId         = createSlot.clinicId
+                veterinarianId   = createSlot.veterinarianId
+                timeSlot         = createSlot.timeSlot
+                consultationType = createSlot.consultationType
+                status           = available
+                patternId        = createSlot.patternId
+                createdAt        = now()
+            }
+
+            emits SlotCreated {
+                slotId           = Slot.id
+                clinicId         = Slot.clinicId
+                veterinarianId   = Slot.veterinarianId
+                timeSlot         = Slot.timeSlot
+                consultationType = Slot.consultationType
+            }
+        }
+
+        "Reserve slot" on ReserveSlot {
+            satisfies []
+            resolves Slot from reserveSlot.slotId
+
+            precondition "Slot must be available" {
+                Slot.status = available
+                violation "Slot is not available for booking"
+            }
+
+            sets Slot {
+                status        = booked
+                appointmentId = reserveSlot.appointmentId
+            }
+
+            emits SlotReserved {
+                slotId        = Slot.id
+                appointmentId = Slot.appointmentId
+                reservedAt    = now()
+            }
+
+            error SlotReservationFailed {
+                slotId = Slot.id
+                reason = "Slot is not available"
+            }
+        }
+
+        "Release slot" on ReleaseSlot {
+            satisfies []
+            resolves Slot from releaseSlot.slotId
+
+            precondition "Slot must be booked" {
+                Slot.status = booked
+                violation "Cannot release a slot that is not booked"
+            }
+
+            sets Slot {
+                status        = available
+                appointmentId = null
+            }
+
+            emits SlotReleased {
+                slotId     = Slot.id
+                releasedAt = now()
+            }
+        }
+
+        "Block slot" on BlockSlot {
+            satisfies []
+            resolves Slot from blockSlot.slotId
+
+            precondition "Slot must be available" {
+                Slot.status = available
+                violation "Can only block an available slot"
+            }
+
+            sets Slot {
+                status = blocked
+            }
+
+            emits SlotBlocked {
+                slotId    = Slot.id
+                blockedAt = now()
+                reason    = blockSlot.reason
+            }
+        }
+
+        "Unblock slot" on UnblockSlot {
+            satisfies []
+            resolves Slot from unblockSlot.slotId
+
+            precondition "Slot must be blocked" {
+                Slot.status = blocked
+                violation "Can only unblock a blocked slot"
+            }
+
+            sets Slot {
+                status = available
+            }
+
+            emits SlotUnblocked {
+                slotId      = Slot.id
+                unblockedAt = now()
+            }
+        }
+    }
+}
+
+statemachine SlotLifecycle {
+    on Slot
+    start available
+    state available {}
+    state booked {
+        invariant bookedSlotHasAppointment
+    }
+    state blocked {}
+    transition available -> booked triggered-by "Reserve slot"
+    transition booked -> available triggered-by "Release slot"
+    transition available -> blocked triggered-by "Block slot"
+    transition blocked -> available triggered-by "Unblock slot"
+    final booked
+}
+
+// =============================================================================
+// Commands — Schedule Management
+// =============================================================================
+
+command DefineAvailabilityPattern :: "Intent to define a new availability pattern for a veterinarian" {
+    satisfies []
+    fields {
+        correlationId     : UUID
+        clinicId          : UUID
+        veterinarianId    : UUID
+        patternType       : AvailabilityPatternType
+        recurrence        : RecurrencePattern optional
+        oneOffSlot        : TimeSlot optional
+        consultationTypes : list<ConsultationType>
+        validFrom         : date
+        validUntil        : date optional
+    }
+}
+
+command RemoveAvailabilityPattern :: "Intent to remove an availability pattern" {
+    satisfies []
+    fields {
+        correlationId : UUID
+        patternId     : UUID
+    }
+}
+
+command CreateSlot :: "Intent to create a concrete bookable slot" {
+    satisfies []
+    fields {
+        correlationId    : UUID
+        clinicId         : UUID
+        veterinarianId   : UUID
+        timeSlot         : TimeSlot
+        consultationType : ConsultationType
+        patternId        : UUID optional
+    }
+}
+
+command ReserveSlot :: "Intent to reserve a slot for an appointment" {
+    satisfies []
+    fields {
+        correlationId : UUID
+        slotId        : UUID
+        appointmentId : UUID
+    }
+}
+
+command ReleaseSlot :: "Intent to release a previously booked slot" {
+    satisfies []
+    fields {
+        correlationId : UUID
+        slotId        : UUID
+    }
+}
+
+command BlockSlot :: "Intent to block a slot so it cannot be booked" {
+    satisfies []
+    fields {
+        correlationId : UUID
+        slotId        : UUID
+        reason        : string
+    }
+}
+
+command UnblockSlot :: "Intent to unblock a previously blocked slot" {
+    satisfies []
+    fields {
+        correlationId : UUID
+        slotId        : UUID
+    }
+}
+
+// =============================================================================
+// Events — Schedule Management
+// =============================================================================
+
+event AvailabilityPatternDefined :: "An availability pattern was created for a veterinarian" {
+    satisfies []
+    fields {
+        patternId      : UUID
+        clinicId       : UUID
+        veterinarianId : UUID
+        patternType    : AvailabilityPatternType
+        createdAt      : datetime
+    }
+}
+
+event AvailabilityPatternRemoved :: "An availability pattern was removed" {
+    satisfies []
+    fields {
+        patternId      : UUID
+        clinicId       : UUID
+        veterinarianId : UUID
+        removedAt      : datetime
+    }
+}
+
+event SlotCreated :: "A concrete bookable slot was generated" {
+    satisfies []
+    fields {
+        slotId           : UUID
+        clinicId         : UUID
+        veterinarianId   : UUID
+        timeSlot         : TimeSlot
+        consultationType : ConsultationType
+    }
+}
+
+event SlotReserved :: "A slot was reserved for an appointment" {
+    satisfies []
+    fields {
+        slotId        : UUID
+        appointmentId : UUID
+        reservedAt    : datetime
+    }
+}
+
+event SlotReleased :: "A previously booked slot was released back to available" {
+    satisfies []
+    fields {
+        slotId     : UUID
+        releasedAt : datetime
+    }
+}
+
+event SlotBlocked :: "A slot was blocked by clinic staff" {
+    satisfies []
+    fields {
+        slotId    : UUID
+        blockedAt : datetime
+        reason    : string
+    }
+}
+
+event SlotUnblocked :: "A blocked slot was made available again" {
+    satisfies []
+    fields {
+        slotId      : UUID
+        unblockedAt : datetime
+    }
+}
+
+error SlotReservationFailed :: "Attempt to reserve a slot that was not available" {
+    satisfies []
+    fields {
+        slotId : UUID
+        reason : string
+    }
+}
+
+// =============================================================================
+// Domain Service — Schedule Management
+// =============================================================================
+
+service SlotGenerationService :: "Generates concrete slots from availability patterns over a date range" {
+    satisfies []
+    operations {
+        generateSlots(patternId: UUID, fromDate: date, toDate: date) :: "Generate bookable slots from an availability pattern for a given period" {
+            returns list<Slot>
+            emits SlotCreated
+        }
+    }
+}
+
+
+// #############################################################################
+//  APPOINTMENT BOOKING CONTEXT
+// #############################################################################
+
+module AppointmentBooking
+uses module ScheduleManagement
+uses module PetHealthRecord
+uses module Notification
+
+// =============================================================================
+// Enums — Appointment Booking
+// =============================================================================
+
+enum AppointmentStatus {
+    requested
+    confirmed
+    cancelled
+    rescheduled
+    completed
+    noShow
+}
+
+enum CancellationReason {
+    ownerCancelled
+    clinicCancelled
+    rescheduled
+}
+
+enum VisitReason {
+    generalCheckup
+    vaccination
+    illness
+    surgery
+    followUp
+    emergency
+    other
+}
+
+// =============================================================================
+// Value Types — Appointment Booking
+// =============================================================================
+
+value CancellationPolicy :: "Rules governing when cancellation is allowed" {
+    fields {
+        minimumHoursBeforeAppointment : int min(0)
+    }
+}
+
+// =============================================================================
+// Entities — Appointment Booking
+// =============================================================================
+
+entity Appointment :: "A scheduled visit between a pet owner, a pet, and a veterinarian at a clinic" {
+    satisfies []
+    identifier id : UUID
+    fields {
+        petOwnerId       : UUID
+        petId            : UUID
+        clinicId         : UUID
+        veterinarianId   : UUID
+        slotId           : UUID
+        visitReason      : VisitReason
+        scheduledAt      : datetime
+        durationMinutes  : int min(5)
+        status           : AppointmentStatus default("requested")
+        confirmationSentAt : datetime optional
+        cancelledAt      : datetime optional
+        cancellationReason : CancellationReason optional
+        rescheduledFromId  : UUID optional
+        completedAt      : datetime optional
+        noShowRecordedAt : datetime optional
+        createdAt        : datetime immutable
+        updatedAt        : datetime
+    }
+    references {
+        petOwner     : PetOwner 1..1
+        pet          : Pet 1..1
+        clinic       : Clinic 1..1
+        veterinarian : Veterinarian 1..1
+        slot         : Slot 1..1
+    }
+
+    invariants {
+        cancellationRequiresNotice :: "Cancellation is only allowed at least 24 hours before the appointment" {
+            if status = cancelled {
+                cancelledAt <= scheduledAt - 24 hours
+            }
+        }
+        completedAppointmentHasDate :: "A completed appointment must record the completion timestamp" {
+            if status = completed { completedAt is defined }
+        }
+    }
+
+    operations {
+        "Book appointment" on BookAppointment {
+            satisfies []
+
+            creates Appointment {
+                petOwnerId      = bookAppointment.petOwnerId
+                petId           = bookAppointment.petId
+                clinicId        = bookAppointment.clinicId
+                veterinarianId  = bookAppointment.veterinarianId
+                slotId          = bookAppointment.slotId
+                visitReason     = bookAppointment.visitReason
+                scheduledAt     = bookAppointment.scheduledAt
+                durationMinutes = bookAppointment.durationMinutes
+                status          = requested
+                createdAt       = now()
+                updatedAt       = now()
+            }
+
+            emits AppointmentBooked {
+                appointmentId  = Appointment.id
+                petOwnerId     = Appointment.petOwnerId
+                petId          = Appointment.petId
+                clinicId       = Appointment.clinicId
+                veterinarianId = Appointment.veterinarianId
+                slotId         = Appointment.slotId
+                scheduledAt    = Appointment.scheduledAt
+                visitReason    = Appointment.visitReason
+                bookedAt       = Appointment.createdAt
+            }
+
+            error AppointmentBookingFailed {
+                appointmentId = bookAppointment.correlationId
+                reason        = "Slot is not available or invalid booking data"
+            }
+        }
+
+        "Confirm appointment" on ConfirmAppointment {
+            satisfies []
+            resolves Appointment from confirmAppointment.appointmentId
+
+            precondition "Appointment must be in requested status" {
+                Appointment.status = requested
+                violation "Cannot confirm an appointment that is not in requested status"
+            }
+
+            sets Appointment {
+                status             = confirmed
+                confirmationSentAt = now()
+                updatedAt          = now()
+            }
+
+            emits AppointmentConfirmed {
+                appointmentId  = Appointment.id
+                petOwnerId     = Appointment.petOwnerId
+                clinicId       = Appointment.clinicId
+                scheduledAt    = Appointment.scheduledAt
+                confirmedAt    = now()
+            }
+        }
+
+        "Cancel appointment" on CancelAppointment {
+            satisfies []
+            resolves Appointment from cancelAppointment.appointmentId
+
+            precondition "Appointment must be cancellable" {
+                Appointment.status = requested or Appointment.status = confirmed
+                violation "Cannot cancel an appointment that is not in requested or confirmed status"
+            }
+
+            precondition "Cancellation must be at least 24 hours before appointment" {
+                now() <= Appointment.scheduledAt - 24 hours
+                violation "Cannot cancel less than 24 hours before the appointment"
+            }
+
+            sets Appointment {
+                status             = cancelled
+                cancelledAt        = now()
+                cancellationReason = cancelAppointment.reason
+                updatedAt          = now()
+            }
+
+            emits AppointmentCancelled {
+                appointmentId    = Appointment.id
+                petOwnerId       = Appointment.petOwnerId
+                clinicId         = Appointment.clinicId
+                slotId           = Appointment.slotId
+                scheduledAt      = Appointment.scheduledAt
+                cancelledAt      = now()
+                reason           = cancelAppointment.reason
+            }
+
+            error AppointmentCancellationFailed {
+                appointmentId = Appointment.id
+                reason        = "Cancellation window has passed or appointment is not cancellable"
+            }
+        }
+
+        "Reschedule appointment" on RescheduleAppointment {
+            satisfies []
+            resolves Appointment from rescheduleAppointment.appointmentId
+
+            precondition "Appointment must be in requested or confirmed status" {
+                Appointment.status = requested or Appointment.status = confirmed
+                violation "Cannot reschedule an appointment in this status"
+            }
+
+            sets Appointment {
+                status    = rescheduled
+                updatedAt = now()
+            }
+
+            emits AppointmentRescheduled {
+                appointmentId       = Appointment.id
+                previousSlotId      = Appointment.slotId
+                newSlotId           = rescheduleAppointment.newSlotId
+                newScheduledAt      = rescheduleAppointment.newScheduledAt
+                petOwnerId          = Appointment.petOwnerId
+                clinicId            = Appointment.clinicId
+                rescheduledAt       = now()
+            }
+        }
+
+        "Complete appointment" on CompleteAppointment {
+            satisfies []
+            resolves Appointment from completeAppointment.appointmentId
+
+            precondition "Appointment must be confirmed" {
+                Appointment.status = confirmed
+                violation "Can only complete a confirmed appointment"
+            }
+
+            sets Appointment {
+                status      = completed
+                completedAt = now()
+                updatedAt   = now()
+            }
+
+            emits AppointmentCompleted {
+                appointmentId  = Appointment.id
+                petOwnerId     = Appointment.petOwnerId
+                petId          = Appointment.petId
+                clinicId       = Appointment.clinicId
+                veterinarianId = Appointment.veterinarianId
+                completedAt    = now()
+            }
+        }
+
+        "Record no-show" on RecordNoShow {
+            satisfies []
+            resolves Appointment from recordNoShow.appointmentId
+
+            precondition "Appointment must be confirmed" {
+                Appointment.status = confirmed
+                violation "Can only record no-show for a confirmed appointment"
+            }
+
+            sets Appointment {
+                status           = noShow
+                noShowRecordedAt = now()
+                updatedAt        = now()
+            }
+
+            emits NoShowRecorded {
+                appointmentId  = Appointment.id
+                petOwnerId     = Appointment.petOwnerId
+                clinicId       = Appointment.clinicId
+                scheduledAt    = Appointment.scheduledAt
+                recordedAt     = now()
+            }
+        }
+    }
+}
+
+statemachine AppointmentLifecycle {
+    on Appointment
+    start requested
+    state requested {}
+    state confirmed {}
+    state cancelled {}
+    state rescheduled {}
+    state completed {}
+    state noShow {}
+    transition requested -> confirmed triggered-by "Confirm appointment"
+    transition requested -> cancelled triggered-by "Cancel appointment"
+    transition confirmed -> cancelled triggered-by "Cancel appointment"
+    transition requested -> rescheduled triggered-by "Reschedule appointment"
+    transition confirmed -> rescheduled triggered-by "Reschedule appointment"
+    transition confirmed -> completed triggered-by "Complete appointment"
+    transition confirmed -> noShow triggered-by "Record no-show"
+    final cancelled
+    final rescheduled
+    final completed
+    final noShow
+}
+
+// =============================================================================
+// Aggregates — Appointment Booking
+// =============================================================================
+
+aggregate AppointmentAggregate :: "An appointment as the consistency boundary" {
+    satisfies []
+    root Appointment
+    contains Appointment
+}
+
+// =============================================================================
+// Commands — Appointment Booking
+// =============================================================================
+
+command BookAppointment :: "Intent to book a new appointment" {
+    satisfies []
+    fields {
+        correlationId   : UUID
+        petOwnerId      : UUID
+        petId           : UUID
+        clinicId        : UUID
+        veterinarianId  : UUID
+        slotId          : UUID
+        visitReason     : VisitReason
+        scheduledAt     : datetime
+        durationMinutes : int
+    }
+}
+
+command ConfirmAppointment :: "Intent to confirm a requested appointment" {
+    satisfies []
+    fields {
+        correlationId : UUID
+        appointmentId : UUID
+    }
+}
+
+command CancelAppointment :: "Intent to cancel an existing appointment" {
+    satisfies []
+    fields {
+        correlationId : UUID
+        appointmentId : UUID
+        reason        : CancellationReason
+    }
+}
+
+command RescheduleAppointment :: "Intent to reschedule an existing appointment to a new slot" {
+    satisfies []
+    fields {
+        correlationId  : UUID
+        appointmentId  : UUID
+        newSlotId      : UUID
+        newScheduledAt : datetime
+    }
+}
+
+command CompleteAppointment :: "Intent to mark an appointment as completed after the visit" {
+    satisfies []
+    fields {
+        correlationId : UUID
+        appointmentId : UUID
+    }
+}
+
+command RecordNoShow :: "Intent to record that a pet owner did not show up" {
+    satisfies []
+    fields {
+        correlationId : UUID
+        appointmentId : UUID
+    }
+}
+
+// =============================================================================
+// Events — Appointment Booking
+// =============================================================================
+
+event AppointmentBooked :: "A new appointment was booked" {
+    satisfies []
+    fields {
+        appointmentId  : UUID
+        petOwnerId     : UUID
+        petId          : UUID
+        clinicId       : UUID
+        veterinarianId : UUID
+        slotId         : UUID
+        scheduledAt    : datetime
+        visitReason    : VisitReason
+        bookedAt       : datetime
+    }
+}
+
+event AppointmentConfirmed :: "An appointment was confirmed" {
+    satisfies []
+    fields {
+        appointmentId : UUID
+        petOwnerId    : UUID
+        clinicId      : UUID
+        scheduledAt   : datetime
+        confirmedAt   : datetime
+    }
+}
+
+event AppointmentCancelled :: "An appointment was cancelled" {
+    satisfies []
+    fields {
+        appointmentId    : UUID
+        petOwnerId       : UUID
+        clinicId         : UUID
+        slotId           : UUID
+        scheduledAt      : datetime
+        cancelledAt      : datetime
+        reason           : CancellationReason
+    }
+}
+
+event AppointmentRescheduled :: "An appointment was rescheduled to a different slot" {
+    satisfies []
+    fields {
+        appointmentId       : UUID
+        previousSlotId      : UUID
+        newSlotId           : UUID
+        newScheduledAt      : datetime
+        petOwnerId          : UUID
+        clinicId            : UUID
+        rescheduledAt       : datetime
+    }
+}
+
+event AppointmentCompleted :: "An appointment visit was completed" {
+    satisfies []
+    fields {
+        appointmentId  : UUID
+        petOwnerId     : UUID
+        petId          : UUID
+        clinicId       : UUID
+        veterinarianId : UUID
+        completedAt    : datetime
+    }
+}
+
+event NoShowRecorded :: "A pet owner did not show up for their appointment" {
+    satisfies []
+    fields {
+        appointmentId : UUID
+        petOwnerId    : UUID
+        clinicId      : UUID
+        scheduledAt   : datetime
+        recordedAt    : datetime
+    }
+}
+
+error AppointmentBookingFailed :: "Attempt to book an appointment failed" {
+    satisfies []
+    fields {
+        appointmentId : UUID
+        reason        : string
+    }
+}
+
+error AppointmentCancellationFailed :: "Attempt to cancel an appointment failed" {
+    satisfies []
+    fields {
+        appointmentId : UUID
+        reason        : string
+    }
+}
+
+// =============================================================================
+// Temporal Events — Appointment Booking
+// =============================================================================
+
+temporal event Reminder48HoursDue :: "Fires 48 hours before an appointment to send a reminder" {
+    satisfies []
+    reference AppointmentConfirmed
+    offset Appointment.scheduledAt - 48 hours
+    guard { Appointment.status = confirmed }
+    fields {
+        appointmentId : UUID
+        petOwnerId    : UUID
+        clinicId      : UUID
+        scheduledAt   : datetime
+    }
+}
+
+temporal event Reminder2HoursDue :: "Fires 2 hours before an appointment to send a same-day reminder" {
+    satisfies []
+    reference AppointmentConfirmed
+    offset Appointment.scheduledAt - 2 hours
+    guard { Appointment.status = confirmed }
+    fields {
+        appointmentId : UUID
+        petOwnerId    : UUID
+        clinicId      : UUID
+        scheduledAt   : datetime
+    }
+}
+
+// =============================================================================
+// Reactions — Appointment Booking
+// =============================================================================
+
+reaction ReleaseSlotOnCancellation :: "When an appointment is cancelled, release the slot back to available" {
+    satisfies []
+    triggered-by AppointmentCancelled
+    guard { true }
+    effects ReleaseSlot
+}
+
+reaction ReserveSlotOnBooking :: "When an appointment is booked, reserve the corresponding slot" {
+    satisfies []
+    triggered-by AppointmentBooked
+    guard { true }
+    effects ReserveSlot
+}
+
+reaction NotifyClinicOnBooking :: "When an appointment is booked, notify the clinic" {
+    satisfies []
+    triggered-by AppointmentBooked
+    guard { true }
+    effects SendClinicNotification
+}
+
+reaction NotifyClinicOnCancellation :: "When an appointment is cancelled, notify the clinic" {
+    satisfies []
+    triggered-by AppointmentCancelled
+    guard { true }
+    effects SendClinicNotification
+}
+
+reaction SendReminder48Hours :: "When the 48-hour reminder fires, send an SMS and push notification" {
+    satisfies []
+    triggered-by Reminder48HoursDue
+    guard { true }
+    effects SendAppointmentReminder
+}
+
+reaction SendReminder2Hours :: "When the 2-hour reminder fires, send a same-day notification" {
+    satisfies []
+    triggered-by Reminder2HoursDue
+    guard { true }
+    effects SendAppointmentReminder
+}
+
+reaction CreateRescheduledAppointment :: "When an appointment is rescheduled, book a new appointment for the new slot" {
+    satisfies []
+    triggered-by AppointmentRescheduled
+    guard { true }
+    effects BookAppointment
+}
+
+
+// #############################################################################
+//  PET HEALTH RECORD CONTEXT
+// #############################################################################
+
+module PetHealthRecord
+uses module AppointmentBooking
+
+// =============================================================================
+// Enums — Pet Health Record
+// =============================================================================
+
+enum PetSpecies {
+    dog
+    cat
+    nac
+}
+
+enum PetGender {
+    male
+    female
+}
+
+enum VaccinationStatus {
+    upToDate
+    due
+    overdue
+}
+
+// =============================================================================
+// Value Types — Pet Health Record
+// =============================================================================
+
+value VaccinationRecord :: "A record of a single vaccination administered to a pet" {
+    fields {
+        vaccineName   : string
+        administeredAt : datetime
+        administeredBy : string
+        clinicId      : UUID
+        nextDueDate   : date optional
+    }
+}
+
+value ConsultationSummary :: "A summary of a veterinary consultation" {
+    fields {
+        appointmentId : UUID
+        clinicId      : UUID
+        veterinarianId : UUID
+        date          : datetime
+        reasonForVisit : string
+        diagnosis     : string optional
+        treatment     : string optional
+        notes         : string optional
+        prescriptions : list<string> optional
+    }
+}
+
+value ShareableRecordToken :: "A token representing a shareable link to a pet's medical record" {
+    fields {
+        token     : string
+        expiresAt : datetime
+        petId     : UUID
+    }
+}
+
+// =============================================================================
+// Entities — Pet Health Record
+// =============================================================================
+
+entity PetOwner :: "An individual who owns one or more pets and uses the platform" {
+    satisfies []
+    identifier id : UUID
+    fields {
+        firstName   : string
+        lastName    : string
+        contact     : ContactInfo
+        address     : Address optional
+        consentSms  : boolean default("false")
+        consentPush : boolean default("false")
+        createdAt   : datetime immutable
+        updatedAt   : datetime
+    }
+    references {
+        pets : Pet 0..N
+    }
+
+    operations {
+        "Register pet owner" on RegisterPetOwner {
+            satisfies []
+
+            creates PetOwner {
+                firstName   = registerPetOwner.firstName
+                lastName    = registerPetOwner.lastName
+                contact     = registerPetOwner.contact
+                address     = registerPetOwner.address
+                consentSms  = registerPetOwner.consentSms
+                consentPush = registerPetOwner.consentPush
+                createdAt   = now()
+                updatedAt   = now()
+            }
+
+            emits PetOwnerRegistered {
+                petOwnerId = PetOwner.id
+                firstName  = PetOwner.firstName
+                lastName   = PetOwner.lastName
+                createdAt  = PetOwner.createdAt
+            }
+        }
+
+        "Update pet owner profile" on UpdatePetOwnerProfile {
+            satisfies []
+            resolves PetOwner from updatePetOwnerProfile.petOwnerId
+
+            sets PetOwner {
+                firstName   = updatePetOwnerProfile.firstName
+                lastName    = updatePetOwnerProfile.lastName
+                contact     = updatePetOwnerProfile.contact
+                address     = updatePetOwnerProfile.address
+                consentSms  = updatePetOwnerProfile.consentSms
+                consentPush = updatePetOwnerProfile.consentPush
+                updatedAt   = now()
+            }
+
+            emits PetOwnerProfileUpdated {
+                petOwnerId = PetOwner.id
+                updatedAt  = now()
+            }
+        }
+
+        "Grant SMS consent" on GrantSmsConsent {
+            satisfies []
+            resolves PetOwner from grantSmsConsent.petOwnerId
+
+            sets PetOwner {
+                consentSms = true
+                updatedAt  = now()
+            }
+
+            emits SmsConsentGranted {
+                petOwnerId = PetOwner.id
+                grantedAt  = now()
+            }
+        }
+
+        "Revoke SMS consent" on RevokeSmsConsent {
+            satisfies []
+            resolves PetOwner from revokeSmsConsent.petOwnerId
+
+            sets PetOwner {
+                consentSms = false
+                updatedAt  = now()
+            }
+
+            emits SmsConsentRevoked {
+                petOwnerId = PetOwner.id
+                revokedAt  = now()
+            }
+        }
+    }
+}
+
+entity Pet :: "An animal registered by a pet owner on the platform" {
+    satisfies []
+    identifier id : UUID
+    fields {
+        ownerId           : UUID
+        name              : string
+        species           : PetSpecies
+        breed             : string optional
+        gender            : PetGender optional
+        birthDate         : date optional
+        weight            : decimal optional min(0)
+        microchipNumber   : string optional
+        vaccinations      : list<VaccinationRecord>
+        consultations     : list<ConsultationSummary>
+        vaccinationStatus : VaccinationStatus default("upToDate")
+        createdAt         : datetime immutable
+        updatedAt         : datetime
+    }
+    references {
+        owner : PetOwner 1..1
+    }
+
+    operations {
+        "Register pet" on RegisterPet {
+            satisfies []
+
+            creates Pet {
+                ownerId         = registerPet.ownerId
+                name            = registerPet.name
+                species         = registerPet.species
+                breed           = registerPet.breed
+                gender          = registerPet.gender
+                birthDate       = registerPet.birthDate
+                weight          = registerPet.weight
+                microchipNumber = registerPet.microchipNumber
+                vaccinations    = []
+                consultations   = []
+                vaccinationStatus = upToDate
+                createdAt       = now()
+                updatedAt       = now()
+            }
+
+            emits PetRegistered {
+                petId     = Pet.id
+                ownerId   = Pet.ownerId
+                name      = Pet.name
+                species   = Pet.species
+                createdAt = Pet.createdAt
+            }
+        }
+
+        "Update pet profile" on UpdatePetProfile {
+            satisfies []
+            resolves Pet from updatePetProfile.petId
+
+            sets Pet {
+                name            = updatePetProfile.name
+                breed           = updatePetProfile.breed
+                gender          = updatePetProfile.gender
+                birthDate       = updatePetProfile.birthDate
+                weight          = updatePetProfile.weight
+                microchipNumber = updatePetProfile.microchipNumber
+                updatedAt       = now()
+            }
+
+            emits PetProfileUpdated {
+                petId     = Pet.id
+                updatedAt = now()
+            }
+        }
+
+        "Record vaccination" on RecordVaccination {
+            satisfies []
+            resolves Pet from recordVaccination.petId
+
+            sets Pet {
+                vaccinations      = append(Pet.vaccinations, recordVaccination.vaccination)
+                vaccinationStatus = upToDate
+                updatedAt         = now()
+            }
+
+            emits VaccinationRecorded {
+                petId         = Pet.id
+                vaccineName   = recordVaccination.vaccination.vaccineName
+                nextDueDate   = recordVaccination.vaccination.nextDueDate
+                administeredAt = recordVaccination.vaccination.administeredAt
+            }
+        }
+
+        "Record consultation" on RecordConsultation {
+            satisfies []
+            resolves Pet from recordConsultation.petId
+
+            sets Pet {
+                consultations = append(Pet.consultations, recordConsultation.summary)
+                updatedAt     = now()
+            }
+
+            emits ConsultationRecorded {
+                petId          = Pet.id
+                appointmentId  = recordConsultation.summary.appointmentId
+                clinicId       = recordConsultation.summary.clinicId
+                veterinarianId = recordConsultation.summary.veterinarianId
+                date           = recordConsultation.summary.date
+            }
+        }
+
+        "Generate shareable record" on GenerateShareableRecord {
+            satisfies []
+            resolves Pet from generateShareableRecord.petId
+
+            emits ShareableRecordGenerated {
+                petId     = Pet.id
+                ownerId   = Pet.ownerId
+                token     = generated()
+                expiresAt = now() + 7 days
+            }
+        }
+
+        "Mark vaccination due" on MarkVaccinationDue {
+            satisfies []
+            resolves Pet from markVaccinationDue.petId
+
+            sets Pet {
+                vaccinationStatus = due
+                updatedAt         = now()
+            }
+
+            emits VaccinationMarkedDue {
+                petId       = Pet.id
+                ownerId     = Pet.ownerId
+                vaccineName = markVaccinationDue.vaccineName
+                dueDate     = markVaccinationDue.dueDate
+            }
+        }
+
+        "Mark vaccination overdue" on MarkVaccinationOverdue {
+            satisfies []
+            resolves Pet from markVaccinationOverdue.petId
+
+            sets Pet {
+                vaccinationStatus = overdue
+                updatedAt         = now()
+            }
+
+            emits VaccinationMarkedOverdue {
+                petId       = Pet.id
+                ownerId     = Pet.ownerId
+                vaccineName = markVaccinationOverdue.vaccineName
+                dueDate     = markVaccinationOverdue.dueDate
+            }
+        }
+    }
+}
+
+statemachine VaccinationStatusLifecycle {
+    on Pet
+    start upToDate
+    state upToDate {}
+    state due {}
+    state overdue {}
+    transition upToDate -> due triggered-by "Mark vaccination due"
+    transition due -> overdue triggered-by "Mark vaccination overdue"
+    transition due -> upToDate triggered-by "Record vaccination"
+    transition overdue -> upToDate triggered-by "Record vaccination"
+    final overdue
+}
+
+// =============================================================================
+// Aggregates — Pet Health Record
+// =============================================================================
+
+aggregate PetOwnerAggregate :: "A pet owner and their pets as a consistency boundary" {
+    satisfies []
+    root PetOwner
+    contains PetOwner, Pet
+}
+
+// =============================================================================
+// Commands — Pet Health Record
+// =============================================================================
+
+command RegisterPetOwner :: "Intent to register a new pet owner on the platform" {
+    satisfies []
+    fields {
+        correlationId : UUID
+        firstName     : string
+        lastName      : string
+        contact       : ContactInfo
+        address       : Address optional
+        consentSms    : boolean
+        consentPush   : boolean
+    }
+}
+
+command UpdatePetOwnerProfile :: "Intent to update a pet owner's profile" {
+    satisfies []
+    fields {
+        correlationId : UUID
+        petOwnerId    : UUID
+        firstName     : string
+        lastName      : string
+        contact       : ContactInfo
+        address       : Address optional
+        consentSms    : boolean
+        consentPush   : boolean
+    }
+}
+
+command GrantSmsConsent :: "Intent to grant SMS notification consent" {
+    satisfies []
+    fields {
+        correlationId : UUID
+        petOwnerId    : UUID
+    }
+}
+
+command RevokeSmsConsent :: "Intent to revoke SMS notification consent" {
+    satisfies []
+    fields {
+        correlationId : UUID
+        petOwnerId    : UUID
+    }
+}
+
+command RegisterPet :: "Intent to register a new pet" {
+    satisfies []
+    fields {
+        correlationId   : UUID
+        ownerId         : UUID
+        name            : string
+        species         : PetSpecies
+        breed           : string optional
+        gender          : PetGender optional
+        birthDate       : date optional
+        weight          : decimal optional
+        microchipNumber : string optional
+    }
+}
+
+command UpdatePetProfile :: "Intent to update a pet's profile" {
+    satisfies []
+    fields {
+        correlationId   : UUID
+        petId           : UUID
+        name            : string
+        breed           : string optional
+        gender          : PetGender optional
+        birthDate       : date optional
+        weight          : decimal optional
+        microchipNumber : string optional
+    }
+}
+
+command RecordVaccination :: "Intent to record a vaccination administered to a pet" {
+    satisfies []
+    fields {
+        correlationId : UUID
+        petId         : UUID
+        vaccination   : VaccinationRecord
+    }
+}
+
+command RecordConsultation :: "Intent to record a consultation summary after a visit" {
+    satisfies []
+    fields {
+        correlationId : UUID
+        petId         : UUID
+        summary       : ConsultationSummary
+    }
+}
+
+command GenerateShareableRecord :: "Intent to generate a shareable link to a pet's medical record" {
+    satisfies []
+    fields {
+        correlationId : UUID
+        petId         : UUID
+    }
+}
+
+command MarkVaccinationDue :: "Intent to mark a pet's vaccination status as due" {
+    satisfies []
+    fields {
+        correlationId : UUID
+        petId         : UUID
+        vaccineName   : string
+        dueDate       : date
+    }
+}
+
+command MarkVaccinationOverdue :: "Intent to mark a pet's vaccination status as overdue" {
+    satisfies []
+    fields {
+        correlationId : UUID
+        petId         : UUID
+        vaccineName   : string
+        dueDate       : date
+    }
+}
+
+// =============================================================================
+// Events — Pet Health Record
+// =============================================================================
+
+event PetOwnerRegistered :: "A new pet owner was registered" {
+    satisfies []
+    fields {
+        petOwnerId : UUID
+        firstName  : string
+        lastName   : string
+        createdAt  : datetime
+    }
+}
+
+event PetOwnerProfileUpdated :: "A pet owner's profile was updated" {
+    satisfies []
+    fields {
+        petOwnerId : UUID
+        updatedAt  : datetime
+    }
+}
+
+event SmsConsentGranted :: "A pet owner granted SMS notification consent" {
+    satisfies []
+    fields {
+        petOwnerId : UUID
+        grantedAt  : datetime
+    }
+}
+
+event SmsConsentRevoked :: "A pet owner revoked SMS notification consent" {
+    satisfies []
+    fields {
+        petOwnerId : UUID
+        revokedAt  : datetime
+    }
+}
+
+event PetRegistered :: "A new pet was registered" {
+    satisfies []
+    fields {
+        petId     : UUID
+        ownerId   : UUID
+        name      : string
+        species   : PetSpecies
+        createdAt : datetime
+    }
+}
+
+event PetProfileUpdated :: "A pet's profile was updated" {
+    satisfies []
+    fields {
+        petId     : UUID
+        updatedAt : datetime
+    }
+}
+
+event VaccinationRecorded :: "A vaccination was recorded for a pet" {
+    satisfies []
+    fields {
+        petId          : UUID
+        vaccineName    : string
+        nextDueDate    : date optional
+        administeredAt : datetime
+    }
+}
+
+event ConsultationRecorded :: "A consultation summary was recorded for a pet" {
+    satisfies []
+    fields {
+        petId          : UUID
+        appointmentId  : UUID
+        clinicId       : UUID
+        veterinarianId : UUID
+        date           : datetime
+    }
+}
+
+event ShareableRecordGenerated :: "A shareable link to a pet's medical record was generated" {
+    satisfies []
+    fields {
+        petId     : UUID
+        ownerId   : UUID
+        token     : string
+        expiresAt : datetime
+    }
+}
+
+event VaccinationMarkedDue :: "A pet's vaccination was marked as due" {
+    satisfies []
+    fields {
+        petId       : UUID
+        ownerId     : UUID
+        vaccineName : string
+        dueDate     : date
+    }
+}
+
+event VaccinationMarkedOverdue :: "A pet's vaccination was marked as overdue" {
+    satisfies []
+    fields {
+        petId       : UUID
+        ownerId     : UUID
+        vaccineName : string
+        dueDate     : date
+    }
+}
+
+// =============================================================================
+// Temporal Events — Pet Health Record
+// =============================================================================
+
+temporal event VaccinationDueReminder :: "Fires 2 weeks before a vaccination due date to send a care reminder" {
+    satisfies []
+    reference VaccinationRecorded
+    offset VaccinationRecord.nextDueDate - 14 days
+    guard { Pet.vaccinationStatus = upToDate and VaccinationRecord.nextDueDate is defined }
+    fields {
+        petId       : UUID
+        ownerId     : UUID
+        vaccineName : string
+        dueDate     : date
+    }
+}
+
+// =============================================================================
+// Reactions — Pet Health Record
+// =============================================================================
+
+reaction RecordConsultationAfterCompletion :: "When an appointment is completed, prompt recording a consultation summary" {
+    satisfies []
+    triggered-by AppointmentCompleted
+    guard { true }
+    effects RecordConsultation
+}
+
+reaction NotifyOwnerOnVaccinationDue :: "When a vaccination due reminder fires, notify the pet owner" {
+    satisfies []
+    triggered-by VaccinationDueReminder
+    guard { true }
+    effects SendVaccinationReminder
+}
+
+
+// #############################################################################
+//  CLINIC DISCOVERY CONTEXT
+// #############################################################################
+
+module ClinicDiscovery
+uses module ClinicManagement
+uses module AppointmentBooking
+
+// =============================================================================
+// Enums — Clinic Discovery
+// =============================================================================
+
+enum ReviewStatus {
+    pending
+    published
+    rejected
+}
+
+// =============================================================================
+// Value Types — Clinic Discovery
+// =============================================================================
+
+value SearchCriteria :: "Criteria used to search for clinics" {
+    fields {
+        location       : GeoCoordinate optional
+        radiusKm       : decimal optional default("10") min(1) max(100)
+        animalType     : AnimalType optional
+        specialty      : string optional
+        availableFrom  : date optional
+        availableTo    : date optional
+    }
+}
+
+value ClinicSearchResult :: "A single result in a clinic search" {
+    fields {
+        clinicId          : UUID
+        name              : string
+        address           : Address
+        distanceKm        : decimal
+        averageRating     : decimal optional
+        totalReviews      : int
+        nextAvailableSlot : datetime optional
+        specialties       : list<Specialty>
+        animalTypes       : list<AnimalType>
+    }
+}
+
+// =============================================================================
+// Entities — Clinic Discovery
+// =============================================================================
+
+entity Review :: "A rating and written review left by a pet owner after a visit" {
+    satisfies []
+    identifier id : UUID
+    fields {
+        clinicId      : UUID
+        petOwnerId    : UUID
+        appointmentId : UUID
+        rating        : Rating
+        text          : string optional
+        status        : ReviewStatus default("pending")
+        clinicResponse : string optional
+        publishedAt   : datetime optional
+        rejectedAt    : datetime optional
+        rejectionReason : string optional
+        createdAt     : datetime immutable
+    }
+    references {
+        clinic   : Clinic 1..1
+        petOwner : PetOwner 1..1
+    }
+
+    invariants {
+        reviewRequiresCompletedAppointment :: "A review can only be created for a completed appointment" {
+            appointmentId is defined
+        }
+        publishedReviewHasRating :: "A published review must have a rating" {
+            if status = published { rating is defined }
+        }
+    }
+
+    operations {
+        "Submit review" on SubmitReview {
+            satisfies []
+
+            precondition "Appointment must be completed" {
+                appointmentId is defined
+                violation "Cannot review without a completed appointment"
+            }
+
+            creates Review {
+                clinicId      = submitReview.clinicId
+                petOwnerId    = submitReview.petOwnerId
+                appointmentId = submitReview.appointmentId
+                rating        = submitReview.rating
+                text          = submitReview.text
+                status        = pending
+                createdAt     = now()
+            }
+
+            emits ReviewSubmitted {
+                reviewId      = Review.id
+                clinicId      = Review.clinicId
+                petOwnerId    = Review.petOwnerId
+                appointmentId = Review.appointmentId
+                rating        = Review.rating
+                submittedAt   = Review.createdAt
+            }
+        }
+
+        "Publish review" on PublishReview {
+            satisfies []
+            resolves Review from publishReview.reviewId
+
+            precondition "Review must be pending" {
+                Review.status = pending
+                violation "Only pending reviews can be published"
+            }
+
+            sets Review {
+                status      = published
+                publishedAt = now()
+            }
+
+            emits ReviewPublished {
+                reviewId    = Review.id
+                clinicId    = Review.clinicId
+                rating      = Review.rating
+                publishedAt = now()
+            }
+        }
+
+        "Reject review" on RejectReview {
+            satisfies []
+            resolves Review from rejectReview.reviewId
+
+            precondition "Review must be pending" {
+                Review.status = pending
+                violation "Only pending reviews can be rejected"
+            }
+
+            sets Review {
+                status          = rejected
+                rejectedAt      = now()
+                rejectionReason = rejectReview.reason
+            }
+
+            emits ReviewRejected {
+                reviewId        = Review.id
+                clinicId        = Review.clinicId
+                rejectedAt      = now()
+                rejectionReason = rejectReview.reason
+            }
+        }
+
+        "Respond to review" on RespondToReview {
+            satisfies []
+            resolves Review from respondToReview.reviewId
+
+            precondition "Review must be published" {
+                Review.status = published
+                violation "Can only respond to published reviews"
+            }
+
+            sets Review {
+                clinicResponse = respondToReview.responseText
+            }
+
+            emits ReviewResponseAdded {
+                reviewId       = Review.id
+                clinicId       = Review.clinicId
+                responseText   = respondToReview.responseText
+                respondedAt    = now()
+            }
+        }
+    }
+}
+
+statemachine ReviewLifecycle {
+    on Review
+    start pending
+    state pending {}
+    state published {}
+    state rejected {}
+    transition pending -> published triggered-by "Publish review"
+    transition pending -> rejected triggered-by "Reject review"
+    final published
+    final rejected
+}
+
+// =============================================================================
+// Commands — Clinic Discovery
+// =============================================================================
+
+command SearchClinics :: "Intent to search for clinics matching criteria" {
+    satisfies []
+    fields {
+        correlationId : UUID
+        criteria      : SearchCriteria
+    }
+}
+
+command SubmitReview :: "Intent to submit a review after a completed appointment" {
+    satisfies []
+    fields {
+        correlationId : UUID
+        clinicId      : UUID
+        petOwnerId    : UUID
+        appointmentId : UUID
+        rating        : Rating
+        text          : string optional
+    }
+}
+
+command PublishReview :: "Intent to publish a pending review" {
+    satisfies []
+    fields {
+        correlationId : UUID
+        reviewId      : UUID
+    }
+}
+
+command RejectReview :: "Intent to reject a pending review" {
+    satisfies []
+    fields {
+        correlationId : UUID
+        reviewId      : UUID
+        reason        : string
+    }
+}
+
+command RespondToReview :: "Intent for a clinic to respond to a published review" {
+    satisfies []
+    fields {
+        correlationId : UUID
+        reviewId      : UUID
+        responseText  : string
+    }
+}
+
+// =============================================================================
+// Events — Clinic Discovery
+// =============================================================================
+
+event ReviewSubmitted :: "A review was submitted by a pet owner" {
+    satisfies []
+    fields {
+        reviewId      : UUID
+        clinicId      : UUID
+        petOwnerId    : UUID
+        appointmentId : UUID
+        rating        : Rating
+        submittedAt   : datetime
+    }
+}
+
+event ReviewPublished :: "A review was approved and published" {
+    satisfies []
+    fields {
+        reviewId    : UUID
+        clinicId    : UUID
+        rating      : Rating
+        publishedAt : datetime
+    }
+}
+
+event ReviewRejected :: "A review was rejected during moderation" {
+    satisfies []
+    fields {
+        reviewId        : UUID
+        clinicId        : UUID
+        rejectedAt      : datetime
+        rejectionReason : string
+    }
+}
+
+event ReviewResponseAdded :: "A clinic responded to a published review" {
+    satisfies []
+    fields {
+        reviewId     : UUID
+        clinicId     : UUID
+        responseText : string
+        respondedAt  : datetime
+    }
+}
+
+// =============================================================================
+// Reactions — Clinic Discovery
+// =============================================================================
+
+reaction UpdateClinicRatingOnReviewPublished :: "When a review is published, recalculate the clinic's average rating" {
+    satisfies []
+    triggered-by ReviewPublished
+    guard { true }
+    effects UpdateClinicProfile
+}
+
+// =============================================================================
+// Domain Service — Clinic Discovery
+// =============================================================================
+
+service ClinicSearchService :: "Searches for clinics by location, specialty, availability, and ratings" {
+    satisfies []
+    operations {
+        searchClinics(criteria: SearchCriteria) :: "Find clinics matching the search criteria, ranked by distance and rating" {
+            returns list<ClinicSearchResult>
+        }
+    }
+}
+
+// =============================================================================
+// Query — Clinic Discovery
+// =============================================================================
+
+query FindClinics :: "Find clinics matching search criteria" {
+    satisfies []
+    fields {
+        criteria : SearchCriteria
+    }
+    returns list<ClinicSearchResult>
+}
+
+query GetClinicProfile :: "Retrieve the full profile of a specific clinic" {
+    satisfies []
+    fields {
+        clinicId : UUID
+    }
+    returns Clinic
+}
+
+query GetClinicReviews :: "Retrieve published reviews for a clinic" {
+    satisfies []
+    fields {
+        clinicId : UUID
+        page     : int optional
+        pageSize : int optional
+    }
+    returns list<Review>
+}
+
+
+// #############################################################################
+//  NOTIFICATION CONTEXT
+// #############################################################################
+
+module Notification
+uses module AppointmentBooking
+uses module PetHealthRecord
+
+// =============================================================================
+// Enums — Notification
+// =============================================================================
+
+enum NotificationChannel {
+    sms
+    push
+    email
+}
+
+enum NotificationType {
+    appointmentConfirmation
+    appointmentReminder48h
+    appointmentReminder2h
+    appointmentCancellation
+    bookingReceived
+    vaccinationDueReminder
+    reviewResponse
+}
+
+enum NotificationStatus {
+    pending
+    sent
+    delivered
+    failed
+}
+
+// =============================================================================
+// Entities — Notification
+// =============================================================================
+
+entity Notification :: "A notification sent to a pet owner or clinic through a specific channel" {
+    satisfies []
+    identifier id : UUID
+    fields {
+        recipientId      : UUID
+        recipientType    : string
+        channel          : NotificationChannel
+        notificationType : NotificationType
+        subject          : string optional
+        body             : string
+        referenceId      : UUID optional
+        status           : NotificationStatus default("pending")
+        sentAt           : datetime optional
+        deliveredAt      : datetime optional
+        failedAt         : datetime optional
+        failureReason    : string optional
+        createdAt        : datetime immutable
+    }
+
+    invariants {
+        sentNotificationHasTimestamp :: "A sent notification must have a sent timestamp" {
+            if status = sent or status = delivered { sentAt is defined }
+        }
+        failedNotificationHasReason :: "A failed notification must record the failure reason" {
+            if status = failed { failureReason is defined }
+        }
+    }
+
+    operations {
+        "Send appointment reminder" on SendAppointmentReminder {
+            satisfies []
+
+            creates Notification {
+                recipientId      = sendAppointmentReminder.petOwnerId
+                recipientType    = "PetOwner"
+                channel          = sendAppointmentReminder.channel
+                notificationType = sendAppointmentReminder.notificationType
+                body             = sendAppointmentReminder.body
+                referenceId      = sendAppointmentReminder.appointmentId
+                status           = pending
+                createdAt        = now()
+            }
+
+            emits NotificationCreated {
+                notificationId   = Notification.id
+                recipientId      = Notification.recipientId
+                channel          = Notification.channel
+                notificationType = Notification.notificationType
+                createdAt        = Notification.createdAt
+            }
+        }
+
+        "Send clinic notification" on SendClinicNotification {
+            satisfies []
+
+            creates Notification {
+                recipientId      = sendClinicNotification.clinicId
+                recipientType    = "Clinic"
+                channel          = sendClinicNotification.channel
+                notificationType = sendClinicNotification.notificationType
+                body             = sendClinicNotification.body
+                referenceId      = sendClinicNotification.referenceId
+                status           = pending
+                createdAt        = now()
+            }
+
+            emits NotificationCreated {
+                notificationId   = Notification.id
+                recipientId      = Notification.recipientId
+                channel          = Notification.channel
+                notificationType = Notification.notificationType
+                createdAt        = Notification.createdAt
+            }
+        }
+
+        "Send vaccination reminder" on SendVaccinationReminder {
+            satisfies []
+
+            creates Notification {
+                recipientId      = sendVaccinationReminder.petOwnerId
+                recipientType    = "PetOwner"
+                channel          = sendVaccinationReminder.channel
+                notificationType = vaccinationDueReminder
+                body             = sendVaccinationReminder.body
+                referenceId      = sendVaccinationReminder.petId
+                status           = pending
+                createdAt        = now()
+            }
+
+            emits NotificationCreated {
+                notificationId   = Notification.id
+                recipientId      = Notification.recipientId
+                channel          = Notification.channel
+                notificationType = Notification.notificationType
+                createdAt        = Notification.createdAt
+            }
+        }
+
+        "Mark notification sent" on MarkNotificationSent {
+            satisfies []
+            resolves Notification from markNotificationSent.notificationId
+
+            precondition "Notification must be pending" {
+                Notification.status = pending
+                violation "Only pending notifications can be marked as sent"
+            }
+
+            sets Notification {
+                status = sent
+                sentAt = now()
+            }
+
+            emits NotificationSent {
+                notificationId = Notification.id
+                channel        = Notification.channel
+                sentAt         = now()
+            }
+        }
+
+        "Mark notification delivered" on MarkNotificationDelivered {
+            satisfies []
+            resolves Notification from markNotificationDelivered.notificationId
+
+            precondition "Notification must be sent" {
+                Notification.status = sent
+                violation "Only sent notifications can be marked as delivered"
+            }
+
+            sets Notification {
+                status      = delivered
+                deliveredAt = now()
+            }
+
+            emits NotificationDelivered {
+                notificationId = Notification.id
+                channel        = Notification.channel
+                deliveredAt    = now()
+            }
+        }
+
+        "Mark notification failed" on MarkNotificationFailed {
+            satisfies []
+            resolves Notification from markNotificationFailed.notificationId
+
+            precondition "Notification must be pending or sent" {
+                Notification.status = pending or Notification.status = sent
+                violation "Cannot fail a notification that is already delivered or failed"
+            }
+
+            sets Notification {
+                status        = failed
+                failedAt      = now()
+                failureReason = markNotificationFailed.reason
+            }
+
+            emits NotificationFailed {
+                notificationId = Notification.id
+                channel        = Notification.channel
+                failedAt       = now()
+                reason         = markNotificationFailed.reason
+            }
+        }
+    }
+}
+
+statemachine NotificationLifecycle {
+    on Notification
+    start pending
+    state pending {}
+    state sent {
+        invariant sentNotificationHasTimestamp
+    }
+    state delivered {
+        invariant sentNotificationHasTimestamp
+    }
+    state failed {
+        invariant failedNotificationHasReason
+    }
+    transition pending -> sent triggered-by "Mark notification sent"
+    transition sent -> delivered triggered-by "Mark notification delivered"
+    transition pending -> failed triggered-by "Mark notification failed"
+    transition sent -> failed triggered-by "Mark notification failed"
+    final delivered
+    final failed
+}
+
+// =============================================================================
+// Commands — Notification
+// =============================================================================
+
+command SendAppointmentReminder :: "Intent to send a reminder notification to a pet owner about an upcoming appointment" {
+    satisfies []
+    fields {
+        correlationId    : UUID
+        petOwnerId       : UUID
+        appointmentId    : UUID
+        channel          : NotificationChannel
+        notificationType : NotificationType
+        body             : string
+    }
+}
+
+command SendClinicNotification :: "Intent to send a notification to a clinic" {
+    satisfies []
+    fields {
+        correlationId    : UUID
+        clinicId         : UUID
+        channel          : NotificationChannel
+        notificationType : NotificationType
+        body             : string
+        referenceId      : UUID optional
+    }
+}
+
+command SendVaccinationReminder :: "Intent to send a vaccination care reminder to a pet owner" {
+    satisfies []
+    fields {
+        correlationId : UUID
+        petOwnerId    : UUID
+        petId         : UUID
+        channel       : NotificationChannel
+        body          : string
+    }
+}
+
+command MarkNotificationSent :: "Intent to mark a notification as sent by the delivery infrastructure" {
+    satisfies []
+    fields {
+        correlationId  : UUID
+        notificationId : UUID
+    }
+}
+
+command MarkNotificationDelivered :: "Intent to mark a notification as delivered to the recipient" {
+    satisfies []
+    fields {
+        correlationId  : UUID
+        notificationId : UUID
+    }
+}
+
+command MarkNotificationFailed :: "Intent to record a notification delivery failure" {
+    satisfies []
+    fields {
+        correlationId  : UUID
+        notificationId : UUID
+        reason         : string
+    }
+}
+
+// =============================================================================
+// Events — Notification
+// =============================================================================
+
+event NotificationCreated :: "A notification was created and queued for delivery" {
+    satisfies []
+    fields {
+        notificationId   : UUID
+        recipientId      : UUID
+        channel          : NotificationChannel
+        notificationType : NotificationType
+        createdAt        : datetime
+    }
+}
+
+event NotificationSent :: "A notification was sent through its delivery channel" {
+    satisfies []
+    fields {
+        notificationId : UUID
+        channel        : NotificationChannel
+        sentAt         : datetime
+    }
+}
+
+event NotificationDelivered :: "A notification was confirmed delivered to the recipient" {
+    satisfies []
+    fields {
+        notificationId : UUID
+        channel        : NotificationChannel
+        deliveredAt    : datetime
+    }
+}
+
+event NotificationFailed :: "A notification delivery attempt failed" {
+    satisfies []
+    fields {
+        notificationId : UUID
+        channel        : NotificationChannel
+        failedAt       : datetime
+        reason         : string
+    }
+}
+
+// =============================================================================
+// Infrastructure Services — Notification
+// =============================================================================
+
+service SmsGatewayService :: "Adapter to external SMS delivery provider" {
+    satisfies []
+    operations {
+        sendSms(phone: string, body: string) :: "Deliver an SMS message to a phone number" {
+            returns boolean
+        }
+    }
+}
+
+service PushNotificationService :: "Adapter to push notification delivery infrastructure" {
+    satisfies []
+    operations {
+        sendPush(recipientId: UUID, title: string, body: string) :: "Deliver a push notification to a recipient's device" {
+            returns boolean
+        }
+    }
+}
+
+service EmailService :: "Adapter to email delivery infrastructure" {
+    satisfies []
+    operations {
+        sendEmail(email: string, subject: string, body: string) :: "Deliver an email to a recipient" {
+            returns boolean
+        }
+    }
+}
+
+
+// #############################################################################
+//  CROSS-CONTEXT AGREEMENTS
+// #############################################################################
+
+agreement SlotAppointmentConsistency :: "A booked slot must correspond to exactly one active appointment, and vice versa" {
+    satisfies []
+    participants ScheduleManagement, AppointmentBooking
+    predicate {
+        forAll slot in Slot where slot.status = booked {
+            exists appointment in Appointment where appointment.slotId = slot.id
+            and (appointment.status = requested or appointment.status = confirmed)
+        }
+    }
+    maintained-by SlotAppointmentReconciliation
+}
+
+reconciliation SlotAppointmentReconciliation :: "Detects and fixes orphaned booked slots or appointments without matching slots" {
+    satisfies []
+    trigger event AppointmentCancelled, SlotReleased
+    detection query-based
+    compensation ReleaseSlot, CancelAppointment
+}

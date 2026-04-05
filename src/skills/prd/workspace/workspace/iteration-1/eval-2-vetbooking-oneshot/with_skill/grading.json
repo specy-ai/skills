@@ -1,0 +1,16 @@
+{
+  "expectations": [
+    {"text": "File uses .prd concrete syntax", "passed": true, "evidence": "File starts with product \"VetBooking\" { and uses structured syntax throughout"},
+    {"text": "Problem statement uses SCQ", "passed": true, "evidence": "problem { block at line 7 with situation, complication, question sub-blocks"},
+    {"text": "At least 2 personas defined", "passed": true, "evidence": "3 personas defined: \"Pet owner\", \"Clinic manager\", \"Veterinarian\""},
+    {"text": "At least 2 jobs with desired outcomes", "passed": true, "evidence": "8 jobs defined (e.g. \"Book a vet appointment without calling\", \"Find a trusted vet nearby\", \"Fill the schedule efficiently\") each with desired-outcomes blocks"},
+    {"text": "Goals have metrics with targets", "passed": true, "evidence": "5 goals found (e.g. \"Onboard 500 clinics in 12 months\", \"Reduce clinic no-show rate\") each with metric { blocks containing target fields"},
+    {"text": "Features have acceptance criteria", "passed": true, "evidence": "8 features with stories { blocks containing acceptance-criteria { blocks (e.g. Online appointment booking, Vet search and discovery)"},
+    {"text": "Non-goals declared", "passed": true, "evidence": "Top-level non-goals { block at line 236 with 5 items, plus feature-level non-goals in multiple features"},
+    {"text": "At least one assumption", "passed": true, "evidence": "4 assumptions found: \"Clinics will adopt an online booking tool\", \"Pet owners will switch from phone to online booking\", \"SMS reminders are effective for pet owners\", \"Clinics will input medical records\""},
+    {"text": "At least one risk", "passed": true, "evidence": "4 risks found: \"Chicken-and-egg marketplace cold start\", \"GDPR non-compliance penalty\", \"Incumbent PMS vendor competition\", \"Low clinic engagement post-onboarding\""},
+    {"text": "At least one release", "passed": true, "evidence": "2 releases found: \"R1 -- Core Booking Loop\" (Q3 2026) and \"R2 -- Trust and Retention\" (Q4 2026)"},
+    {"text": "Features link to goals", "passed": true, "evidence": "advances keyword found in all 8 feature blocks, linking features to goals"},
+    {"text": "Features link to jobs", "passed": true, "evidence": "addresses keyword found in feature blocks (e.g. addresses \"Book a vet appointment without calling\", \"Feel reassured about my pet's care\")"}
+  ]
+}

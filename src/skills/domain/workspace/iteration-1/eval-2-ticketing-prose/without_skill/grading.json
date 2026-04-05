@@ -1,0 +1,8 @@
+{"expectations": [
+  {"text": "Uses .domain structured syntax", "passed": false, "evidence": "File is markdown with headings (##, ###), tables, and ASCII state machine diagrams — no structured entity/value/command/event blocks"},
+  {"text": "At least 2 entities", "passed": true, "evidence": "Entities described: Event (Aggregate Root), Ticket (Aggregate Root), WaitlistEntry, Organizer, Buyer (5 entities in markdown)"},
+  {"text": "At least 1 aggregate", "passed": true, "evidence": "Event and Ticket are both labeled 'Aggregate Root' at lines 9 and 25"},
+  {"text": "At least 1 state machine", "passed": true, "evidence": "Three state machines documented in ASCII: Event Lifecycle (line 190), Ticket Lifecycle (line 204), Waitlist Entry Lifecycle (line 216)"},
+  {"text": "At least 1 invariant", "passed": true, "evidence": "Domain Rules and Invariants section at line 304 lists 8 invariants including capacity enforcement, sales window, sliding-scale refund, transfer restrictions, waitlist fairness, reservation timeout, event cancellation cascade, one ticket per buyer per tier"},
+  {"text": "Error paths exist", "passed": true, "evidence": "Preconditions on commands (e.g. ReserveTicket requires remaining capacity and open sales window); reservation timeout/expiration flows; TicketCancelledDueToEventCancellation error event"}
+]}

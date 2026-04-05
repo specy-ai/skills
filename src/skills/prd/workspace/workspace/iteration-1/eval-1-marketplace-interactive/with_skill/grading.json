@@ -1,0 +1,16 @@
+{
+  "expectations": [
+    {"text": "File uses .prd concrete syntax", "passed": true, "evidence": "File starts with product \"ConsultMatch\" { and uses structured syntax throughout"},
+    {"text": "Problem statement uses SCQ", "passed": true, "evidence": "problem { block found at line 8 with situation, complication, question sub-blocks"},
+    {"text": "At least 2 personas defined", "passed": true, "evidence": "4 personas defined: \"Hiring Manager\", \"Freelance Consultant\", \"Platform Administrator\", \"Procurement Officer\""},
+    {"text": "At least 2 jobs with desired outcomes", "passed": true, "evidence": "6 jobs defined (e.g. \"Staff a project with the right consultant quickly\", \"Find my next mission without constant prospecting\") each with desired-outcomes blocks"},
+    {"text": "Goals have metrics with targets", "passed": true, "evidence": "5 goals found (e.g. \"Reduce time-to-match\", \"Grow active consultant base\") with 5 metric { blocks containing target fields"},
+    {"text": "Features have acceptance criteria", "passed": true, "evidence": "10 features with stories { blocks (10 total) containing 16 acceptance-criteria { blocks"},
+    {"text": "Non-goals declared", "passed": true, "evidence": "7 non-goals { blocks found (top-level and within features)"},
+    {"text": "At least one assumption", "passed": true, "evidence": "4 assumption blocks found"},
+    {"text": "At least one risk", "passed": true, "evidence": "4 risk blocks found"},
+    {"text": "At least one release", "passed": true, "evidence": "3 release blocks found"},
+    {"text": "Features link to goals", "passed": true, "evidence": "10 occurrences of advances keyword found in feature blocks"},
+    {"text": "Features link to jobs", "passed": true, "evidence": "9 occurrences of addresses keyword found in feature blocks"}
+  ]
+}

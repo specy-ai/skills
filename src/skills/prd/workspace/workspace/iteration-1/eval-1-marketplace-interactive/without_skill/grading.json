@@ -1,0 +1,12 @@
+{
+  "expectations": [
+    {"text": "File uses .prd concrete syntax", "passed": false, "evidence": "File uses free-form markdown with headings (# Product Requirement Document: ConsultConnect), not product \"...\" { structured syntax"},
+    {"text": "Problem statement uses SCQ", "passed": false, "evidence": "Problem statement is split into 'For Companies' and 'For Consultants' bullet lists; no situation/complication/question structure"},
+    {"text": "At least 2 personas defined", "passed": true, "evidence": "4 personas defined under section 4: Persona 1 (Hiring Manager), Persona 2 (Procurement/Legal), Persona 3 (Freelance Consultant), Persona 4 (Platform Administrator)"},
+    {"text": "Goals have metrics with targets", "passed": true, "evidence": "Section 3 'Goals (First 18 Months)' table has 7 goals each with Metric and Target columns (e.g. 'Registered consultants' target 5,000)"},
+    {"text": "Non-goals declared", "passed": true, "evidence": "Section 5 'Out of Scope (V1)' lists 6 items including managed services, team composition, payroll integration, etc."},
+    {"text": "At least one assumption", "passed": false, "evidence": "No assumptions section found in the document"},
+    {"text": "At least one risk", "passed": true, "evidence": "Section 12 'Risks and Mitigations' table lists 6 risks (cold start, disintermediation, regulatory complexity, etc.)"},
+    {"text": "At least one release", "passed": true, "evidence": "Section 14 'Release Plan' defines 4 phases: MVP (Months 1-4), Growth (5-8), Scale (9-14), Expansion (15-18)"}
+  ]
+}

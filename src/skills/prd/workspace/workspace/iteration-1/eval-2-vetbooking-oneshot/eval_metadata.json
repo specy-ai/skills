@@ -1,0 +1,6 @@
+{
+  "eval_id": 2,
+  "eval_name": "vetbooking-oneshot",
+  "prompt": "Create a PRD for a veterinary appointment booking platform. Target users are pet owners and veterinary clinics. Pet owners need to find available vets nearby, book appointments, get reminders, and access their pet's medical history. Clinics need to manage their schedule, send reminders, and track patient records. The market has Doctolib for humans but nothing equivalent for veterinary care. We want to launch in France first. Key constraint: GDPR compliance for personal data. Goal: 500 clinics onboarded in 12 months.",
+  "assertions": []
+}

@@ -1,0 +1,16 @@
+{
+  "expectations": [
+    {"text": "File uses .prd concrete syntax", "passed": true, "evidence": "File starts with product \"ExpenseFlow\" { and uses structured syntax throughout"},
+    {"text": "Problem statement uses SCQ", "passed": true, "evidence": "problem { block at line 7 with situation, complication, question sub-blocks"},
+    {"text": "At least 2 personas defined", "passed": true, "evidence": "4 personas defined: \"Employee\", \"Manager\", \"VP / Senior Leader\", \"Finance officer\""},
+    {"text": "At least 2 jobs with desired outcomes", "passed": true, "evidence": "4 jobs defined (e.g. \"Submit an expense quickly while on the go\", \"Process reimbursements accurately at scale\") each with desired-outcomes blocks"},
+    {"text": "Goals have metrics with targets", "passed": true, "evidence": "4 goals found (e.g. \"Reduce reimbursement cycle time\", \"Automate SAP integration\") each with metric { blocks containing target fields (e.g. target \"< 5 days\", target \"> 95%\")"},
+    {"text": "Features have acceptance criteria", "passed": true, "evidence": "8 features with stories { blocks containing acceptance-criteria { blocks (e.g. Receipt OCR scanning, Approval workflow, Meal allowance compliance engine)"},
+    {"text": "Non-goals declared", "passed": true, "evidence": "Top-level non-goals { block at line 175 with 5 items, plus feature-level non-goals in multiple features"},
+    {"text": "At least one assumption", "passed": true, "evidence": "3 assumptions found: \"OCR accuracy sufficient for receipts\", \"SAP integration via standard API\", \"Employees carry smartphones\""},
+    {"text": "At least one risk", "passed": true, "evidence": "4 risks found: \"OCR provider reliability\", \"SAP integration delays\", \"URSSAF threshold changes\", \"Low employee adoption\""},
+    {"text": "At least one release", "passed": true, "evidence": "2 releases found: \"R1 -- Core expense loop\" (Q3 2026) and \"R2 -- Visibility and optimization\" (Q4 2026)"},
+    {"text": "Features link to goals", "passed": true, "evidence": "advances keyword present in feature blocks (e.g. advances \"Reduce reimbursement cycle time\", \"Employee adoption\")"},
+    {"text": "Features link to jobs", "passed": true, "evidence": "addresses keyword present in feature blocks (e.g. addresses \"Submit an expense quickly while on the go\", \"Process reimbursements accurately at scale\")"}
+  ]
+}

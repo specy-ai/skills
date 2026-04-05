@@ -1,0 +1,12 @@
+{
+  "expectations": [
+    {"text": "File uses .prd concrete syntax", "passed": false, "evidence": "File uses free-form markdown starting with '# Product Requirement Document: VetBook', not product \"...\" { structured syntax"},
+    {"text": "Problem statement uses SCQ", "passed": false, "evidence": "Section 2 uses 'For Pet Owners' and 'For Veterinary Clinics' bullet lists plus a 'Market Gap' paragraph; no situation/complication/question structure"},
+    {"text": "At least 2 personas defined", "passed": true, "evidence": "3 personas defined: Persona 1 (Pet Owner 'Sophie'), Persona 2 (Clinic Manager 'Dr. Marc Lefebvre'), Persona 3 (Receptionist 'Amina')"},
+    {"text": "Goals have metrics with targets", "passed": true, "evidence": "Section 3 'Primary Goals' table has 5 goals with Metric, Target, and Timeframe columns (e.g. 500 active clinics in 12 months)"},
+    {"text": "Non-goals declared", "passed": true, "evidence": "Section 5 'Out of Scope (v1.0)' lists 8 items including telemedicine, online payment, insurance integration, etc."},
+    {"text": "At least one assumption", "passed": false, "evidence": "No assumptions section found in the document"},
+    {"text": "At least one risk", "passed": true, "evidence": "Section 13 'Risks and Mitigations' table lists 6 risks (low clinic adoption, cold start, GDPR non-compliance, competition, data breach, SMS delivery failures)"},
+    {"text": "At least one release", "passed": true, "evidence": "Section 15 'Release Plan' defines 4 releases: MVP (v1.0), v1.1, v1.2, v2.0"}
+  ]
+}

@@ -1,0 +1,8 @@
+{"expectations": [
+  {"text": "Uses .domain structured syntax", "passed": false, "evidence": "File is markdown with headings (##, ###), tables, and ASCII diagrams — no structured entity/value/command/event blocks"},
+  {"text": "At least 2 entities", "passed": true, "evidence": "Entities described: LoanApplication (Aggregate Root), CreditAnalysis, ProductConfiguration, AutoApprovalConfiguration (4 entities in markdown tables)"},
+  {"text": "At least 1 aggregate", "passed": true, "evidence": "LoanApplication is labeled 'Aggregate Root' at line 127; the word 'aggregate' appears in the ubiquitous language table and entity descriptions"},
+  {"text": "At least 1 state machine", "passed": true, "evidence": "State Machine section at line 372 with ASCII diagram and transitions table for LoanApplication lifecycle (DRAFT -> SUBMITTED -> UNDER_REVIEW -> APPROVED/REJECTED)"},
+  {"text": "At least 1 invariant", "passed": true, "evidence": "Invariants Summary table at line 412 lists 5 invariants: applicationMustBeComplete, noAutoRejection, overrideMustHaveJustification, scoringOverrideMustHaveRationale, routingOverrideRequiresHigherAuthority"},
+  {"text": "Error paths exist", "passed": true, "evidence": "ApplicationSubmissionRejected event at line 358 (failure path on SubmitLoanApplication); guards and preconditions documented on commands"}
+]}

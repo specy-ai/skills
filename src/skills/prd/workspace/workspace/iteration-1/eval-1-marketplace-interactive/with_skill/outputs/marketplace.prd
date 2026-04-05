@@ -1,0 +1,1007 @@
+product "ConsultMatch" {
+
+  vision "A European B2B marketplace that connects companies seeking freelance software
+         consultants with verified independent experts, making mission staffing as fast
+         and transparent as booking a flight — while handling compliance, contracts,
+         and payments so both sides can focus on the work."
+
+  problem {
+    situation "European companies increasingly rely on freelance software consultants for
+               projects, staff augmentation, and specialized expertise. Meanwhile, tens of
+               thousands of independent IT consultants across Europe seek missions that match
+               their skills, rates, and availability."
+    complication "Finding the right consultant is slow and opaque: companies rely on personal
+                  networks, staffing agencies with 20-30% margins, or LinkedIn searches that
+                  yield hundreds of unqualified profiles. Consultants waste time on unpaid
+                  prospecting, face late payments, and lack visibility into upcoming missions.
+                  Cross-border engagements add VAT complexity, contract law differences, and
+                  compliance burdens that neither side wants to manage."
+    question "How can we create a trusted, transparent marketplace where companies find
+              vetted consultants in days instead of weeks, and consultants access a steady
+              pipeline of missions without intermediary overhead?"
+  }
+
+  persona "Hiring Manager" {
+    role "A tech lead or engineering manager at a mid-size European company who needs
+          to staff a project with one or more freelance software consultants"
+    goals {
+      "Fill open missions with qualified consultants within 5 business days"
+      "Keep staffing costs below traditional agency margins"
+      "Ensure contractual and fiscal compliance across EU jurisdictions"
+    }
+    frustrations {
+      "Screening dozens of unqualified applicants wastes time"
+      "Agencies charge 20-30% margins and add little value beyond sourcing"
+      "Cross-border contracts and VAT handling are confusing and risky"
+      "No reliable way to verify a consultant's track record before engaging"
+    }
+    context "Works at a company with 50-500 employees, manages a team of 5-20 engineers,
+             hires 3-10 freelancers per year, uses web on desktop during business hours,
+             budget authority up to 150k EUR per mission"
+    weight primary
+  }
+
+  persona "Freelance Consultant" {
+    role "An independent software consultant based in Europe who sells expertise
+          by the day or by the mission to corporate clients"
+    goals {
+      "Maintain a pipeline of missions with minimal unpaid prospecting time"
+      "Get paid on time and in full, without chasing invoices"
+      "Build a portable reputation that follows them across clients"
+    }
+    frustrations {
+      "Prospecting and sales consume 20-30% of available time"
+      "Clients pay late — 60-90 day payment cycles are common"
+      "No portable proof of past mission success beyond word of mouth"
+      "Agencies take large commissions for minimal ongoing value"
+    }
+    context "Operates as a solo freelancer or through a personal company (EURL, GmbH, BV, etc.),
+             rates 400-1200 EUR/day, works on 2-4 missions per year, uses mobile and desktop,
+             values autonomy and flexibility"
+    weight primary
+  }
+
+  persona "Platform Administrator" {
+    role "An internal operations team member who manages consultant vetting,
+          dispute resolution, and marketplace health"
+    goals {
+      "Maintain marketplace quality by vetting consultants efficiently"
+      "Resolve disputes fairly and quickly"
+      "Monitor key marketplace health metrics daily"
+    }
+    frustrations {
+      "Manual vetting does not scale beyond a few hundred consultants"
+      "Disputes escalate when there is no clear contractual framework"
+    }
+    context "Uses backoffice tools on desktop, handles 20-50 vetting requests per week,
+             manages a small ops team of 2-5 people"
+    weight secondary
+  }
+
+  persona "Procurement Officer" {
+    role "A procurement or legal team member at a large enterprise who must validate
+          that freelance engagements comply with internal purchasing policies"
+    goals {
+      "Ensure all freelance engagements pass compliance checks"
+      "Consolidate freelance spending into a single auditable channel"
+    }
+    frustrations {
+      "Freelancers are engaged through informal channels that bypass procurement"
+      "No single view of all active freelance engagements across the company"
+    }
+    context "Works at companies with 500+ employees, involved in purchase orders above 50k EUR,
+             uses desktop during business hours, needs audit trails"
+    weight secondary
+  }
+
+  job "Staff a project with the right consultant quickly" {
+    persona "Hiring Manager"
+    statement "When I have an approved project that needs external expertise,
+               I want to find and engage a qualified freelance consultant within days,
+               so I can keep my project timeline on track without waiting weeks for agencies."
+    type functional
+    importance critical
+    satisfaction underserved
+    related-to "Verify consultant quality before committing"
+    desired-outcomes {
+      "Minimize the time between posting a mission and receiving qualified applications" {
+        importance high
+        current-satisfaction low
+      }
+      "Minimize the effort required to evaluate consultant fit for the mission" {
+        importance high
+        current-satisfaction low
+      }
+      "Minimize the risk of engaging a consultant who underperforms" {
+        importance high
+        current-satisfaction medium
+      }
+    }
+  }
+
+  job "Verify consultant quality before committing" {
+    persona "Hiring Manager"
+    statement "When I have shortlisted consultants for a mission,
+               I want to verify their skills, track record, and reliability through trusted signals,
+               so I can commit with confidence rather than relying on self-reported CVs."
+    type functional
+    importance critical
+    satisfaction underserved
+    desired-outcomes {
+      "Maximize the confidence that the consultant can deliver on the mission requirements" {
+        importance high
+        current-satisfaction low
+      }
+      "Minimize the time spent on reference checks and credential verification" {
+        importance medium
+        current-satisfaction low
+      }
+    }
+  }
+
+  job "Find my next mission without constant prospecting" {
+    persona "Freelance Consultant"
+    statement "When my current mission is ending in the next 4-6 weeks,
+               I want relevant mission opportunities to come to me based on my profile,
+               so I can maintain continuity of income without spending weeks on unpaid sales."
+    type functional
+    importance critical
+    satisfaction underserved
+    related-to "Get paid reliably and on time"
+    desired-outcomes {
+      "Minimize the gap between missions (inter-contract period)" {
+        importance high
+        current-satisfaction low
+      }
+      "Minimize the time spent on prospecting and applications that go nowhere" {
+        importance high
+        current-satisfaction low
+      }
+      "Maximize the relevance of mission suggestions to my skills and preferences" {
+        importance high
+        current-satisfaction low
+      }
+    }
+  }
+
+  job "Get paid reliably and on time" {
+    persona "Freelance Consultant"
+    statement "When I have completed work on a mission,
+               I want to be paid within a predictable and short timeframe,
+               so I can manage my cash flow without anxiety."
+    type functional
+    importance critical
+    satisfaction underserved
+    desired-outcomes {
+      "Minimize the time between work completion and payment receipt" {
+        importance high
+        current-satisfaction low
+      }
+      "Minimize the likelihood of payment disputes or delays" {
+        importance high
+        current-satisfaction low
+      }
+    }
+  }
+
+  job "Build a portable professional reputation" {
+    persona "Freelance Consultant"
+    statement "When I have successfully completed missions,
+               I want my track record to be visible and verifiable by future clients,
+               so I can win new missions based on proven results rather than starting from scratch."
+    type social
+    importance important
+    satisfaction unserved
+    desired-outcomes {
+      "Maximize the visibility of verified mission completions to prospective clients" {
+        importance high
+        current-satisfaction low
+      }
+      "Minimize the effort needed to demonstrate expertise to a new client" {
+        importance medium
+        current-satisfaction low
+      }
+    }
+  }
+
+  job "Feel confident the engagement is legally sound" {
+    persona "Hiring Manager"
+    statement "When I am about to engage a freelance consultant from another EU country,
+               I want the contract, VAT, and compliance aspects handled correctly,
+               so I can focus on the project without worrying about legal or fiscal risk."
+    type emotional
+    importance important
+    satisfaction underserved
+    desired-outcomes {
+      "Minimize the anxiety about cross-border compliance errors" {
+        importance high
+        current-satisfaction low
+      }
+      "Minimize the time my legal team spends reviewing freelance contracts" {
+        importance medium
+        current-satisfaction low
+      }
+    }
+  }
+
+  non-goals {
+    "Become a staffing agency — we are a marketplace, not a body shop; we do not employ consultants"
+    "Handle permanent hiring — we serve freelance missions only, not full-time recruitment"
+    "Serve non-IT consulting — we focus on software and technology consulting exclusively"
+    "Provide project management — we match and contract; project delivery is between client and consultant"
+    "Operate outside the EU/EEA — we start European and stay European to manage compliance depth"
+  }
+
+  evidence "Freelance market growth in Europe" {
+    type market-research
+    summary "The European freelance IT market grew 12% year-over-year in 2025, reaching
+             an estimated 45B EUR. France, Germany, and Netherlands are the three largest
+             markets, together representing 60% of volume."
+    source-reference "Malt Freelancing Index 2025; IDC European IT Services Report Q4-2025"
+    date 2025-11-01
+    confidence moderate
+    supports "Grow active consultant base"
+  }
+
+  evidence "Agency margin pain point" {
+    type customer-feedback
+    summary "In 50 interviews with hiring managers across 5 EU countries, 82% cited agency
+             margins (20-30%) as a primary pain point. 68% said they would switch to a
+             direct marketplace if consultant quality could be guaranteed."
+    source-reference "ConsultMatch Customer Discovery Interviews — Round 2, Oct 2025"
+    date 2025-10-30
+    confidence moderate
+    supports "Mission posting and consultant matching"
+  }
+
+  evidence "Consultant prospecting time waste" {
+    type user-research
+    summary "Survey of 200 freelance IT consultants in FR/DE/NL: average 25% of working
+             time is spent on unpaid prospecting. 71% report inter-contract gaps of 3+ weeks.
+             Top request: 'Send me relevant missions, don't make me search.'"
+    source-reference "ConsultMatch Consultant Survey — Sept 2025"
+    date 2025-09-15
+    confidence moderate
+    supports "Find my next mission without constant prospecting"
+  }
+
+  evidence "Late payment prevalence" {
+    type analytics
+    summary "Analysis of 500 freelance invoices in the FR/DE market shows average payment
+             delay of 52 days from invoice date. 23% of invoices exceeded 90 days.
+             Late payment is the #1 cited reason for leaving freelancing."
+    source-reference "Freelance Payment Practices Study — Hiscox/Malt 2025"
+    date 2025-08-20
+    confidence strong
+    supports "Escrow and guaranteed payment"
+  }
+
+  goal "Reduce time-to-match" {
+    statement "Reduce average time from mission posting to first qualified application
+               to under 48 hours"
+    horizon short-term
+    owner "Head of Product"
+    metric {
+      indicator "p50 time from MissionPublished to first QualifiedApplicationReceived"
+      target "< 48 hours"
+      baseline "Unknown — to be established in pilot"
+      measurement "Event timestamp delta in production"
+    }
+  }
+
+  goal "Grow active consultant base" {
+    statement "Reach 5,000 verified active consultants across FR, DE, and NL within
+               12 months of launch"
+    horizon mid-term
+    owner "Head of Growth"
+    metric {
+      indicator "Number of verified consultants with profile marked available in last 90 days"
+      target "5,000"
+      baseline "0"
+      measurement "Monthly count from consultant status in production database"
+    }
+  }
+
+  goal "Achieve marketplace liquidity" {
+    statement "Reach a mission fill rate of 70% — 7 out of 10 posted missions result
+               in a signed engagement within 14 days"
+    horizon mid-term
+    owner "Head of Product"
+    metric {
+      indicator "Percentage of missions with status Engaged within 14 days of posting"
+      target "70%"
+      baseline "0% — pre-launch"
+      measurement "Ratio computed weekly from mission lifecycle events"
+    }
+  }
+
+  goal "Reduce client staffing cost" {
+    statement "Clients save at least 15% on staffing costs compared to traditional
+               agencies by using ConsultMatch"
+    horizon mid-term
+    owner "Head of Sales"
+    metric {
+      indicator "Average platform fee as percentage of mission value vs. agency benchmark"
+      target "< 12% platform fee (vs. 20-30% agency)"
+      baseline "20-30% agency average"
+      measurement "Platform fee divided by total mission value, compared to industry benchmarks"
+    }
+  }
+
+  goal "Guarantee consultant payment speed" {
+    statement "Consultants receive payment within 14 days of validated timesheet submission"
+    horizon short-term
+    owner "Head of Finance"
+    metric {
+      indicator "p90 time from TimesheetValidated to PaymentReceived"
+      target "< 14 days"
+      baseline "52 days industry average"
+      measurement "Payment event timestamps in production"
+    }
+  }
+
+  hypothesis "Skill-based matching increases application quality" {
+    intervention "Use structured skill taxonomy and mission requirements to auto-match
+                  and rank consultants, surfacing only relevant missions to each consultant"
+    expected-outcome "First-application acceptance rate increases to 40% (vs. 15% on
+                      generic job boards)"
+    mechanism "Relevance filtering reduces noise for consultants and reduces screening
+               effort for hiring managers, improving both sides of the marketplace"
+    validation-method "Compare acceptance rate of matched applications vs. unmatched
+                       applications in pilot phase"
+    status proposed
+    proposes "Mission posting and consultant matching"
+    predicts "Reduce time-to-match"
+  }
+
+  hypothesis "Escrow increases consultant trust and adoption" {
+    intervention "Hold client payment in escrow upon mission start, releasing to consultant
+                  upon validated timesheet — guaranteeing payment within 14 days"
+    expected-outcome "Consultant activation rate increases by 30% and churn decreases by 20%"
+    mechanism "Guaranteed payment removes the #1 freelancer anxiety, making the platform
+               more attractive than direct client relationships for payment reliability"
+    validation-method "Compare consultant sign-up-to-first-mission conversion and 6-month
+                       retention with and without escrow guarantee in pilot"
+    status proposed
+    proposes "Escrow and guaranteed payment"
+    predicts "Guarantee consultant payment speed"
+  }
+
+  hypothesis "Verified reviews drive repeat hiring" {
+    intervention "Collect structured end-of-mission reviews from both client and consultant,
+                  verified by platform (only parties to a real mission can review)"
+    expected-outcome "Consultants with 3+ verified reviews are hired 2x faster than those
+                      without reviews"
+    mechanism "Verified reviews reduce perceived hiring risk, making clients more willing
+               to shortlist and engage quickly"
+    validation-method "Cohort analysis: compare time-to-engagement for reviewed vs.
+                       unreviewed consultants after 6 months of operation"
+    status proposed
+    proposes "Verified reviews and reputation"
+    predicts "Reduce time-to-match"
+  }
+
+  feature "Mission posting and consultant matching" {
+    summary "Companies post missions with structured requirements (skills, duration, rate range,
+             location/remote, start date) and receive ranked, pre-matched consultant applications"
+    persona "Hiring Manager"
+    value-proposition "Find qualified consultants in days instead of weeks, without agency overhead"
+    priority must
+    status accepted
+    addresses "Staff a project with the right consultant quickly"
+    advances "Reduce time-to-match", "Achieve marketplace liquidity"
+    tested-by "Skill-based matching increases application quality"
+    non-goals {
+      "Automatically engage consultants without client review — matching suggests, humans decide"
+      "Support non-IT mission types — we index on software and tech consulting only"
+    }
+    stories {
+      "As a hiring manager, I want to post a mission with required skills, budget range,
+       and timeline, so that I receive applications only from consultants who fit." {
+        acceptance-criteria {
+          "Mission form requires: title, description, required skills (from taxonomy), duration,
+           rate range, location (on-site/hybrid/remote), and desired start date"
+          "Mission is published within 1 minute of submission"
+          "Matching algorithm notifies relevant consultants within 1 hour of publication"
+        }
+      }
+      "As a hiring manager, I want to see a ranked shortlist of applicants with match scores,
+       so that I can quickly identify the best candidates." {
+        acceptance-criteria {
+          "Shortlist shows match score, key skills overlap, availability, rate, and verified reviews"
+          "Hiring manager can filter and sort the shortlist"
+          "Shortlist is available within 48 hours of posting for active markets"
+        }
+      }
+    }
+  }
+
+  feature "Consultant profile and availability" {
+    summary "Consultants create a structured profile with skills, experience, rate, and
+             real-time availability calendar, making them discoverable by the matching engine"
+    persona "Freelance Consultant"
+    value-proposition "Be found for relevant missions automatically instead of prospecting manually"
+    priority must
+    status accepted
+    addresses "Find my next mission without constant prospecting"
+    advances "Grow active consultant base"
+    non-goals {
+      "Act as a full CV builder — we capture structured data for matching, not a document"
+      "Support team profiles — each consultant has an individual profile"
+    }
+    stories {
+      "As a freelance consultant, I want to create a profile with my skills, experience,
+       daily rate, and availability, so that companies can find me for matching missions." {
+        acceptance-criteria {
+          "Profile includes: skills (from taxonomy), years of experience per skill, daily rate,
+           preferred mission types, location preferences, and availability calendar"
+          "Consultant can update availability in real time"
+          "Profile is searchable by matching engine once marked as active"
+        }
+      }
+      "As a freelance consultant, I want to be notified when a mission matches my profile,
+       so that I can apply without actively searching." {
+        acceptance-criteria {
+          "Notification sent within 1 hour of a matching mission being published"
+          "Notification includes mission summary, rate range, duration, and match score"
+          "Consultant can apply directly from the notification"
+        }
+      }
+    }
+  }
+
+  feature "Consultant vetting and verification" {
+    summary "Platform verifies consultant identity, credentials, and professional references
+             before granting verified status"
+    persona "Platform Administrator"
+    value-proposition "Guarantees marketplace quality — clients trust that listed consultants
+                       are real, qualified, and professionally vetted"
+    priority must
+    status accepted
+    addresses "Verify consultant quality before committing"
+    advances "Achieve marketplace liquidity"
+    non-goals {
+      "Certify technical skill level — we verify identity and credentials, not test coding ability"
+      "Replace client-side interviews — vetting provides a baseline, not a hiring decision"
+    }
+    stories {
+      "As a platform administrator, I want to verify a consultant's identity and professional
+       credentials, so that only vetted professionals appear on the marketplace." {
+        acceptance-criteria {
+          "Identity verified via government ID check"
+          "Professional status verified (company registration or freelance status proof)"
+          "At least one professional reference checked"
+          "Vetting decision rendered within 3 business days of submission"
+        }
+      }
+      "As a hiring manager, I want to see a verified badge on consultant profiles,
+       so that I know the platform has checked their credentials." {
+        acceptance-criteria {
+          "Verified badge displayed on profile and in search results"
+          "Badge links to verification details (what was checked, when)"
+          "Only verified consultants appear in matching results by default"
+        }
+      }
+    }
+  }
+
+  feature "Mission application and shortlisting" {
+    summary "Consultants apply to missions with a tailored pitch; hiring managers review,
+             shortlist, and schedule interviews through the platform"
+    persona "Freelance Consultant"
+    value-proposition "Apply to relevant missions with minimal effort and get clear feedback
+                       on application status"
+    priority must
+    status accepted
+    addresses "Find my next mission without constant prospecting", "Staff a project with the right consultant quickly"
+    advances "Reduce time-to-match"
+    stories {
+      "As a freelance consultant, I want to apply to a mission with a short pitch
+       explaining my fit, so that I stand out from other applicants." {
+        acceptance-criteria {
+          "Application form pre-fills data from consultant profile"
+          "Consultant adds a mission-specific pitch (max 500 words)"
+          "Application submitted in under 3 minutes"
+        }
+      }
+      "As a hiring manager, I want to shortlist applicants and schedule interviews,
+       so that I can move from applications to engagement efficiently." {
+        acceptance-criteria {
+          "Hiring manager can accept, reject, or shortlist each application"
+          "Shortlisted consultants receive notification within 1 hour"
+          "Rejected consultants receive a polite decline notification"
+          "Interview scheduling available via integrated calendar"
+        }
+      }
+    }
+  }
+
+  feature "Contract generation and e-signature" {
+    summary "Platform generates a compliant freelance services contract based on mission
+             terms and collects e-signatures from both parties"
+    persona "Hiring Manager"
+    value-proposition "Eliminates legal overhead — a compliant contract is ready in minutes,
+                       not weeks"
+    priority must
+    status accepted
+    addresses "Feel confident the engagement is legally sound"
+    advances "Reduce time-to-match"
+    non-goals {
+      "Replace custom enterprise contracts — we offer a standard template; enterprises can bring their own"
+      "Provide legal advice — we generate contracts, not legal opinions"
+    }
+    stories {
+      "As a hiring manager, I want the platform to generate a contract based on agreed
+       mission terms, so that I don't need to involve my legal team for standard engagements." {
+        acceptance-criteria {
+          "Contract auto-generated from mission terms (rate, duration, scope, location)"
+          "Contract template compliant with consultant's country of registration"
+          "Both parties can review, comment, and sign electronically"
+          "Signed contract stored and downloadable by both parties"
+        }
+      }
+    }
+  }
+
+  feature "Timesheet and work validation" {
+    summary "Consultants submit timesheets; clients validate worked time, triggering
+             the payment process"
+    persona "Freelance Consultant"
+    value-proposition "Clear and auditable record of work done, directly linked to payment"
+    priority must
+    status accepted
+    addresses "Get paid reliably and on time"
+    advances "Guarantee consultant payment speed"
+    stories {
+      "As a freelance consultant, I want to submit my timesheet weekly,
+       so that my worked days are recorded and ready for client validation." {
+        acceptance-criteria {
+          "Timesheet submitted with worked days and optional notes"
+          "Client notified of pending timesheet within 1 hour"
+          "Client must validate or dispute within 5 business days"
+          "Auto-validation if client does not respond within 5 business days"
+        }
+      }
+    }
+  }
+
+  feature "Escrow and guaranteed payment" {
+    summary "Client funds are held in escrow upon mission start; payment released to
+             consultant within 14 days of validated timesheet"
+    persona "Freelance Consultant"
+    value-proposition "Never chase an invoice again — payment is guaranteed by the platform"
+    priority must
+    status accepted
+    addresses "Get paid reliably and on time"
+    advances "Guarantee consultant payment speed"
+    tested-by "Escrow increases consultant trust and adoption"
+    non-goals {
+      "Offer credit or financing to clients — clients must fund escrow upfront or via payment terms with platform"
+      "Handle cryptocurrency payments — EUR bank transfers and SEPA only"
+    }
+    stories {
+      "As a freelance consultant, I want to receive payment within 14 days of
+       my validated timesheet, so that I can manage my cash flow predictably." {
+        acceptance-criteria {
+          "Payment initiated within 24 hours of timesheet validation"
+          "Payment received in consultant's bank account within 14 calendar days"
+          "Consultant receives payment confirmation notification"
+          "Payment breakdown shows: days worked, daily rate, platform fee, net amount"
+        }
+      }
+      "As a hiring manager, I want to fund the escrow for a mission,
+       so that the consultant is guaranteed payment for validated work." {
+        acceptance-criteria {
+          "Escrow amount calculated based on mission duration and rate"
+          "Payment via SEPA direct debit or bank transfer"
+          "Escrow status visible to both parties at all times"
+        }
+      }
+    }
+  }
+
+  feature "Verified reviews and reputation" {
+    summary "Both client and consultant leave structured reviews at the end of each mission;
+             reviews are verified (only real mission participants can review) and visible
+             on profiles"
+    persona "Freelance Consultant"
+    value-proposition "Build a portable, trustworthy professional reputation that wins future missions"
+    priority should
+    status accepted
+    addresses "Build a portable professional reputation", "Verify consultant quality before committing"
+    advances "Achieve marketplace liquidity"
+    tested-by "Verified reviews drive repeat hiring"
+    stories {
+      "As a hiring manager, I want to leave a structured review of the consultant
+       at the end of the mission, so that future clients can assess their track record." {
+        acceptance-criteria {
+          "Review form includes: overall rating (1-5), skill ratings, on-time delivery,
+           communication quality, and free-text comments"
+          "Review only available after mission marked as completed"
+          "Review visible on consultant profile after both parties have submitted"
+        }
+      }
+      "As a freelance consultant, I want to leave a review of the client,
+       so that other consultants know what to expect." {
+        acceptance-criteria {
+          "Review form includes: overall rating, payment reliability, scope clarity,
+           communication quality, and free-text comments"
+          "Client review visible on company profile"
+        }
+      }
+    }
+  }
+
+  feature "Cross-border compliance engine" {
+    summary "Platform handles VAT calculations, invoicing requirements, and regulatory
+             compliance for missions involving parties in different EU countries"
+    persona "Hiring Manager"
+    value-proposition "Engage consultants across borders without worrying about fiscal
+                       and regulatory complexity"
+    priority should
+    status proposed
+    addresses "Feel confident the engagement is legally sound"
+    advances "Grow active consultant base"
+    non-goals {
+      "Handle non-EU jurisdictions — EU/EEA only at launch"
+      "Provide tax advisory services — we automate known rules, not interpret ambiguous ones"
+    }
+    stories {
+      "As a hiring manager, I want the platform to calculate the correct VAT treatment
+       for a cross-border engagement, so that my finance team does not have to research it." {
+        acceptance-criteria {
+          "VAT treatment determined based on client country, consultant country, and service type"
+          "Invoice generated with correct VAT number validation (VIES check)"
+          "Reverse charge mechanism applied where applicable"
+        }
+      }
+    }
+  }
+
+  feature "Company dashboard and spend analytics" {
+    summary "Companies see all active missions, consultant performance, and spending
+             in a single dashboard with export capabilities"
+    persona "Procurement Officer"
+    value-proposition "Single pane of glass for all freelance engagements — no more shadow spending"
+    priority could
+    status proposed
+    advances "Reduce client staffing cost"
+    stories {
+      "As a procurement officer, I want to see all active freelance engagements and
+       total spend, so that I can ensure compliance with purchasing policies." {
+        acceptance-criteria {
+          "Dashboard shows: active missions, total spend YTD, spend by department,
+           spend by consultant, upcoming renewals"
+          "Data exportable as CSV and PDF"
+          "Role-based access control — only authorized users see spend data"
+        }
+      }
+    }
+  }
+
+  assumption "Consultants will accept platform fee for payment guarantee" {
+    statement "Freelance consultants will accept a 5-8% platform fee in exchange for
+               guaranteed payment within 14 days and access to mission pipeline"
+    impact-if-wrong "Consultant acquisition cost rises; marketplace cannot reach liquidity
+                     if supply side rejects the fee model"
+    validation-plan "Test fee acceptance in pre-launch survey with 200 consultants;
+                     validate with actual conversion in pilot market (France)"
+    status unvalidated
+    underpins "Escrow and guaranteed payment"
+  }
+
+  assumption "Companies will post missions on a new platform" {
+    statement "Mid-size European tech companies will post real missions on ConsultMatch
+               within the first 3 months if they can access vetted consultants"
+    impact-if-wrong "Demand side is empty; consultants leave due to no missions;
+                     classic cold-start marketplace failure"
+    validation-plan "Pre-sell to 30 pilot companies with a white-glove onboarding
+                     experience; measure first mission posted within 30 days of activation"
+    status unvalidated
+    underpins "Mission posting and consultant matching"
+  }
+
+  assumption "Standard contract template covers most engagements" {
+    statement "A single parameterized contract template per jurisdiction covers 80%+
+               of freelance IT consulting engagements without custom legal review"
+    impact-if-wrong "Legal teams reject the standard contract; engagement flow stalls
+                     waiting for custom contract negotiation, defeating the speed advantage"
+    validation-plan "Review template with employment lawyers in FR, DE, NL; pilot with
+                     30 missions and track template acceptance rate"
+    status unvalidated
+    underpins "Contract generation and e-signature"
+  }
+
+  assumption "Skill taxonomy is stable enough for matching" {
+    statement "A curated taxonomy of 200-300 software consulting skills provides
+               sufficient granularity for accurate mission-to-consultant matching"
+    impact-if-wrong "Matching is too coarse (poor relevance) or too fine (consultants
+                     don't find their skills); both reduce match quality"
+    validation-plan "Build initial taxonomy from 100 real mission descriptions and
+                     50 consultant profiles; test categorization accuracy with 20 users"
+    status unvalidated
+    underpins "Mission posting and consultant matching", "Consultant profile and availability"
+  }
+
+  risk "Cold start — marketplace chicken-and-egg" {
+    statement "Cannot attract consultants without missions, and cannot attract companies
+               without consultants. Platform may fail to reach minimum liquidity."
+    likelihood high
+    impact critical
+    mitigation mitigate
+    owner "CEO"
+    threatens "Achieve marketplace liquidity"
+  }
+
+  risk "Disintermediation — parties bypass platform after first mission" {
+    statement "After a successful first engagement, client and consultant may transact
+               directly to avoid platform fees, reducing repeat revenue."
+    likelihood medium
+    impact high
+    mitigation mitigate
+    owner "Head of Product"
+    threatens "Reduce client staffing cost"
+  }
+
+  risk "Regulatory reclassification of consultants as employees" {
+    statement "EU member states may tighten rules on freelance status, potentially
+               reclassifying long-term consultants as employees — creating liability
+               for clients and the platform."
+    likelihood medium
+    impact critical
+    mitigation mitigate
+    owner "Head of Legal"
+    threatens "Contract generation and e-signature", "Cross-border compliance engine"
+  }
+
+  risk "Data breach exposing consultant and company data" {
+    statement "A security breach could expose personal data, financial information,
+               and contractual details, causing regulatory fines and trust collapse."
+    likelihood low
+    impact critical
+    mitigation mitigate
+    owner "CTO"
+    threatens "Grow active consultant base"
+  }
+
+  constraint "GDPR compliance" {
+    statement "All personal data processing must comply with GDPR — including right to
+               access, rectification, erasure, and data portability"
+    source regulatory
+    constrains "Consultant profile and availability", "Verified reviews and reputation",
+               "Company dashboard and spend analytics"
+  }
+
+  constraint "PSD2 and e-money regulations" {
+    statement "Holding client funds in escrow may qualify as payment services under PSD2;
+               platform must either obtain a payment institution license or partner with
+               a licensed provider"
+    source regulatory
+    constrains "Escrow and guaranteed payment"
+  }
+
+  constraint "eIDAS for e-signatures" {
+    statement "Electronic signatures on contracts must comply with eIDAS regulation
+               to be legally binding across EU member states"
+    source regulatory
+    constrains "Contract generation and e-signature"
+  }
+
+  constraint "Anti-money laundering (AML/KYC)" {
+    statement "Platform must perform KYC checks on companies and consultants handling
+               payments above regulatory thresholds"
+    source regulatory
+    constrains "Escrow and guaranteed payment", "Consultant vetting and verification"
+  }
+
+  open-question "Payment institution license vs. partnership" {
+    question "Should ConsultMatch obtain its own payment institution license under PSD2,
+              or partner with a licensed payment service provider (e.g., Mangopay, Lemonway)?"
+    context "Own license gives control but takes 6-12 months and significant compliance
+             investment. Partnership is faster but creates dependency and margin pressure.
+             Decision impacts launch timeline and unit economics."
+    owner "CFO"
+    deadline 2026-06-01
+    status open
+    blocks "Escrow and guaranteed payment"
+  }
+
+  open-question "Pricing model — commission vs. subscription" {
+    question "Should the platform charge a per-mission commission (% of mission value)
+              or a monthly subscription fee to companies, or a hybrid model?"
+    context "Commission aligns revenue with value delivered but may encourage disintermediation.
+             Subscription creates predictable revenue but raises the barrier to first use.
+             Hybrid (low subscription + lower commission) may balance both."
+    owner "Head of Product"
+    deadline 2026-05-15
+    status open
+    blocks "Mission posting and consultant matching"
+  }
+
+  open-question "Which countries to launch first" {
+    question "Should we launch in France first (largest freelance IT market) or
+              simultaneously in France and Netherlands (France for volume, Netherlands
+              for English-speaking market and cross-border test)?"
+    context "Single-country launch is simpler operationally but delays cross-border
+             value proposition. Dual launch tests the core differentiator earlier
+             but doubles compliance and ops effort."
+    owner "CEO"
+    deadline 2026-05-01
+    status investigating
+  }
+
+  open-question "Dispute resolution mechanism" {
+    question "What dispute resolution mechanism should the platform offer when client
+              and consultant disagree on timesheet validation or deliverable quality?"
+    context "Without a clear mechanism, disputes escalate to legal proceedings, which
+             destroys trust and creates churn. Options: internal mediation, external
+             arbitration clause, or escrow release rules with escalation path."
+    owner "Head of Legal"
+    deadline 2026-07-01
+    status open
+    blocks "Escrow and guaranteed payment", "Timesheet and work validation"
+  }
+
+  journey "Post mission to signed engagement" for "Hiring Manager" {
+    trigger "Hiring manager has an approved project that needs a freelance software consultant"
+    outcome "Contract signed with a vetted consultant; mission start date confirmed;
+             escrow funded"
+    steps {
+      1 "Hiring manager logs in and clicks 'Post a mission'" {
+        system-response "Displays mission creation form with structured fields"
+        channel web
+        emotional-tone confident
+      }
+      2 "Fills in mission details: title, description, skills, duration, rate range,
+         location, start date" {
+        system-response "Validates fields and shows estimated match count based on criteria"
+        channel web
+        emotional-tone neutral
+      }
+      3 "Publishes the mission" {
+        system-response "Mission goes live; matching engine notifies relevant consultants"
+        channel web
+        emotional-tone confident
+      }
+      4 "Waits for applications (target: first within 48 hours)" {
+        system-response "Sends email/push notifications as qualified applications arrive"
+        channel email
+        emotional-tone anxious
+      }
+      5 "Reviews ranked shortlist of applicants" {
+        system-response "Displays applicants with match score, skills, rate, reviews, and pitch"
+        channel web
+        emotional-tone confident
+      }
+      6 "Shortlists 2-3 candidates and schedules interviews" {
+        system-response "Sends interview invitations; provides integrated scheduling"
+        channel web
+        emotional-tone neutral
+      }
+      7 "Conducts interviews (outside platform)" {
+        channel external
+        emotional-tone neutral
+      }
+      8 "Selects consultant and initiates engagement" {
+        system-response "Generates contract from agreed terms; sends to both parties for review"
+        channel web
+        emotional-tone confident
+      }
+      9 "Both parties review and e-sign the contract" {
+        system-response "Contract signed and stored; escrow funding initiated"
+        channel web
+        emotional-tone delighted
+      }
+      10 "Hiring manager funds the escrow" {
+        system-response "Escrow funded confirmation; mission status changes to active"
+        channel web
+        emotional-tone confident
+      }
+    }
+  }
+
+  journey "Apply to mission and start working" for "Freelance Consultant" {
+    trigger "Consultant receives notification of a matching mission while current
+             engagement is ending"
+    outcome "Contract signed; consultant starts working on the mission; first timesheet
+             submitted and payment in process"
+    steps {
+      1 "Receives mission match notification" {
+        system-response "Push/email notification with mission summary and match score"
+        channel email
+        emotional-tone confident
+      }
+      2 "Reviews mission details and decides to apply" {
+        system-response "Displays full mission description, client profile, and reviews"
+        channel web
+        emotional-tone neutral
+      }
+      3 "Submits application with tailored pitch" {
+        system-response "Application confirmed; estimated review timeline displayed"
+        channel web
+        emotional-tone anxious
+      }
+      4 "Waits for client response" {
+        system-response "Notifications on application status changes"
+        channel email
+        emotional-tone anxious
+      }
+      5 "Shortlisted — schedules and attends interview" {
+        system-response "Interview scheduling; preparation tips shown"
+        channel web
+        emotional-tone confident
+      }
+      6 "Selected — reviews and signs contract" {
+        system-response "Contract displayed for review; e-signature flow"
+        channel web
+        emotional-tone delighted
+      }
+      7 "Starts working on the mission" {
+        channel external
+        emotional-tone confident
+      }
+      8 "Submits first weekly timesheet" {
+        system-response "Timesheet recorded; client notified for validation"
+        channel web
+        emotional-tone neutral
+      }
+      9 "Client validates timesheet" {
+        system-response "Payment initiated from escrow; consultant notified"
+        channel web
+        emotional-tone delighted
+      }
+    }
+  }
+
+  release "R1 — Core marketplace loop" {
+    target-date "Q3 2026"
+    theme "Minimum viable marketplace: post missions, match consultants, contract, pay"
+    status planned
+    includes {
+      "Mission posting and consultant matching"
+      "Consultant profile and availability"
+      "Consultant vetting and verification"
+      "Mission application and shortlisting"
+      "Contract generation and e-signature"
+      "Timesheet and work validation"
+      "Escrow and guaranteed payment"
+    }
+    exit-criteria {
+      "All must features pass acceptance testing"
+      "No P0 bugs open"
+      "Pilot market (France) onboarded with 30+ companies and 500+ consultants"
+      "At least 10 missions completed end-to-end in pilot"
+      "Payment processing compliant with PSD2 (via licensed partner)"
+    }
+  }
+
+  release "R2 — Trust and retention" {
+    target-date "Q4 2026"
+    theme "Build trust through reviews and expand to second market"
+    status planned
+    depends-on "R1 — Core marketplace loop"
+    includes {
+      "Verified reviews and reputation"
+      "Cross-border compliance engine"
+    }
+    exit-criteria {
+      "Review system live and collecting reviews on completed missions"
+      "Cross-border compliance tested for FR-NL corridor"
+      "Second market (Netherlands) operational"
+    }
+  }
+
+  release "R3 — Enterprise and analytics" {
+    target-date "Q1 2027"
+    theme "Enterprise features for larger clients and marketplace analytics"
+    status planned
+    depends-on "R2 — Trust and retention"
+    includes {
+      "Company dashboard and spend analytics"
+    }
+    exit-criteria {
+      "Dashboard live with at least 5 enterprise pilot clients"
+      "Spend data exportable and audit-ready"
+    }
+  }
+}

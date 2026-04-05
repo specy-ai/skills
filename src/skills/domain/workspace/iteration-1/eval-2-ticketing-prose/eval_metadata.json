@@ -1,0 +1,1 @@
+{"eval_id": 2, "eval_name": "ticketing-prose", "prompt": "I'm building an event ticketing platform. Organizers create events with multiple ticket tiers (early bird, regular, VIP). Buyers purchase tickets. There's a waitlist when sold out. Tickets can be transferred to another person. Refunds follow a sliding scale based on days before the event.", "assertions": []}

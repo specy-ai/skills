@@ -1,0 +1,23 @@
+{
+  "skill_name": "domain",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Build a domain model from the system requirements at examples/business-loan/business-loan.sysreq.md. Cover the LoanOriginationContext only.",
+      "expected_output": "A .domain file for LoanOriginationContext with entities (LoanApplication, CreditAnalysis, ProductConfiguration, etc.), commands, events, state machine, invariants, policies, and satisfies traceability to REQ-ORI-*, REQ-SCO-*, REQ-AUT-*, REQ-CFG-* requirements",
+      "files": ["examples/business-loan/business-loan.sysreq.md"]
+    },
+    {
+      "id": 2,
+      "prompt": "I'm building an event ticketing platform. Organizers create events with multiple ticket tiers (early bird, regular, VIP). Buyers purchase tickets. There's a waitlist when sold out. Tickets can be transferred to another person. Refunds follow a sliding scale based on days before the event.",
+      "expected_output": "A .domain file with Event aggregate, Ticket entity, TicketTier value type, Waitlist, state machines for Event and Ticket lifecycles, refund policy with sliding scale, transfer operation",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Build a domain model directly from the PRD at skills/prd-workspace/iteration-1/eval-2-vetbooking-oneshot/with_skill/outputs/vetbooking.prd. No system requirements exist yet — leave satisfies empty.",
+      "expected_output": "A .domain file with bounded contexts for appointment booking, clinic management, patient records, with entities, commands, events, but no satisfies references",
+      "files": ["skills/prd-workspace/iteration-1/eval-2-vetbooking-oneshot/with_skill/outputs/vetbooking.prd"]
+    }
+  ]
+}

@@ -1,0 +1,1196 @@
+// =============================================================================
+// Event Ticketing Platform — Domain Model
+//
+// Organization: EventTicketingOrganization
+// Bounded Contexts:
+//   EventManagementContext  — event creation, ticket tier configuration, capacity
+//   TicketingContext        — ticket purchasing, transfers, waitlist, refunds
+//   PaymentContext          — payment processing, refund disbursement
+// =============================================================================
+
+
+// #############################################################################
+//  SHARED VALUE TYPES
+// #############################################################################
+
+value Money :: "A monetary amount with currency" {
+    fields {
+        amount   : decimal min(0)
+        currency : string default("USD") maxLength(3)
+    }
+}
+
+value Percentage :: "A percentage value between 0 and 100" {
+    fields {
+        value : decimal min(0) max(100)
+    }
+}
+
+value DateRange :: "A period defined by a start and end date" {
+    fields {
+        startDate : datetime
+        endDate   : datetime
+    }
+    invariants {
+        startBeforeEnd :: "Start date must precede end date" {
+            startDate < endDate
+        }
+    }
+}
+
+value Address :: "A physical venue address" {
+    fields {
+        street  : string
+        city    : string
+        state   : string optional
+        country : string
+        zipCode : string optional
+    }
+}
+
+value RefundScale :: "A single tier of the sliding-scale refund policy" {
+    fields {
+        minimumDaysBefore : int min(0)
+        refundPercentage  : Percentage
+    }
+}
+
+value AttendeeInfo :: "Identity information of a ticket holder" {
+    fields {
+        fullName : string
+        email    : string
+        phone    : string optional
+    }
+}
+
+value TransferRecord :: "A record of a ticket transfer between attendees" {
+    fields {
+        fromAttendee : AttendeeInfo
+        toAttendee   : AttendeeInfo
+        transferredAt : datetime
+    }
+}
+
+
+// #############################################################################
+//  EVENT MANAGEMENT CONTEXT
+// #############################################################################
+
+module EventManagement
+uses module Ticketing
+
+// =============================================================================
+// Enums
+// =============================================================================
+
+enum EventStatus {
+    DRAFT
+    PUBLISHED
+    SALES_OPEN
+    SOLD_OUT
+    COMPLETED
+    CANCELLED
+}
+
+enum TicketTierType {
+    EARLY_BIRD
+    REGULAR
+    VIP
+}
+
+// =============================================================================
+// Entities — Event Management
+// =============================================================================
+
+entity Organizer :: "A person or organization that creates and manages events" {
+    satisfies []
+    identifier id : UUID
+    fields {
+        name       : string
+        email      : string
+        phone      : string optional
+        verified   : boolean default("false")
+        createdAt  : datetime immutable
+    }
+
+    operations {
+        "Register organizer" on RegisterOrganizer {
+            satisfies []
+
+            creates Organizer {
+                name = registerOrganizer.name
+                email = registerOrganizer.email
+                phone = registerOrganizer.phone
+                verified = false
+                createdAt = now()
+            }
+
+            emits OrganizerRegistered {
+                organizerId = Organizer.id
+                name = Organizer.name
+                email = Organizer.email
+                createdAt = Organizer.createdAt
+            }
+        }
+
+        "Verify organizer" on VerifyOrganizer {
+            satisfies []
+
+            sets Organizer {
+                verified = true
+            }
+
+            emits OrganizerVerified {
+                organizerId = Organizer.id
+                verifiedAt = now()
+            }
+        }
+    }
+}
+
+entity Event :: "An occasion with a date, venue, and ticket tiers that attendees can purchase tickets for" {
+    satisfies []
+    identifier id : UUID
+    fields {
+        title        : string
+        description  : string optional
+        venue        : Address
+        eventDate    : DateRange
+        status       : EventStatus default("DRAFT")
+        organizerId  : UUID
+        refundPolicy : list<RefundScale>
+        createdAt    : datetime immutable
+        publishedAt  : datetime optional
+        cancelledAt  : datetime optional
+    }
+    references {
+        organizer  : Organizer 1..1
+        ticketTiers : TicketTier 0..n
+    }
+
+    invariants {
+        eventDateMustBeFuture :: "An event can only be published if its start date is in the future" {
+            satisfies []
+            status != PUBLISHED or eventDate.startDate > now()
+            enforcement reject
+        }
+        refundPolicyMustBeOrdered :: "Refund scale tiers must be ordered by descending days-before threshold" {
+            satisfies []
+            // Each tier's minimumDaysBefore must be strictly decreasing
+            true
+            enforcement reject
+        }
+        mustHaveAtLeastOneTier :: "A published event must have at least one ticket tier" {
+            satisfies []
+            status = DRAFT or ticketTiers.size > 0
+            enforcement reject
+        }
+    }
+
+    operations {
+        "Create event" on CreateEvent {
+            satisfies []
+
+            creates Event {
+                title = createEvent.title
+                description = createEvent.description
+                venue = createEvent.venue
+                eventDate = createEvent.eventDate
+                organizerId = createEvent.organizerId
+                refundPolicy = createEvent.refundPolicy
+                status = DRAFT
+                createdAt = now()
+            }
+
+            emits EventCreated {
+                eventId = Event.id
+                organizerId = Event.organizerId
+                title = Event.title
+                eventDate = Event.eventDate
+                createdAt = Event.createdAt
+            }
+        }
+
+        "Publish event" on PublishEvent {
+            satisfies []
+            policy eventDateMustBeFuture(Event)
+            policy mustHaveAtLeastOneTier(Event)
+
+            sets Event {
+                status = PUBLISHED
+                publishedAt = now()
+            }
+
+            emits EventPublished {
+                eventId = Event.id
+                title = Event.title
+                eventDate = Event.eventDate
+                publishedAt = Event.publishedAt
+            }
+        }
+
+        "Open sales" on OpenEventSales {
+            satisfies []
+
+            sets Event {
+                status = SALES_OPEN
+            }
+
+            emits EventSalesOpened {
+                eventId = Event.id
+                openedAt = now()
+            }
+        }
+
+        "Mark sold out" on MarkEventSoldOut {
+            satisfies []
+
+            sets Event {
+                status = SOLD_OUT
+            }
+
+            emits EventSoldOut {
+                eventId = Event.id
+                soldOutAt = now()
+            }
+        }
+
+        "Complete event" on CompleteEvent {
+            satisfies []
+
+            sets Event {
+                status = COMPLETED
+            }
+
+            emits EventCompleted {
+                eventId = Event.id
+                completedAt = now()
+            }
+        }
+
+        "Cancel event" on CancelEvent {
+            satisfies []
+
+            sets Event {
+                status = CANCELLED
+                cancelledAt = now()
+            }
+
+            emits EventCancelled {
+                eventId = Event.id
+                cancelledAt = Event.cancelledAt
+                reason = cancelEvent.reason
+            }
+
+            error EventCancellationFailed {
+                eventId = Event.id
+                reason = "Event has already been completed"
+            }
+        }
+
+        "Update refund policy" on UpdateRefundPolicy {
+            satisfies []
+
+            sets Event {
+                refundPolicy = updateRefundPolicy.refundPolicy
+            }
+
+            emits RefundPolicyUpdated {
+                eventId = Event.id
+                refundPolicy = Event.refundPolicy
+                updatedAt = now()
+            }
+        }
+    }
+}
+
+statemachine EventLifecycle {
+    on Event
+    start DRAFT
+    state DRAFT {}
+    state PUBLISHED {}
+    state SALES_OPEN {}
+    state SOLD_OUT {}
+    state COMPLETED {}
+    state CANCELLED {}
+    transition DRAFT -> PUBLISHED triggered-by "Publish event"
+    transition PUBLISHED -> SALES_OPEN triggered-by "Open sales"
+    transition SALES_OPEN -> SOLD_OUT triggered-by "Mark sold out"
+    transition SOLD_OUT -> SALES_OPEN triggered-by "Open sales"
+    transition SALES_OPEN -> COMPLETED triggered-by "Complete event"
+    transition SOLD_OUT -> COMPLETED triggered-by "Complete event"
+    transition DRAFT -> CANCELLED triggered-by "Cancel event"
+    transition PUBLISHED -> CANCELLED triggered-by "Cancel event"
+    transition SALES_OPEN -> CANCELLED triggered-by "Cancel event"
+    transition SOLD_OUT -> CANCELLED triggered-by "Cancel event"
+    final COMPLETED
+    final CANCELLED
+}
+
+entity TicketTier :: "A pricing and capacity tier within an event (e.g. Early Bird, Regular, VIP)" {
+    satisfies []
+    identifier id : UUID
+    fields {
+        eventId        : UUID
+        tierType       : TicketTierType
+        name           : string
+        price          : Money
+        totalCapacity  : int min(1)
+        soldCount      : int default("0") min(0)
+        reservedCount  : int default("0") min(0)
+        salesStart     : datetime optional
+        salesEnd       : datetime optional
+        createdAt      : datetime immutable
+    }
+
+    invariants {
+        soldCannotExceedCapacity :: "Sold plus reserved tickets cannot exceed total capacity" {
+            satisfies []
+            soldCount + reservedCount <= totalCapacity
+            enforcement reject
+        }
+        salesWindowValid :: "Sales start must precede sales end when both are defined" {
+            satisfies []
+            salesStart is not defined or salesEnd is not defined or salesStart < salesEnd
+            enforcement reject
+        }
+    }
+
+    operations {
+        "Create ticket tier" on CreateTicketTier {
+            satisfies []
+
+            creates TicketTier {
+                eventId = createTicketTier.eventId
+                tierType = createTicketTier.tierType
+                name = createTicketTier.name
+                price = createTicketTier.price
+                totalCapacity = createTicketTier.totalCapacity
+                soldCount = 0
+                reservedCount = 0
+                salesStart = createTicketTier.salesStart
+                salesEnd = createTicketTier.salesEnd
+                createdAt = now()
+            }
+
+            emits TicketTierCreated {
+                ticketTierId = TicketTier.id
+                eventId = TicketTier.eventId
+                tierType = TicketTier.tierType
+                name = TicketTier.name
+                price = TicketTier.price
+                totalCapacity = TicketTier.totalCapacity
+                createdAt = TicketTier.createdAt
+            }
+        }
+
+        "Reserve ticket" on ReserveTicket {
+            satisfies []
+            policy soldCannotExceedCapacity(TicketTier)
+
+            sets TicketTier {
+                reservedCount = reservedCount + 1
+            }
+
+            emits TicketReserved {
+                ticketTierId = TicketTier.id
+                eventId = TicketTier.eventId
+                remainingCapacity = TicketTier.totalCapacity - TicketTier.soldCount - TicketTier.reservedCount
+            }
+
+            error TicketReservationFailed {
+                ticketTierId = TicketTier.id
+                eventId = TicketTier.eventId
+                reason = "No capacity available in this tier"
+            }
+        }
+
+        "Confirm ticket sale" on ConfirmTicketSale {
+            satisfies []
+
+            sets TicketTier {
+                soldCount = soldCount + 1
+                reservedCount = reservedCount - 1
+            }
+
+            emits TicketSaleConfirmed {
+                ticketTierId = TicketTier.id
+                eventId = TicketTier.eventId
+                soldCount = TicketTier.soldCount
+                remainingCapacity = TicketTier.totalCapacity - TicketTier.soldCount - TicketTier.reservedCount
+            }
+        }
+
+        "Release reservation" on ReleaseTicketReservation {
+            satisfies []
+
+            sets TicketTier {
+                reservedCount = reservedCount - 1
+            }
+
+            emits TicketReservationReleased {
+                ticketTierId = TicketTier.id
+                eventId = TicketTier.eventId
+                remainingCapacity = TicketTier.totalCapacity - TicketTier.soldCount - TicketTier.reservedCount
+            }
+        }
+
+        "Increase capacity" on IncreaseTicketTierCapacity {
+            satisfies []
+
+            sets TicketTier {
+                totalCapacity = increaseTicketTierCapacity.newCapacity
+            }
+
+            emits TicketTierCapacityIncreased {
+                ticketTierId = TicketTier.id
+                eventId = TicketTier.eventId
+                oldCapacity = increaseTicketTierCapacity.oldCapacity
+                newCapacity = TicketTier.totalCapacity
+            }
+        }
+    }
+}
+
+aggregate EventAggregate :: "An event with its ticket tiers, enforcing capacity and pricing consistency" {
+    satisfies []
+    root Event
+    contains Event, TicketTier
+}
+
+
+// #############################################################################
+//  TICKETING CONTEXT
+// #############################################################################
+
+module Ticketing
+uses module EventManagement
+uses module Payment
+
+// =============================================================================
+// Enums
+// =============================================================================
+
+enum TicketStatus {
+    RESERVED
+    PURCHASED
+    TRANSFERRED
+    REFUND_REQUESTED
+    REFUNDED
+    CANCELLED
+    CHECKED_IN
+}
+
+enum WaitlistEntryStatus {
+    WAITING
+    OFFERED
+    EXPIRED
+    CONVERTED
+    REMOVED
+}
+
+// =============================================================================
+// Entities — Ticketing
+// =============================================================================
+
+entity Buyer :: "A person who purchases tickets on the platform" {
+    satisfies []
+    identifier id : UUID
+    fields {
+        fullName  : string
+        email     : string
+        phone     : string optional
+        createdAt : datetime immutable
+    }
+
+    operations {
+        "Register buyer" on RegisterBuyer {
+            satisfies []
+
+            creates Buyer {
+                fullName = registerBuyer.fullName
+                email = registerBuyer.email
+                phone = registerBuyer.phone
+                createdAt = now()
+            }
+
+            emits BuyerRegistered {
+                buyerId = Buyer.id
+                email = Buyer.email
+                createdAt = Buyer.createdAt
+            }
+        }
+    }
+}
+
+entity Ticket :: "A purchased or reserved admission to an event for a specific tier" {
+    satisfies []
+    identifier id : UUID
+    fields {
+        eventId       : UUID
+        ticketTierId  : UUID
+        buyerId       : UUID
+        attendee      : AttendeeInfo
+        status        : TicketStatus default("RESERVED")
+        purchasePrice : Money
+        transferHistory : list<TransferRecord>
+        purchasedAt   : datetime optional
+        refundedAt    : datetime optional
+        cancelledAt   : datetime optional
+        checkedInAt   : datetime optional
+        createdAt     : datetime immutable
+    }
+    references {
+        buyer : Buyer 1..1
+    }
+
+    invariants {
+        transferredTicketRetainsEvent :: "A transferred ticket must remain associated with the same event and tier" {
+            satisfies []
+            // eventId and ticketTierId must never change after creation
+            true
+            enforcement reject
+        }
+        checkinOnlyForPurchased :: "Only a purchased ticket can be checked in" {
+            satisfies []
+            status != CHECKED_IN or purchasedAt is defined
+            enforcement reject
+        }
+    }
+
+    operations {
+        "Reserve ticket for buyer" on ReserveTicketForBuyer {
+            satisfies []
+
+            creates Ticket {
+                eventId = reserveTicketForBuyer.eventId
+                ticketTierId = reserveTicketForBuyer.ticketTierId
+                buyerId = reserveTicketForBuyer.buyerId
+                attendee = reserveTicketForBuyer.attendee
+                purchasePrice = reserveTicketForBuyer.price
+                status = RESERVED
+                transferHistory = []
+                createdAt = now()
+            }
+
+            emits TicketReservedForBuyer {
+                ticketId = Ticket.id
+                eventId = Ticket.eventId
+                ticketTierId = Ticket.ticketTierId
+                buyerId = Ticket.buyerId
+                price = Ticket.purchasePrice
+                createdAt = Ticket.createdAt
+            }
+        }
+
+        "Confirm purchase" on ConfirmTicketPurchase {
+            satisfies []
+
+            sets Ticket {
+                status = PURCHASED
+                purchasedAt = now()
+            }
+
+            emits TicketPurchased {
+                ticketId = Ticket.id
+                eventId = Ticket.eventId
+                ticketTierId = Ticket.ticketTierId
+                buyerId = Ticket.buyerId
+                purchasePrice = Ticket.purchasePrice
+                purchasedAt = Ticket.purchasedAt
+            }
+        }
+
+        "Transfer ticket" on TransferTicket {
+            satisfies []
+
+            sets Ticket {
+                attendee = transferTicket.newAttendee
+                status = TRANSFERRED
+                transferHistory = append(transferHistory, TransferRecord(attendee, transferTicket.newAttendee, now()))
+            }
+
+            emits TicketTransferred {
+                ticketId = Ticket.id
+                eventId = Ticket.eventId
+                fromAttendee = transferTicket.previousAttendee
+                toAttendee = Ticket.attendee
+                transferredAt = now()
+            }
+
+            error TicketTransferFailed {
+                ticketId = Ticket.id
+                reason = "Ticket is not in a transferable state"
+            }
+        }
+
+        "Request refund" on RequestTicketRefund {
+            satisfies []
+
+            sets Ticket {
+                status = REFUND_REQUESTED
+            }
+
+            emits TicketRefundRequested {
+                ticketId = Ticket.id
+                eventId = Ticket.eventId
+                buyerId = Ticket.buyerId
+                purchasePrice = Ticket.purchasePrice
+                requestedAt = now()
+            }
+
+            error TicketRefundRequestFailed {
+                ticketId = Ticket.id
+                reason = "Ticket is not eligible for refund"
+            }
+        }
+
+        "Process refund" on ProcessTicketRefund {
+            satisfies []
+
+            sets Ticket {
+                status = REFUNDED
+                refundedAt = now()
+            }
+
+            emits TicketRefunded {
+                ticketId = Ticket.id
+                eventId = Ticket.eventId
+                buyerId = Ticket.buyerId
+                refundAmount = processTicketRefund.refundAmount
+                refundPercentage = processTicketRefund.refundPercentage
+                refundedAt = Ticket.refundedAt
+            }
+        }
+
+        "Cancel ticket" on CancelTicket {
+            satisfies []
+
+            sets Ticket {
+                status = CANCELLED
+                cancelledAt = now()
+            }
+
+            emits TicketCancelled {
+                ticketId = Ticket.id
+                eventId = Ticket.eventId
+                buyerId = Ticket.buyerId
+                cancelledAt = Ticket.cancelledAt
+            }
+        }
+
+        "Check in ticket" on CheckInTicket {
+            satisfies []
+            policy checkinOnlyForPurchased(Ticket)
+
+            sets Ticket {
+                status = CHECKED_IN
+                checkedInAt = now()
+            }
+
+            emits TicketCheckedIn {
+                ticketId = Ticket.id
+                eventId = Ticket.eventId
+                attendee = Ticket.attendee
+                checkedInAt = Ticket.checkedInAt
+            }
+
+            error TicketCheckInFailed {
+                ticketId = Ticket.id
+                reason = "Ticket is not in a valid state for check-in"
+            }
+        }
+    }
+}
+
+statemachine TicketLifecycle {
+    on Ticket
+    start RESERVED
+    state RESERVED {}
+    state PURCHASED {}
+    state TRANSFERRED {
+        invariant transferredTicketRetainsEvent
+    }
+    state REFUND_REQUESTED {}
+    state REFUNDED {}
+    state CANCELLED {}
+    state CHECKED_IN {}
+    transition RESERVED -> PURCHASED triggered-by "Confirm purchase"
+    transition RESERVED -> CANCELLED triggered-by "Cancel ticket"
+    transition PURCHASED -> TRANSFERRED triggered-by "Transfer ticket"
+    transition TRANSFERRED -> TRANSFERRED triggered-by "Transfer ticket"
+    transition PURCHASED -> REFUND_REQUESTED triggered-by "Request refund"
+    transition TRANSFERRED -> REFUND_REQUESTED triggered-by "Request refund"
+    transition REFUND_REQUESTED -> REFUNDED triggered-by "Process refund"
+    transition PURCHASED -> CHECKED_IN triggered-by "Check in ticket"
+    transition TRANSFERRED -> CHECKED_IN triggered-by "Check in ticket"
+    final REFUNDED
+    final CANCELLED
+    final CHECKED_IN
+}
+
+entity WaitlistEntry :: "A buyer's position on a waitlist for a sold-out ticket tier" {
+    satisfies []
+    identifier id : UUID
+    fields {
+        eventId       : UUID
+        ticketTierId  : UUID
+        buyerId       : UUID
+        attendee      : AttendeeInfo
+        position      : int min(1)
+        status        : WaitlistEntryStatus default("WAITING")
+        offerExpiresAt : datetime optional
+        joinedAt      : datetime immutable
+        offeredAt     : datetime optional
+        convertedAt   : datetime optional
+        removedAt     : datetime optional
+    }
+    references {
+        buyer : Buyer 1..1
+    }
+
+    invariants {
+        offerMustHaveExpiry :: "An offered waitlist entry must have an expiry time" {
+            satisfies []
+            status != OFFERED or offerExpiresAt is defined
+            enforcement reject
+        }
+    }
+
+    operations {
+        "Join waitlist" on JoinWaitlist {
+            satisfies []
+
+            creates WaitlistEntry {
+                eventId = joinWaitlist.eventId
+                ticketTierId = joinWaitlist.ticketTierId
+                buyerId = joinWaitlist.buyerId
+                attendee = joinWaitlist.attendee
+                position = joinWaitlist.position
+                status = WAITING
+                joinedAt = now()
+            }
+
+            emits WaitlistJoined {
+                waitlistEntryId = WaitlistEntry.id
+                eventId = WaitlistEntry.eventId
+                ticketTierId = WaitlistEntry.ticketTierId
+                buyerId = WaitlistEntry.buyerId
+                position = WaitlistEntry.position
+                joinedAt = WaitlistEntry.joinedAt
+            }
+        }
+
+        "Offer ticket from waitlist" on OfferTicketFromWaitlist {
+            satisfies []
+
+            sets WaitlistEntry {
+                status = OFFERED
+                offerExpiresAt = offerTicketFromWaitlist.expiresAt
+                offeredAt = now()
+            }
+
+            emits WaitlistTicketOffered {
+                waitlistEntryId = WaitlistEntry.id
+                eventId = WaitlistEntry.eventId
+                ticketTierId = WaitlistEntry.ticketTierId
+                buyerId = WaitlistEntry.buyerId
+                offerExpiresAt = WaitlistEntry.offerExpiresAt
+                offeredAt = WaitlistEntry.offeredAt
+            }
+        }
+
+        "Accept waitlist offer" on AcceptWaitlistOffer {
+            satisfies []
+
+            sets WaitlistEntry {
+                status = CONVERTED
+                convertedAt = now()
+            }
+
+            emits WaitlistOfferAccepted {
+                waitlistEntryId = WaitlistEntry.id
+                eventId = WaitlistEntry.eventId
+                ticketTierId = WaitlistEntry.ticketTierId
+                buyerId = WaitlistEntry.buyerId
+                convertedAt = WaitlistEntry.convertedAt
+            }
+        }
+
+        "Expire waitlist offer" on ExpireWaitlistOffer {
+            satisfies []
+
+            sets WaitlistEntry {
+                status = EXPIRED
+            }
+
+            emits WaitlistOfferExpired {
+                waitlistEntryId = WaitlistEntry.id
+                eventId = WaitlistEntry.eventId
+                ticketTierId = WaitlistEntry.ticketTierId
+                buyerId = WaitlistEntry.buyerId
+                expiredAt = now()
+            }
+        }
+
+        "Remove from waitlist" on RemoveFromWaitlist {
+            satisfies []
+
+            sets WaitlistEntry {
+                status = REMOVED
+                removedAt = now()
+            }
+
+            emits WaitlistEntryRemoved {
+                waitlistEntryId = WaitlistEntry.id
+                eventId = WaitlistEntry.eventId
+                buyerId = WaitlistEntry.buyerId
+                removedAt = WaitlistEntry.removedAt
+            }
+        }
+    }
+}
+
+statemachine WaitlistEntryLifecycle {
+    on WaitlistEntry
+    start WAITING
+    state WAITING {}
+    state OFFERED {
+        invariant offerMustHaveExpiry
+    }
+    state EXPIRED {}
+    state CONVERTED {}
+    state REMOVED {}
+    transition WAITING -> OFFERED triggered-by "Offer ticket from waitlist"
+    transition OFFERED -> CONVERTED triggered-by "Accept waitlist offer"
+    transition OFFERED -> EXPIRED triggered-by "Expire waitlist offer"
+    transition WAITING -> REMOVED triggered-by "Remove from waitlist"
+    final EXPIRED
+    final CONVERTED
+    final REMOVED
+}
+
+
+// =============================================================================
+// Domain Services — Ticketing
+// =============================================================================
+
+service RefundCalculationService :: "Computes the refund amount based on the event's sliding-scale refund policy and days remaining before the event" {
+    satisfies []
+    operations {
+        "Calculate refund amount"(ticketId: UUID, eventId: UUID, purchasePrice: Money, eventStartDate: datetime, refundPolicy: list<RefundScale>) :: "Determine refund amount by matching days-before-event to the highest applicable refund tier" {
+            returns refundAmount : Money
+            returns refundPercentage : Percentage
+        }
+    }
+}
+
+service WaitlistManagementService :: "Manages waitlist ordering and offer distribution when capacity becomes available" {
+    satisfies []
+    operations {
+        "Offer next in waitlist"(eventId: UUID, ticketTierId: UUID) :: "Find the next waiting entry and make an offer with a time-limited window" {
+            returns offeredEntryId : UUID
+        }
+    }
+}
+
+service TicketPurchaseService :: "Orchestrates the full ticket purchase flow: reserve capacity, create ticket, process payment" {
+    satisfies []
+    operations {
+        "Purchase ticket"(eventId: UUID, ticketTierId: UUID, buyerId: UUID, attendee: AttendeeInfo) :: "Reserve a ticket on the tier, create the ticket record, and initiate payment" {
+            returns ticketId : UUID
+        }
+    }
+}
+
+
+// =============================================================================
+// Temporal Events
+// =============================================================================
+
+temporal-event WaitlistOfferDeadlineElapsed :: "Fires when a waitlist offer expires without acceptance" {
+    satisfies []
+    reference WaitlistTicketOffered
+    instant WaitlistEntry.offerExpiresAt
+    guard { WaitlistEntry.status = OFFERED }
+}
+
+
+// =============================================================================
+// Reactions — Ticketing
+// =============================================================================
+
+reaction offerNextWaitlistEntryOnRefund :: "When a ticket is refunded, offer the freed capacity to the next person on the waitlist" {
+    satisfies []
+    triggered-by TicketRefunded
+    guard { true }
+    effects ReserveTicket
+}
+
+reaction offerNextWaitlistEntryOnCancellation :: "When a ticket is cancelled, offer the freed capacity to the next person on the waitlist" {
+    satisfies []
+    triggered-by TicketCancelled
+    guard { true }
+    effects ReserveTicket
+}
+
+reaction expireWaitlistOfferOnDeadline :: "When a waitlist offer deadline elapses, expire the offer and move to the next entry" {
+    satisfies []
+    triggered-by WaitlistOfferDeadlineElapsed
+    guard { WaitlistEntry.status = OFFERED }
+    effects ExpireWaitlistOffer
+}
+
+reaction cancelAllTicketsOnEventCancellation :: "When an event is cancelled, cancel all associated tickets and initiate full refunds" {
+    satisfies []
+    triggered-by EventCancelled
+    guard { true }
+    effects CancelTicket
+}
+
+reaction markEventSoldOutWhenCapacityExhausted :: "When a ticket sale is confirmed and remaining capacity across all tiers is zero, mark the event as sold out" {
+    satisfies []
+    triggered-by TicketSaleConfirmed
+    guard { Event.allTiersExhausted = true }
+    effects MarkEventSoldOut
+}
+
+reaction reopenSalesOnCapacityFreed :: "When a ticket is refunded or cancelled on a sold-out event, reopen sales" {
+    satisfies []
+    triggered-by TicketRefunded
+    guard { Event.status = SOLD_OUT }
+    effects OpenEventSales
+}
+
+reaction initiateRefundPaymentOnTicketRefund :: "When a ticket refund is processed, initiate the payment refund disbursement" {
+    satisfies []
+    triggered-by TicketRefunded
+    guard { true }
+    effects InitiateRefundPayment
+}
+
+reaction releaseReservationOnPurchaseTimeout :: "When a reserved ticket is not purchased within the reservation window, release the reservation" {
+    satisfies []
+    triggered-by ReservationTimeoutElapsed
+    guard { Ticket.status = RESERVED }
+    effects CancelTicket
+}
+
+
+// #############################################################################
+//  PAYMENT CONTEXT
+// #############################################################################
+
+module Payment
+
+// =============================================================================
+// Enums
+// =============================================================================
+
+enum PaymentStatus {
+    PENDING
+    COMPLETED
+    FAILED
+    REFUND_PENDING
+    REFUND_COMPLETED
+    REFUND_FAILED
+}
+
+// =============================================================================
+// Entities — Payment
+// =============================================================================
+
+entity Payment :: "A financial transaction for a ticket purchase or refund" {
+    satisfies []
+    identifier id : UUID
+    fields {
+        ticketId       : UUID
+        buyerId        : UUID
+        amount         : Money
+        refundAmount   : Money optional
+        status         : PaymentStatus default("PENDING")
+        paymentMethod  : string
+        transactionRef : string optional
+        createdAt      : datetime immutable
+        completedAt    : datetime optional
+        refundedAt     : datetime optional
+    }
+
+    invariants {
+        refundCannotExceedPayment :: "Refund amount cannot exceed the original payment amount" {
+            satisfies []
+            refundAmount is not defined or refundAmount.amount <= amount.amount
+            enforcement reject
+        }
+    }
+
+    operations {
+        "Initiate payment" on InitiatePayment {
+            satisfies []
+
+            creates Payment {
+                ticketId = initiatePayment.ticketId
+                buyerId = initiatePayment.buyerId
+                amount = initiatePayment.amount
+                status = PENDING
+                paymentMethod = initiatePayment.paymentMethod
+                createdAt = now()
+            }
+
+            emits PaymentInitiated {
+                paymentId = Payment.id
+                ticketId = Payment.ticketId
+                buyerId = Payment.buyerId
+                amount = Payment.amount
+                createdAt = Payment.createdAt
+            }
+        }
+
+        "Complete payment" on CompletePayment {
+            satisfies []
+
+            sets Payment {
+                status = COMPLETED
+                transactionRef = completePayment.transactionRef
+                completedAt = now()
+            }
+
+            emits PaymentCompleted {
+                paymentId = Payment.id
+                ticketId = Payment.ticketId
+                amount = Payment.amount
+                transactionRef = Payment.transactionRef
+                completedAt = Payment.completedAt
+            }
+
+            error PaymentFailed {
+                paymentId = Payment.id
+                ticketId = Payment.ticketId
+                reason = completePayment.failureReason
+            }
+        }
+
+        "Fail payment" on FailPayment {
+            satisfies []
+
+            sets Payment {
+                status = FAILED
+            }
+
+            emits PaymentFailed {
+                paymentId = Payment.id
+                ticketId = Payment.ticketId
+                reason = failPayment.reason
+            }
+        }
+
+        "Initiate refund payment" on InitiateRefundPayment {
+            satisfies []
+            policy refundCannotExceedPayment(Payment)
+
+            sets Payment {
+                refundAmount = initiateRefundPayment.refundAmount
+                status = REFUND_PENDING
+            }
+
+            emits RefundPaymentInitiated {
+                paymentId = Payment.id
+                ticketId = Payment.ticketId
+                refundAmount = Payment.refundAmount
+                initiatedAt = now()
+            }
+        }
+
+        "Complete refund payment" on CompleteRefundPayment {
+            satisfies []
+
+            sets Payment {
+                status = REFUND_COMPLETED
+                refundedAt = now()
+            }
+
+            emits RefundPaymentCompleted {
+                paymentId = Payment.id
+                ticketId = Payment.ticketId
+                refundAmount = Payment.refundAmount
+                refundedAt = Payment.refundedAt
+            }
+
+            error RefundPaymentFailed {
+                paymentId = Payment.id
+                ticketId = Payment.ticketId
+                reason = completeRefundPayment.failureReason
+            }
+        }
+    }
+}
+
+statemachine PaymentLifecycle {
+    on Payment
+    start PENDING
+    state PENDING {}
+    state COMPLETED {}
+    state FAILED {}
+    state REFUND_PENDING {}
+    state REFUND_COMPLETED {}
+    state REFUND_FAILED {}
+    transition PENDING -> COMPLETED triggered-by "Complete payment"
+    transition PENDING -> FAILED triggered-by "Fail payment"
+    transition COMPLETED -> REFUND_PENDING triggered-by "Initiate refund payment"
+    transition REFUND_PENDING -> REFUND_COMPLETED triggered-by "Complete refund payment"
+    transition REFUND_PENDING -> REFUND_FAILED triggered-by "Complete refund payment"
+    final COMPLETED
+    final FAILED
+    final REFUND_COMPLETED
+    final REFUND_FAILED
+}
+
+
+// =============================================================================
+// Infrastructure Services
+// =============================================================================
+
+service PaymentGatewayService :: "Adapter to external payment processor for charges and refunds" {
+    satisfies []
+    operations {
+        "Charge"(amount: Money, paymentMethod: string, idempotencyKey: UUID) :: "Charge the buyer's payment method" {
+            returns transactionRef : string
+        }
+        "Refund"(transactionRef: string, amount: Money) :: "Refund the specified amount against the original transaction" {
+            returns refundTransactionRef : string
+        }
+    }
+}
+
+service NotificationService :: "Sends notifications to buyers and organizers via email or push" {
+    satisfies []
+    operations {
+        "Notify buyer"(buyerId: UUID, subject: string, body: string) :: "Send a notification to a buyer" {
+        }
+        "Notify organizer"(organizerId: UUID, subject: string, body: string) :: "Send a notification to an organizer" {
+        }
+    }
+}
+
+
+// =============================================================================
+// Agreements
+// =============================================================================
+
+agreement TicketCapacityAgreement :: "The total number of sold tickets for a tier must never exceed the tier's total capacity across Ticketing and EventManagement contexts" {
+    satisfies []
+    participants [EventAggregate, Ticket]
+    predicate { TicketTier.soldCount <= TicketTier.totalCapacity }
+    maintained-by CapacityReconciliation
+}
+
+reconciliation CapacityReconciliation :: "Detects and resolves capacity overcommitment by comparing sold ticket count against tier capacity" {
+    satisfies []
+    trigger TicketSaleConfirmed
+    detection { count(Ticket where eventId = TicketTier.eventId and ticketTierId = TicketTier.id and status in [PURCHASED, TRANSFERRED]) <= TicketTier.totalCapacity }
+    compensation {
+        // If oversold, cancel the most recently sold ticket and issue a full refund
+        effects CancelTicket
+        effects InitiateRefundPayment
+    }
+}

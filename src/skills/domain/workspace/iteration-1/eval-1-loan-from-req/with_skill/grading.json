@@ -1,0 +1,15 @@
+{"expectations": [
+  {"text": "Uses .domain structured syntax", "passed": true, "evidence": "File uses structured blocks: module, entity, value, command, event, aggregate, statemachine, enum keywords throughout"},
+  {"text": "At least 2 entities", "passed": true, "evidence": "Entities: LoanApplication, CreditAnalysis, ProductConfiguration, AutoApprovalConfiguration (4 entities)"},
+  {"text": "At least 1 aggregate", "passed": true, "evidence": "Three aggregates defined: LoanApplicationAggregate, ProductConfigurationAggregate, AutoApprovalConfigurationAggregate"},
+  {"text": "At least 2 value types", "passed": true, "evidence": "8 value types: Money, Percentage, FinancialRatio, ChecklistItem, CreditDecision, DelegationMatrix, RatioOverrideRecord, StateHistoryEntry"},
+  {"text": "Commands use PascalCase verb+noun", "passed": true, "evidence": "CreateLoanApplication, SubmitLoanApplication, ComputeFinancialRatios, DecideLoanApplication, AutoApproveLoanApplication, etc."},
+  {"text": "Events use past participle", "passed": true, "evidence": "LoanApplicationCreated, LoanApplicationSubmitted, FinancialRatiosComputed, CreditScoreComputed, LoanApplicationApproved, LoanApplicationRejected, etc."},
+  {"text": "At least 1 state machine", "passed": true, "evidence": "statemachine LoanApplicationLifecycle defined at line 689 with states DRAFT, SUBMITTED, UNDER_REVIEW, APPROVED, REJECTED"},
+  {"text": "At least 1 invariant", "passed": true, "evidence": "Multiple invariants: applicationMustBeComplete, noAutoRejection, overrideMustHaveJustification, scoringOverrideMustHaveRationale, routingOverrideRequiresHigherAuthority, productConfigurationMustBeValid"},
+  {"text": "Error paths exist", "passed": true, "evidence": "Error events emitted: ApplicationSubmissionRejected, FieldValidationFailed, FinancialRatioComputationFailed, CreditScoreComputationFailed; preconditions on most commands"},
+  {"text": "No technical jargon in names", "passed": true, "evidence": "No 'database', 'API', or 'DTO' found in entity or value type names"},
+  {"text": "requirements-source present", "passed": true, "evidence": "Line 15: requirements-source \"examples/business-loan/business-loan.sysreq.md\""},
+  {"text": "satisfies populated", "passed": true, "evidence": "satisfies populated on entities (e.g. LoanApplication satisfies [REQ-ORI-001..008, REQ-AUT-001, REQ-AUT-004]), value types, invariants, operations, and aggregates with specific REQ-* references"},
+  {"text": "Coverage analysis", "passed": true, "evidence": "Covers REQ-ORI-001 through REQ-ORI-008, REQ-SCO-001 through REQ-SCO-007, REQ-AUT-001 through REQ-AUT-004, REQ-CFG-001 and REQ-CFG-002 — satisfies references span all requirement groups"}
+]}

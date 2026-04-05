@@ -1,0 +1,807 @@
+product "ExpenseFlow" {
+
+  vision "An internal expense management platform that lets employees submit, managers approve,
+         and finance reimburse expenses in days instead of weeks — with built-in compliance,
+         intelligent receipt scanning, and seamless accounting integration."
+
+  problem {
+    situation "Employees across the company incur business expenses (meals, travel, supplies)
+               and submit them for reimbursement. Managers review and approve or reject.
+               Finance processes reimbursements and records them in the accounting system."
+    complication "The current process is slow (3 weeks average reimbursement), manual,
+                  and error-prone. Employees fill paper or spreadsheet-based forms,
+                  attach receipts by email, and chase managers for approval. Finance
+                  re-enters data into SAP manually. Compliance with French tax rules
+                  (e.g., 19.40 EUR meal allowance cap) is checked by hand, leading to
+                  errors and audit findings. Employees are frustrated by the wait,
+                  managers lack visibility, and finance spends excessive time on
+                  low-value data entry."
+    question "How can we reduce the reimbursement cycle from 3 weeks to 5 days while
+              ensuring compliance, reducing manual effort, and giving all stakeholders
+              real-time visibility?"
+  }
+
+  persona "Employee" {
+    role "Any company employee who incurs business expenses and seeks reimbursement"
+    goals {
+      "Get reimbursed quickly and predictably"
+      "Submit expenses with minimal effort, especially on the go"
+      "Know the status of every submitted expense at any time"
+      "Avoid compliance rejections by getting guidance before submitting"
+    }
+    frustrations {
+      "Reimbursement takes 3 weeks on average"
+      "Paper receipts get lost"
+      "No visibility into where the expense is in the approval chain"
+      "Rejection reasons are unclear and arrive too late"
+    }
+    context "Uses smartphone during travel and laptop at office. Submits 3-10 expenses per month.
+             Varying levels of familiarity with expense policies."
+    weight primary
+  }
+
+  persona "Manager" {
+    role "A team lead or department head who approves or rejects expense reports from direct reports"
+    goals {
+      "Approve legitimate expenses quickly without becoming a bottleneck"
+      "Have clear visibility into team spending against budget"
+      "Be alerted to policy violations before approving"
+    }
+    frustrations {
+      "Approval requests arrive by email with incomplete information"
+      "No easy way to check remaining team budget"
+      "Chasing employees for missing receipts delays the whole process"
+    }
+    context "Manages 5-20 direct reports. Reviews expenses weekly. Uses laptop primarily,
+             occasionally mobile. Approval is not their primary job — speed matters."
+    weight primary
+  }
+
+  persona "VP / Senior Leader" {
+    role "A vice president who provides secondary approval for high-value expenses above 500 EUR"
+    goals {
+      "Review only the expenses that truly require senior oversight"
+      "Approve or reject high-value expenses quickly with sufficient context"
+    }
+    frustrations {
+      "Gets pulled into approvals that could be handled at lower levels"
+      "Lacks context on why an expense was incurred"
+    }
+    context "Very time-constrained. Needs mobile-friendly approval with one-tap actions.
+             Reviews 2-5 escalated expenses per week."
+    weight secondary
+  }
+
+  persona "Finance officer" {
+    role "A member of the finance team who processes approved expenses for reimbursement
+          and records them in the accounting system"
+    goals {
+      "Process reimbursements accurately and on time"
+      "Ensure every expense complies with French tax rules and company policy"
+      "Minimize manual data entry into SAP"
+      "Maintain an audit trail for every expense"
+    }
+    frustrations {
+      "Manual data re-entry into SAP is time-consuming and error-prone"
+      "Checking compliance with meal allowance caps is tedious"
+      "Chasing missing receipts and incomplete submissions"
+    }
+    context "Uses SAP daily. Processes 100-300 expenses per month across all departments.
+             Subject to internal and external audit."
+    weight primary
+  }
+
+  job "Submit an expense quickly while on the go" {
+    persona "Employee"
+    statement "When I've just paid for a business meal or taxi and I have the receipt in hand,
+               I want to capture and submit the expense immediately from my phone,
+               so I can get it into the system before I forget or lose the receipt."
+    type functional
+    importance critical
+    satisfaction underserved
+    desired-outcomes {
+      "Minimize the time between incurring an expense and having it submitted" {
+        importance high
+        current-satisfaction low
+      }
+      "Minimize the likelihood of an expense being rejected due to missing information" {
+        importance high
+        current-satisfaction low
+      }
+      "Minimize the manual data entry required to submit an expense" {
+        importance high
+        current-satisfaction low
+      }
+    }
+  }
+
+  job "Know where my expense stands at any moment" {
+    persona "Employee"
+    statement "When I've submitted an expense and I'm waiting for reimbursement,
+               I want to see its current status in real time,
+               so I can plan my personal finances and follow up if something is stuck."
+    type emotional
+    importance important
+    satisfaction unserved
+    desired-outcomes {
+      "Minimize the uncertainty about when reimbursement will arrive" {
+        importance high
+        current-satisfaction low
+      }
+    }
+  }
+
+  job "Approve expenses without it becoming a second job" {
+    persona "Manager"
+    statement "When expense reports from my team arrive for approval,
+               I want to review and approve them quickly with clear policy guidance,
+               so I can keep the process moving without spending excessive time on it."
+    type functional
+    importance critical
+    satisfaction underserved
+    related-to "Submit an expense quickly while on the go"
+    desired-outcomes {
+      "Minimize the time spent reviewing each expense report" {
+        importance high
+        current-satisfaction low
+      }
+      "Minimize the likelihood of approving a non-compliant expense" {
+        importance high
+        current-satisfaction medium
+      }
+    }
+  }
+
+  job "Process reimbursements accurately at scale" {
+    persona "Finance officer"
+    statement "When approved expenses are ready for reimbursement,
+               I want them to flow into SAP automatically with correct accounting codes,
+               so I can process reimbursements in bulk without manual re-entry."
+    type functional
+    importance critical
+    satisfaction underserved
+    desired-outcomes {
+      "Minimize the manual steps between expense approval and SAP booking" {
+        importance high
+        current-satisfaction low
+      }
+      "Minimize the number of compliance errors caught during audit" {
+        importance high
+        current-satisfaction medium
+      }
+    }
+  }
+
+  non-goals {
+    "Corporate credit card management — we handle reimbursement of out-of-pocket expenses only"
+    "Travel booking — this is an expense tool, not a travel management system"
+    "Procurement or purchase order workflows — only post-purchase expense claims"
+    "Multi-currency support beyond EUR — initial scope is France-based employees only"
+    "Replace SAP — we integrate with SAP, we do not duplicate its accounting capabilities"
+  }
+
+  evidence "Reimbursement cycle time" {
+    type analytics
+    summary "Internal finance report shows average reimbursement time is 21 calendar days.
+             Breakdown: 7 days employee submission delay, 8 days manager approval queue,
+             6 days finance processing and SAP entry."
+    source-reference "Finance Operations Quarterly Report Q4-2025, page 8"
+    date 2026-01-15
+    confidence strong
+    supports "Reduce reimbursement cycle time"
+  }
+
+  evidence "Employee satisfaction survey" {
+    type customer-feedback
+    summary "Annual employee engagement survey shows expense reimbursement ranked as the
+             #2 administrative pain point (after IT ticket resolution). 67% of respondents
+             rated the process as 'frustrating' or 'very frustrating'."
+    source-reference "HR Employee Engagement Survey 2025, Section 4.3"
+    date 2025-11-20
+    confidence strong
+    supports "Reduce reimbursement cycle time"
+  }
+
+  evidence "French meal allowance regulation" {
+    type domain-expertise
+    summary "URSSAF sets the maximum tax-exempt meal allowance at 19.40 EUR per meal
+             (2025 threshold). Amounts above this are subject to social contributions
+             and must be flagged. Non-compliance carries audit penalties."
+    source-reference "URSSAF — Frais professionnels, barème repas 2025"
+    date 2025-01-01
+    confidence strong
+    supports "French meal allowance compliance"
+  }
+
+  evidence "Finance manual entry effort" {
+    type analytics
+    summary "Finance team spends an estimated 40 hours per month on manual data entry
+             of approved expenses into SAP. Error rate on manual entries is approximately 8%,
+             requiring rework."
+    source-reference "Finance team time tracking report, Jan 2026"
+    date 2026-01-31
+    confidence moderate
+    supports "Automate SAP integration"
+  }
+
+  goal "Reduce reimbursement cycle time" {
+    statement "Reduce the average time from expense submission to reimbursement
+               from 21 calendar days to 5 calendar days"
+    horizon short-term
+    owner "Head of Finance"
+    metric {
+      indicator "Average calendar days from expense submission to bank transfer"
+      target "< 5 days"
+      baseline "21 days"
+      measurement "Timestamp delta between submission event and payment confirmation event
+                   in the expense system"
+    }
+  }
+
+  goal "Automate SAP integration" {
+    statement "Eliminate manual data entry by automatically posting approved expenses to SAP
+               with correct cost centers and accounting codes"
+    horizon short-term
+    owner "Head of Finance"
+    metric {
+      indicator "Percentage of approved expenses posted to SAP without manual intervention"
+      target "> 95%"
+      baseline "0% (all manual today)"
+      measurement "Ratio of auto-posted vs manually-entered expenses in SAP integration log"
+    }
+  }
+
+  goal "French meal allowance compliance" {
+    statement "Ensure 100% of meal expenses are checked against the 19.40 EUR URSSAF threshold
+               before approval, with automatic flagging of overages"
+    horizon short-term
+    owner "Head of Finance"
+    metric {
+      indicator "Percentage of meal expenses automatically checked against URSSAF threshold"
+      target "100%"
+      baseline "Manual spot-checks only (~30% coverage)"
+      measurement "System audit log of compliance checks applied to meal-category expenses"
+    }
+  }
+
+  goal "Employee adoption" {
+    statement "Achieve 90% employee adoption of the mobile expense app within 6 months of launch"
+    horizon mid-term
+    owner "Head of HR"
+    metric {
+      indicator "Percentage of active employees who submitted at least one expense via the app
+                 in the last 30 days"
+      target "> 90%"
+      baseline "0% (no app today)"
+      measurement "Monthly active submitters / total active employees"
+    }
+  }
+
+  hypothesis "OCR reduces submission time and errors" {
+    intervention "Provide receipt scanning via OCR that auto-extracts amount, date, vendor, and
+                  category from a photo of the receipt"
+    expected-outcome "Average submission time drops from 8 minutes to under 2 minutes,
+                      and rejection rate due to data errors drops by 60%"
+    mechanism "OCR eliminates manual transcription, which is slow and error-prone.
+               Pre-populated fields reduce cognitive load and data entry mistakes."
+    validation-method "Pilot with 50 employees for 1 month. Compare submission time and error
+                       rate against control group using manual entry."
+    status proposed
+    proposes "Receipt OCR scanning"
+    predicts "Reduce reimbursement cycle time"
+  }
+
+  hypothesis "Automated routing reduces approval bottleneck" {
+    intervention "Automatically route expenses to the correct approver based on org chart
+                  and amount thresholds (> 500 EUR to VP), with push notifications and reminders"
+    expected-outcome "Manager approval time drops from 8 days average to under 2 days"
+    mechanism "Push notifications and a dedicated approval queue reduce the time expenses
+               sit unnoticed in email. Automatic escalation prevents stalled approvals."
+    validation-method "Measure approval turnaround time in pilot department vs. control
+                       department over 2 months."
+    status proposed
+    proposes "Approval workflow"
+    predicts "Reduce reimbursement cycle time"
+  }
+
+  feature "Receipt OCR scanning" {
+    summary "Employee photographs a receipt and the system auto-extracts amount, date,
+             vendor, and expense category using OCR"
+    persona "Employee"
+    value-proposition "Eliminates manual data entry — snap a photo and the expense is
+                       pre-filled, reducing submission to under 2 minutes"
+    priority must
+    status accepted
+    addresses "Submit an expense quickly while on the go"
+    advances "Reduce reimbursement cycle time", "Employee adoption"
+    tested-by "OCR reduces submission time and errors"
+    non-goals {
+      "Handwritten receipt recognition — only printed/digital receipts are supported"
+      "Automatic categorization beyond standard categories — edge cases require manual selection"
+    }
+    stories {
+      "As an employee, I want to take a photo of my receipt and have the expense form
+       auto-filled, so that I don't have to type amounts and dates manually." {
+        acceptance-criteria {
+          "OCR extracts amount, date, and vendor name from a clear photo within 5 seconds"
+          "Employee can review and correct any extracted field before submitting"
+          "System flags low-confidence extractions for manual review"
+          "Supported receipt formats: printed thermal, printed laser, digital PDF"
+        }
+      }
+      "As an employee, I want to submit an expense from my phone while traveling,
+       so that I capture the receipt before it gets lost." {
+        acceptance-criteria {
+          "Mobile app allows photo capture from camera or gallery"
+          "Submission works offline and syncs when connection is restored"
+          "Receipt image is stored and attached to the expense record"
+        }
+      }
+    }
+  }
+
+  feature "Expense submission form" {
+    summary "Employee submits an expense with category, amount, date, justification,
+             and receipt attachment"
+    persona "Employee"
+    value-proposition "Structured submission ensures completeness and reduces back-and-forth
+                       with managers and finance"
+    priority must
+    status accepted
+    addresses "Submit an expense quickly while on the go"
+    advances "Reduce reimbursement cycle time"
+    non-goals {
+      "Bulk upload of multiple expenses from CSV — submit one at a time"
+    }
+    stories {
+      "As an employee, I want to select an expense category and see the applicable policy
+       (e.g., meal cap 19.40 EUR), so that I submit compliant expenses the first time." {
+        acceptance-criteria {
+          "Available categories include: meals, transport, accommodation, supplies, other"
+          "When 'meals' is selected, the 19.40 EUR URSSAF limit is displayed"
+          "Amounts exceeding the meal cap are flagged with a warning before submission"
+          "Justification field is mandatory for expenses above 200 EUR"
+        }
+      }
+    }
+  }
+
+  feature "Approval workflow" {
+    summary "Expenses are routed to the correct approver based on org chart and amount.
+             Expenses above 500 EUR require additional VP approval."
+    persona "Manager"
+    value-proposition "Managers see a prioritized approval queue with compliance pre-checks,
+                       reducing review time and preventing policy violations"
+    priority must
+    status accepted
+    addresses "Approve expenses without it becoming a second job"
+    advances "Reduce reimbursement cycle time"
+    tested-by "Automated routing reduces approval bottleneck"
+    non-goals {
+      "Custom approval chains per department — standard two-level hierarchy (manager + VP for > 500 EUR)"
+      "Delegation of approval authority during absence — out of scope for R1"
+    }
+    stories {
+      "As a manager, I want to see a list of pending expense approvals with policy flags,
+       so that I can approve compliant expenses with one tap and focus on exceptions." {
+        acceptance-criteria {
+          "Approval queue shows all pending expenses sorted by submission date"
+          "Each expense shows amount, category, employee name, and compliance flags"
+          "Manager can approve or reject with one tap/click"
+          "Rejection requires a reason from a predefined list plus optional free text"
+          "Push notification sent to manager when new expenses await approval"
+        }
+      }
+      "As a VP, I want to review only expenses above 500 EUR that my managers have
+       already approved, so that I provide oversight without reviewing every expense." {
+        acceptance-criteria {
+          "VP receives only expenses above 500 EUR that have passed manager approval"
+          "VP can approve or reject with full context: receipt, justification, manager approval"
+          "Reminder sent after 48 hours if VP has not acted"
+        }
+      }
+    }
+  }
+
+  feature "Expense status tracking" {
+    summary "Employee sees real-time status of every submitted expense: submitted,
+             under review, approved, rejected, reimbursed"
+    persona "Employee"
+    value-proposition "Eliminates the 'black hole' feeling — employees always know where
+                       their expense is in the process"
+    priority must
+    status accepted
+    addresses "Know where my expense stands at any moment"
+    advances "Employee adoption"
+    stories {
+      "As an employee, I want to see the status of all my submitted expenses in one view,
+       so that I know which are pending, approved, or reimbursed." {
+        acceptance-criteria {
+          "Dashboard shows all expenses with status: submitted, under review, approved, rejected, reimbursed"
+          "Each expense shows its current approver and time in current status"
+          "Push notification sent when status changes"
+          "Rejected expenses show the reason for rejection"
+        }
+      }
+    }
+  }
+
+  feature "Meal allowance compliance engine" {
+    summary "System automatically checks meal expenses against the 19.40 EUR URSSAF threshold
+             and flags overages for both the employee and the approver"
+    persona "Finance officer"
+    value-proposition "100% compliance coverage replaces manual spot-checks, eliminating
+                       audit risk from missed violations"
+    priority must
+    status accepted
+    addresses "Process reimbursements accurately at scale"
+    advances "French meal allowance compliance"
+    stories {
+      "As a finance officer, I want every meal expense automatically checked against the
+       19.40 EUR URSSAF cap, so that non-compliant amounts are flagged before reimbursement." {
+        acceptance-criteria {
+          "All expenses categorized as 'meals' are checked against the 19.40 EUR threshold"
+          "Amounts above the threshold are flagged as 'exceeds URSSAF meal allowance'"
+          "Flagged expenses require explicit acknowledgment from the approver before proceeding"
+          "Audit log records every compliance check with timestamp and result"
+        }
+      }
+    }
+  }
+
+  feature "SAP accounting integration" {
+    summary "Approved and reimbursed expenses are automatically posted to SAP with correct
+             cost centers, GL accounts, and tax codes"
+    persona "Finance officer"
+    value-proposition "Eliminates the 40 hours/month of manual SAP data entry and reduces
+                       the 8% error rate on manual entries to near zero"
+    priority must
+    status accepted
+    addresses "Process reimbursements accurately at scale"
+    advances "Automate SAP integration"
+    non-goals {
+      "Two-way sync with SAP — data flows from ExpenseFlow to SAP, not the reverse"
+      "SAP master data management — cost centers and GL accounts are maintained in SAP"
+    }
+    stories {
+      "As a finance officer, I want approved expenses to be automatically posted to SAP
+       with the correct cost center and GL account, so that I don't re-enter data manually." {
+        acceptance-criteria {
+          "Each approved expense maps to a cost center based on employee department"
+          "Expense category maps to the correct GL account and tax code"
+          "SAP posting occurs within 1 hour of final approval"
+          "Failed postings are queued for manual review with error details"
+          "Finance officer can trigger a manual re-post for failed items"
+        }
+      }
+    }
+  }
+
+  feature "Mobile app" {
+    summary "Native mobile application for iOS and Android that supports expense submission,
+             receipt capture, status tracking, and approval on the go"
+    persona "Employee"
+    value-proposition "Employees submit expenses immediately when they occur, and managers
+                       approve from anywhere — removing the 'I'll do it when I'm at my desk'
+                       delay that adds days to the cycle"
+    priority must
+    status accepted
+    addresses "Submit an expense quickly while on the go", "Approve expenses without it becoming a second job"
+    advances "Reduce reimbursement cycle time", "Employee adoption"
+    non-goals {
+      "Full admin and reporting features on mobile — admin functions are web-only"
+      "Tablet-optimized layout — phone-first design"
+    }
+    stories {
+      "As an employee, I want to submit an expense from my phone immediately after a meal,
+       so that I capture the receipt while I still have it." {
+        acceptance-criteria {
+          "App is available on iOS 16+ and Android 12+"
+          "Receipt photo capture uses the device camera"
+          "Expense can be submitted in under 2 minutes with OCR assistance"
+          "App works offline for submission and syncs when online"
+        }
+      }
+      "As a manager, I want to approve expenses from my phone with a push notification,
+       so that approvals don't wait until I'm at my desk." {
+        acceptance-criteria {
+          "Push notification when new expenses await approval"
+          "Approve/reject with one tap from the notification"
+          "Receipt image and expense details viewable on mobile"
+        }
+      }
+    }
+  }
+
+  feature "Reporting dashboard" {
+    summary "Finance and management have access to expense analytics: spending by department,
+             category trends, compliance rates, and cycle time metrics"
+    persona "Finance officer"
+    value-proposition "Provides visibility into spending patterns and process efficiency,
+                       enabling data-driven policy decisions"
+    priority should
+    status proposed
+    advances "Reduce reimbursement cycle time"
+    stories {
+      "As a finance officer, I want to see expense trends by department and category,
+       so that I can identify spending anomalies and policy gaps." {
+        acceptance-criteria {
+          "Dashboard shows total expenses by department, category, and month"
+          "Cycle time chart shows average days from submission to reimbursement"
+          "Compliance rate chart shows percentage of flagged vs clean expenses"
+          "Data exportable to CSV for external analysis"
+        }
+      }
+    }
+  }
+
+  feature "Approval delegation" {
+    summary "Managers can delegate approval authority to a colleague during planned absence"
+    persona "Manager"
+    value-proposition "Prevents approval bottlenecks when managers are on leave"
+    priority could
+    status proposed
+    addresses "Approve expenses without it becoming a second job"
+    advances "Reduce reimbursement cycle time"
+  }
+
+  assumption "OCR accuracy sufficient for receipts" {
+    statement "Commercial OCR services can extract amount, date, and vendor from French
+               printed receipts with at least 90% field-level accuracy"
+    impact-if-wrong "Employees would need to correct most fields manually, negating the
+                     speed benefit and causing frustration"
+    validation-plan "Test 3 OCR providers (Google Vision, AWS Textract, Mindee) on a corpus
+                     of 200 real French receipts. Measure field-level extraction accuracy."
+    status unvalidated
+    underpins "Receipt OCR scanning"
+  }
+
+  assumption "SAP integration via standard API" {
+    statement "SAP instance supports posting journal entries via RFC/BAPI or SAP S/4HANA
+               OData APIs with acceptable latency (< 5 seconds per posting)"
+    impact-if-wrong "Integration would require custom SAP ABAP development, adding 2-3 months
+                     to timeline and significant cost"
+    validation-plan "Conduct a technical spike with SAP team: test posting a sample journal
+                     entry via the available API. Validate authentication, latency, and
+                     error handling."
+    status unvalidated
+    underpins "SAP accounting integration"
+  }
+
+  assumption "Employees carry smartphones" {
+    statement "At least 95% of employees have access to a personal or company smartphone
+               capable of running the mobile app (iOS 16+ or Android 12+)"
+    impact-if-wrong "Significant employee segment cannot use the mobile app, undermining
+                     the adoption goal and the 'submit immediately' workflow"
+    validation-plan "Survey IT asset records and employee device survey from HR."
+    status unvalidated
+    underpins "Mobile app"
+  }
+
+  risk "OCR provider reliability" {
+    statement "The chosen OCR provider may experience outages or degraded accuracy,
+               preventing real-time receipt scanning"
+    likelihood low
+    impact medium
+    mitigation mitigate
+    owner "Tech Lead"
+    threatens "Receipt OCR scanning"
+  }
+
+  risk "SAP integration delays" {
+    statement "SAP integration may require custom development if standard APIs are
+               insufficient, delaying the R1 launch"
+    likelihood medium
+    impact high
+    mitigation mitigate
+    owner "Head of Engineering"
+    threatens "Automate SAP integration"
+  }
+
+  risk "URSSAF threshold changes" {
+    statement "URSSAF may revise the meal allowance threshold, requiring immediate system
+               updates to stay compliant"
+    likelihood medium
+    impact medium
+    mitigation mitigate
+    owner "Head of Finance"
+    threatens "French meal allowance compliance"
+  }
+
+  risk "Low employee adoption" {
+    statement "Employees may resist switching from familiar (even if slow) email-based process,
+               especially older employees or those who rarely travel"
+    likelihood medium
+    impact high
+    mitigation mitigate
+    owner "Head of HR"
+    threatens "Employee adoption"
+  }
+
+  constraint "French tax compliance" {
+    statement "All meal expense reimbursements must comply with URSSAF barème for
+               frais de repas (19.40 EUR max tax-exempt, 2025 rate). Amounts above the
+               threshold must be treated as taxable benefit."
+    source regulatory
+    constrains "Meal allowance compliance engine", "Expense submission form"
+  }
+
+  constraint "VP approval threshold" {
+    statement "Company policy mandates VP-level approval for any individual expense
+               exceeding 500 EUR"
+    source organizational
+    constrains "Approval workflow"
+  }
+
+  constraint "SAP as accounting system of record" {
+    statement "SAP is the company's accounting system of record. All financial postings
+               must ultimately reside in SAP. ExpenseFlow is not a ledger."
+    source organizational
+    constrains "SAP accounting integration"
+  }
+
+  constraint "GDPR data handling" {
+    statement "Employee personal data and receipt images must be handled in compliance
+               with GDPR. Data retention must follow company policy (current: 10 years
+               for accounting documents per French Code de commerce)."
+    source regulatory
+    constrains "Receipt OCR scanning", "Expense submission form", "SAP accounting integration"
+  }
+
+  open-question "OCR provider selection" {
+    question "Which OCR provider offers the best accuracy-cost tradeoff for French receipts
+              (Google Vision, AWS Textract, Mindee, or other)?"
+    context "Provider choice affects accuracy, cost, latency, and data residency (GDPR).
+             Must be decided before R1 development starts."
+    owner "Tech Lead"
+    deadline 2026-05-01
+    status open
+    blocks "Receipt OCR scanning"
+  }
+
+  open-question "SAP integration approach" {
+    question "Will the SAP integration use RFC/BAPI or S/4HANA OData APIs? Is middleware
+              (e.g., SAP CPI) required?"
+    context "Determines architecture, timeline, and cost. The SAP team has not yet confirmed
+             which APIs are available in our instance."
+    owner "Head of Engineering"
+    deadline 2026-05-15
+    status open
+    blocks "SAP accounting integration"
+  }
+
+  open-question "Offline submission scope" {
+    question "How much functionality should work offline? Just receipt capture, or full
+              submission including validation?"
+    context "Full offline support adds complexity (local validation, conflict resolution
+             on sync). Receipt-only offline may be sufficient."
+    owner "Product Manager"
+    deadline 2026-05-01
+    status open
+    blocks "Mobile app"
+  }
+
+  open-question "Meal allowance overage handling" {
+    question "When a meal expense exceeds 19.40 EUR, should the system block submission,
+              allow submission with a warning, or split the amount into exempt and taxable?"
+    context "Blocking would frustrate employees with legitimate high-cost meals in expensive
+             cities. Splitting requires payroll integration for taxable benefit reporting."
+    owner "Head of Finance"
+    deadline 2026-04-15
+    status open
+    blocks "Meal allowance compliance engine"
+  }
+
+  journey "Employee submits an expense after a business lunch" for "Employee" {
+    trigger "Employee finishes a business lunch and has the receipt"
+    outcome "Expense is submitted with receipt attached, pre-filled via OCR,
+             and routed to the manager for approval"
+    steps {
+      1 "Opens the mobile app and taps 'New Expense'" {
+        channel app
+        emotional-tone neutral
+      }
+      2 "Takes a photo of the receipt using the phone camera" {
+        channel app
+        emotional-tone neutral
+      }
+      3 "System extracts amount, date, vendor via OCR and pre-fills the form" {
+        system-response "Fields are populated, confidence indicators shown for each field"
+        channel app
+        emotional-tone delighted
+      }
+      4 "Reviews extracted data, selects 'Meals' category, sees 19.40 EUR cap reminder" {
+        system-response "Policy reminder displayed: 'URSSAF meal allowance cap: 19.40 EUR'"
+        channel app
+        emotional-tone confident
+      }
+      5 "Adds a brief justification and taps 'Submit'" {
+        system-response "Expense submitted. Status: 'Under review'. Notification sent to manager."
+        channel app
+        emotional-tone confident
+      }
+      6 "Receives push notification when manager approves" {
+        system-response "Notification: 'Your expense of 18.50 EUR (Business lunch) has been approved'"
+        channel app
+        emotional-tone delighted
+      }
+      7 "Reimbursement arrives in bank account within 5 days" {
+        channel external
+        emotional-tone delighted
+      }
+    }
+  }
+
+  journey "Manager reviews and approves expenses" for "Manager" {
+    trigger "Manager receives a push notification that expenses are awaiting approval"
+    outcome "Compliant expenses are approved, non-compliant ones are rejected with reasons"
+    steps {
+      1 "Receives push notification: '3 expenses awaiting your approval'" {
+        channel app
+        emotional-tone neutral
+      }
+      2 "Opens the approval queue on mobile" {
+        channel app
+        emotional-tone neutral
+      }
+      3 "Reviews first expense: sees receipt image, OCR-extracted data, compliance flags" {
+        system-response "Expense details shown with green 'compliant' badge (meal within cap)"
+        channel app
+        emotional-tone confident
+      }
+      4 "Approves compliant expense with one tap" {
+        system-response "Approved. Employee notified. Routed to finance for processing."
+        channel app
+        emotional-tone confident
+      }
+      5 "Reviews second expense: sees 'exceeds URSSAF meal cap' flag" {
+        system-response "Orange flag: 'Amount 24.00 EUR exceeds 19.40 EUR meal allowance cap'"
+        channel app
+        emotional-tone anxious
+      }
+      6 "Rejects expense with reason 'exceeds meal allowance — please resubmit within cap'" {
+        system-response "Rejected. Employee notified with reason."
+        channel app
+        emotional-tone neutral
+      }
+    }
+  }
+
+  release "R1 — Core expense loop" {
+    target-date "Q3 2026"
+    theme "End-to-end expense submission, approval, compliance checking, and SAP posting"
+    status planned
+    includes {
+      "Receipt OCR scanning"
+      "Expense submission form"
+      "Approval workflow"
+      "Expense status tracking"
+      "Meal allowance compliance engine"
+      "SAP accounting integration"
+      "Mobile app"
+    }
+    exit-criteria {
+      "All must-priority features pass acceptance testing"
+      "OCR extraction accuracy > 90% on French receipts in QA test set"
+      "SAP integration successfully posts expenses to correct cost centers in staging"
+      "Average end-to-end cycle time < 5 days in pilot department"
+      "No P0 bugs open"
+      "GDPR compliance review passed"
+    }
+  }
+
+  release "R2 — Visibility and optimization" {
+    target-date "Q4 2026"
+    theme "Reporting, delegation, and process optimization based on R1 data"
+    status planned
+    depends-on "R1 — Core expense loop"
+    includes {
+      "Reporting dashboard"
+      "Approval delegation"
+    }
+    exit-criteria {
+      "Dashboard shows accurate data from R1 production"
+      "Delegation workflow tested with 3 manager pairs"
+    }
+  }
+}
