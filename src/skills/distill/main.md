@@ -2,8 +2,8 @@
 
 ---
 name: distill
-version: v3
-description: Reverse-engineers source code into Specy v3 .domain files
+version: v4
+description: Reverse-engineers source code into .domain files, derives .sysreq requirements, and produces refactoring recommendations
 user-invocable: true
 ---
 
@@ -12,6 +12,8 @@ user-invocable: true
 ## Role
 
 You are an expert Domain-Driven Design practitioner who reverse-engineers existing source code into Specy v3 domain model files. You extract the business logic — entities, aggregates, value objects, commands, queries, events, operations, preconditions, postconditions, policies, invariants, agreements, and state machines — from a codebase and express them in a unified `.domain` file.
+
+You also **derive system requirements** from the extracted domain model, producing a `.sysreq` file per bounded context that formalizes what the code actually does in testable EARS statements — including infrastructure concerns, unclear business rules, and gaps that the domain grammar cannot express. Finally, you produce a **refactoring report** with DDD-aligned design improvements.
 
 ---
 
@@ -129,7 +131,22 @@ A role check (`user.isAdmin`, `requirePermission`) is an **authorization mechani
 - **Invariants with enforcement:** file-level `invariant Name { on Entity, must { expr }, enforcement rejection|compensation CommandType|alert }`.
 - **Description operator:** use `::` to attach business descriptions to constructs (e.g., `entity Order :: "A customer order" { ... }`).
 - **Metadata:** optionally add `meta { key = value }` blocks on constructs.
-- **Traceability:** optionally add `satisfies [REQ-XXX-001]` on constructs linked to system requirements.
+- **Traceability:** every domain construct MUST have a `satisfies [REQ-{CTX}-{NNN}]` reference to the derived system requirement it realizes.
+
+### System Requirements Output
+
+- **Naming:** `{domain}.sysreq` per bounded context — same base name as the `.domain` file.
+- **Requirement ID scheme:** `REQ-{CTX}-{NNN}` where `CTX` is the context shortname (e.g., `ORD`, `PAY`) and `NNN` is a zero-padded 3-digit sequence.
+- **Traceability link:** the `.domain` file declares `requirements-source "{domain}.sysreq"` at context level; each domain construct uses `satisfies [REQ-{CTX}-{NNN}]`.
+- **NOTE promotion:** every `// NOTE:` marker in the `.domain` file becomes an NFR requirement in the `.sysreq` file (classify by category: performance, security, operability, resilience, compliance).
+- **UNCLEAR promotion:** every `// UNCLEAR:` marker becomes a functional requirement with `priority should` and the full business rule description as the EARS statement. The rationale (`::`) explains why the domain grammar cannot express it.
+- **Infrastructure promotion:** every element that failed Decision Test 2 (omitted from `.domain` with `// NOTE: infrastructure`) becomes an NFR in the `.sysreq` file.
+- **Functional requirements:** every operation, precondition, invariant, and policy in the `.domain` also gets a corresponding EARS requirement. This ensures the `.sysreq` is a complete specification of the bounded context's behavior.
+
+### Refactoring Report Output
+
+- **File:** `specy/refactoring.report` — a single markdown file covering all bounded contexts.
+- **Purpose:** proposes DDD-aligned design improvements over what the code currently implements, explaining why the refactored design better satisfies the requirements.
 
 ---
 
@@ -183,7 +200,56 @@ For each bounded context:
 18. **Identify temporal events** — scheduled jobs, time-based triggers, expiration logic → `temporal event` (relative/absolute/recurring).
 19. **Identify agreements** — cross-aggregate consistency checks, sagas that compensate → `agreement` with `reconciliation`.
 20. **Test-aware enrichment:** for each extracted operation, read associated test files. Use test assertions to confirm or enrich `precondition` clauses, `sets` blocks, `emits` blocks, and service calls. Use test names as candidate operation labels when they are more expressive than handler method names.
-21. Write `.domain` and print summary:
+21. Write `.domain` file.
+
+22. **Derive system requirements** — for each bounded context, generate a `.sysreq` file:
+
+    | Domain construct | EARS pattern | Requirement type |
+    |---|---|---|
+    | Command-triggered operation | Event-driven (`When {command} is received, the system shall...`) | Functional |
+    | Event-triggered operation | Event-driven (`When {event} occurs, the system shall...`) | Functional |
+    | Precondition with `rejects` | Unwanted (`If {condition violated}, then the system shall reject...`) | Functional |
+    | Invariant | Ubiquitous (`The system shall ensure that {property} holds...`) | Functional |
+    | Policy (reactive rule) | Event-driven (`When {trigger event}, the system shall {effect command}`) | Functional |
+    | State machine transition | State-driven (`While {entity} is in {state}, when {operation}, the system shall transition to {target}`) | Functional |
+    | Agreement | Ubiquitous (`The system shall maintain consistency between {participants}...`) | Functional |
+    | `// NOTE: (infrastructure)` | Ubiquitous or Event-driven (depends on context) | NFR |
+    | `// NOTE: {gap description}` | Based on gap type | NFR or Functional (`priority could`) |
+    | `// UNCLEAR: {business rule}` | Based on rule intent | Functional (`priority should`) |
+    | Decision Test 2 failure (infrastructure element) | Ubiquitous or Event-driven | NFR |
+
+    For each generated requirement:
+    - Assign a unique `REQ-{CTX}-{NNN}` ID.
+    - Write the EARS statement in business language (not code language).
+    - Classify priority: `must` for operations/preconditions/invariants, `should` for UNCLEAR-sourced, `could` for NOTE-sourced gaps.
+    - Add `:: "rationale"` explaining the business justification (from the code's perspective).
+    - Back-annotate the `.domain` file: add `satisfies [REQ-{CTX}-{NNN}]` on every domain construct that realizes the requirement.
+    - Add `requirements-source "{domain}.sysreq"` at context level in the `.domain` file.
+
+23. **Generate refactoring report** — analyze the extracted model for DDD design smells:
+
+    | Smell | Detection heuristic | Refactoring suggestion |
+    |---|---|---|
+    | **Anemic entity** | Entity has many fields but few or no operations (logic lives in services) | Move operations into the entity; convert service methods to entity operations |
+    | **God entity** | Entity has >10 operations or >20 fields | Split into multiple entities or extract an aggregate with contained entities |
+    | **Missing aggregate** | Multiple entities always modified together in the same operation but not grouped | Create an aggregate with a root and contained entities |
+    | **Missing state machine** | Entity has a status enum field + operations that check/set status, but no `states { machine }` block | Add an explicit state machine with guards and transitions |
+    | **Transaction script** | Application service contains business logic (conditions, mutations) instead of delegating to entities | Move logic into entity operations; convert service to orchestrator |
+    | **Missing error events** | Operations have preconditions that reject but no error event is emitted on rejection | Add error events for failed operations |
+    | **Missing temporal concerns** | Entities have date/datetime fields suggesting expiration or deadlines but no temporal events | Add temporal events (relative/absolute) |
+    | **Orphan events** | Events emitted but never consumed by any operation or policy | Flag as potential missing reactive behavior |
+    | **Missing invariants** | Entity has cross-field consistency requirements evident in code but not formalized | Add invariants with enforcement strategy |
+    | **Weak aggregate boundaries** | Cross-aggregate mutations without justification or agreement | Propose agreement/reconciliation or redesign boundaries |
+
+    For each detected smell, write a refactoring note with:
+    - **What the code does:** describe the current implementation
+    - **What it should do:** propose the DDD-aligned design
+    - **Why:** the DDD principle violated and the business benefit of fixing it
+    - **Affected requirements:** which `REQ-{CTX}-{NNN}` would be better satisfied
+
+    Write `specy/refactoring.report`.
+
+24. Print extraction summary:
     ```
     ## Extraction — {domain}
     Enums: {n} | Values: {n} | Entities: {n} | Aggregates: {n}
@@ -193,6 +259,8 @@ For each bounded context:
     Operations (cmd): {n} | Operations (evt): {n} | Operations (internal): {n}
     Preconditions: {n} | Postconditions: {n} | Policies: {n} | Invariants: {n}
     Agreements: {n} | State Machines: {n} | UNCLEAR: {n}
+    Requirements (functional): {n} | Requirements (NFR): {n}
+    Refactoring notes: {n}
     ```
 
 ### Phase 3 — Cross-Validation
@@ -212,9 +280,13 @@ For each bounded context:
 13. Verify every reactive policy's `trigger` event and `effect` command exist.
 14. Verify every agreement's `participants` exist as entities/aggregates.
 15. Verify every file-level invariant has an `enforcement` strategy.
-16. **Test confirmation:** when a test assertion confirms an extracted behaviour (precondition, `sets`, `emits`, service call), treat it as validation. When a test asserts a behaviour absent from the extraction, flag it for review.
-17. Fix obvious errors. For ambiguous cases → `// UNCLEAR`.
-18. Write `specy/gaps.report`:
+16. **Requirement traceability:** verify every domain construct has at least one `satisfies [REQ-...]` reference.
+17. **Requirement resolution:** verify every `REQ-{CTX}-{NNN}` referenced in `satisfies` exists in the `.sysreq` file.
+18. **Marker coverage:** verify every `// NOTE` and `// UNCLEAR` in the `.domain` file has a corresponding requirement in the `.sysreq` file.
+19. **Requirement uniqueness:** verify requirement IDs are unique and sequential within each context.
+20. **Test confirmation:** when a test assertion confirms an extracted behaviour (precondition, `sets`, `emits`, service call), treat it as validation. When a test asserts a behaviour absent from the extraction, flag it for review.
+21. Fix obvious errors. For ambiguous cases → `// UNCLEAR`.
+22. Write `specy/gaps.report`:
     ```
     # Distill Report — {date}
 
@@ -231,11 +303,25 @@ For each bounded context:
     Residual UNCLEAR markers: {n}
     ### {pattern} ({n} occurrences)
     {Why the grammar cannot express it.}
+
+    ## Requirement Coverage
+    Total requirements generated: {n} (functional: {n}, NFR: {n})
+    Domain constructs with satisfies: {n}/{n} ({%})
+    NOTE markers promoted to requirements: {n}/{n}
+    UNCLEAR markers promoted to requirements: {n}/{n}
+    Infrastructure elements promoted to NFRs: {n}
+
+    ## Refactoring Summary
+    Design smells detected: {n}
+    | Smell | Entity/Aggregate | Severity | Affected Requirements |
+    |-------|------------------|----------|----------------------|
+    | {smell} | {name} | {high|medium|low} | {REQ-IDs} |
     ```
 19. Print validation summary:
     ```
     ## Validation Summary
     Types: {n}/{n} | Dot-paths: {n}/{n} | Enums: {n}/{n} | Preconditions: {n}/{n} | Services: {n}/{n} | State Machines: {n}/{n} | Aggregates: {n}/{n} | Queries: {n}/{n} | Policies: {n}/{n} | Corrected: {n} | UNCLEAR: {n}
+    Requirement traceability: {n}/{n} constructs with satisfies | Requirement IDs: {n} unique
     Files written: {list}
     ```
 
@@ -247,7 +333,7 @@ When no `specy/*.domain` files exist:
 
 1. Create `specy/` directory if absent.
 2. Execute Phases 1–3.
-3. Write `.domain` and `gaps.report`.
+3. Write `.domain`, `.sysreq`, `gaps.report`, and `refactoring.report`.
 4. Write `specy/.meta.json` (see Meta File section).
 
 ---
@@ -263,8 +349,8 @@ When no `specy/*.domain` files exist:
   "gitSha": "abc1234def5678",
   "filemap": {
     "src/models/User.java": ["entity User", "enum UserStatus"],
-    "src/services/OrderService.java": ["operation Order.PlaceOrder", "precondition orderMustBeDraft"],
-    "src/listeners/OrderListener.java": ["policy OnOrderShipped"]
+    "src/services/OrderService.java": ["operation Order.PlaceOrder", "precondition orderMustBeDraft", "REQ-ORD-001", "REQ-ORD-002"],
+    "src/listeners/OrderListener.java": ["policy OnOrderShipped", "REQ-ORD-005"]
   }
 }
 ```
@@ -2216,6 +2302,13 @@ Before writing final files, verify each item. If any fails, fix it.
 - [ ] `// source:` comment on every definition
 - [ ] Query-only entities annotated with `// NOTE: query-only`
 - [ ] Unreferenced enums annotated with `// NOTE: not referenced`
+- [ ] Every domain construct has `satisfies [REQ-{CTX}-{NNN}]`
+- [ ] Every `// NOTE` in `.domain` has a corresponding requirement in `.sysreq`
+- [ ] Every `// UNCLEAR` in `.domain` has a corresponding requirement in `.sysreq`
+- [ ] Requirement IDs are sequential and unique within each context
+- [ ] `.sysreq` file has correct syntax per SYSTEM-REQ-METAMODEL.md
+- [ ] `.domain` file has `requirements-source "{domain}.sysreq"` at context level
+- [ ] `refactoring.report` produced with design smell analysis
 
 ---
 
