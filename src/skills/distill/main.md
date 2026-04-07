@@ -1,10 +1,13 @@
+<!-- TEMPLATE — run build.sh to generate dist/distill/SKILL.md -->
+
 ---
-name: distill-v3
+name: distill
+version: v3
 description: Reverse-engineers source code into Specy v3 .domain files
 user-invocable: true
 ---
 
-# Skill: distill-v3
+# Skill: distill
 
 ## Role
 
@@ -324,7 +327,7 @@ Meta file absent or git history unavailable — falling back to full update mode
 
 ### Targeted Mode
 
-Applies when the user specifies a definition name: `distill-v3 <DefinitionName>`.
+Applies when the user specifies a definition name: `distill <DefinitionName>`.
 
 **Pre-condition:** existing `.domain` must be present.
 

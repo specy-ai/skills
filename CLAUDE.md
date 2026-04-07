@@ -13,7 +13,7 @@ Specy is a DDD toolkit that captures business knowledge in structured DSL files 
 ./src/skills/build.sh
 
 # Build a single skill
-./src/skills/build.sh distill-v3
+./src/skills/build.sh distill
 
 # Build tree-sitter parsers + run smoke tests against examples/
 ./src/tree-sitters/build.sh    # requires: tree-sitter CLI
@@ -39,7 +39,7 @@ The build script also copies **runtime files** (heuristics, grammars) to `dist/`
 
 ### Source of Truth
 
-- **Domain grammar**: `src/grammars/domain.ebnf` is the single canonical grammar. It gets copied to `dist/distill-v3/grammars/` by the build script.
+- **Domain grammar**: `src/grammars/domain.ebnf` is the single canonical grammar. It gets copied to `dist/distill/grammars/` by the build script.
 - **Metamodels**: `src/metamodels/DOMAIN-METAMODEL.md` documents the v3 domain metamodel concepts and constraints.
 - **Skill templates**: `src/skills/{skill}/main.md` — always edit here, never in `dist/`.
 

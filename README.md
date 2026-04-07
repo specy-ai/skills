@@ -219,7 +219,7 @@ specy-skill/
 ├── src/                          # All source material (humans edit here)
 │   ├── skills/                   # Skill templates and build system
 │   │   ├── build.sh              # Assembles SKILL.md from templates → dist/
-│   │   ├── distill-v3/           # Distill skill source
+│   │   ├── distill/           # Distill skill source
 │   │   │   ├── main.md           # Template with <!-- include: --> markers
 │   │   │   └── heuristics/       # Stack-specific extraction heuristics (source)
 │   │   ├── dialogue/             # Dialogue skill source
@@ -242,7 +242,7 @@ specy-skill/
 │       └── tree-sitter-specy-sysreq/
 │
 ├── dist/                         # Built output (generated — do not edit)
-│   ├── distill-v3/               # Distill skill
+│   ├── distill/               # Distill skill
 │   │   ├── SKILL.md
 │   │   ├── heuristics/           # Runtime heuristics (copied from src)
 │   │   └── grammars/             # Runtime grammar (domain.ebnf)
@@ -308,7 +308,7 @@ Run the install script to symlink all skills from `dist/` to `~/.claude/skills/`
 ./install-skills-for-user.sh
 ```
 
-This installs: distill-v3, dialogue, spec, prd, sysreq, domain.
+This installs: distill, dialogue, spec, prd, sysreq, domain.
 
 ### Manual setup (any assistant)
 
@@ -316,13 +316,13 @@ Skills are self-contained directories with a `SKILL.md` and optional runtime fil
 
 ```bash
 # Claude Code
-ln -sf /path/to/specy-skill/dist/distill-v3 ~/.claude/skills/distill-v3
+ln -sf /path/to/specy-skill/dist/distill ~/.claude/skills/distill
 
 # GitHub Copilot (in your target project)
-ln -sf /path/to/specy-skill/dist/distill-v3 .github/skills/distill-v3
+ln -sf /path/to/specy-skill/dist/distill .github/skills/distill
 
 # Vibe (Mistral)
-ln -sf /path/to/specy-skill/dist/distill-v3 ~/.vibe/skills/distill-v3
+ln -sf /path/to/specy-skill/dist/distill ~/.vibe/skills/distill
 ```
 
 ## Usage
@@ -367,7 +367,7 @@ After editing, regenerate:
 
 ```bash
 src/skills/build.sh            # Build all skills
-src/skills/build.sh distill-v3 # Build a single skill
+src/skills/build.sh distill # Build a single skill
 ```
 
 The pre-commit hook blocks commits if `dist/` is out of date with `src/`.

@@ -71,7 +71,7 @@ resolve_includes() {
 
 # -----------------------------------------------------------------------------
 # build_skill: builds one SKILL.md from its main.md template
-# $1 = skill name (distill-v3, dialogue, spec, prd, sysreq, domain)
+# $1 = skill name (distill, dialogue, spec, prd, sysreq, domain)
 # -----------------------------------------------------------------------------
 build_skill() {
   local skill="$1"
@@ -101,19 +101,19 @@ build_skill() {
 # These are files the agent reads on demand during execution, not embedded in SKILL.md.
 # -----------------------------------------------------------------------------
 copy_runtime_files() {
-  # distill-v3: stack-specific heuristics
-  local distill_v3_heuristics="$DIST_DIR/distill-v3/heuristics"
+  # distill: stack-specific heuristics
+  local distill_v3_heuristics="$DIST_DIR/distill/heuristics"
   mkdir -p "$distill_v3_heuristics"
   for f in java-spring.md typescript-nestjs.md clojure.md; do
-    cp "$SCRIPT_DIR/distill-v3/heuristics/$f" "$distill_v3_heuristics/$f"
+    cp "$SCRIPT_DIR/distill/heuristics/$f" "$distill_v3_heuristics/$f"
   done
-  echo "  distill-v3/heuristics/: 3 files copied"
+  echo "  distill/heuristics/: 3 files copied"
 
-  # distill-v3: domain grammar
-  local distill_v3_grammars="$DIST_DIR/distill-v3/grammars"
+  # distill: domain grammar
+  local distill_v3_grammars="$DIST_DIR/distill/grammars"
   mkdir -p "$distill_v3_grammars"
   cp "$REPO_ROOT/src/grammars/domain.ebnf" "$distill_v3_grammars/domain.ebnf"
-  echo "  distill-v3/grammars/: 1 file copied"
+  echo "  distill/grammars/: 1 file copied"
 
   # spec: v3 domain grammar (runtime reference for changes blocks)
   local spec_grammars="$DIST_DIR/spec/grammars"
@@ -161,7 +161,7 @@ if [[ $# -gt 0 ]]; then
 else
   build_skill dialogue
   build_skill spec
-  build_skill distill-v3
+  build_skill distill
   build_skill prd
   build_skill sysreq
   build_skill domain
