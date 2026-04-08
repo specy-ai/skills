@@ -1,0 +1,26 @@
+{
+  "skill_name": "distill-sysreq",
+  "evals": [
+    {
+      "id": 1,
+      "name": "broadleaf-orders-targeted",
+      "prompt": "Extract the system requirements for the order management area of this Broadleaf Commerce codebase. Focus on the order lifecycle: placement, confirmation, shipping, delivery, and cancellation.",
+      "expected_output": "A .sysreq file with EARS requirements covering the order lifecycle: placement (event-driven), state transitions (state-driven), cancellation guards (unwanted), and any infrastructure NFRs found in the order area.",
+      "files": ["/Users/jeremiegrodziski/sandbox/BroadleafCommerce"]
+    },
+    {
+      "id": 2,
+      "name": "url-shortener-full",
+      "prompt": "Extract all system requirements from this URL shortener project.",
+      "expected_output": "A complete .sysreq file covering: URL creation, redirection, analytics, expiration, and any NFRs. Should be a small, focused requirement set.",
+      "files": ["/Users/jeremiegrodziski/Dropbox/projects/specy-skill/examples/url-shortener"]
+    },
+    {
+      "id": 3,
+      "name": "broadleaf-payment-targeted",
+      "prompt": "What are the system requirements for the payment processing in this codebase?",
+      "expected_output": "A .sysreq file with EARS requirements for payment: capture, refund, failure handling, payment method validation, and security NFRs.",
+      "files": ["/Users/jeremiegrodziski/sandbox/BroadleafCommerce"]
+    }
+  ]
+}

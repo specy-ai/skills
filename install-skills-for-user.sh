@@ -2,13 +2,13 @@
 set -euo pipefail
 
 # Install Specy skills by symlinking from this repo to ~/.claude/skills/
-# Skills: distill, dialogue, spec, prd, sysreq, domain
+# Skills: distill, distill-sysreq, dialogue, spec, prd, sysreq, domain
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SKILLS_SRC="$SCRIPT_DIR/dist"
 SKILLS_DST="$HOME/.claude/skills"
 
-SKILLS=(distill dialogue spec prd sysreq domain)
+SKILLS=(distill distill-sysreq dialogue spec prd sysreq domain)
 
 echo "Installing Specy skills from $SKILLS_SRC"
 echo "Destination: $SKILLS_DST"

@@ -121,6 +121,14 @@ copy_runtime_files() {
   cp "$REPO_ROOT/src/grammars/domain.ebnf" "$spec_grammars/domain.ebnf"
   echo "  spec/grammars/: 1 file copied"
 
+  # distill-sysreq: sysreq grammar + metamodel reference
+  local distill_sysreq_refs="$DIST_DIR/distill-sysreq/references"
+  local distill_sysreq_grammar="$DIST_DIR/distill-sysreq/grammar"
+  mkdir -p "$distill_sysreq_refs" "$distill_sysreq_grammar"
+  cp "$REPO_ROOT/src/metamodels/SYSTEM-REQ-METAMODEL.md" "$distill_sysreq_refs/SYSTEM-REQ-METAMODEL.md"
+  cp "$REPO_ROOT/src/grammars/sysreq.ebnf" "$distill_sysreq_grammar/sysreq.ebnf"
+  echo "  distill-sysreq/references/: 1 file, distill-sysreq/grammar/: 1 file copied"
+
   # prd: grammar + references
   local prd_grammar="$DIST_DIR/prd/grammar"
   local prd_refs="$DIST_DIR/prd/references"
@@ -162,6 +170,7 @@ else
   build_skill dialogue
   build_skill spec
   build_skill distill
+  build_skill distill-sysreq
   build_skill prd
   build_skill sysreq
   build_skill domain
