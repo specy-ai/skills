@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Pre-commit hook: ensures generated SKILL.md files are up to date with src/
+# Pre-commit hook: ensures generated dist/ files are up to date with src/skills/
 #
-# Rebuilds from src/ templates and checks for drift. If the generated files
+# Rebuilds from src/skills/ templates and checks for drift. If the generated files
 # differ from what's staged, the commit is blocked.
 
 set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
-BUILD_SCRIPT="$REPO_ROOT/skills/src/build.sh"
+BUILD_SCRIPT="$REPO_ROOT/src/skills/build.sh"
 
 if [[ ! -x "$BUILD_SCRIPT" ]]; then
   echo "pre-commit: build script not found or not executable: $BUILD_SCRIPT"
@@ -17,32 +17,37 @@ fi
 # Run the build
 "$BUILD_SCRIPT" > /dev/null 2>&1
 
-# Check if any generated files changed
-GENERATED_FILES=(
-  "skills/distill/SKILL.md"
-  "skills/dialogue/SKILL.md"
-  "skills/spec/SKILL.md"
-  "skills/distill/heuristics/java-spring.md"
-  "skills/distill/heuristics/typescript-nestjs.md"
-  "skills/distill/heuristics/clojure.md"
-  "skills/distill/grammars/specy.ebnf"
-)
-
+# Check all SKILL.md files and runtime files in dist/ for drift
 DIRTY=()
-for f in "${GENERATED_FILES[@]}"; do
-  if ! git diff --quiet -- "$REPO_ROOT/$f" 2>/dev/null; then
-    DIRTY+=("$f")
+for skill_dir in "$REPO_ROOT"/dist/*/; do
+  skill=$(basename "$skill_dir")
+  # Check SKILL.md
+  if [[ -f "$skill_dir/SKILL.md" ]]; then
+    if ! git diff --quiet -- "$skill_dir/SKILL.md" 2>/dev/null; then
+      DIRTY+=("dist/$skill/SKILL.md")
+    fi
   fi
+  # Check runtime files (heuristics, grammars, grammar, references)
+  for subdir in heuristics grammars grammar references; do
+    if [[ -d "$skill_dir/$subdir" ]]; then
+      for f in "$skill_dir/$subdir"/*; do
+        [[ -f "$f" ]] || continue
+        if ! git diff --quiet -- "$f" 2>/dev/null; then
+          DIRTY+=("dist/$skill/$subdir/$(basename "$f")")
+        fi
+      done
+    fi
+  done
 done
 
 if [[ ${#DIRTY[@]} -gt 0 ]]; then
-  echo "pre-commit: generated files are out of date with src/ templates."
+  echo "pre-commit: generated files in dist/ are out of date with src/skills/ templates."
   echo ""
   echo "The following files need to be regenerated and staged:"
   for f in "${DIRTY[@]}"; do
     echo "  - $f"
   done
   echo ""
-  echo "Run: skills/src/build.sh && git add ${DIRTY[*]}"
+  echo "Run: src/skills/build.sh && git add dist/"
   exit 1
 fi
