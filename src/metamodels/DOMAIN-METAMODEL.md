@@ -55,8 +55,6 @@
     - [How traceability works](#how-traceability-works)
     - [Traceability by concept type](#traceability-by-concept-type)
     - [Bidirectional traceability](#bidirectional-traceability)
-    - [Concrete syntax](#concrete-syntax)
-    - [Agent instruction summary](#agent-instruction-summary)
   - [Software System's Interface](#software-systems-interface)
     - [Inbound communication (System is Driven)](#inbound-communication-system-is-driven)
     - [Outbound Communication (System is Driving)](#outbound-communication-system-is-driving)
@@ -78,7 +76,7 @@ The `satisfies` list is the traceability bridge from the domain model back to th
 
 If no system requirements are provided as input, the `satisfies` list is left empty — it is always optional in the schema but mandatory in practice when requirements exist.
 
-When the system requirements are loaded from a file, the domain model MUST declare a **requirements-source** attribute at the top level (on the organization or bounded context) containing the relative path to that file (e.g. `requirements-source "specs/order-requirements.sysreq"`). This makes the provenance of requirement identifiers explicit and machine-resolvable — any agent or tool can follow the path to read the full requirement text, check coverage, or detect drift.
+When the system requirements are loaded from a file, the domain model MUST declare a **requirements-source** attribute at the top level (on the organization or bounded context) containing the relative path to that file. This makes the provenance of requirement identifiers explicit and machine-resolvable — any agent or tool can follow the path to read the full requirement text, check coverage, or detect drift.
 
 ## Organization
 
@@ -614,44 +612,6 @@ Traceability is bidirectional:
 A domain element with an empty `satisfies` list when requirements are available is an **orphan** — it exists but no requirement justifies it. An orphan is either over-engineering or a signal that a requirement is missing.
 
 A requirement whose identifier appears in no domain element's `satisfies` list is **unsatisfied** — a gap in the domain model.
-
-### Concrete syntax
-
-In `.domain` files, the `requirements-source` appears at the bounded context or organization level, and the `satisfies` attribute appears as a list after each element declaration:
-
-```
-context OrderContext {
-  requirements-source "specs/order-requirements.sysreq"
-
-  entity Order {
-    satisfies [REQ-ORD-002, REQ-ORD-007]
-    ...
-  }
-
-  invariant positiveQuantity {
-    satisfies [REQ-ORD-001]
-    ...
-  }
-
-  command PlaceOrder {
-    satisfies [REQ-ORD-002]
-    ...
-  }
-}
-```
-
-The `requirements-source` path is relative to the `.domain` file's location. Multiple `requirements-source` declarations are allowed when requirements span several files.
-
-### Agent instruction summary
-
-When building or updating a domain model:
-
-1. **Check if system requirements are provided.** Look for a `.sysreq` file, a requirements section, or any input containing EARS statements with identifiers.
-2. **If requirements come from a file**: add a `requirements-source` declaration at the bounded context or organization level with the relative path to that file. This is mandatory — it is the provenance link that makes `satisfies` identifiers resolvable.
-3. **If requirements exist**: for every domain model element you create or modify, determine which requirement(s) it realizes and populate the `satisfies` list with the corresponding identifier(s). Do not leave `satisfies` empty unless the element genuinely satisfies no requirement — and in that case, question whether the element should exist.
-4. **If no requirements exist**: leave `satisfies` empty and omit `requirements-source`. Do not invent requirement identifiers.
-5. **After building the model**: verify coverage — every `must` and `should` requirement should appear in at least one element's `satisfies` list. Flag any unsatisfied requirement as a gap.
-
 
 ## Software System's Interface
 

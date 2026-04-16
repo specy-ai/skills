@@ -175,20 +175,11 @@ After generating:
 
 ## Output Format
 
-The output is always a `.prd` file in the concrete syntax defined in `references/PRODUCT-REQ-METAMODEL.md`. Follow the syntax rules exactly — the file must be parseable by downstream tools.
+The output is always a `.prd` file. Follow the syntax rules exactly — the file must be parseable by downstream tools.
 
-Key syntax patterns:
-- `product "<name>" { ... }` wraps the entire PRD
-- `problem { situation, complication, question }` uses the SCQ framework
-- `persona "<name>" { role, goals { ... }, frustrations { ... }, context, weight }`
-- `job "<name>" { persona, statement, type, importance, satisfaction, desired-outcomes { ... } }`
-- `goal "<name>" { statement, horizon, owner, metric { indicator, target, baseline, measurement } }`
-- `hypothesis "<name>" { intervention, expected-outcome, mechanism, validation-method, status, proposes, predicts }`
-- `feature "<name>" { summary, persona, value-proposition, priority, status, addresses, advances, tested-by, non-goals { ... }, stories { ... } }`
-- `evidence "<name>" { type, summary, source-reference, date, confidence, supports }`
-- `assumption`, `risk`, `constraint`, `open-question`, `release`, `journey` — see metamodel for full syntax
+<!-- include: constructs/concrete-syntax.md -->
 
-When in doubt about syntax, re-read the concrete syntax section and the RideNow example in `references/PRODUCT-REQ-METAMODEL.md`.
+When in doubt about syntax, re-read the concrete syntax and the RideNow example.
 
 ---
 

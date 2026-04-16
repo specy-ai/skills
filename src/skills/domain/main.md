@@ -281,83 +281,11 @@ Ask: "Does this concept earn its place? What requirement justifies it?"
 
 ## Output Format
 
-The output is always a `.domain` file in the concrete syntax defined in `references/DOMAIN-METAMODEL.md`.
+The output is always a `.domain` file.
 
-Key syntax patterns:
+<!-- include: constructs/concrete-syntax.md -->
 
-```
-organization "<name>" {
-
-  context "<name>" {
-    requirements-source "<relative-path-to-req-file>"
-
-    module "<name>" {
-
-      entity <Name> {
-        satisfies [REQ-CTX-001, REQ-CTX-002]
-        :: "<rationale>"
-        <field> : <Type>
-        ...
-      }
-
-      aggregate <Name> {
-        satisfies [REQ-CTX-003]
-        root <EntityName>
-        contains <EntityName>, <EntityName>
-      }
-
-      value <Name> {
-        <field> : <Type>
-      }
-
-      command <CommandName> {
-        satisfies [REQ-CTX-001]
-        <field> : <Type>
-      }
-
-      event <EventName> {
-        satisfies [REQ-CTX-001]
-        <field> : <Type>
-      }
-
-      operation "<verb phrase>" {
-        satisfies [REQ-CTX-001]
-        on <EntityName>
-        accepts <arg> : <Type>
-        returns <Type>
-        emits <EventName>
-        precondition "<name>" { ... }
-        postcondition "<name>" { ... }
-      }
-
-      statemachine <Name> {
-        on <EntityName>
-        start <StateName>
-        state <StateName> { invariant ... }
-        transition <From> -> <To> triggered-by "<operation name>"
-        final <StateName>
-      }
-
-      invariant <name> {
-        satisfies [REQ-CTX-004]
-        on <EntityName>
-        must { <expression> }
-        message "<business language>"
-        enforcement <reject|compensate|alert>
-      }
-
-      reaction <name> {
-        satisfies [REQ-CTX-005]
-        triggered-by <EventName>
-        guard { <expression> }
-        effects <CommandName>
-      }
-    }
-  }
-}
-```
-
-When in doubt about syntax, re-read the concrete syntax section and the business-loan example referenced in `references/DOMAIN-METAMODEL.md`.
+When in doubt about syntax, re-read the concrete syntax and the business-loan example.
 
 ---
 

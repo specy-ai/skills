@@ -190,21 +190,9 @@ Present the analysis after the `.sysreq` file.
 
 ## Output Format
 
-The output is always a `.sysreq` file in the concrete syntax defined in `references/SYSTEM-REQ-METAMODEL.md`.
+The output is always a `.sysreq` file.
 
-Key syntax patterns:
-
-```
-requirements "<name>" scoped-to <BoundedContext> {
-  prd-source "<relative-path-to-prd>"
-
-  REQ-CTX-001 "<name>" : <pattern>
-    :: "<rationale>"
-    source "<PRD element reference>"
-    "<EARS statement>"
-    priority <must|should|could|wont>
-}
-```
+<!-- include: constructs/concrete-syntax.md -->
 
 Note: there is no `satisfied-by` block in the `.sysreq` file. Domain model elements reference requirement IDs via their `satisfies` attribute — the traceability is bottom-up, not top-down.
 
@@ -224,7 +212,7 @@ source "Job: <job name>"
 
 **EARS clause order**: Always `While` → `When`/`If`/`Where` → system name → `shall` response.
 
-When in doubt about syntax, re-read the concrete syntax section and examples in `references/SYSTEM-REQ-METAMODEL.md`.
+When in doubt about syntax, re-read the concrete syntax and examples.
 
 ---
 
