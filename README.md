@@ -235,11 +235,13 @@ specy-skill/
 │   │   ├── DOMAIN-METAMODEL.md
 │   │   ├── PRODUCT-REQ-METAMODEL.md
 │   │   └── SYSTEM-REQ-METAMODEL.md
-│   └── tree-sitters/             # Tree-sitter parser generators + build script
-│       ├── build.sh
-│       ├── tree-sitter-specy-domain/
-│       ├── tree-sitter-specy-prd/
-│       └── tree-sitter-specy-sysreq/
+│   ├── tree-sitters/             # Tree-sitter parser generators + build script
+│   │   ├── build.sh
+│   │   ├── tree-sitter-specy-domain/
+│   │   ├── tree-sitter-specy-prd/
+│   │   └── tree-sitter-specy-sysreq/
+│   └── langium/                  # Langium-based LSP server + parser CLI
+│       └── specy-domain/         # .domain language server (parse/validate/JSON)
 │
 ├── dist/                         # Built output (generated — do not edit)
 │   ├── distill/               # Distill skill
@@ -287,6 +289,8 @@ specy-skill/
 **`src/metamodels/`** — Prose documentation of each metamodel. These describe the concepts, relationships, and constraints that the grammars formalize. Copied to `dist/` as runtime references for skills that need them.
 
 **`src/tree-sitters/`** — Tree-sitter parser generators for Specy file formats. Used for syntax highlighting, parsing validation, and tooling integration.
+
+**`src/langium/`** — [Langium](https://langium.org/)-based LSP server and parser CLI for the `.domain` DSL. Provides editor diagnostics, AST access, and a `parse` command that emits JSON. See [LSP Server](#lsp-server) below.
 
 **`examples/`** — Complete example projects demonstrating Specy files across different domains.
 
@@ -348,6 +352,68 @@ The typical workflow follows the traceability chain:
 | Extract domain models from existing code | `/distill` in your project |
 
 In your target project, Specy files live under `specy/` at the project root.
+
+## LSP Server
+
+Specy ships a [Langium](https://langium.org/)-based Language Server and parser CLI for `.domain` files, located in `src/langium/specy-domain/`. It provides:
+
+- **Editor integration** — diagnostics, syntax validation, and AST navigation via LSP (VS Code extension entrypoint in `src/extension/main.ts`).
+- **Parser CLI** (`specy-domain`) — parses a `.domain` file into a JSON AST or validates it from the command line.
+
+### Build
+
+```bash
+./src/langium/specy-domain/build.sh
+```
+
+The script runs `npm install`, generates the Langium artifacts, compiles TypeScript to `out/`, and smoke-tests the CLI against `examples/business-loan/business-loan.domain` and `examples/ecommerce/v2/orders.domain`.
+
+### Parse a `.domain` file to JSON
+
+From `src/langium/specy-domain/`, the `parse` command emits the typed AST as JSON:
+
+```bash
+# Pretty-printed JSON AST from an example
+node out/cli/index.js parse ../../../examples/business-loan/business-loan.domain --pretty
+
+# Compact JSON (pipe to jq for exploration)
+node out/cli/index.js parse ../../../examples/business-loan/business-loan.domain | jq '.organization.contexts[0].name'
+```
+
+Example output (truncated) for `examples/business-loan/business-loan.domain`:
+
+```json
+{
+  "organization": {
+    "name": "BusinessLoan",
+    "contexts": [
+      {
+        "name": "LoanOrigination",
+        "modules": [
+          {
+            "name": "Application",
+            "entities": [
+              { "name": "LoanApplication", "identity": "applicationId", "states": { "...": "..." } }
+            ],
+            "commands": [ { "name": "SubmitApplication", "...": "..." } ],
+            "events":   [ { "name": "ApplicationSubmitted", "...": "..." } ]
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Parse errors are written to `stderr` with `line:column` locations, and the process exits non-zero.
+
+### Validate a `.domain` file
+
+```bash
+node out/cli/index.js validate ../../../examples/business-loan/business-loan.domain
+```
+
+Emits one `path:line:col [severity] message` line per diagnostic. Exits `0` when there are no errors (warnings allowed), `1` otherwise — suitable for CI gates.
 
 ## Contributing
 
