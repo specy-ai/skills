@@ -155,6 +155,9 @@ service GeolocationGateway {
         }
         isStopOffRoute(rideId: uuid, stopLocation: Location): boolean :: "Check if a stop is off-route" {
         }
+        estimateDriverArrival(driverId: uuid, pickupLocation: Location): datetime :: "Estimate when the assigned driver will arrive at pickup" {
+            // Supports the DriverArrivalDeadlineElapsed temporal event offset.
+        }
     }
 }
 
@@ -200,6 +203,10 @@ service NotificationService {
 service DriverManagementGateway {
     operations {
         requestTemporarySuspension(driverId: uuid, durationMinutes: int): void :: "Request temporary driver suspension" {
+        }
+        getCancellationCount(driverId: uuid, windowHours: int): int :: "Get driver cancellation count within a time window" {
+        }
+        getNoShowCount(driverId: uuid, windowHours: int): int :: "Get driver no-show count within a time window" {
         }
     }
 }
@@ -281,20 +288,6 @@ entity RideRequest :: "A rider's request for transportation, covering matching u
         offers : RideOffer 0..N
     }
 
-    policies {
-        riderMustBeActive(riderId: uuid) :: "Only active riders can request rides" {
-            // Verified via Rider Management ACL — rider status must be active
-        }
-
-        requestMustBeSearching(rideRequest: RideRequest) :: "Can only match while searching" {
-            rideRequest.status = searching
-        }
-
-        requestCanBeCancelledByRider(rideRequest: RideRequest) :: "Rider can cancel while searching" {
-            rideRequest.status = searching
-        }
-    }
-
     invariants {
         pickupAndDropoffRequired :: "Must have both pickup and dropoff" {
             pickupLocation is defined and dropoffLocation is defined
@@ -311,7 +304,9 @@ entity RideRequest :: "A rider's request for transportation, covering matching u
 
     operations {
         "Request a ride" on RequestRide {
-            policy riderMustBeActive(requestRide.riderId)
+            precondition riderMustBeActive :: "Only active riders can request rides (verified via Rider Management ACL)" {
+                // ACL check — rider status must be active in Rider Management
+            }
 
             creates RideRequest {
                 riderId         = requestRide.riderId
@@ -326,6 +321,12 @@ entity RideRequest :: "A rider's request for transportation, covering matching u
                 updatedAt       = now()
             }
 
+            postcondition requestStartsSearching :: "A fresh ride request starts in searching with a computed fare estimate and no cancellation" {
+                state_after.status = searching
+                state_after.fareEstimate is defined
+                state_after.cancellation is not defined
+            }
+
             emits RideRequested {
                 rideRequestId   = RideRequest.id
                 riderId         = RideRequest.riderId
@@ -337,10 +338,12 @@ entity RideRequest :: "A rider's request for transportation, covering matching u
             }
         }
 
-        "Initiate driver matching" when RideRequested then InitiateMatching {
+        "Initiate driver matching" on InitiateMatching {
             resolves RideRequest from initiateMatching.rideRequestId
 
-            policy requestMustBeSearching(RideRequest)
+            precondition requestMustBeSearching :: "Can only match while searching" {
+                RideRequest.status = searching
+            }
 
             MatchingService.findAndOfferDriver(RideRequest)
               :: "Query Geo for nearby drivers and offer to closest"
@@ -349,11 +352,18 @@ entity RideRequest :: "A rider's request for transportation, covering matching u
         "Handle driver offer timeout" on HandleOfferTimeout {
             resolves RideRequest from handleOfferTimeout.rideRequestId
 
-            policy requestMustBeSearching(RideRequest)
+            precondition requestMustBeSearching :: "Can only retry matching while searching" {
+                RideRequest.status = searching
+            }
 
             sets RideOffer {
                 status      = timeout
                 respondedAt = now()
+            }
+
+            postcondition offerMarkedTimeout :: "The targeted offer is recorded as timed out with a response timestamp" {
+                state_after.status = timeout
+                state_after.respondedAt is defined
             }
 
             emits RideOfferTimedOut {
@@ -370,7 +380,9 @@ entity RideRequest :: "A rider's request for transportation, covering matching u
         "Cancel request — no driver available" on CancelRequestNoDriver {
             resolves RideRequest from cancelRequestNoDriver.rideRequestId
 
-            policy requestMustBeSearching(RideRequest)
+            precondition requestMustBeSearching :: "Only searching requests can be cancelled for lack of drivers" {
+                RideRequest.status = searching
+            }
 
             sets RideRequest {
                 status = cancelled
@@ -381,6 +393,12 @@ entity RideRequest :: "A rider's request for transportation, covering matching u
                     feeCharged  = false
                 }
                 updatedAt = now()
+            }
+
+            postcondition cancelledWithNoDriverReason :: "Request is cancelled with the no-driver reason and no fee" {
+                state_after.status = cancelled
+                state_after.cancellation.reason = noDriverAvailable
+                state_after.cancellation.feeCharged = false
             }
 
             NotificationService.notifyRider(RideRequest.riderId,
@@ -397,7 +415,9 @@ entity RideRequest :: "A rider's request for transportation, covering matching u
         "Driver accepts ride offer" on AcceptRideOffer {
             resolves RideRequest from acceptRideOffer.rideRequestId
 
-            policy requestMustBeSearching(RideRequest)
+            precondition requestMustBeSearching :: "Offer can only be accepted while request is still searching" {
+                RideRequest.status = searching
+            }
 
             sets RideOffer {
                 status      = accepted
@@ -409,6 +429,12 @@ entity RideRequest :: "A rider's request for transportation, covering matching u
                 matchedDriverId = acceptRideOffer.driverId
                 matchedAt       = now()
                 updatedAt       = now()
+            }
+
+            postcondition requestMatchedToDriver :: "After acceptance the request is matched to a driver with a match timestamp" {
+                state_after.status = matched
+                state_after.matchedDriverId = acceptRideOffer.driverId
+                state_after.matchedAt is defined
             }
 
             emits RideRequestMatched {
@@ -425,7 +451,9 @@ entity RideRequest :: "A rider's request for transportation, covering matching u
         "Rider cancels request" on CancelRequestByRider {
             resolves RideRequest from cancelRequestByRider.rideRequestId
 
-            policy requestCanBeCancelledByRider(RideRequest)
+            precondition requestCanBeCancelledByRider :: "Rider can cancel while still searching" {
+                RideRequest.status = searching
+            }
 
             sets RideRequest {
                 status = cancelled
@@ -436,6 +464,13 @@ entity RideRequest :: "A rider's request for transportation, covering matching u
                     feeCharged  = false
                 }
                 updatedAt = now()
+            }
+
+            postcondition cancelledByRiderBeforeMatch :: "Request is cancelled with rider-cancelled-before-match reason and no fee" {
+                state_after.status = cancelled
+                state_after.cancellation.reason = riderCancelledBeforeMatch
+                state_after.cancellation.cancelledBy = "rider"
+                state_after.cancellation.feeCharged = false
             }
 
             emits RideRequestCancelledByRider {
@@ -457,62 +492,29 @@ entity RideRequest :: "A rider's request for transportation, covering matching u
 entity Ride :: "The actual ride from driver assignment through trip completion" {
     identifier id : UUID
     fields {
-        rideRequestId          : uuid immutable
-        riderId                : uuid immutable
-        driverId               : uuid
-        status                 : RideStatus default("driverEnRoute")
-        pickupLocation         : Location immutable
-        dropoffLocation        : Location immutable
-        fareEstimate           : FareEstimate immutable
-        actualPickupLocation   : Location optional
-        actualPickupTime       : datetime optional pastOrPresent
-        actualDropoffLocation  : Location optional
-        actualDropoffTime      : datetime optional pastOrPresent
-        finalFare              : FinalFare optional
-        currentRoute           : Route optional
-        cancellation           : CancellationDetail optional
-        tripSharingActive      : boolean default("false")
-        createdAt              : datetime immutable pastOrPresent
-        updatedAt              : datetime pastOrPresent
+        rideRequestId               : uuid immutable
+        riderId                     : uuid immutable
+        driverId                    : uuid
+        status                      : RideStatus default("driverEnRoute")
+        pickupLocation              : Location immutable
+        dropoffLocation             : Location immutable
+        fareEstimate                : FareEstimate immutable
+        estimatedDriverArrivalTime  : datetime optional
+        actualPickupLocation        : Location optional
+        actualPickupTime            : datetime optional pastOrPresent
+        actualDropoffLocation       : Location optional
+        actualDropoffTime           : datetime optional pastOrPresent
+        finalFare                   : FinalFare optional
+        currentRoute                : Route optional
+        cancellation                : CancellationDetail optional
+        tripSharingActive           : boolean default("false")
+        createdAt                   : datetime immutable pastOrPresent
+        updatedAt                   : datetime pastOrPresent
     }
     references {
         emergencyEvents   : EmergencyEvent 0..N
         safetyReports     : SafetyReport 0..N
         tripSharingLinks  : TripSharingLink 0..N
-    }
-
-    policies {
-        rideMustBeDriverEnRoute(ride: Ride) :: "Driver must be en route to signal arrival" {
-            ride.status = driverEnRoute
-        }
-
-        rideMustBeDriverArrived(ride: Ride) :: "Driver must have arrived to start ride" {
-            ride.status = driverArrived
-        }
-
-        rideMustBeInProgress(ride: Ride) :: "Ride must be in progress to complete" {
-            ride.status = inProgress
-        }
-
-        rideCanBeCancelledByRider(ride: Ride) :: "Rider can cancel while driver en route or arrived" {
-            ride.status in { driverEnRoute, driverArrived }
-        }
-
-        rideCanBeCancelledByDriver(ride: Ride) :: "Driver can cancel while en route" {
-            ride.status = driverEnRoute
-        }
-
-        rideMustBeDriverArrivedForNoShow(ride: Ride) :: "No-show only when driver arrived" {
-            ride.status = driverArrived
-        }
-
-        rideMustBeActiveForEmergency(ride: Ride) :: "Emergency requires an active ride" {
-            ride.status in { driverEnRoute, driverArrived, inProgress }
-        }
-
-        rideMustBeCompletedForSafetyReport(ride: Ride) :: "Safety reports filed after completion" {
-            ride.status = completed
-        }
     }
 
     invariants {
@@ -531,17 +533,25 @@ entity Ride :: "The actual ride from driver assignment through trip completion" 
     operations {
         // === Ride Creation ===
 
-        "Create ride from matched request" when RideRequestMatched then CreateRide {
+        "Create ride from matched request" on CreateRide {
             creates Ride {
-                rideRequestId   = createRide.rideRequestId
-                riderId         = createRide.riderId
-                driverId        = createRide.driverId
-                status          = driverEnRoute
-                pickupLocation  = createRide.pickupLocation
-                dropoffLocation = createRide.dropoffLocation
-                fareEstimate    = createRide.fareEstimate
-                createdAt       = now()
-                updatedAt       = now()
+                rideRequestId              = createRide.rideRequestId
+                riderId                    = createRide.riderId
+                driverId                   = createRide.driverId
+                status                     = driverEnRoute
+                pickupLocation             = createRide.pickupLocation
+                dropoffLocation            = createRide.dropoffLocation
+                fareEstimate               = createRide.fareEstimate
+                estimatedDriverArrivalTime = GeolocationGateway.estimateDriverArrival(
+                                               createRide.driverId, createRide.pickupLocation)
+                createdAt                  = now()
+                updatedAt                  = now()
+            }
+
+            postcondition rideStartsDriverEnRoute :: "A new Ride starts in driverEnRoute with driver assigned and an estimated arrival time" {
+                state_after.status = driverEnRoute
+                state_after.driverId is defined
+                state_after.estimatedDriverArrivalTime is defined
             }
 
             NotificationService.notifyRider(Ride.riderId,
@@ -564,11 +574,17 @@ entity Ride :: "The actual ride from driver assignment through trip completion" 
         "Driver arrives at pickup" on SignalDriverArrival {
             resolves Ride from signalDriverArrival.rideId
 
-            policy rideMustBeDriverEnRoute(Ride)
+            precondition rideMustBeDriverEnRoute :: "Driver must be en route to signal arrival" {
+                Ride.status = driverEnRoute
+            }
 
             sets Ride {
                 status    = driverArrived
                 updatedAt = now()
+            }
+
+            postcondition driverNowArrived :: "After arrival the ride transitions to driverArrived" {
+                state_after.status = driverArrived
             }
 
             NotificationService.notifyRider(Ride.riderId,
@@ -585,7 +601,9 @@ entity Ride :: "The actual ride from driver assignment through trip completion" 
         "Cancel ride — rider no-show" on CancelRideNoShow {
             resolves Ride from cancelRideNoShow.rideId
 
-            policy rideMustBeDriverArrivedForNoShow(Ride)
+            precondition rideMustBeDriverArrivedForNoShow :: "No-show only when driver has arrived" {
+                Ride.status = driverArrived
+            }
 
             sets Ride {
                 status = cancelled
@@ -597,6 +615,13 @@ entity Ride :: "The actual ride from driver assignment through trip completion" 
                     feeAmount   = PaymentGateway.computeCancellationFee(Ride.rideRequestId)
                 }
                 updatedAt = now()
+            }
+
+            postcondition cancelledRiderNoShowWithFee :: "Ride cancelled with rider-no-show reason, fee charged and amount recorded" {
+                state_after.status = cancelled
+                state_after.cancellation.reason = riderNoShow
+                state_after.cancellation.feeCharged = true
+                state_after.cancellation.feeAmount is defined
             }
 
             PaymentGateway.chargeCancellationFee(Ride.riderId, Ride.cancellation.feeAmount)
@@ -613,7 +638,9 @@ entity Ride :: "The actual ride from driver assignment through trip completion" 
         "Cancel ride — driver no-show" on CancelRideDriverNoShow {
             resolves Ride from cancelRideDriverNoShow.rideId
 
-            policy rideMustBeDriverEnRoute(Ride)
+            precondition rideMustBeDriverEnRoute :: "Driver no-show only while driver is en route" {
+                Ride.status = driverEnRoute
+            }
 
             sets Ride {
                 status = cancelled
@@ -624,6 +651,12 @@ entity Ride :: "The actual ride from driver assignment through trip completion" 
                     feeCharged  = false
                 }
                 updatedAt = now()
+            }
+
+            postcondition cancelledDriverNoShow :: "Ride cancelled with driver-no-show reason and no rider fee" {
+                state_after.status = cancelled
+                state_after.cancellation.reason = driverNoShow
+                state_after.cancellation.feeCharged = false
             }
 
             NotificationService.notifyRider(Ride.riderId,
@@ -642,13 +675,21 @@ entity Ride :: "The actual ride from driver assignment through trip completion" 
         "Start the ride" on StartRide {
             resolves Ride from startRide.rideId
 
-            policy rideMustBeDriverArrived(Ride)
+            precondition rideMustBeDriverArrived :: "Driver must have arrived to start the ride" {
+                Ride.status = driverArrived
+            }
 
             sets Ride {
                 status               = inProgress
                 actualPickupLocation = startRide.pickupLocation
                 actualPickupTime     = now()
                 updatedAt            = now()
+            }
+
+            postcondition rideInProgressWithActualPickup :: "Ride moves to inProgress with actual pickup location and time recorded" {
+                state_after.status = inProgress
+                state_after.actualPickupLocation is defined
+                state_after.actualPickupTime is defined
             }
 
             emits RideStarted {
@@ -663,11 +704,18 @@ entity Ride :: "The actual ride from driver assignment through trip completion" 
         "Update ride tracking" on UpdateRideTracking {
             resolves Ride from updateRideTracking.rideId
 
-            policy rideMustBeInProgress(Ride)
+            precondition rideMustBeInProgress :: "Tracking only updates while ride is in progress" {
+                Ride.status = inProgress
+            }
 
             sets Ride {
                 currentRoute = GeolocationGateway.getCurrentRoute(Ride.id)
                 updatedAt    = now()
+            }
+
+            postcondition routeUpdated :: "Current route is refreshed and update timestamp advances" {
+                state_after.currentRoute is defined
+                state_after.updatedAt > state_before.updatedAt
             }
 
             emits RideLocationUpdated {
@@ -680,7 +728,9 @@ entity Ride :: "The actual ride from driver assignment through trip completion" 
         "Complete the ride" on CompleteRide {
             resolves Ride from completeRide.rideId
 
-            policy rideMustBeInProgress(Ride)
+            precondition rideMustBeInProgress :: "Only in-progress rides can be completed" {
+                Ride.status = inProgress
+            }
 
             sets Ride {
                 status                = completed
@@ -694,15 +744,22 @@ entity Ride :: "The actual ride from driver assignment through trip completion" 
                 updatedAt             = now()
             }
 
+            postcondition rideCompletedWithFinalFare :: "A completed ride carries actual dropoff location, time, and a final fare" {
+                state_after.status = completed
+                state_after.actualDropoffLocation is defined
+                state_after.actualDropoffTime is defined
+                state_after.finalFare is defined
+            }
+
             PaymentGateway.capturePayment(Ride.riderId, Ride.finalFare)
 
             emits RideCompleted {
-                rideId               = Ride.id
-                riderId              = Ride.riderId
-                driverId             = Ride.driverId
+                rideId                = Ride.id
+                riderId               = Ride.riderId
+                driverId              = Ride.driverId
                 actualDropoffLocation = Ride.actualDropoffLocation
-                finalFare            = Ride.finalFare
-                completedAt          = Ride.actualDropoffTime
+                finalFare             = Ride.finalFare
+                completedAt           = Ride.actualDropoffTime
             }
         }
 
@@ -711,7 +768,9 @@ entity Ride :: "The actual ride from driver assignment through trip completion" 
         "Rider cancels ride after match" on CancelRideByRider {
             resolves Ride from cancelRideByRider.rideId
 
-            policy rideCanBeCancelledByRider(Ride)
+            precondition rideCanBeCancelledByRider :: "Rider can cancel while driver en route or arrived" {
+                Ride.status in { driverEnRoute, driverArrived }
+            }
 
             sets Ride {
                 status = cancelled
@@ -723,6 +782,12 @@ entity Ride :: "The actual ride from driver assignment through trip completion" 
                     feeAmount   = PaymentGateway.computeCancellationFee(Ride.rideRequestId)
                 }
                 updatedAt = now()
+            }
+
+            postcondition cancelledByRiderAfterMatch :: "Ride cancelled with rider-after-match reason and a charged fee" {
+                state_after.status = cancelled
+                state_after.cancellation.reason = riderCancelledAfterMatch
+                state_after.cancellation.feeCharged = true
             }
 
             PaymentGateway.chargeCancellationFee(Ride.riderId, Ride.cancellation.feeAmount)
@@ -739,7 +804,9 @@ entity Ride :: "The actual ride from driver assignment through trip completion" 
         "Driver cancels ride" on CancelRideByDriver {
             resolves Ride from cancelRideByDriver.rideId
 
-            policy rideCanBeCancelledByDriver(Ride)
+            precondition rideCanBeCancelledByDriver :: "Driver can cancel only while en route" {
+                Ride.status = driverEnRoute
+            }
 
             sets Ride {
                 status = cancelled
@@ -750,6 +817,12 @@ entity Ride :: "The actual ride from driver assignment through trip completion" 
                     feeCharged  = false
                 }
                 updatedAt = now()
+            }
+
+            postcondition cancelledByDriver :: "Ride cancelled with driver-cancelled reason and no rider fee" {
+                state_after.status = cancelled
+                state_after.cancellation.reason = driverCancelled
+                state_after.cancellation.cancelledBy = "driver"
             }
 
             emits RideCancelledByDriver {
@@ -765,7 +838,9 @@ entity Ride :: "The actual ride from driver assignment through trip completion" 
         "Trigger emergency" on TriggerEmergency {
             resolves Ride from triggerEmergency.rideId
 
-            policy rideMustBeActiveForEmergency(Ride)
+            precondition rideMustBeActiveForEmergency :: "Emergency requires an active ride (en route, arrived, or in progress)" {
+                Ride.status in { driverEnRoute, driverArrived, inProgress }
+            }
 
             creates EmergencyEvent {
                 type        = triggerEmergency.emergencyType
@@ -773,6 +848,10 @@ entity Ride :: "The actual ride from driver assignment through trip completion" 
                 triggeredAt = now()
                 location    = GeolocationGateway.getCurrentLocation(Ride.id)
                 ride        = Ride
+            }
+
+            postcondition emergencyEventAppended :: "A new EmergencyEvent is appended referencing this ride" {
+                count(state_after.emergencyEvents) = count(state_before.emergencyEvents) + 1
             }
 
             NotificationService.shareLocationWithEmergencyServices(Ride.id, EmergencyEvent.location)
@@ -796,6 +875,10 @@ entity Ride :: "The actual ride from driver assignment through trip completion" 
                 updatedAt         = now()
             }
 
+            postcondition tripSharingEnabled :: "Trip sharing is active after activation" {
+                state_after.tripSharingActive = true
+            }
+
             NotificationService.sendTrackingLink(activateTripSharing.contacts, Ride.id)
 
             emits TripSharingActivated {
@@ -808,7 +891,9 @@ entity Ride :: "The actual ride from driver assignment through trip completion" 
         "Detect unusual stop" on DetectUnusualStop {
             resolves Ride from detectUnusualStop.rideId
 
-            policy rideMustBeInProgress(Ride)
+            precondition rideMustBeInProgress :: "Unusual-stop detection only applies to in-progress rides" {
+                Ride.status = inProgress
+            }
 
             NotificationService.sendSafetyCheck(Ride.riderId, Ride.id,
               detectUnusualStop.stopLocation)
@@ -825,7 +910,9 @@ entity Ride :: "The actual ride from driver assignment through trip completion" 
         "File safety report" on FileSafetyReport {
             resolves Ride from fileSafetyReport.rideId
 
-            policy rideMustBeCompletedForSafetyReport(Ride)
+            precondition rideMustBeCompletedForSafetyReport :: "Safety reports are filed after completion" {
+                Ride.status = completed
+            }
 
             creates SafetyReport {
                 ride        = Ride
@@ -835,6 +922,10 @@ entity Ride :: "The actual ride from driver assignment through trip completion" 
                 reportedAt  = now()
                 escalated   = true
                 escalatedAt = now()
+            }
+
+            postcondition safetyReportAppended :: "A new SafetyReport is appended, flagged as escalated" {
+                count(state_after.safetyReports) = count(state_before.safetyReports) + 1
             }
 
             NotificationService.escalateToSafetyTeam(Ride.id, SafetyReport)
@@ -860,60 +951,116 @@ entity Ride :: "The actual ride from driver assignment through trip completion" 
 }
 
 // =============================================================================
-// Reactive Policies
+// Reactions (top-level, asynchronous, cross-aggregate)
 // =============================================================================
 
-// source: ride-management.model.md
-policy reMatchOnDriverCancellation {
-    trigger  : RideCancelledByDriver
-    guard    : true
-    effect   : RequestRide {
-                   riderId         = event.riderId
-                   pickupLocation  = ride.pickupLocation
-                   dropoffLocation = ride.dropoffLocation
-               }
-    :: "Driver cancelled — re-enter matching for the rider with a new request"
+// source: ride-management.model.md — the original `when RideRequested then InitiateMatching` operation
+reaction startMatchingOnRequest triggered by RideRequested
+    :: "Every accepted ride request immediately enters matching" {
+    effect command InitiateMatching {
+        rideRequestId = rideRequested.rideRequestId
+    }
 }
 
-// source: ride-management.model.md
-policy suspendDriverOnExcessiveCancellation {
-    trigger  : RideCancelledByDriver
-    guard    : GetDriverCancellationCount(event.driverId, 24) > 3
-    effect   : DriverManagementGateway.requestTemporarySuspension(event.driverId, 30)
-    :: "Driver cancelled >3 rides in 24h — suspend for 30 minutes"
+// source: ride-management.model.md — the original `when RideRequestMatched then CreateRide` operation
+reaction createRideOnMatch triggered by RideRequestMatched
+    :: "When a driver accepts, materialize the Ride aggregate so the trip can begin" {
+    effect command CreateRide {
+        rideRequestId   = rideRequestMatched.rideRequestId
+        riderId         = rideRequestMatched.riderId
+        driverId        = rideRequestMatched.driverId
+        pickupLocation  = rideRequestMatched.pickupLocation
+        dropoffLocation = rideRequestMatched.dropoffLocation
+        fareEstimate    = rideRequestMatched.fareEstimate
+    }
 }
 
-// source: ride-management.model.md
-policy reMatchOnDriverNoShow {
-    trigger  : RideCancelledDriverNoShow
-    guard    : true
-    effect   : RequestRide {
-                   riderId         = event.riderId
-                   pickupLocation  = ride.pickupLocation
-                   dropoffLocation = ride.dropoffLocation
-               }
-    :: "Driver did not arrive — create a new request to find another driver"
+// source: ride-management.model.md — formalizes REQ-RIDE-022 (re-match)
+reaction reMatchOnDriverCancellation triggered by RideCancelledByDriver
+    :: "Driver cancelled — re-enter matching for the rider with a new request" {
+    effect command RequestRide {
+        riderId         = rideCancelledByDriver.riderId
+        pickupLocation  = rideCancelledByDriver.pickupLocation
+        dropoffLocation = rideCancelledByDriver.dropoffLocation
+    }
 }
 
-// source: ride-management.model.md
-policy suspendDriverOnExcessiveNoShows {
-    trigger  : RideCancelledDriverNoShow
-    guard    : GetDriverNoShowCount(event.driverId, 24) > 2
-    effect   : DriverManagementGateway.requestTemporarySuspension(event.driverId, 60)
-    :: "Driver no-showed >2 times in 24h — suspend for 1 hour"
+// source: ride-management.model.md — formalizes REQ-RIDE-023
+reaction suspendDriverOnExcessiveCancellation triggered by RideCancelledByDriver
+    :: "A driver who has cancelled more than 3 rides in the last 24h is suspended for 30 minutes" {
+    guard {
+        DriverManagementGateway.getCancellationCount(rideCancelledByDriver.driverId, 24) > 3
+    }
+    effect {
+        DriverManagementGateway.requestTemporarySuspension(rideCancelledByDriver.driverId, 30)
+    }
 }
 
-// source: ride-management.model.md
-policy recordDriverNoShowForReliability {
-    trigger  : RideCancelledDriverNoShow
-    guard    : true
-    effect   : emits DriverNoShowRecorded {
-                   driverId      = event.driverId
-                   rideId        = event.rideId
-                   rideRequestId = ride.rideRequestId
-                   recordedAt    = now()
-               }
-    :: "Notify Driver Management of no-show for reliability scoring"
+// source: ride-management.model.md — formalizes REQ-RIDE-024 (re-match on driver no-show)
+reaction reMatchOnDriverNoShow triggered by RideCancelledDriverNoShow
+    :: "Driver did not arrive — create a new request to find another driver" {
+    effect command RequestRide {
+        riderId         = rideCancelledDriverNoShow.riderId
+        pickupLocation  = rideCancelledDriverNoShow.pickupLocation
+        dropoffLocation = rideCancelledDriverNoShow.dropoffLocation
+    }
+}
+
+// source: ride-management.model.md — formalizes REQ-RIDE-026
+reaction suspendDriverOnExcessiveNoShows triggered by RideCancelledDriverNoShow
+    :: "A driver who has no-showed more than 2 times in the last 24h is suspended for 1 hour" {
+    guard {
+        DriverManagementGateway.getNoShowCount(rideCancelledDriverNoShow.driverId, 24) > 2
+    }
+    effect {
+        DriverManagementGateway.requestTemporarySuspension(rideCancelledDriverNoShow.driverId, 60)
+    }
+}
+
+// source: ride-management.model.md — formalizes REQ-RIDE-027
+reaction recordDriverNoShowForReliability triggered by RideCancelledDriverNoShow
+    :: "Notify Driver Management of no-show for reliability scoring" {
+    effect emits DriverNoShowRecorded {
+        driverId      = rideCancelledDriverNoShow.driverId
+        rideId        = rideCancelledDriverNoShow.rideId
+        rideRequestId = rideCancelledDriverNoShow.rideRequestId
+        recordedAt    = now()
+    }
+}
+
+// source: ride-management.model.md — formalizes REQ-RIDE-005 (15s offer timeout)
+reaction retractExpiredOffer triggered by RideOfferDeadlineElapsed
+    :: "Offer timed out — retract and try next driver" {
+    guard {
+        rideOfferDeadlineElapsed.rideOffer.status = pending
+    }
+    effect command HandleOfferTimeout {
+        rideRequestId = rideOfferDeadlineElapsed.rideOffer.rideRequest.id
+        offerId       = rideOfferDeadlineElapsed.rideOffer.id
+        driverId      = rideOfferDeadlineElapsed.rideOffer.driverId
+    }
+}
+
+// source: ride-management.model.md — formalizes REQ-RIDE-011 (rider 5-min boarding deadline)
+reaction cancelOnRiderNoShow triggered by RiderBoardingDeadlineElapsed
+    :: "Rider did not board within 5 minutes — cancel and charge fee" {
+    guard {
+        riderBoardingDeadlineElapsed.ride.status = driverArrived
+    }
+    effect command CancelRideNoShow {
+        rideId = riderBoardingDeadlineElapsed.ride.id
+    }
+}
+
+// source: ride-management.model.md — formalizes REQ-RIDE-024 (ETA+5min driver arrival deadline)
+reaction cancelOnDriverNoShow triggered by DriverArrivalDeadlineElapsed
+    :: "Driver did not arrive within ETA + 5 min — cancel and re-match" {
+    guard {
+        driverArrivalDeadlineElapsed.ride.status = driverEnRoute
+    }
+    effect command CancelRideDriverNoShow {
+        rideId = driverArrivalDeadlineElapsed.ride.id
+    }
 }
 
 // =============================================================================
@@ -942,38 +1089,6 @@ temporal event DriverArrivalDeadlineElapsed {
     reference : RideCreated
     offset    : ride.estimatedDriverArrivalTime + 5 minutes
     guard     : ride.status = driverEnRoute
-}
-
-// =============================================================================
-// Temporal Policies
-// =============================================================================
-
-// source: ride-management.model.md
-policy retractExpiredOffer {
-    trigger : RideOfferDeadlineElapsed
-    guard   : rideOffer.status = pending
-    effect  : HandleOfferTimeout {
-                  rideRequestId = rideOffer.rideRequest.id
-                  offerId       = rideOffer.id
-                  driverId      = rideOffer.driverId
-              }
-    :: "Offer timed out — retract and try next driver"
-}
-
-// source: ride-management.model.md
-policy cancelOnRiderNoShow {
-    trigger : RiderBoardingDeadlineElapsed
-    guard   : ride.status = driverArrived
-    effect  : CancelRideNoShow { rideId = ride.id }
-    :: "Rider did not board within 5 minutes — cancel and charge fee"
-}
-
-// source: ride-management.model.md
-policy cancelOnDriverNoShow {
-    trigger : DriverArrivalDeadlineElapsed
-    guard   : ride.status = driverEnRoute
-    effect  : CancelRideDriverNoShow { rideId = ride.id }
-    :: "Driver did not arrive within ETA + 5 min — cancel and re-match"
 }
 
 // =============================================================================
@@ -1289,20 +1404,25 @@ event RideCancelledByRider {
 // source: ride-management.model.md
 event RideCancelledByDriver {
     fields {
-        rideId      : uuid
-        riderId     : uuid
-        driverId    : uuid
-        cancelledAt : datetime
+        rideId          : uuid
+        riderId         : uuid
+        driverId        : uuid
+        pickupLocation  : Location
+        dropoffLocation : Location
+        cancelledAt     : datetime
     }
 }
 
 // source: ride-management.model.md
 event RideCancelledDriverNoShow {
     fields {
-        rideId      : uuid
-        riderId     : uuid
-        driverId    : uuid
-        cancelledAt : datetime
+        rideId          : uuid
+        riderId         : uuid
+        driverId        : uuid
+        rideRequestId   : uuid
+        pickupLocation  : Location
+        dropoffLocation : Location
+        cancelledAt     : datetime
     }
 }
 

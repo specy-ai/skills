@@ -183,17 +183,6 @@ service MappingProvider :: "External mapping and geocoding provider — infrastr
 }
 
 // =============================================================================
-// File-level Policies (cross-entity)
-// =============================================================================
-
-// source: geolocation-routing.model.md
-policy surgeConfirmationRequired(zone: SurgeZone) :: "Rider must see surge multiplier and confirm before ride request proceeds" {
-    if zone.status = active {
-        zone.currentMultiplier is defined
-    }
-}
-
-// =============================================================================
 // Entities
 // =============================================================================
 
@@ -210,16 +199,6 @@ entity DriverPosition :: "Real-time geographic position of a driver — continuo
         receivedAt : datetime
     }
 
-    policies {
-        locationMustBeFresh(recordedAt: datetime) :: "Discard location updates older than 30 seconds" {
-            now() - recordedAt <= 30s
-        }
-
-        locationMustBeAccurate(accuracy: LocationAccuracy) :: "Discard location updates with horizontal accuracy worse than 100 meters" {
-            accuracy.horizontalAccuracyMeters <= 100
-        }
-    }
-
     invariants {
         positionHasTimestamp :: "Every driver position must have a recording timestamp" {
             recordedAt is defined
@@ -228,8 +207,12 @@ entity DriverPosition :: "Real-time geographic position of a driver — continuo
 
     operations {
         "Update driver location" on UpdateDriverLocation {
-            policy locationMustBeFresh(updateDriverLocation.recordedAt)
-            policy locationMustBeAccurate(updateDriverLocation.accuracy)
+            precondition locationMustBeFresh :: "Discard location updates older than 30 seconds" {
+                now() - updateDriverLocation.recordedAt <= 30s
+            }
+            precondition locationMustBeAccurate :: "Discard location updates with horizontal accuracy worse than 100 meters" {
+                updateDriverLocation.accuracy.horizontalAccuracyMeters <= 100
+            }
 
             sets DriverPosition {
                 position = updateDriverLocation.position
@@ -238,6 +221,12 @@ entity DriverPosition :: "Real-time geographic position of a driver — continuo
                 speed = updateDriverLocation.speed
                 recordedAt = updateDriverLocation.recordedAt
                 receivedAt = now()
+            }
+
+            postcondition positionStored :: "The projection reflects the incoming update and is stamped with arrival time" {
+                state_after.position = updateDriverLocation.position
+                state_after.recordedAt = updateDriverLocation.recordedAt
+                state_after.receivedAt is defined
             }
 
             emits DriverLocationUpdated {
@@ -251,6 +240,10 @@ entity DriverPosition :: "Real-time geographic position of a driver — continuo
         "Set driver availability" on SetDriverAvailability {
             sets DriverPosition {
                 availability = setDriverAvailability.availability
+            }
+
+            postcondition availabilityApplied :: "The availability flag matches the command" {
+                state_after.availability = setDriverAvailability.availability
             }
 
             emits DriverAvailabilityChanged {
@@ -276,28 +269,6 @@ entity SurgeZone :: "A geographic zone where demand/supply imbalance triggers su
         deactivatedAt : datetime optional
     }
 
-    policies {
-        ratioExceedsThreshold(zone: SurgeZone) :: "Demand/supply ratio must exceed surge threshold to activate" {
-            zone.demandSupplyRatio > zone.surgeThreshold
-        }
-
-        ratioBelowThreshold(zone: SurgeZone) :: "Demand/supply ratio must be below surge threshold to deactivate" {
-            zone.demandSupplyRatio <= zone.surgeThreshold
-        }
-
-        multiplierWithinCap(multiplier: SurgeMultiplier) :: "Surge multiplier must not exceed the maximum of 5.0x" {
-            multiplier.value <= 5.0
-        }
-
-        zoneMustBeInactive(zone: SurgeZone) :: "Zone must be inactive to activate surge" {
-            zone.status = inactive
-        }
-
-        zoneMustBeActive(zone: SurgeZone) :: "Zone must be active to deactivate surge" {
-            zone.status = active
-        }
-    }
-
     invariants {
         activeZoneHasMultiplier :: "An active surge zone must have a multiplier" {
             if status = active {
@@ -316,15 +287,27 @@ entity SurgeZone :: "A geographic zone where demand/supply imbalance triggers su
         "Activate surge in zone" on ActivateSurge {
             resolves SurgeZone from activateSurge.zoneId
 
-            policy zoneMustBeInactive(SurgeZone)
-            policy ratioExceedsThreshold(SurgeZone)
-            policy multiplierWithinCap(activateSurge.multiplier)
+            precondition zoneMustBeInactive :: "Zone must be inactive to activate surge" {
+                SurgeZone.status = inactive
+            }
+            precondition ratioExceedsThreshold :: "Demand/supply ratio must exceed surge threshold to activate" {
+                activateSurge.demandSupplyRatio > SurgeZone.surgeThreshold
+            }
+            precondition multiplierWithinCap :: "Surge multiplier must not exceed the maximum of 5.0x" {
+                activateSurge.multiplier.value <= 5.0
+            }
 
             sets SurgeZone {
                 status = active
                 currentMultiplier = activateSurge.multiplier
                 demandSupplyRatio = activateSurge.demandSupplyRatio
                 activatedAt = now()
+            }
+
+            postcondition statusBecomesActive :: "The zone transitions to active and records its activation time and multiplier" {
+                state_after.status = active
+                state_after.currentMultiplier = activateSurge.multiplier
+                state_after.activatedAt is defined
             }
 
             emits SurgeActivated {
@@ -339,14 +322,23 @@ entity SurgeZone :: "A geographic zone where demand/supply imbalance triggers su
         "Deactivate surge in zone" on DeactivateSurge {
             resolves SurgeZone from deactivateSurge.zoneId
 
-            policy zoneMustBeActive(SurgeZone)
-            policy ratioBelowThreshold(SurgeZone)
+            precondition zoneMustBeActive :: "Zone must be active to deactivate surge" {
+                SurgeZone.status = active
+            }
+            precondition ratioBelowThreshold :: "Demand/supply ratio must be below surge threshold to deactivate" {
+                deactivateSurge.demandSupplyRatio <= SurgeZone.surgeThreshold
+            }
 
             sets SurgeZone {
                 status = inactive
                 currentMultiplier = deactivateSurge.multiplier
                 demandSupplyRatio = deactivateSurge.demandSupplyRatio
                 deactivatedAt = now()
+            }
+
+            postcondition statusBecomesInactive :: "The zone transitions to inactive and records its deactivation time" {
+                state_after.status = inactive
+                state_after.deactivatedAt is defined
             }
 
             emits SurgeDeactivated {
@@ -360,12 +352,21 @@ entity SurgeZone :: "A geographic zone where demand/supply imbalance triggers su
         "Update surge multiplier" on UpdateSurgeMultiplier {
             resolves SurgeZone from updateSurgeMultiplier.zoneId
 
-            policy zoneMustBeActive(SurgeZone)
-            policy multiplierWithinCap(updateSurgeMultiplier.multiplier)
+            precondition zoneMustBeActive :: "Zone must be active to update its surge multiplier" {
+                SurgeZone.status = active
+            }
+            precondition multiplierWithinCap :: "Updated surge multiplier must not exceed the maximum of 5.0x" {
+                updateSurgeMultiplier.multiplier.value <= 5.0
+            }
 
             sets SurgeZone {
                 currentMultiplier = updateSurgeMultiplier.multiplier
                 demandSupplyRatio = updateSurgeMultiplier.demandSupplyRatio
+            }
+
+            postcondition multiplierApplied :: "The new multiplier replaces the prior one on the active zone" {
+                state_after.currentMultiplier = updateSurgeMultiplier.multiplier
+                state_after.status = active
             }
 
             emits SurgeMultiplierUpdated {

@@ -154,32 +154,6 @@ service NotificationService {
 }
 
 // =============================================================================
-// File-level Policies
-// =============================================================================
-
-// source: rider-management.model.md
-policy riderEligibleForWarning(rider: Rider) :: "A rider is eligible for a low rating warning when they have completed more than 10 rides and their average rating drops below 4.0" {
-    rider.totalRides > 10
-    and rider.averageRating < 4.0
-    and rider.status = active
-}
-
-// source: rider-management.model.md
-policy riderEligibleForBan(rider: Rider) :: "A rider must be banned when they have completed more than 10 rides and their average rating drops below 3.5" {
-    rider.totalRides > 10
-    and rider.averageRating < 3.5
-    and rider.status = active
-}
-
-// source: rider-management.model.md
-// NOTE: uses 'some' quantifier — 'every' is the standard v2 quantifier
-policy riderProfileComplete(rider: Rider) :: "Rider must have a verified phone and at least one active payment method to request a ride" {
-    rider.status = active
-    and isNotEmpty(rider.paymentMethods)
-    and some pm in rider.paymentMethods { pm.isActive = true }
-}
-
-// =============================================================================
 // Entities
 // =============================================================================
 
@@ -206,36 +180,6 @@ entity Rider :: "A person who uses RideNow to request rides" {
         paymentMethods : PaymentMethodRef 0..N
         ratings : Rating 0..N
         appeal : Appeal 0..1
-    }
-
-    policies {
-        riderMustBeUnverified(rider: Rider) :: "Only unverified riders can submit a verification code" {
-            rider.status = unverified
-        }
-
-        riderMustBeActive(rider: Rider) :: "Rider must be active to perform profile actions" {
-            rider.status = active
-        }
-
-        verificationNotLocked(rider: Rider) :: "Verification must not be locked due to too many failed attempts" {
-            rider.verificationAttempt.lockedUntil is not defined
-            or rider.verificationAttempt.lockedUntil < now()
-        }
-
-        riderMustBeBanned(rider: Rider) :: "Only banned riders can submit an appeal" {
-            rider.status = banned
-        }
-
-        // NOTE: uses 'some' quantifier — 'every' is the standard v2 quantifier
-        riderProfileComplete(rider: Rider) :: "Rider must have a verified phone and at least one active payment method to request a ride" {
-            rider.status = active
-            and isNotEmpty(rider.paymentMethods)
-            and some pm in rider.paymentMethods { pm.isActive = true }
-        }
-
-        maxSavedAddresses(rider: Rider) :: "A rider can have at most 20 saved addresses" {
-            count(rider.savedAddresses) < 20
-        }
     }
 
     invariants {
@@ -267,6 +211,12 @@ entity Rider :: "A person who uses RideNow to request rides" {
                 updatedAt = now()
             }
 
+            postcondition riderIsUnverified :: "A freshly registered rider starts in unverified status with a verification code" {
+                state_after.status = unverified
+                state_after.verificationCode is defined
+                state_after.totalRides = 0
+            }
+
             NotificationService.sendVerificationCode(Rider.phoneNumber, Rider.verificationCode.code)
 
             emits RiderRegistered {
@@ -279,8 +229,13 @@ entity Rider :: "A person who uses RideNow to request rides" {
         "Verify rider phone number" on VerifyPhone {
             resolves Rider from verifyPhone.riderId
 
-            policy riderMustBeUnverified(Rider)
-            policy verificationNotLocked(Rider)
+            precondition riderMustBeUnverified :: "Only unverified riders can submit a verification code" {
+                Rider.status = unverified
+            }
+            precondition verificationNotLocked :: "Verification must not be locked due to too many failed attempts" {
+                Rider.verificationAttempt.lockedUntil is not defined
+                or Rider.verificationAttempt.lockedUntil < now()
+            }
 
             // Happy path: code matches
             sets Rider {
@@ -288,6 +243,12 @@ entity Rider :: "A person who uses RideNow to request rides" {
                 verificationCode = cleared
                 verificationAttempt = VerificationAttempt()
                 updatedAt = now()
+            }
+
+            postcondition riderBecomesActive :: "After phone verification the rider is active with no pending verification code" {
+                state_after.status = active
+                state_after.verificationCode is not defined
+                state_after.verificationAttempt.failedCount = 0
             }
 
             emits RiderPhoneVerified {
@@ -299,8 +260,13 @@ entity Rider :: "A person who uses RideNow to request rides" {
         "Reject invalid verification code" on SubmitInvalidVerificationCode {
             resolves Rider from submitInvalidVerificationCode.riderId
 
-            policy riderMustBeUnverified(Rider)
-            policy verificationNotLocked(Rider)
+            precondition riderMustBeUnverified :: "Only unverified riders can submit a verification code" {
+                Rider.status = unverified
+            }
+            precondition verificationNotLocked :: "Verification must not be locked due to too many failed attempts" {
+                Rider.verificationAttempt.lockedUntil is not defined
+                or Rider.verificationAttempt.lockedUntil < now()
+            }
 
             sets Rider {
                 verificationAttempt = VerificationAttempt {
@@ -310,6 +276,13 @@ entity Rider :: "A person who uses RideNow to request rides" {
                                   else Rider.verificationAttempt.lockedUntil
                 }
                 updatedAt = now()
+            }
+
+            postcondition failedCountIncrementedAndLockedIfThresholdReached :: "Failed count advances by one; lockout engages at three failed attempts" {
+                state_after.verificationAttempt.failedCount = state_before.verificationAttempt.failedCount + 1
+                if state_after.verificationAttempt.failedCount >= 3 {
+                    state_after.verificationAttempt.lockedUntil is defined
+                }
             }
 
             emits VerificationFailed {
@@ -323,8 +296,12 @@ entity Rider :: "A person who uses RideNow to request rides" {
         "Save an address to rider profile" on SaveAddress {
             resolves Rider from saveAddress.riderId
 
-            policy riderMustBeActive(Rider)
-            policy maxSavedAddresses(Rider)
+            precondition riderMustBeActive :: "Only active riders can save addresses" {
+                Rider.status = active
+            }
+            precondition maxSavedAddresses :: "A rider can have at most 20 saved addresses" {
+                count(Rider.savedAddresses) < 20
+            }
 
             sets Rider {
                 savedAddresses = Rider.savedAddresses + SavedAddress {
@@ -339,6 +316,10 @@ entity Rider :: "A person who uses RideNow to request rides" {
                 updatedAt = now()
             }
 
+            postcondition addressAppended :: "The new address is appended to the rider's saved addresses" {
+                count(state_after.savedAddresses) = count(state_before.savedAddresses) + 1
+            }
+
             emits AddressSaved {
                 riderId = Rider.id
                 label = saveAddress.label
@@ -349,7 +330,9 @@ entity Rider :: "A person who uses RideNow to request rides" {
         "Add a payment method to rider profile" on AddPaymentMethod {
             resolves Rider from addPaymentMethod.riderId
 
-            policy riderMustBeActive(Rider)
+            precondition riderMustBeActive :: "Only active riders can add payment methods" {
+                Rider.status = active
+            }
 
             PaymentValidationService.validatePaymentMethod(addPaymentMethod.paymentMethodId)
 
@@ -362,6 +345,13 @@ entity Rider :: "A person who uses RideNow to request rides" {
                     addedAt = now()
                 }
                 updatedAt = now()
+            }
+
+            postcondition paymentMethodAppended :: "The new payment-method reference is appended, active by default" {
+                count(state_after.paymentMethods) = count(state_before.paymentMethods) + 1
+                some pm in state_after.paymentMethods {
+                    pm.paymentMethodId = addPaymentMethod.paymentMethodId and pm.isActive = true
+                }
             }
 
             emits PaymentMethodAdded {
@@ -387,6 +377,12 @@ entity Rider :: "A person who uses RideNow to request rides" {
                 updatedAt = now()
             }
 
+            postcondition ratingCountsUpdated :: "Total-rides is incremented and the average rating is recomputed over all ratings" {
+                state_after.totalRides = state_before.totalRides + 1
+                count(state_after.ratings) = count(state_before.ratings) + 1
+                state_after.averageRating = (sum(state_after.ratings.score)) / count(state_after.ratings)
+            }
+
             emits RiderRated {
                 riderId = Rider.id
                 rideId = recordRiderRating.rideId
@@ -398,11 +394,12 @@ entity Rider :: "A person who uses RideNow to request rides" {
             }
         }
 
-        "Warn rider of low rating" when RiderRated then WarnLowRating {
+        "Warn rider of low rating" on WarnLowRating {
             resolves Rider from warnLowRating.riderId
 
-            // Guard: only when >10 rides and avg < 4.0 and not yet banned
-            policy riderMustBeActive(Rider)
+            precondition riderMustBeActive :: "Only active riders can receive a low-rating warning" {
+                Rider.status = active
+            }
 
             NotificationService.sendLowRatingWarning(Rider.id, Rider.averageRating)
 
@@ -414,14 +411,20 @@ entity Rider :: "A person who uses RideNow to request rides" {
             }
         }
 
-        "Ban rider due to critically low rating" when RiderRated then BanRiderForLowRating {
+        "Ban rider for critically low rating" on BanRiderForLowRating {
             resolves Rider from banRiderForLowRating.riderId
 
-            policy riderMustBeActive(Rider)
+            precondition riderMustBeActive :: "Only an active rider can be banned (no double-ban)" {
+                Rider.status = active
+            }
 
             sets Rider {
                 status = banned
                 updatedAt = now()
+            }
+
+            postcondition statusBecomesBanned :: "A banned rider lands in the banned status" {
+                state_after.status = banned
             }
 
             NotificationService.sendBanNotification(Rider.id, Rider.averageRating)
@@ -437,7 +440,9 @@ entity Rider :: "A person who uses RideNow to request rides" {
         "Submit a ban appeal" on SubmitBanAppeal {
             resolves Rider from submitBanAppeal.riderId
 
-            policy riderMustBeBanned(Rider)
+            precondition riderMustBeBanned :: "Only banned riders can submit an appeal" {
+                Rider.status = banned
+            }
 
             sets Rider {
                 status = appealInReview
@@ -447,6 +452,12 @@ entity Rider :: "A person who uses RideNow to request rides" {
                     status = pending
                 }
                 updatedAt = now()
+            }
+
+            postcondition statusBecomesAppealInReview :: "A submitted appeal moves the rider to appeal-in-review with a recorded appeal" {
+                state_after.status = appealInReview
+                state_after.appeal is defined
+                state_after.appeal.status = pending
             }
 
             emits BanAppealSubmitted {
@@ -460,8 +471,41 @@ entity Rider :: "A person who uses RideNow to request rides" {
     transitions {
         [*] --> unverified on "Register a new rider"
         unverified --> active on "Verify rider phone number"
-        active --> banned on "Ban rider due to critically low rating"
+        active --> banned on "Ban rider for critically low rating"
         banned --> appealInReview on "Submit a ban appeal"
+    }
+}
+
+// =============================================================================
+// Reactions (top-level, asynchronous, cross-aggregate)
+// =============================================================================
+
+// source: rider-management.model.md — formalizes REQ-RDR-011
+reaction warnRiderOnLowRating triggered by RiderRated
+    :: "When rider ratings fall below 4.0 after more than 10 rides, send a warning before we consider a ban" {
+    guard {
+        riderRated.totalRides > 10
+        and riderRated.newAverageRating < 4.0
+        and riderRated.newAverageRating >= 3.5
+    }
+    effect command WarnLowRating {
+        riderId = riderRated.riderId
+        averageRating = riderRated.newAverageRating
+        totalRides = riderRated.totalRides
+    }
+}
+
+// source: rider-management.model.md — formalizes REQ-RDR-012
+reaction banRiderOnCriticallyLowRating triggered by RiderRated
+    :: "When rider ratings fall below 3.5 after more than 10 rides, ban the rider to protect drivers" {
+    guard {
+        riderRated.totalRides > 10
+        and riderRated.newAverageRating < 3.5
+    }
+    effect command BanRiderForLowRating {
+        riderId = riderRated.riderId
+        averageRating = riderRated.newAverageRating
+        totalRides = riderRated.totalRides
     }
 }
 

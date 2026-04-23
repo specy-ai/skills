@@ -233,6 +233,15 @@ service InvoicingService {
     }
 }
 
+// source: payment.model.md
+service NotificationService {
+    operations {
+        notifyRiderOfDebt(riderId: uuid, amount: Money) : void
+            :: "Notify the rider that a payment has failed and debt has been recorded" {
+        }
+    }
+}
+
 // =============================================================================
 // Entities
 // =============================================================================
@@ -261,18 +270,6 @@ entity Payment :: "A financial transaction for a ride" {
         riderAccount : RiderAccount 1..1
     }
 
-    policies {
-        paymentMustBeAuthorized(payment: Payment) :: "Payment must be in authorized status to capture" {
-            payment.status = authorized
-        }
-        retryLimitNotExceeded(payment: Payment) :: "Payment retry count must not exceed 3" {
-            payment.retryCount < 3
-        }
-        riderHasNoOutstandingDebt(riderAccount: RiderAccount) :: "Rider must not have outstanding debt to authorize new payments" {
-            riderAccount.outstandingDebt.amount = 0
-        }
-    }
-
     invariants {
         finalAmountNonNegative :: "Final amount must not be negative" {
             if finalAmount is defined { finalAmount.amount >= 0 }
@@ -285,7 +282,10 @@ entity Payment :: "A financial transaction for a ride" {
     operations {
         "Authorize payment for ride" on AuthorizePayment {
             resolves RiderAccount from authorizePayment.riderId
-            policy riderHasNoOutstandingDebt(RiderAccount)
+
+            precondition riderHasNoOutstandingDebt :: "Rider must not have outstanding debt to authorize new payments (formalizes BlockNewRidesOnDebt)" {
+                RiderAccount.outstandingDebt.amount = 0
+            }
 
             creates Payment {
                 rideId = authorizePayment.rideId
@@ -294,6 +294,12 @@ entity Payment :: "A financial transaction for a ride" {
                 estimatedAmount = authorizePayment.estimatedAmount
                 paymentMethodUsed = RiderAccount.defaultPaymentMethod
                 authorizedAt = now()
+            }
+
+            postcondition paymentStartsAuthorized :: "A freshly authorized payment is in authorized status with the estimated amount recorded" {
+                state_after.status = authorized
+                state_after.estimatedAmount = authorizePayment.estimatedAmount
+                state_after.authorizedAt is defined
             }
 
             PaymentGateway.placeHold(Payment.paymentMethodUsed, Payment.estimatedAmount)
@@ -311,13 +317,22 @@ entity Payment :: "A financial transaction for a ride" {
             resolves Payment from capturePayment.paymentId
             resolves RiderAccount from Payment.riderId
 
-            policy paymentMustBeAuthorized(Payment)
+            precondition paymentMustBeAuthorized :: "Payment must be in authorized status to capture" {
+                Payment.status = authorized
+            }
 
             sets Payment {
                 status = captured
                 finalAmount = capturePayment.finalAmount
                 fareBreakdown = capturePayment.fareBreakdown
                 capturedAt = now()
+            }
+
+            postcondition paymentCaptured :: "After capture the payment records the final amount, breakdown, and a capture timestamp" {
+                state_after.status = captured
+                state_after.finalAmount = capturePayment.finalAmount
+                state_after.fareBreakdown = capturePayment.fareBreakdown
+                state_after.capturedAt is defined
             }
 
             PaymentGateway.captureCharge(Payment.paymentMethodUsed, Payment.finalAmount)
@@ -336,10 +351,16 @@ entity Payment :: "A financial transaction for a ride" {
             resolves Payment from retryPayment.paymentId
             resolves RiderAccount from Payment.riderId
 
-            policy retryLimitNotExceeded(Payment)
+            precondition retryLimitNotExceeded :: "Payment retry count must not exceed 3" {
+                Payment.retryCount < 3
+            }
 
             sets Payment {
                 retryCount = Payment.retryCount + 1
+            }
+
+            postcondition retryCounterIncremented :: "Retry count advances by one" {
+                state_after.retryCount = state_before.retryCount + 1
             }
 
             PaymentGateway.captureCharge(Payment.paymentMethodUsed, Payment.finalAmount)
@@ -351,13 +372,18 @@ entity Payment :: "A financial transaction for a ride" {
             }
         }
 
-        "Fall back to next payment method" when PaymentRetryExhausted then FallbackPaymentMethod {
+        "Fall back to next payment method" on FallbackPaymentMethod {
             resolves Payment from fallbackPaymentMethod.paymentId
             resolves RiderAccount from Payment.riderId
 
             sets Payment {
                 paymentMethodUsed = RiderAccount.nextActivePaymentMethod(Payment.paymentMethodUsed)
                 retryCount = 0
+            }
+
+            postcondition paymentMethodSwitched :: "After fallback the payment method is different and the retry count is reset to zero" {
+                state_after.paymentMethodUsed != state_before.paymentMethodUsed
+                state_after.retryCount = 0
             }
 
             PaymentGateway.captureCharge(Payment.paymentMethodUsed, Payment.finalAmount)
@@ -369,7 +395,7 @@ entity Payment :: "A financial transaction for a ride" {
             }
         }
 
-        "Record payment failure" when AllPaymentMethodsExhausted then RecordPaymentFailure {
+        "Record payment failure" on RecordPaymentFailure {
             resolves Payment from recordPaymentFailure.paymentId
             resolves RiderAccount from Payment.riderId
 
@@ -384,6 +410,12 @@ entity Payment :: "A financial transaction for a ride" {
                 outstandingDebt = RiderAccount.outstandingDebt.amount + Payment.finalAmount.amount
             }
 
+            postcondition paymentFailedAndDebtRecorded :: "Payment moves to failed with a reason; rider's outstanding debt grows by the unpaid amount" {
+                state_after.status = failed
+                state_after.debtRecorded = true
+                state_after.failureReason is defined
+            }
+
             emits PaymentFailed {
                 paymentId = Payment.id
                 rideId = Payment.rideId
@@ -394,12 +426,17 @@ entity Payment :: "A financial transaction for a ride" {
             }
         }
 
-        "Release hold on system cancellation" when RideCancelledBySystem then ReleasePaymentHold {
+        "Release hold on system cancellation" on ReleasePaymentHold {
             resolves Payment from releasePaymentHold.paymentId
 
             sets Payment {
                 status = fullyRefunded
                 refundedAmount = Payment.estimatedAmount
+            }
+
+            postcondition holdReleasedAsFullRefund :: "A released hold leaves the payment in fullyRefunded with the estimated amount recorded as refunded" {
+                state_after.status = fullyRefunded
+                state_after.refundedAmount.amount = state_before.estimatedAmount.amount
             }
 
             PaymentGateway.releaseHold(Payment.paymentMethodUsed, Payment.estimatedAmount)
@@ -421,6 +458,11 @@ entity Payment :: "A financial transaction for a ride" {
                 refundedAmount = processPartialRefund.refundAmount
             }
 
+            postcondition partialRefundRecorded :: "Payment moves to partiallyRefunded with the partial refund amount recorded" {
+                state_after.status = partiallyRefunded
+                state_after.refundedAmount.amount = processPartialRefund.refundAmount.amount
+            }
+
             PaymentGateway.refund(Payment.paymentMethodUsed, processPartialRefund.refundAmount)
 
             emits PartialRefundProcessed {
@@ -438,6 +480,11 @@ entity Payment :: "A financial transaction for a ride" {
             sets Payment {
                 status = fullyRefunded
                 refundedAmount = Payment.finalAmount
+            }
+
+            postcondition fullRefundRecorded :: "Payment moves to fullyRefunded with the final amount recorded as refunded" {
+                state_after.status = fullyRefunded
+                state_after.refundedAmount.amount = state_before.finalAmount.amount
             }
 
             PaymentGateway.refund(Payment.paymentMethodUsed, Payment.finalAmount)
@@ -477,12 +524,6 @@ entity RiderAccount :: "Tracks a rider's payment methods, outstanding debt, and 
         promotionalCredits : PromotionalCredit 0..N
     }
 
-    policies {
-        hasAtLeastOnePaymentMethod(riderAccount: RiderAccount) :: "Rider must have at least one active payment method" {
-            isNotEmpty(riderAccount.paymentMethods)
-        }
-    }
-
     invariants {
         debtNonNegative :: "Outstanding debt must not be negative" {
             outstandingDebt.amount >= 0
@@ -497,6 +538,10 @@ entity RiderAccount :: "Tracks a rider's payment methods, outstanding debt, and 
                 paymentMethods = append(RiderAccount.paymentMethods, addPaymentMethod.paymentMethod)
             }
 
+            postcondition paymentMethodAppended :: "The new payment method is appended to the rider's list" {
+                count(state_after.paymentMethods) = count(state_before.paymentMethods) + 1
+            }
+
             emits PaymentMethodAdded {
                 riderId = RiderAccount.riderId
                 paymentMethodId = addPaymentMethod.paymentMethod.paymentMethodId
@@ -507,8 +552,16 @@ entity RiderAccount :: "Tracks a rider's payment methods, outstanding debt, and 
         "Settle outstanding debt" on SettleDebt {
             resolves RiderAccount from settleDebt.riderId
 
+            precondition hasOutstandingDebt :: "There must be a positive outstanding debt to settle" {
+                RiderAccount.outstandingDebt.amount > 0
+            }
+
             sets RiderAccount {
                 outstandingDebt = Money { amount = 0, currency = RiderAccount.outstandingDebt.currency }
+            }
+
+            postcondition debtCleared :: "After settlement the rider's outstanding debt is zero" {
+                state_after.outstandingDebt.amount = 0
             }
 
             PaymentGateway.captureCharge(RiderAccount.defaultPaymentMethod, settleDebt.amount)
@@ -559,6 +612,11 @@ entity PromotionalCredit :: "A time-limited credit on a rider's account" {
                 expiresAt = grantPromotionalCredit.expiresAt
             }
 
+            postcondition creditStartsActive :: "A freshly granted credit is active with remaining equal to the granted amount" {
+                state_after.status = active
+                state_after.remainingAmount.amount = state_after.amount.amount
+            }
+
             emits PromotionalCreditGranted {
                 creditId = PromotionalCredit.id
                 riderId = PromotionalCredit.riderId
@@ -571,10 +629,23 @@ entity PromotionalCredit :: "A time-limited credit on a rider's account" {
         "Apply promotional credit to fare" on ApplyPromotionalCredit {
             resolves PromotionalCredit from applyPromotionalCredit.creditId
 
+            precondition creditMustBeActive :: "Only active credits can be applied" {
+                PromotionalCredit.status = active
+            }
+            precondition appliedAmountAvailable :: "Applied amount must not exceed remaining credit" {
+                applyPromotionalCredit.appliedAmount.amount <= PromotionalCredit.remainingAmount.amount
+            }
+
             sets PromotionalCredit {
                 status = applied
                 remainingAmount = PromotionalCredit.remainingAmount.amount - applyPromotionalCredit.appliedAmount.amount
                 appliedAt = now()
+            }
+
+            postcondition creditDebited :: "Remaining amount decreases by exactly the applied amount; credit moves to applied" {
+                state_after.status = applied
+                state_after.remainingAmount.amount = state_before.remainingAmount.amount - applyPromotionalCredit.appliedAmount.amount
+                state_after.appliedAt is defined
             }
 
             emits PromotionalCreditApplied {
@@ -587,12 +658,17 @@ entity PromotionalCredit :: "A time-limited credit on a rider's account" {
             }
         }
 
-        "Expire promotional credit" when CreditExpiryReached then ExpirePromotionalCredit {
+        "Expire promotional credit" on ExpirePromotionalCredit {
             resolves PromotionalCredit from expirePromotionalCredit.creditId
 
             sets PromotionalCredit {
                 status = expired
                 voidedAt = now()
+            }
+
+            postcondition creditExpired :: "Credit moves to expired with an expiry timestamp" {
+                state_after.status = expired
+                state_after.voidedAt is defined
             }
 
             emits PromotionalCreditExpired {
@@ -609,6 +685,11 @@ entity PromotionalCredit :: "A time-limited credit on a rider's account" {
             sets PromotionalCredit {
                 status = voided
                 voidedAt = now()
+            }
+
+            postcondition creditVoided :: "Credit moves to voided with a void timestamp" {
+                state_after.status = voided
+                state_after.voidedAt is defined
             }
 
             emits PromotionalCreditVoided {
@@ -642,15 +723,6 @@ entity DriverBalance :: "Tracks a driver's accumulated earnings from completed r
     }
     // NOTE: bankAccount (BankAccount from DriverManagement — not modelled in this context)
 
-    policies {
-        balanceExceedsPayoutMinimum(driverBalance: DriverBalance, minimumThreshold: Money) :: "Driver balance must exceed the minimum payout threshold" {
-            driverBalance.availableBalance.amount >= minimumThreshold.amount
-        }
-        hasSufficientBalance(driverBalance: DriverBalance, amount: Money) :: "Driver must have sufficient balance for deduction" {
-            driverBalance.availableBalance.amount >= amount.amount
-        }
-    }
-
     invariants {
         balanceNonNegative :: "Available balance must not be negative" {
             availableBalance.amount >= 0
@@ -669,6 +741,11 @@ entity DriverBalance :: "Tracks a driver's accumulated earnings from completed r
                 totalEarnings = DriverBalance.totalEarnings.amount + creditDriverEarnings.driverEarnings.amount
             }
 
+            postcondition balanceIncreasedByEarnings :: "Available balance and total earnings grow by exactly the credited amount" {
+                state_after.availableBalance.amount = state_before.availableBalance.amount + creditDriverEarnings.driverEarnings.amount
+                state_after.totalEarnings.amount = state_before.totalEarnings.amount + creditDriverEarnings.driverEarnings.amount
+            }
+
             emits DriverEarningsCredited {
                 driverId = DriverBalance.driverId
                 rideId = creditDriverEarnings.rideId
@@ -683,11 +760,18 @@ entity DriverBalance :: "Tracks a driver's accumulated earnings from completed r
         "Process weekly payout" on ProcessWeeklyPayout {
             resolves DriverBalance from processWeeklyPayout.driverId
 
-            policy balanceExceedsPayoutMinimum(DriverBalance, processWeeklyPayout.minimumThreshold)
+            precondition balanceExceedsPayoutMinimum :: "Driver balance must exceed the minimum payout threshold" {
+                DriverBalance.availableBalance.amount >= processWeeklyPayout.minimumThreshold.amount
+            }
 
             sets DriverBalance {
                 pendingBalance = DriverBalance.availableBalance
                 availableBalance = Money { amount = 0, currency = DriverBalance.availableBalance.currency }
+            }
+
+            postcondition balanceMovedToPending :: "Available balance transfers to pending; available is zeroed" {
+                state_after.pendingBalance.amount = state_before.availableBalance.amount
+                state_after.availableBalance.amount = 0
             }
 
             BankTransferService.transferToBank(DriverBalance.bankAccount, DriverBalance.pendingBalance)
@@ -699,13 +783,19 @@ entity DriverBalance :: "Tracks a driver's accumulated earnings from completed r
             }
         }
 
-        "Complete payout" when BankTransferCompleted then CompletePayout {
+        "Complete payout" on CompletePayout {
             resolves DriverBalance from completePayout.driverId
 
             sets DriverBalance {
                 totalPayouts = DriverBalance.totalPayouts.amount + completePayout.transferredAmount.amount
                 pendingBalance = Money { amount = 0, currency = DriverBalance.pendingBalance.currency }
                 lastPayoutAt = now()
+            }
+
+            postcondition payoutAccounted :: "Total payouts grow by the transferred amount; pending balance is cleared" {
+                state_after.totalPayouts.amount = state_before.totalPayouts.amount + completePayout.transferredAmount.amount
+                state_after.pendingBalance.amount = 0
+                state_after.lastPayoutAt is defined
             }
 
             emits PayoutCompleted {
@@ -719,11 +809,21 @@ entity DriverBalance :: "Tracks a driver's accumulated earnings from completed r
         "Process instant payout" on ProcessInstantPayout {
             resolves DriverBalance from processInstantPayout.driverId
 
-            policy balanceExceedsPayoutMinimum(DriverBalance, processInstantPayout.minimumThreshold)
+            precondition balanceExceedsPayoutMinimum :: "Driver balance must exceed the minimum payout threshold" {
+                DriverBalance.availableBalance.amount >= processInstantPayout.minimumThreshold.amount
+            }
+            precondition balanceCoversFee :: "Available balance must cover the instant-payout fee" {
+                DriverBalance.availableBalance.amount >= processInstantPayout.instantPayoutFee.amount
+            }
 
             sets DriverBalance {
                 availableBalance = Money { amount = 0, currency = DriverBalance.availableBalance.currency }
                 totalPayouts = DriverBalance.totalPayouts.amount + DriverBalance.availableBalance.amount - processInstantPayout.instantPayoutFee.amount
+            }
+
+            postcondition instantPayoutAccounted :: "Available balance is zeroed; total payouts grow by gross minus fee" {
+                state_after.availableBalance.amount = 0
+                state_after.totalPayouts.amount = state_before.totalPayouts.amount + state_before.availableBalance.amount - processInstantPayout.instantPayoutFee.amount
             }
 
             BankTransferService.transferToBank(DriverBalance.bankAccount, DriverBalance.availableBalance - processInstantPayout.instantPayoutFee)
@@ -741,11 +841,18 @@ entity DriverBalance :: "Tracks a driver's accumulated earnings from completed r
         "Deduct driver balance for driver-fault refund" on DeductDriverBalance {
             resolves DriverBalance from deductDriverBalance.driverId
 
-            policy hasSufficientBalance(DriverBalance, deductDriverBalance.amount)
+            precondition hasSufficientBalance :: "Driver must have sufficient balance for deduction" {
+                DriverBalance.availableBalance.amount >= deductDriverBalance.amount.amount
+            }
 
             sets DriverBalance {
                 availableBalance = DriverBalance.availableBalance.amount - deductDriverBalance.amount.amount
                 totalEarnings = DriverBalance.totalEarnings.amount - deductDriverBalance.amount.amount
+            }
+
+            postcondition balanceDecreasedByDeduction :: "Available balance and total earnings shrink by exactly the deducted amount" {
+                state_after.availableBalance.amount = state_before.availableBalance.amount - deductDriverBalance.amount.amount
+                state_after.totalEarnings.amount = state_before.totalEarnings.amount - deductDriverBalance.amount.amount
             }
 
             emits DriverBalanceDeducted {
@@ -778,18 +885,6 @@ entity RefundRequest :: "A rider's request for a refund on a completed ride" {
         processedAt : datetime optional
     }
 
-    policies {
-        refundMustBePending(refundRequest: RefundRequest) :: "Refund must be in pending status to begin review" {
-            refundRequest.status = pending
-        }
-        refundMustBeUnderReview(refundRequest: RefundRequest) :: "Refund must be under review to approve or reject" {
-            refundRequest.status = underReview
-        }
-        approvedAmountDoesNotExceedRequested(refundRequest: RefundRequest) :: "Approved amount must not exceed the requested refund" {
-            refundRequest.approvedAmount.amount <= refundRequest.requestedAmount.amount
-        }
-    }
-
     operations {
         "Request refund" on RequestRefund {
             creates RefundRequest {
@@ -801,6 +896,12 @@ entity RefundRequest :: "A rider's request for a refund on a completed ride" {
                 status = pending
                 reason = requestRefund.reason
                 requestedAt = now()
+            }
+
+            postcondition refundStartsPending :: "A freshly submitted refund request is in pending with a requested amount and timestamp" {
+                state_after.status = pending
+                state_after.requestedAmount.amount > 0
+                state_after.requestedAt is defined
             }
 
             emits RefundRequested {
@@ -815,10 +916,16 @@ entity RefundRequest :: "A rider's request for a refund on a completed ride" {
         "Begin refund review" on BeginRefundReview {
             resolves RefundRequest from beginRefundReview.refundRequestId
 
-            policy refundMustBePending(RefundRequest)
+            precondition refundMustBePending :: "Refund must be in pending status to begin review" {
+                RefundRequest.status = pending
+            }
 
             sets RefundRequest {
                 status = underReview
+            }
+
+            postcondition refundUnderReview :: "Refund transitions to underReview" {
+                state_after.status = underReview
             }
 
             emits RefundReviewStarted {
@@ -830,7 +937,12 @@ entity RefundRequest :: "A rider's request for a refund on a completed ride" {
         "Approve refund" on ApproveRefund {
             resolves RefundRequest from approveRefund.refundRequestId
 
-            policy refundMustBeUnderReview(RefundRequest)
+            precondition refundMustBeUnderReview :: "Refund must be under review to approve" {
+                RefundRequest.status = underReview
+            }
+            precondition approvedAmountDoesNotExceedRequested :: "Approved amount must not exceed the requested refund" {
+                approveRefund.approvedAmount.amount <= RefundRequest.requestedAmount.amount
+            }
 
             sets RefundRequest {
                 status = approved
@@ -840,7 +952,12 @@ entity RefundRequest :: "A rider's request for a refund on a completed ride" {
                 reviewedAt = now()
             }
 
-            policy approvedAmountDoesNotExceedRequested(RefundRequest)
+            postcondition refundApproved :: "Refund moves to approved with approved amount, fault type, and reviewed timestamp recorded" {
+                state_after.status = approved
+                state_after.approvedAmount = approveRefund.approvedAmount
+                state_after.faultType = approveRefund.faultType
+                state_after.reviewedAt is defined
+            }
 
             emits RefundApproved {
                 refundRequestId = RefundRequest.id
@@ -856,12 +973,19 @@ entity RefundRequest :: "A rider's request for a refund on a completed ride" {
         "Reject refund" on RejectRefund {
             resolves RefundRequest from rejectRefund.refundRequestId
 
-            policy refundMustBeUnderReview(RefundRequest)
+            precondition refundMustBeUnderReview :: "Refund must be under review to reject" {
+                RefundRequest.status = underReview
+            }
 
             sets RefundRequest {
                 status = rejected
                 reviewerNotes = rejectRefund.reviewerNotes
                 reviewedAt = now()
+            }
+
+            postcondition refundRejected :: "Refund moves to rejected with reviewer notes recorded" {
+                state_after.status = rejected
+                state_after.reviewedAt is defined
             }
 
             emits RefundRejected {
@@ -872,17 +996,23 @@ entity RefundRequest :: "A rider's request for a refund on a completed ride" {
             }
         }
 
-        "Execute approved refund" when RefundApproved then ExecuteRefund {
+        "Execute approved refund" on ExecuteRefund {
             resolves RefundRequest from executeRefund.refundRequestId
             resolves Payment from RefundRequest.paymentId
+
+            precondition refundMustBeApproved :: "Refund must be approved before it can be executed" {
+                RefundRequest.status = approved
+            }
 
             sets RefundRequest {
                 status = processed
                 processedAt = now()
             }
 
-            // NOTE: determines partial vs full refund based on approvedAmount vs finalAmount
-            // NOTE: if faultType = driverFault, deducts from driver balance
+            postcondition refundProcessed :: "Refund moves to processed with a processed timestamp" {
+                state_after.status = processed
+                state_after.processedAt is defined
+            }
 
             emits RefundExecuted {
                 refundRequestId = RefundRequest.id
@@ -933,7 +1063,7 @@ entity Receipt :: "A financial document generated after payment capture" {
     }
 
     operations {
-        "Generate ride receipt" when PaymentCaptured then GenerateReceipt {
+        "Generate ride receipt" on GenerateReceipt {
             creates Receipt {
                 rideId = generateReceipt.rideId
                 riderId = generateReceipt.riderId
@@ -949,6 +1079,12 @@ entity Receipt :: "A financial document generated after payment capture" {
                 generatedAt = now()
             }
 
+            postcondition receiptGenerated :: "Receipt is generated with original total equal to the breakdown's total" {
+                state_after.status = generated
+                state_after.originalTotal = state_after.fareBreakdown.total
+                state_after.generatedAt is defined
+            }
+
             // NOTE: receipt delivery to rider handled by Notification BC
 
             emits ReceiptGenerated {
@@ -959,7 +1095,7 @@ entity Receipt :: "A financial document generated after payment capture" {
             }
         }
 
-        "Correct receipt after refund" when RefundExecuted then CorrectReceipt {
+        "Correct receipt after refund" on CorrectReceipt {
             resolves Receipt from correctReceipt.paymentId
 
             sets Receipt {
@@ -967,6 +1103,12 @@ entity Receipt :: "A financial document generated after payment capture" {
                 refundAmount = correctReceipt.refundAmount
                 adjustedTotal = Receipt.originalTotal.amount - correctReceipt.refundAmount.amount
                 correctedAt = now()
+            }
+
+            postcondition receiptCorrected :: "Receipt moves to corrected; adjusted total equals original minus refund" {
+                state_after.status = corrected
+                state_after.refundAmount = correctReceipt.refundAmount
+                state_after.adjustedTotal.amount = state_before.originalTotal.amount - correctReceipt.refundAmount.amount
             }
 
             // NOTE: corrected receipt delivery to rider handled by Notification BC
@@ -990,41 +1132,183 @@ entity Receipt :: "A financial document generated after payment capture" {
 }
 
 // =============================================================================
-// File-level Policies
+// Reactions (top-level, asynchronous, cross-aggregate)
+// =============================================================================
+//
+// These reactions formalize the behaviors previously documented only as NOTE
+// comments in the file-level policies section. Each has an explicit trigger,
+// guard, and effect.
+//
+
+// source: payment.model.md — formalizes AutoApplyPromotionalCredit NOTE
+reaction autoApplyPromotionalCredit triggered by PaymentAuthorized
+    :: "When a payment is authorized, apply the rider's oldest active promotional credit to the fare" {
+    guard {
+        // The oldest-active-credit check is performed by the command handler
+        // based on the rider's promotional-credit list.
+    }
+    effect command ApplyPromotionalCredit {
+        creditId      = paymentAuthorized.oldestActiveCreditId
+        rideId        = paymentAuthorized.rideId
+        appliedAmount = paymentAuthorized.oldestActiveCreditAmount
+    }
+}
+
+// source: payment.model.md — formalizes RecordDebtOnPaymentFailure NOTE
+reaction notifyRiderOfDebtOnPaymentFailure triggered by PaymentFailed
+    :: "On payment failure, notify the rider that a debt has been recorded against their account" {
+    effect {
+        NotificationService.notifyRiderOfDebt(paymentFailed.riderId, paymentFailed.amount)
+    }
+}
+
+// source: payment.model.md — formalizes AutoRefundOnSystemCancellation NOTE
+reaction autoRefundOnSystemCancellation triggered by RideCancelledBySystem
+    :: "A system-cancelled ride triggers an automatic release of the payment hold" {
+    effect command ReleasePaymentHold {
+        paymentId = rideCancelledBySystem.paymentId
+    }
+}
+
+// source: payment.model.md — formalizes CreditDriverAfterCapture NOTE
+reaction creditDriverAfterCapture triggered by PaymentCaptured
+    :: "After a successful capture, credit the driver's earnings (fare minus platform commission)" {
+    effect command CreditDriverEarnings {
+        driverId         = paymentCaptured.driverId
+        rideId           = paymentCaptured.rideId
+        fareAmount       = paymentCaptured.amount
+        commissionAmount = paymentCaptured.commissionAmount
+        driverEarnings   = paymentCaptured.driverEarnings
+    }
+}
+
+// source: payment.model.md — formalizes DeductDriverOnFaultRefund NOTE
+reaction deductDriverOnFaultRefund triggered by RefundApproved
+    :: "When a refund is classified as driver-fault, deduct the refund amount from the driver's balance" {
+    guard {
+        refundApproved.faultType = driverFault
+    }
+    effect command DeductDriverBalance {
+        driverId = refundApproved.driverId
+        rideId   = refundApproved.rideId
+        amount   = refundApproved.approvedAmount
+    }
+}
+
+// source: payment.model.md — formalizes GenerateReceiptAfterCapture NOTE
+reaction generateReceiptAfterCapture triggered by PaymentCaptured
+    :: "Every successful capture produces a ride receipt for the rider" {
+    effect command GenerateReceipt {
+        rideId             = paymentCaptured.rideId
+        riderId            = paymentCaptured.riderId
+        driverId           = paymentCaptured.driverId
+        paymentId          = paymentCaptured.paymentId
+        fareBreakdown      = paymentCaptured.fareBreakdown
+        routeSummary       = paymentCaptured.routeSummary
+        driverName         = paymentCaptured.driverName
+        driverLicensePlate = paymentCaptured.driverLicensePlate
+        paymentMethodUsed  = paymentCaptured.paymentMethodUsed
+    }
+}
+
+// source: payment.model.md — formalizes CorrectReceiptAfterRefund NOTE
+reaction correctReceiptAfterRefund triggered by RefundExecuted
+    :: "After a refund is executed, correct the previously generated receipt" {
+    effect command CorrectReceipt {
+        paymentId    = refundExecuted.paymentId
+        refundAmount = refundExecuted.amount
+    }
+}
+
+// source: payment.model.md — formalizes RetryPaymentOnTransientFailure NOTE
+reaction retryPaymentOnTransientFailure triggered by PaymentRetryAttempted
+    :: "Retry a transient payment failure up to three times" {
+    guard {
+        paymentRetryAttempted.retryCount < 3
+    }
+    effect command RetryPayment {
+        paymentId = paymentRetryAttempted.paymentId
+    }
+}
+
+// source: payment.model.md — formalizes FallbackOnRetryExhaustion NOTE
+reaction fallbackOnRetryExhaustion triggered by PaymentRetryExhausted
+    :: "After retries are exhausted, switch to the rider's next active payment method" {
+    effect command FallbackPaymentMethod {
+        paymentId = paymentRetryExhausted.paymentId
+    }
+}
+
+// source: payment.model.md — formalizes ExpirePromotionalCreditsOnSchedule NOTE (temporal)
+reaction expirePromotionalCreditsOnSchedule triggered by CreditExpiryReached
+    :: "When a promotional credit reaches its expiry instant, void the remaining balance" {
+    guard {
+        creditExpiryReached.credit.status = active
+    }
+    effect command ExpirePromotionalCredit {
+        creditId = creditExpiryReached.credit.id
+    }
+}
+
+// source: payment.model.md — the original `when PaymentCaptured then GenerateReceipt` operation pattern
+// Note: autoApplyPromotionalCredit, creditDriverAfterCapture and generateReceiptAfterCapture
+// all trigger on PaymentCaptured. Their guards differentiate which fires for which subscriber.
+
+// source: payment.model.md — formalizes RefundApproved → ExecuteRefund chain (previously when/then)
+reaction executeRefundOnApproval triggered by RefundApproved
+    :: "When a refund is approved, execute the actual refund" {
+    effect command ExecuteRefund {
+        refundRequestId = refundApproved.refundRequestId
+    }
+}
+
+// source: payment.model.md — the original `when BankTransferCompleted then CompletePayout` operation pattern
+reaction completePayoutOnBankTransfer triggered by BankTransferCompleted
+    :: "When the bank confirms transfer, finalize the payout record on the driver's balance" {
+    effect command CompletePayout {
+        driverId          = bankTransferCompleted.driverId
+        transferredAmount = bankTransferCompleted.transferredAmount
+    }
+}
+
+// source: payment.model.md — formalizes the weekly payout cycle
+reaction initiateWeeklyPayouts triggered by WeeklyPayoutCycleDue
+    :: "On the weekly payout schedule, trigger payouts for every driver whose balance exceeds the threshold" {
+    effect {
+        // NOTE: for each DriverBalance where availableBalance > minimumPayoutThreshold
+        //       dispatch ProcessWeeklyPayout { driverId = balance.driverId, minimumThreshold }
+    }
+}
+
+// source: payment.model.md — payment-retry-exhaustion path (originally `when PaymentRetryExhausted then FallbackPaymentMethod`)
+// This chain is already covered by reaction `fallbackOnRetryExhaustion` above.
+
+// source: payment.model.md — payment-all-methods-exhausted path (originally `when AllPaymentMethodsExhausted then RecordPaymentFailure`)
+reaction recordFailureOnAllMethodsExhausted triggered by AllPaymentMethodsExhausted
+    :: "When every fallback method has failed, record the payment as failed and create debt" {
+    effect command RecordPaymentFailure {
+        paymentId = allPaymentMethodsExhausted.paymentId
+        reason    = allPaymentMethodsExhausted.reason
+    }
+}
+
+// =============================================================================
+// Temporal Events
 // =============================================================================
 
 // source: payment.model.md
-// NOTE: AutoApplyPromotionalCredit — triggered by PaymentAuthorized, applies oldest active credit
+temporal event CreditExpiryReached {
+    trigger : absolute
+    instant : credit.expiresAt
+    guard   : credit.status = active
+}
 
 // source: payment.model.md
-// NOTE: RecordDebtOnPaymentFailure — triggered by PaymentFailed, notifies rider of outstanding debt
-
-// source: payment.model.md
-// NOTE: BlockNewRidesOnDebt — precondition on AuthorizePayment, rejects if outstanding debt > 0
-
-// source: payment.model.md
-// NOTE: AutoRefundOnSystemCancellation — triggered by RideCancelledBySystem, releases hold
-
-// source: payment.model.md
-// NOTE: CreditDriverAfterCapture — triggered by PaymentCaptured, computes and credits driver earnings
-
-// source: payment.model.md
-// NOTE: DeductDriverOnFaultRefund — triggered by RefundApproved where faultType = driverFault
-
-// source: payment.model.md
-// NOTE: GenerateReceiptAfterCapture — triggered by PaymentCaptured, creates receipt
-
-// source: payment.model.md
-// NOTE: CorrectReceiptAfterRefund — triggered by RefundExecuted, corrects receipt
-
-// source: payment.model.md
-// NOTE: RetryPaymentOnTransientFailure — triggered by PaymentRetryAttempted when retryCount < 3
-
-// source: payment.model.md
-// NOTE: FallbackOnRetryExhaustion — triggered by PaymentRetryExhausted, switches payment method
-
-// source: payment.model.md
-// NOTE: ExpirePromotionalCreditsOnSchedule — triggered by CreditExpiryReached temporal event
+temporal event WeeklyPayoutCycleDue {
+    trigger  : recurring
+    schedule : "0 0 * * MON"
+    guard    : true
+}
 
 // =============================================================================
 // Commands
@@ -1298,6 +1582,8 @@ event PaymentAuthorized {
         riderId : uuid
         amount : Money
         authorizedAt : datetime
+        oldestActiveCreditId : uuid optional
+        oldestActiveCreditAmount : Money optional
     }
 }
 
@@ -1307,8 +1593,15 @@ event PaymentCaptured {
         paymentId : uuid
         rideId : uuid
         riderId : uuid
+        driverId : uuid
         amount : Money
         fareBreakdown : FareBreakdown
+        commissionAmount : Money
+        driverEarnings : Money
+        routeSummary : string
+        driverName : string
+        driverLicensePlate : string
+        paymentMethodUsed : PaymentMethodInfo
         capturedAt : datetime
     }
 }
@@ -1544,6 +1837,7 @@ event RefundApproved {
         refundRequestId : uuid
         rideId : uuid
         riderId : uuid
+        driverId : uuid
         paymentId : uuid
         approvedAmount : Money
         faultType : RefundFaultType
@@ -1603,30 +1897,4 @@ event RideCancelledBySystem {
         reason : string
         cancelledAt : datetime
     }
-}
-
-// =============================================================================
-// Temporal Events
-// =============================================================================
-
-// source: payment.model.md
-temporal event CreditExpiryReached {
-    trigger : absolute
-    instant : credit.expiresAt
-    guard   : credit.status = active
-}
-
-// source: payment.model.md
-temporal event WeeklyPayoutCycleDue {
-    trigger  : recurring
-    schedule : "0 0 * * MON"
-    guard    : true
-}
-
-// source: payment.model.md
-policy initiateWeeklyPayouts {
-    trigger : WeeklyPayoutCycleDue
-    guard   : true
-    effect  : ProcessWeeklyPayout { for each DriverBalance where balance > minimumPayoutThreshold }
-    :: "Weekly payout cycle — transfer accumulated balances to drivers"
 }

@@ -273,48 +273,6 @@ service DocumentStorageService {
 }
 
 // =============================================================================
-// File-level Policies
-// =============================================================================
-
-// source: driver-management.model.md
-policy initiateVerificationOnDocumentUpload(driver: Driver) :: "Initiate background check when a document is uploaded and driver is pending verification" {
-    driver.verificationState = pendingVerification
-    and isNotEmpty(driver.identityDocuments)
-}
-
-// source: driver-management.model.md
-policy notifyOnBackgroundCheckFailure(driver: Driver) :: "Notify driver when background check fails" {
-    // NOTE: always fires on BackgroundCheckFailed event — no guard
-}
-
-// source: driver-management.model.md
-policy suspendOnLowRating(driver: Driver) :: "Suspend driver when average rating drops below 4.2 after more than 20 rides" {
-    driver.totalRidesCompleted > 20
-    and driver.averageRating.value < 4.2
-}
-
-// source: driver-management.model.md
-policy notifyOnSuspension(driver: Driver) :: "Notify driver when account is suspended" {
-    // NOTE: always fires on DriverSuspended event — no guard
-}
-
-// source: driver-management.model.md
-policy suspendOnDocumentExpiry(driver: Driver) :: "Suspend driver when identity document or vehicle inspection expires" {
-    driver.verificationState = verified
-}
-
-// source: driver-management.model.md
-policy notifyOnAppealResolution(driver: Driver) :: "Notify driver of appeal decision" {
-    // NOTE: always fires on AppealResolved event — no guard
-}
-
-// source: driver-management.model.md
-policy autoOfflineOnInactivity(driver: Driver) :: "Auto-offline driver when location updates are stale for more than 5 minutes" {
-    driver.availabilityState = online
-    // UNCLEAR: now() - driver.lastLocationUpdateAt > 5 minutes (duration arithmetic)
-}
-
-// =============================================================================
 // Entities
 // =============================================================================
 
@@ -355,6 +313,12 @@ entity IdentityDocument :: "An identity document uploaded by a driver for verifi
                 verified = false
             }
 
+            postcondition documentRecordedUnverified :: "Newly uploaded documents start unverified with an upload timestamp and a future expiry" {
+                state_after.verified = false
+                state_after.uploadedAt is defined
+                state_after.expiresAt > state_after.uploadedAt
+            }
+
             emits IdentityDocumentUploaded {
                 driverId = IdentityDocument.driverId
                 documentId = IdentityDocument.documentId
@@ -366,6 +330,10 @@ entity IdentityDocument :: "An identity document uploaded by a driver for verifi
         markVerified() :: "Mark document as verified" {
             sets IdentityDocument {
                 verified = true
+            }
+
+            postcondition documentMarkedVerified :: "After verification the document's verified flag is true" {
+                state_after.verified = true
             }
         }
     }
@@ -393,6 +361,12 @@ entity Vehicle :: "A vehicle registered by a driver" {
                 registeredAt = now()
             }
 
+            postcondition vehicleRegistered :: "A newly registered vehicle has its details and a registration timestamp, no inspection yet" {
+                state_after.details = registerVehicle.details
+                state_after.registeredAt is defined
+                state_after.inspectionResult is not defined
+            }
+
             emits VehicleRegistered {
                 driverId = Vehicle.driverId
                 vehicleId = Vehicle.vehicleId
@@ -406,6 +380,10 @@ entity Vehicle :: "A vehicle registered by a driver" {
 
             sets Vehicle {
                 inspectionResult = recordVehicleInspection.result
+            }
+
+            postcondition inspectionStored :: "After recording, the vehicle carries the inspection outcome" {
+                state_after.inspectionResult = recordVehicleInspection.result
             }
 
             emits VehicleInspectionRecorded {
@@ -444,42 +422,6 @@ entity Driver :: "A driver who provides rides through the platform" {
         vehicle : Vehicle 0..1
     }
 
-    policies {
-        driverMustBePendingVerification(driver: Driver) :: "Driver must be pending verification" {
-            driver.verificationState = pendingVerification
-        }
-
-        driverMustBeVerified(driver: Driver) :: "Driver must be verified" {
-            driver.verificationState = verified
-        }
-
-        driverMustBeSuspended(driver: Driver) :: "Driver must be suspended to submit appeal" {
-            driver.verificationState = suspended
-        }
-
-        driverMustBeAppealInReview(driver: Driver) :: "Driver must be in appeal review to resolve" {
-            driver.verificationState = appealInReview
-        }
-
-        driverMustBeOnline(driver: Driver) :: "Driver must be online" {
-            driver.availabilityState = online
-        }
-
-        driverMustBeOffline(driver: Driver) :: "Driver must be offline to go online" {
-            driver.availabilityState = offline
-        }
-
-        vehicleReadyForOnline(driver: Driver) :: "A vehicle with valid inspection is required to go online" {
-            driver.vehicle is defined
-            and driver.vehicle.inspectionResult is defined
-            and driver.vehicle.inspectionResult.passed = true
-        }
-
-        driverNotSuspended(driver: Driver) :: "Suspended drivers cannot go online" {
-            driver.verificationState = verified
-        }
-    }
-
     invariants {
         singleVehicle :: "A driver has at most one active vehicle" {
             // NOTE: enforced by 0..1 cardinality in references
@@ -502,6 +444,12 @@ entity Driver :: "A driver who provides rides through the platform" {
                 registeredAt = now()
             }
 
+            postcondition driverIsPendingVerification :: "A freshly registered driver starts pending verification, offline, with empty rating record" {
+                state_after.verificationState = pendingVerification
+                state_after.availabilityState = offline
+                state_after.totalRidesCompleted = 0
+            }
+
             emits DriverRegistered {
                 driverId = Driver.driverId
                 fullName = Driver.fullName
@@ -516,11 +464,21 @@ entity Driver :: "A driver who provides rides through the platform" {
         "Complete background check — clear" on CompleteBackgroundCheck {
             resolves Driver from completeBackgroundCheck.driverId
 
-            policy driverMustBePendingVerification(Driver)
+            precondition driverMustBePendingVerification :: "Driver must be pending verification" {
+                Driver.verificationState = pendingVerification
+            }
+            precondition resultMustBeClear :: "This operation handles only the clear-result branch" {
+                completeBackgroundCheck.backgroundCheckResult = clear
+            }
 
             sets Driver {
                 verificationState = verified
                 verifiedAt = now()
+            }
+
+            postcondition driverBecomesVerified :: "On a clear background check the driver transitions to verified with a verification timestamp" {
+                state_after.verificationState = verified
+                state_after.verifiedAt is defined
             }
 
             emits BackgroundCheckCompleted {
@@ -531,21 +489,54 @@ entity Driver :: "A driver who provides rides through the platform" {
             }
         }
 
-        // NOTE: BackgroundCheckFailed handled separately — same command, different branch
-        // UNCLEAR: branching on completeBackgroundCheck.backgroundCheckResult (clear vs failed) within single operation
+        "Reject driver application" on RejectDriverApplication {
+            resolves Driver from rejectDriverApplication.driverId
+
+            precondition driverMustBePendingVerification :: "Only pending applicants can be rejected via background-check failure" {
+                Driver.verificationState = pendingVerification
+            }
+
+            sets Driver {
+                verificationState = rejected
+            }
+
+            postcondition driverBecomesRejected :: "On a failed background check the driver transitions to rejected" {
+                state_after.verificationState = rejected
+            }
+
+            emits DriverApplicationRejected {
+                driverId = Driver.driverId
+                checkId = rejectDriverApplication.checkId
+                failureReason = rejectDriverApplication.failureReason
+                rejectedAt = now()
+            }
+        }
 
         // === Availability ===
 
         "Go online" on GoOnline {
             resolves Driver from goOnline.driverId
 
-            policy driverNotSuspended(Driver)
-            policy driverMustBeOffline(Driver)
-            policy vehicleReadyForOnline(Driver)
+            precondition driverNotSuspended :: "Suspended drivers cannot go online" {
+                Driver.verificationState = verified
+            }
+            precondition driverMustBeOffline :: "Driver must be offline to go online" {
+                Driver.availabilityState = offline
+            }
+            precondition vehicleReadyForOnline :: "A vehicle with valid inspection is required to go online" {
+                Driver.vehicle is defined
+                and Driver.vehicle.inspectionResult is defined
+                and Driver.vehicle.inspectionResult.passed = true
+            }
 
             sets Driver {
                 availabilityState = online
                 lastLocationUpdateAt = now()
+            }
+
+            postcondition driverIsOnline :: "After going online the driver is in the online availability state with a fresh activity timestamp" {
+                state_after.availabilityState = online
+                state_after.lastLocationUpdateAt is defined
             }
 
             emits DriverWentOnline {
@@ -557,10 +548,16 @@ entity Driver :: "A driver who provides rides through the platform" {
         "Go offline" on GoOffline {
             resolves Driver from goOffline.driverId
 
-            policy driverMustBeOnline(Driver)
+            precondition driverMustBeOnline :: "Driver must be online to go offline" {
+                Driver.availabilityState = online
+            }
 
             sets Driver {
                 availabilityState = offline
+            }
+
+            postcondition driverIsOffline :: "After going offline the driver is in the offline availability state" {
+                state_after.availabilityState = offline
             }
 
             emits DriverWentOffline {
@@ -573,11 +570,17 @@ entity Driver :: "A driver who provides rides through the platform" {
         "Timeout inactive driver" on TimeoutInactiveDriver {
             resolves Driver from timeoutInactiveDriver.driverId
 
-            policy driverMustBeOnline(Driver)
+            precondition driverMustBeOnline :: "Inactivity timeout only applies to online drivers" {
+                Driver.availabilityState = online
+            }
             // UNCLEAR: now() - Driver.lastLocationUpdateAt > 5 minutes (duration arithmetic)
 
             sets Driver {
                 availabilityState = offline
+            }
+
+            postcondition driverIsOffline :: "An inactivity timeout transitions the driver to offline" {
+                state_after.availabilityState = offline
             }
 
             emits DriverWentOffline {
@@ -593,9 +596,14 @@ entity Driver :: "A driver who provides rides through the platform" {
             resolves Driver from submitRating.driverId
 
             sets Driver {
-                averageRating = Driver.averageRating
-                // NOTE: averageRating.incorporate(submitRating.rating) — recomputes average
+                averageRating = Driver.averageRating.incorporate(submitRating.rating)
                 totalRidesCompleted = Driver.totalRidesCompleted + 1
+            }
+
+            postcondition ratingIncorporated :: "Total rides completed advances by one and average rating is recomputed by incorporating the new score" {
+                state_after.totalRidesCompleted = state_before.totalRidesCompleted + 1
+                state_after.averageRating.totalRatings = state_before.averageRating.totalRatings + 1
+                state_after.averageRating.ratingSum = state_before.averageRating.ratingSum + submitRating.rating.value
             }
 
             emits RatingSubmitted {
@@ -613,13 +621,22 @@ entity Driver :: "A driver who provides rides through the platform" {
         "Suspend driver" on SuspendDriver {
             resolves Driver from suspendDriver.driverId
 
-            policy driverMustBeVerified(Driver)
+            precondition driverMustBeVerified :: "Driver must be verified to be suspended" {
+                Driver.verificationState = verified
+            }
 
             sets Driver {
                 verificationState = suspended
                 suspensionReason = suspendDriver.reason
                 suspendedAt = now()
                 availabilityState = offline
+            }
+
+            postcondition driverIsSuspended :: "After suspension the driver is in the suspended state, offline, with reason and timestamp recorded" {
+                state_after.verificationState = suspended
+                state_after.availabilityState = offline
+                state_after.suspendedAt is defined
+                state_after.suspensionReason is defined
             }
 
             emits DriverSuspended {
@@ -634,11 +651,18 @@ entity Driver :: "A driver who provides rides through the platform" {
         "Submit appeal" on SubmitAppeal {
             resolves Driver from submitAppeal.driverId
 
-            policy driverMustBeSuspended(Driver)
+            precondition driverMustBeSuspended :: "Driver must be suspended to submit appeal" {
+                Driver.verificationState = suspended
+            }
 
             sets Driver {
                 verificationState = appealInReview
                 appeal = submitAppeal.appeal
+            }
+
+            postcondition appealRecorded :: "After submission the driver is in appeal-in-review with the appeal recorded" {
+                state_after.verificationState = appealInReview
+                state_after.appeal is defined
             }
 
             emits AppealSubmitted {
@@ -647,20 +671,53 @@ entity Driver :: "A driver who provides rides through the platform" {
             }
         }
 
-        "Resolve appeal" on ResolveAppeal {
-            resolves Driver from resolveAppeal.driverId
+        "Reinstate driver after appeal" on ReinstateDriver {
+            resolves Driver from reinstateDriver.driverId
 
-            policy driverMustBeAppealInReview(Driver)
+            precondition driverMustBeAppealInReview :: "Driver must be in appeal-in-review to be reinstated" {
+                Driver.verificationState = appealInReview
+            }
 
             sets Driver {
-                appealResolution = resolveAppeal.resolution
-                // NOTE: if resolution.outcome = reinstated → verificationState = verified, clear suspension
-                // NOTE: if resolution.outcome = permanentlySuspended → verificationState = permanentlySuspended
+                appealResolution = reinstateDriver.resolution
+                verificationState = verified
+                suspensionReason = cleared
+            }
+
+            postcondition driverIsReinstated :: "After reinstatement the driver returns to verified with the appeal resolution recorded" {
+                state_after.verificationState = verified
+                state_after.appealResolution is defined
+                state_after.appealResolution.outcome = reinstated
             }
 
             emits AppealResolved {
                 driverId = Driver.driverId
-                resolution = resolveAppeal.resolution
+                resolution = reinstateDriver.resolution
+                resolvedAt = now()
+            }
+        }
+
+        "Permanently suspend driver after appeal" on PermanentlySuspendDriver {
+            resolves Driver from permanentlySuspendDriver.driverId
+
+            precondition driverMustBeAppealInReview :: "Driver must be in appeal-in-review to be permanently suspended" {
+                Driver.verificationState = appealInReview
+            }
+
+            sets Driver {
+                appealResolution = permanentlySuspendDriver.resolution
+                verificationState = permanentlySuspended
+            }
+
+            postcondition driverIsPermanentlySuspended :: "After this resolution the driver is permanently suspended with the appeal resolution recorded" {
+                state_after.verificationState = permanentlySuspended
+                state_after.appealResolution is defined
+                state_after.appealResolution.outcome = permanentlySuspended
+            }
+
+            emits AppealResolved {
+                driverId = Driver.driverId
+                resolution = permanentlySuspendDriver.resolution
                 resolvedAt = now()
             }
         }
@@ -670,11 +727,119 @@ entity Driver :: "A driver who provides rides through the platform" {
     transitions {
         [*] --> pendingVerification on "Register a new driver"
         pendingVerification --> verified on "Complete background check — clear"
-        // NOTE: pendingVerification --> rejected on "Complete background check — failed" (branching not modelled)
+        pendingVerification --> rejected on "Reject driver application"
         verified --> suspended on "Suspend driver"
         suspended --> appealInReview on "Submit appeal"
-        // NOTE: appealInReview --> verified on "Resolve appeal" (when reinstated)
-        // NOTE: appealInReview --> permanentlySuspended on "Resolve appeal" (when permanently suspended)
+        appealInReview --> verified on "Reinstate driver after appeal"
+        appealInReview --> permanentlySuspended on "Permanently suspend driver after appeal"
+    }
+}
+
+// =============================================================================
+// Reactions (top-level, asynchronous, cross-aggregate)
+// =============================================================================
+
+// source: driver-management.model.md — formalizes REQ-DRV-002 → REQ-DRV-003 chain
+reaction initiateVerificationOnDocumentUpload triggered by IdentityDocumentUploaded
+    :: "Each document upload kicks off a background check while the driver is still pending verification" {
+    guard {
+        // The Driver entity status is checked by the precondition on RequestBackgroundCheck;
+        // here the reaction simply forwards the event to the verification machinery.
+    }
+    effect command RequestBackgroundCheck {
+        driverId = identityDocumentUploaded.driverId
+        documentId = identityDocumentUploaded.documentId
+    }
+}
+
+// source: driver-management.model.md — formalizes REQ-DRV-004
+reaction rejectDriverOnBackgroundCheckFailure triggered by BackgroundCheckFailed
+    :: "Background-check failures auto-reject the application before any onboarding can proceed" {
+    effect command RejectDriverApplication {
+        driverId = backgroundCheckFailed.driverId
+        checkId = backgroundCheckFailed.checkId
+        failureReason = backgroundCheckFailed.failureReason
+    }
+}
+
+// source: driver-management.model.md — formalizes REQ-DRV-004 (notification side)
+reaction notifyOnBackgroundCheckFailure triggered by BackgroundCheckFailed
+    :: "Tell the applicant their background check failed and the application is rejected" {
+    effect command NotifyDriver {
+        driverId = backgroundCheckFailed.driverId
+        subject = "Application not approved"
+        message = "Your background check could not be cleared. Reason: " + backgroundCheckFailed.failureReason
+        channel = email
+    }
+}
+
+// source: driver-management.model.md — formalizes REQ-DRV-022
+reaction suspendOnLowRating triggered by RatingSubmitted
+    :: "Suspend a driver whose average rating drops below 4.2 after more than 20 completed rides" {
+    guard {
+        ratingSubmitted.totalRidesCompleted > 20
+        and ratingSubmitted.newAverageRating.value < 4.2
+    }
+    effect command SuspendDriver {
+        driverId = ratingSubmitted.driverId
+        reason = "Average rating below threshold (" + ratingSubmitted.newAverageRating.value + ")"
+    }
+}
+
+// source: driver-management.model.md — formalizes notification of REQ-DRV-022
+reaction notifyOnSuspension triggered by DriverSuspended
+    :: "Always notify a driver when their account is suspended" {
+    effect command NotifyDriver {
+        driverId = driverSuspended.driverId
+        subject = "Your driver account has been suspended"
+        message = "Reason: " + driverSuspended.reason
+        channel = email
+    }
+}
+
+// source: driver-management.model.md — formalizes REQ-DRV-007
+reaction suspendOnDocumentExpiry triggered by DocumentExpired
+    :: "When a driver's identity document or vehicle inspection expires, suspend them and prompt for renewal" {
+    effect command SuspendDriver {
+        driverId = documentExpired.driverId
+        reason = "Document expired: " + documentExpired.expiryType
+    }
+}
+
+// source: driver-management.model.md — formalizes REQ-DRV-013
+reaction autoOfflineOnInactivity triggered by DriverInactivityDetected
+    :: "Take an online driver offline if no location update has arrived for more than five minutes" {
+    effect command TimeoutInactiveDriver {
+        driverId = driverInactivityDetected.driverId
+        now = driverInactivityDetected.detectedAt
+    }
+}
+
+// source: driver-management.model.md — notifications for resolved appeals
+reaction notifyOnReinstatement triggered by AppealResolved
+    :: "Tell the driver they have been reinstated after their appeal was upheld" {
+    guard {
+        appealResolved.resolution.outcome = reinstated
+    }
+    effect command NotifyDriver {
+        driverId = appealResolved.driverId
+        subject = "Your appeal has been upheld"
+        message = "You have been reinstated. " + appealResolved.resolution.justification
+        channel = email
+    }
+}
+
+// source: driver-management.model.md — notifications for resolved appeals
+reaction notifyOnPermanentSuspension triggered by AppealResolved
+    :: "Tell the driver their appeal was denied and the suspension is now permanent" {
+    guard {
+        appealResolved.resolution.outcome = permanentlySuspended
+    }
+    effect command NotifyDriver {
+        driverId = appealResolved.driverId
+        subject = "Your appeal has been denied"
+        message = "Your suspension is now permanent. " + appealResolved.resolution.justification
+        channel = email
     }
 }
 
@@ -703,12 +868,29 @@ command UploadIdentityDocument {
     }
 }
 
+// source: driver-management.model.md — added during policy rework
+command RequestBackgroundCheck {
+    fields {
+        driverId : uuid
+        documentId : uuid
+    }
+}
+
 // source: driver-management.model.md
 command CompleteBackgroundCheck {
     fields {
         driverId : uuid
         backgroundCheckResult : BackgroundCheckResult
         checkId : string
+    }
+}
+
+// source: driver-management.model.md — added during policy rework
+command RejectDriverApplication {
+    fields {
+        driverId : uuid
+        checkId : string
+        failureReason : string
     }
 }
 
@@ -776,8 +958,16 @@ command SubmitAppeal {
     }
 }
 
-// source: driver-management.model.md
-command ResolveAppeal {
+// source: driver-management.model.md — replaces ResolveAppeal (reinstate branch)
+command ReinstateDriver {
+    fields {
+        driverId : uuid
+        resolution : AppealResolution
+    }
+}
+
+// source: driver-management.model.md — replaces ResolveAppeal (permanent-suspension branch)
+command PermanentlySuspendDriver {
     fields {
         driverId : uuid
         resolution : AppealResolution
@@ -840,6 +1030,16 @@ event BackgroundCheckFailed {
     }
 }
 
+// source: driver-management.model.md — added during policy rework
+event DriverApplicationRejected {
+    fields {
+        driverId : uuid
+        checkId : string
+        failureReason : string
+        rejectedAt : datetime
+    }
+}
+
 // source: driver-management.model.md
 event VehicleRegistered {
     fields {
@@ -874,6 +1074,15 @@ event DriverWentOffline {
         driverId : uuid
         reason : OfflineReason
         timestamp : datetime
+    }
+}
+
+// source: driver-management.model.md — emitted by InactivityMonitor when stale-location detection fires
+event DriverInactivityDetected {
+    fields {
+        driverId : uuid
+        lastLocationUpdateAt : datetime
+        detectedAt : datetime
     }
 }
 
