@@ -536,7 +536,7 @@ Responsibility: Onboarding, identity verification, vehicle registration, availab
 - **Caused by command:** `UploadIdentityDocument`
 - **Raised by operation:** `uploadIdentityDocument`
 - **Type:** Internal
-- **Triggers policy:** `InitiateVerificationOnDocumentUpload`
+- **Triggers reaction:** `InitiateVerificationOnDocumentUpload`
 - **Realizes:** REQ-DRV-002
 
 ### BackgroundCheckCompleted
@@ -562,7 +562,7 @@ Responsibility: Onboarding, identity verification, vehicle registration, availab
 - **Caused by command:** `CompleteBackgroundCheck`
 - **Raised by operation:** `completeBackgroundCheck`
 - **Type:** Internal
-- **Triggers policy:** `NotifyOnBackgroundCheckFailure`
+- **Triggers reaction:** `NotifyOnBackgroundCheckFailure`
 - **Realizes:** REQ-DRV-004
 
 ### VehicleRegistered
@@ -622,7 +622,7 @@ Responsibility: Onboarding, identity verification, vehicle registration, availab
 - **Caused by command:** `SubmitRating`
 - **Raised by operation:** `submitRating`
 - **Type:** Internal
-- **Triggers policy:** `SuspendOnLowRating`
+- **Triggers reaction:** `SuspendOnLowRating`
 - **Realizes:** REQ-DRV-020
 
 ### DriverSuspended
@@ -634,7 +634,7 @@ Responsibility: Onboarding, identity verification, vehicle registration, availab
 - **Caused by command:** `SuspendDriver`
 - **Raised by operation:** `suspend`
 - **Type:** Internal
-- **Triggers policy:** `NotifyOnSuspension`
+- **Triggers reaction:** `NotifyOnSuspension`
 - **Realizes:** REQ-DRV-007, REQ-DRV-022
 
 ### AppealSubmitted
@@ -656,7 +656,7 @@ Responsibility: Onboarding, identity verification, vehicle registration, availab
 - **Caused by command:** `ResolveAppeal`
 - **Raised by operation:** `resolveAppeal`
 - **Type:** Internal
-- **Triggers policy:** `NotifyOnAppealResolution`
+- **Triggers reaction:** `NotifyOnAppealResolution`
 - **Realizes:** REQ-DRV-024
 
 ### DriverNotified
@@ -682,7 +682,7 @@ Responsibility: Onboarding, identity verification, vehicle registration, availab
 - **Caused by command:** (raised by scheduled check, not a direct command)
 - **Raised by operation:** `checkDocumentExpiry` (domain service)
 - **Type:** Internal
-- **Triggers policy:** `SuspendOnDocumentExpiry`
+- **Triggers reaction:** `SuspendOnDocumentExpiry`
 - **Realizes:** REQ-DRV-007
 
 ### External: RideCompleted
@@ -866,18 +866,18 @@ Responsibility: Onboarding, identity verification, vehicle registration, availab
 | Requirement | Realized by |
 |---|---|
 | REQ-DRV-001 | RegisterDriver (command), registerDriver (operation), DriverRegistered (event), Driver entity (pending-verification state) |
-| REQ-DRV-002 | UploadIdentityDocument (command), uploadIdentityDocument (operation), IdentityDocumentUploaded (event), IdentityDocument entity, DocumentType (value), DocumentStorageService, InitiateVerificationOnDocumentUpload (policy) |
+| REQ-DRV-002 | UploadIdentityDocument (command), uploadIdentityDocument (operation), IdentityDocumentUploaded (event), IdentityDocument entity, DocumentType (value), DocumentStorageService, InitiateVerificationOnDocumentUpload (reaction) |
 | REQ-DRV-003 | CompleteBackgroundCheck (command), completeBackgroundCheck (operation), BackgroundCheckCompleted (event), pending-verification→verified transition, BackgroundCheckService |
-| REQ-DRV-004 | CompleteBackgroundCheck (command), completeBackgroundCheck (operation), BackgroundCheckFailed (event), pending-verification→rejected transition, NotifyOnBackgroundCheckFailure (policy), NotificationService |
+| REQ-DRV-004 | CompleteBackgroundCheck (command), completeBackgroundCheck (operation), BackgroundCheckFailed (event), pending-verification→rejected transition, NotifyOnBackgroundCheckFailure (reaction), NotificationService |
 | REQ-DRV-005 | RegisterVehicle (command), registerVehicle (operation), VehicleRegistered (event), Vehicle entity, VehicleDetails (value) |
 | REQ-DRV-006 | RecordVehicleInspection (command), recordVehicleInspection (operation), VehicleInspectionRecorded (event), InspectionResult (value), InspectionRequiredForActivation (invariant), goOnline guard |
-| REQ-DRV-007 | DocumentExpiryChecker (domain service), DocumentExpired (event), SuspendOnDocumentExpiry (policy), SuspendDriver (command), NotifyOnSuspension (policy), NotificationService |
+| REQ-DRV-007 | DocumentExpiryChecker (domain service), DocumentExpired (event), SuspendOnDocumentExpiry (reaction), SuspendDriver (command), NotifyOnSuspension (reaction), NotificationService |
 | REQ-DRV-010 | GoOnline (command), goOnline (operation), DriverWentOnline (event), offline→online transition, VerifiedForOnline (aggregate invariant) |
 | REQ-DRV-011 | GoOffline (command), goOffline (operation), DriverWentOffline (event), online→offline transition |
 | REQ-DRV-012 | goOnline precondition (verification state must be verified, not suspended), VerifiedForOnline (aggregate invariant) |
-| REQ-DRV-013 | InactivityMonitor (domain service), TimeoutInactiveDriver (command), timeoutInactivity (operation), DriverWentOffline (event), AutoOfflineOnInactivity (policy), FindOnlineDriversWithStaleLocation (query) |
+| REQ-DRV-013 | InactivityMonitor (domain service), TimeoutInactiveDriver (command), timeoutInactivity (operation), DriverWentOffline (event), AutoOfflineOnInactivity (reaction), FindOnlineDriversWithStaleLocation (query) |
 | REQ-DRV-020 | SubmitRating (command), submitRating (operation), RatingSubmitted (event), AverageRating (value) |
 | REQ-DRV-021 | Rating (value type, invariant RatingRange), submitRating precondition |
-| REQ-DRV-022 | SuspendOnLowRating (policy), SuspendDriver (command), suspend (operation), DriverSuspended (event), NotifyOnSuspension (policy) |
+| REQ-DRV-022 | SuspendOnLowRating (reaction), SuspendDriver (command), suspend (operation), DriverSuspended (event), NotifyOnSuspension (reaction) |
 | REQ-DRV-023 | SubmitAppeal (command), submitAppeal (operation), AppealSubmitted (event), AppealDetails (value), suspended→appeal-in-review transition |
-| REQ-DRV-024 | ResolveAppeal (command), resolveAppeal (operation), AppealResolved (event), AppealResolution (value), appeal-in-review→verified / permanently-suspended transitions, NotifyOnAppealResolution (policy) |
+| REQ-DRV-024 | ResolveAppeal (command), resolveAppeal (operation), AppealResolved (event), AppealResolution (value), appeal-in-review→verified / permanently-suspended transitions, NotifyOnAppealResolution (reaction) |

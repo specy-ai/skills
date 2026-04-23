@@ -254,22 +254,6 @@ entity RideRequest :: "A rider's request for transportation, covering matching u
         offers : RideOffer 0..N
     }
 
-    policies {
-        // realizes: REQ-RIDE-002
-        riderMustBeActive(riderId: uuid) :: "Only active riders can request rides" {
-            // Verified via Rider Management ACL — rider status must be active
-        }
-
-        // realizes: REQ-RIDE-004
-        requestMustBeSearching(rideRequest: RideRequest) :: "Can only match while searching" {
-            rideRequest.status = searching
-        }
-
-        // realizes: REQ-RIDE-020
-        requestCanBeCancelledByRider(rideRequest: RideRequest) :: "Rider can cancel while searching" {
-            rideRequest.status = searching
-        }
-    }
 
     invariants {
         // realizes: REQ-RIDE-001
@@ -291,7 +275,7 @@ entity RideRequest :: "A rider's request for transportation, covering matching u
     operations {
         // realizes: REQ-RIDE-001, REQ-RIDE-002, REQ-RIDE-003
         "Request a ride" on RequestRide {
-            policy riderMustBeActive(requestRide.riderId)
+            precondition riderMustBeActive(requestRide.riderId)
 
             creates RideRequest {
                 riderId         = requestRide.riderId
@@ -321,7 +305,7 @@ entity RideRequest :: "A rider's request for transportation, covering matching u
         "Initiate driver matching" when RideRequested then InitiateMatching {
             resolves RideRequest from initiateMatching.rideRequestId
 
-            policy requestMustBeSearching(RideRequest)
+            precondition requestMustBeSearching(RideRequest)
 
             MatchingService.findAndOfferDriver(RideRequest)
               :: "Query Geo for nearby drivers and offer to closest"
@@ -331,7 +315,7 @@ entity RideRequest :: "A rider's request for transportation, covering matching u
         "Handle driver offer timeout" on HandleOfferTimeout {
             resolves RideRequest from handleOfferTimeout.rideRequestId
 
-            policy requestMustBeSearching(RideRequest)
+            precondition requestMustBeSearching(RideRequest)
 
             sets RideOffer {
                 status      = timeout
@@ -353,7 +337,7 @@ entity RideRequest :: "A rider's request for transportation, covering matching u
         "Cancel request — no driver available" on CancelRequestNoDriver {
             resolves RideRequest from cancelRequestNoDriver.rideRequestId
 
-            policy requestMustBeSearching(RideRequest)
+            precondition requestMustBeSearching(RideRequest)
 
             sets RideRequest {
                 status = cancelled
@@ -381,7 +365,7 @@ entity RideRequest :: "A rider's request for transportation, covering matching u
         "Driver accepts ride offer" on AcceptRideOffer {
             resolves RideRequest from acceptRideOffer.rideRequestId
 
-            policy requestMustBeSearching(RideRequest)
+            precondition requestMustBeSearching(RideRequest)
 
             sets RideOffer {
                 status      = accepted
@@ -410,7 +394,7 @@ entity RideRequest :: "A rider's request for transportation, covering matching u
         "Rider cancels request" on CancelRequestByRider {
             resolves RideRequest from cancelRequestByRider.rideRequestId
 
-            policy requestCanBeCancelledByRider(RideRequest)
+            precondition requestCanBeCancelledByRider(RideRequest)
 
             sets RideRequest {
                 status = cancelled
@@ -477,47 +461,6 @@ entity Ride :: "The actual ride from driver assignment through trip completion" 
         tripSharingLinks  : TripSharingLink 0..N
     }
 
-    policies {
-        // realizes: REQ-RIDE-010
-        rideMustBeDriverEnRoute(ride: Ride) :: "Driver must be en route to signal arrival" {
-            ride.status = driverEnRoute
-        }
-
-        // realizes: REQ-RIDE-012
-        rideMustBeDriverArrived(ride: Ride) :: "Driver must have arrived to start ride" {
-            ride.status = driverArrived
-        }
-
-        // realizes: REQ-RIDE-014
-        rideMustBeInProgress(ride: Ride) :: "Ride must be in progress to complete" {
-            ride.status = inProgress
-        }
-
-        // realizes: REQ-RIDE-021
-        rideCanBeCancelledByRider(ride: Ride) :: "Rider can cancel while driver en route or arrived" {
-            ride.status in { driverEnRoute, driverArrived }
-        }
-
-        // realizes: REQ-RIDE-022
-        rideCanBeCancelledByDriver(ride: Ride) :: "Driver can cancel while en route" {
-            ride.status = driverEnRoute
-        }
-
-        // realizes: REQ-RIDE-011
-        rideMustBeDriverArrivedForNoShow(ride: Ride) :: "No-show only when driver arrived" {
-            ride.status = driverArrived
-        }
-
-        // realizes: REQ-RIDE-030
-        rideMustBeActiveForEmergency(ride: Ride) :: "Emergency requires an active ride" {
-            ride.status in { driverEnRoute, driverArrived, inProgress }
-        }
-
-        // realizes: REQ-RIDE-033
-        rideMustBeCompletedForSafetyReport(ride: Ride) :: "Safety reports filed after completion" {
-            ride.status = completed
-        }
-    }
 
     invariants {
         // realizes: REQ-RIDE-014
@@ -576,7 +519,7 @@ entity Ride :: "The actual ride from driver assignment through trip completion" 
         "Driver arrives at pickup" on SignalDriverArrival {
             resolves Ride from signalDriverArrival.rideId
 
-            policy rideMustBeDriverEnRoute(Ride)
+            precondition rideMustBeDriverEnRoute(Ride)
 
             sets Ride {
                 status    = driverArrived
@@ -598,8 +541,8 @@ entity Ride :: "The actual ride from driver assignment through trip completion" 
         "Cancel ride — rider no-show" on CancelRideNoShow {
             resolves Ride from cancelRideNoShow.rideId
 
-            policy rideMustBeDriverArrivedForNoShow(Ride)
-            // Caused by: temporal event RiderBoardingDeadlineElapsed → cancelOnRiderNoShow policy
+            precondition rideMustBeDriverArrivedForNoShow(Ride)
+            // Caused by: temporal event RiderBoardingDeadlineElapsed → cancelOnRiderNoShow reaction
 
             sets Ride {
                 status = cancelled
@@ -628,8 +571,8 @@ entity Ride :: "The actual ride from driver assignment through trip completion" 
         "Cancel ride — driver no-show" on CancelRideDriverNoShow {
             resolves Ride from cancelRideDriverNoShow.rideId
 
-            policy rideMustBeDriverEnRoute(Ride)
-            // Caused by: temporal event DriverArrivalDeadlineElapsed → cancelOnDriverNoShow policy
+            precondition rideMustBeDriverEnRoute(Ride)
+            // Caused by: temporal event DriverArrivalDeadlineElapsed → cancelOnDriverNoShow reaction
 
             sets Ride {
                 status = cancelled
@@ -661,7 +604,7 @@ entity Ride :: "The actual ride from driver assignment through trip completion" 
         "Start the ride" on StartRide {
             resolves Ride from startRide.rideId
 
-            policy rideMustBeDriverArrived(Ride)
+            precondition rideMustBeDriverArrived(Ride)
 
             sets Ride {
                 status               = inProgress
@@ -683,7 +626,7 @@ entity Ride :: "The actual ride from driver assignment through trip completion" 
         "Update ride tracking" on UpdateRideTracking {
             resolves Ride from updateRideTracking.rideId
 
-            policy rideMustBeInProgress(Ride)
+            precondition rideMustBeInProgress(Ride)
 
             sets Ride {
                 currentRoute = GeolocationGateway.getCurrentRoute(Ride.id)
@@ -701,7 +644,7 @@ entity Ride :: "The actual ride from driver assignment through trip completion" 
         "Complete the ride" on CompleteRide {
             resolves Ride from completeRide.rideId
 
-            policy rideMustBeInProgress(Ride)
+            precondition rideMustBeInProgress(Ride)
 
             sets Ride {
                 status                = completed
@@ -735,7 +678,7 @@ entity Ride :: "The actual ride from driver assignment through trip completion" 
         "Rider cancels ride after match" on CancelRideByRider {
             resolves Ride from cancelRideByRider.rideId
 
-            policy rideCanBeCancelledByRider(Ride)
+            precondition rideCanBeCancelledByRider(Ride)
 
             sets Ride {
                 status = cancelled
@@ -764,7 +707,7 @@ entity Ride :: "The actual ride from driver assignment through trip completion" 
         "Driver cancels ride" on CancelRideByDriver {
             resolves Ride from cancelRideByDriver.rideId
 
-            policy rideCanBeCancelledByDriver(Ride)
+            precondition rideCanBeCancelledByDriver(Ride)
 
             sets Ride {
                 status = cancelled
@@ -793,7 +736,7 @@ entity Ride :: "The actual ride from driver assignment through trip completion" 
         "Trigger emergency" on TriggerEmergency {
             resolves Ride from triggerEmergency.rideId
 
-            policy rideMustBeActiveForEmergency(Ride)
+            precondition rideMustBeActiveForEmergency(Ride)
 
             creates EmergencyEvent {
                 type        = triggerEmergency.emergencyType
@@ -838,7 +781,7 @@ entity Ride :: "The actual ride from driver assignment through trip completion" 
         "Detect unusual stop" on DetectUnusualStop {
             resolves Ride from detectUnusualStop.rideId
 
-            policy rideMustBeInProgress(Ride)
+            precondition rideMustBeInProgress(Ride)
 
             NotificationService.sendSafetyCheck(Ride.riderId, Ride.id,
               detectUnusualStop.stopLocation)
@@ -856,7 +799,7 @@ entity Ride :: "The actual ride from driver assignment through trip completion" 
         "File safety report" on FileSafetyReport {
             resolves Ride from fileSafetyReport.rideId
 
-            policy rideMustBeCompletedForSafetyReport(Ride)
+            precondition rideMustBeCompletedForSafetyReport(Ride)
 
             creates SafetyReport {
                 ride        = Ride
@@ -1331,11 +1274,11 @@ temporal event DriverArrivalDeadlineElapsed {
     // If the driver already arrived (status = driverArrived), the guard is false → suppressed
     //
     // RECOMPUTATION HEURISTIC: if a RouteRecalculated event changes the ETA,
-    // define a recomputation policy that re-arms this deadline with the new ETA + 5 min.
+    // define a recomputation reaction that re-arms this deadline with the new ETA + 5 min.
 }
 ```
 
-### Temporal event → policy → command chains
+### Temporal event → reaction → command chains
 
 These temporal events replace direct infrastructure-scheduled commands. The causal chain is now explicit:
 
@@ -1347,7 +1290,7 @@ These temporal events replace direct infrastructure-scheduled commands. The caus
 
 ```
 // realizes: REQ-RIDE-005
-policy retractExpiredOffer {
+reaction retractExpiredOffer {
     trigger : RideOfferDeadlineElapsed
     guard   : rideOffer.status = pending
     effect  : HandleOfferTimeout {
@@ -1359,7 +1302,7 @@ policy retractExpiredOffer {
 }
 
 // realizes: REQ-RIDE-011
-policy cancelOnRiderNoShow {
+reaction cancelOnRiderNoShow {
     trigger : RiderBoardingDeadlineElapsed
     guard   : ride.status = driverArrived
     effect  : CancelRideNoShow { rideId = ride.id }
@@ -1367,7 +1310,7 @@ policy cancelOnRiderNoShow {
 }
 
 // realizes: REQ-RIDE-024
-policy cancelOnDriverNoShow {
+reaction cancelOnDriverNoShow {
     trigger : DriverArrivalDeadlineElapsed
     guard   : ride.status = driverEnRoute
     effect  : CancelRideDriverNoShow { rideId = ride.id }
@@ -1447,7 +1390,7 @@ service MatchingService :: "Coordinates finding drivers via Geolocation and offe
 // realizes: REQ-RIDE-022
 // When a driver cancels a Ride, re-enter matching by creating a new RideRequest
 // with the same parameters (pickup, dropoff, rider)
-policy reMatchOnDriverCancellation {
+reaction reMatchOnDriverCancellation {
     trigger  : RideCancelledByDriver
     guard    : true
     effect   : RequestRide {
@@ -1460,7 +1403,7 @@ policy reMatchOnDriverCancellation {
 
 // realizes: REQ-RIDE-023
 // When a driver cancels, check their recent cancellation rate and suspend if excessive
-policy suspendDriverOnExcessiveCancellation {
+reaction suspendDriverOnExcessiveCancellation {
     trigger  : RideCancelledByDriver
     guard    : GetDriverCancellationCount(event.driverId, 24) > 3
     effect   : DriverManagementGateway.requestTemporarySuspension(event.driverId, 30)
@@ -1469,7 +1412,7 @@ policy suspendDriverOnExcessiveCancellation {
 
 // realizes: REQ-RIDE-024, REQ-RIDE-025
 // When a driver no-shows, re-enter matching for the rider with a new RideRequest
-policy reMatchOnDriverNoShow {
+reaction reMatchOnDriverNoShow {
     trigger  : RideCancelledDriverNoShow
     guard    : true
     effect   : RequestRide {
@@ -1482,7 +1425,7 @@ policy reMatchOnDriverNoShow {
 
 // realizes: REQ-RIDE-026
 // When a driver no-shows, check their recent no-show count and suspend if excessive
-policy suspendDriverOnExcessiveNoShows {
+reaction suspendDriverOnExcessiveNoShows {
     trigger  : RideCancelledDriverNoShow
     guard    : GetDriverNoShowCount(event.driverId, 24) > 2
     effect   : DriverManagementGateway.requestTemporarySuspension(event.driverId, 60)
@@ -1491,7 +1434,7 @@ policy suspendDriverOnExcessiveNoShows {
 
 // realizes: REQ-RIDE-027
 // When a driver no-shows, publish an event so Driver Management can degrade reliability score
-policy recordDriverNoShowForReliability {
+reaction recordDriverNoShowForReliability {
     trigger  : RideCancelledDriverNoShow
     guard    : true
     effect   : emits DriverNoShowRecorded {
@@ -1563,28 +1506,28 @@ service DriverManagementGateway {
 | Requirement | Aggregate | Model Elements |
 |---|---|---|
 | REQ-RIDE-001 | RideRequest | `RequestRide` cmd, `"Request a ride"` op, `RideRequested` event, `pickupAndDropoffRequired` invariant |
-| REQ-RIDE-002 | RideRequest | `riderMustBeActive` policy |
+| REQ-RIDE-002 | RideRequest | `riderMustBeActive` precondition |
 | REQ-RIDE-003 | RideRequest | `FareEstimate` value, `PaymentGateway.computeFareEstimate`, `"Request a ride"` op |
 | REQ-RIDE-004 | RideRequest | `MatchingService.findAndOfferDriver`, `GeolocationGateway.findNearbyAvailableDrivers`, `"Initiate driver matching"` reactor |
 | REQ-RIDE-005 | RideRequest | `HandleOfferTimeout` cmd, `RideOfferTimedOut` event, `RideOffer` entity |
 | REQ-RIDE-006 | RideRequest | `CancelRequestNoDriver` cmd, `RideRequestCancelled` event, `MatchingService` |
 | REQ-RIDE-007 | RideRequest → Ride | `AcceptRideOffer` cmd, `RideRequestMatched` event (bridge), `CreateRide` cmd, `RideCreated` event |
 | REQ-RIDE-008 | RideRequest | `RideScheduleType` enum, `scheduledPickupTime` field, `scheduledRideHasPickupTime` invariant |
-| REQ-RIDE-010 | Ride | `SignalDriverArrival` cmd, `DriverArrived` event, `rideMustBeDriverEnRoute` policy |
-| REQ-RIDE-011 | Ride | `CancelRideNoShow` cmd, `RideCancelledNoShow` event, `rideMustBeDriverArrivedForNoShow` policy |
+| REQ-RIDE-010 | Ride | `SignalDriverArrival` cmd, `DriverArrived` event, `rideMustBeDriverEnRoute` precondition |
+| REQ-RIDE-011 | Ride | `CancelRideNoShow` cmd, `RideCancelledNoShow` event, `rideMustBeDriverArrivedForNoShow` precondition |
 | REQ-RIDE-012 | Ride | `StartRide` cmd, `RideStarted` event, `actualPickupLocation/Time` fields |
 | REQ-RIDE-013 | Ride | `UpdateRideTracking` cmd, `RideLocationUpdated` event, `GeolocationGateway.getCurrentRoute` |
 | REQ-RIDE-014 | Ride | `CompleteRide` cmd, `RideCompleted` event, `completedRideHasActualTimes` invariant |
 | REQ-RIDE-015 | Ride | `FinalFare` value, `PaymentGateway.computeFinalFare`, `completedRideHasFinalFare` invariant |
 | REQ-RIDE-016 | Ride | `PaymentGateway.capturePayment`, `"Complete the ride"` op |
 | REQ-RIDE-020 | RideRequest | `CancelRequestByRider` cmd, `RideRequestCancelledByRider` event |
-| REQ-RIDE-021 | Ride | `CancelRideByRider` cmd, `RideCancelledByRider` event, `rideCanBeCancelledByRider` policy |
-| REQ-RIDE-022 | Ride | `CancelRideByDriver` cmd, `RideCancelledByDriver` event, `reMatchOnDriverCancellation` policy |
-| REQ-RIDE-023 | Ride | `suspendDriverOnExcessiveCancellation` policy, `DriverManagementGateway.requestTemporarySuspension` |
-| REQ-RIDE-024 | Ride | `CancelRideDriverNoShow` cmd, `"Cancel ride — driver no-show"` op, `RideCancelledDriverNoShow` event, `rideMustBeDriverEnRoute` policy |
-| REQ-RIDE-025 | Ride | `RideCancelledDriverNoShow` event, `NotificationService.notifyRider`, `reMatchOnDriverNoShow` policy |
-| REQ-RIDE-026 | Ride | `suspendDriverOnExcessiveNoShows` policy, `GetDriverNoShowCount` query, `DriverManagementGateway.requestTemporarySuspension` |
-| REQ-RIDE-027 | Ride | `recordDriverNoShowForReliability` policy, `DriverNoShowRecorded` event (published to Driver Management BC) |
+| REQ-RIDE-021 | Ride | `CancelRideByRider` cmd, `RideCancelledByRider` event, `rideCanBeCancelledByRider` precondition |
+| REQ-RIDE-022 | Ride | `CancelRideByDriver` cmd, `RideCancelledByDriver` event, `reMatchOnDriverCancellation` reaction |
+| REQ-RIDE-023 | Ride | `suspendDriverOnExcessiveCancellation` reaction, `DriverManagementGateway.requestTemporarySuspension` |
+| REQ-RIDE-024 | Ride | `CancelRideDriverNoShow` cmd, `"Cancel ride — driver no-show"` op, `RideCancelledDriverNoShow` event, `rideMustBeDriverEnRoute` precondition |
+| REQ-RIDE-025 | Ride | `RideCancelledDriverNoShow` event, `NotificationService.notifyRider`, `reMatchOnDriverNoShow` reaction |
+| REQ-RIDE-026 | Ride | `suspendDriverOnExcessiveNoShows` reaction, `GetDriverNoShowCount` query, `DriverManagementGateway.requestTemporarySuspension` |
+| REQ-RIDE-027 | Ride | `recordDriverNoShowForReliability` reaction, `DriverNoShowRecorded` event (published to Driver Management BC) |
 | REQ-RIDE-030 | Ride | `TriggerEmergency` cmd, `EmergencyEvent` entity, `EmergencyTriggered` event |
 | REQ-RIDE-031 | Ride | `ActivateTripSharing` cmd, `TripSharingLink` value, `TripSharingActivated` event |
 | REQ-RIDE-032 | Ride | `DetectUnusualStop` cmd, `UnusualStopDetected` event, `GeolocationGateway.isStopOffRoute` |

@@ -1136,7 +1136,7 @@ entity Receipt :: "A financial document generated after payment capture" {
 // =============================================================================
 //
 // These reactions formalize the behaviors previously documented only as NOTE
-// comments in the file-level policies section. Each has an explicit trigger,
+// comments in the file-level reactions section. Each has an explicit trigger,
 // guard, and effect.
 //
 

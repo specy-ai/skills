@@ -272,7 +272,7 @@ realizes: REQ-PAY-011, REQ-PAY-013
 
 ```
 resolves RiderAccount from authorizePayment.riderId
-policy riderHasNoOutstandingDebt(RiderAccount)
+precondition riderHasNoOutstandingDebt(RiderAccount)
 
 creates Payment {
     rideId = authorizePayment.rideId
@@ -301,7 +301,7 @@ realizes: REQ-PAY-010, REQ-PAY-002, REQ-PAY-003, REQ-PAY-004
 resolves Payment from capturePayment.paymentId
 resolves RiderAccount from Payment.riderId
 
-policy paymentMustBeAuthorized(Payment)
+precondition paymentMustBeAuthorized(Payment)
 
 sets Payment {
     status = captured
@@ -329,7 +329,7 @@ realizes: REQ-PAY-014, REQ-PAY-015
 resolves Payment from retryPayment.paymentId
 resolves RiderAccount from Payment.riderId
 
-policy retryLimitNotExceeded(Payment)
+precondition retryLimitNotExceeded(Payment)
 
 sets Payment {
     retryCount = Payment.retryCount + 1
@@ -712,7 +712,7 @@ realizes: REQ-PAY-022, REQ-PAY-024
 ```
 resolves DriverBalance from processWeeklyPayout.driverId
 
-policy balanceExceedsPayoutMinimum(DriverBalance, processWeeklyPayout.minimumThreshold)
+precondition balanceExceedsPayoutMinimum(DriverBalance, processWeeklyPayout.minimumThreshold)
 
 sets DriverBalance {
     pendingBalance = DriverBalance.availableBalance
@@ -754,7 +754,7 @@ realizes: REQ-PAY-023, REQ-PAY-024
 ```
 resolves DriverBalance from processInstantPayout.driverId
 
-policy balanceExceedsPayoutMinimum(DriverBalance, processInstantPayout.minimumThreshold)
+precondition balanceExceedsPayoutMinimum(DriverBalance, processInstantPayout.minimumThreshold)
 
 sets DriverBalance {
     availableBalance = Money { amount = 0, currency = DriverBalance.availableBalance.currency }
@@ -779,7 +779,7 @@ realizes: REQ-PAY-033
 ```
 resolves DriverBalance from deductDriverBalance.driverId
 
-policy hasSufficientBalance(DriverBalance, deductDriverBalance.amount)
+precondition hasSufficientBalance(DriverBalance, deductDriverBalance.amount)
 
 sets DriverBalance {
     availableBalance = DriverBalance.availableBalance.amount - deductDriverBalance.amount.amount
@@ -867,7 +867,7 @@ realizes: REQ-PAY-030
 ```
 resolves RefundRequest from beginRefundReview.refundRequestId
 
-policy refundMustBePending(RefundRequest)
+precondition refundMustBePending(RefundRequest)
 
 sets RefundRequest {
     status = underReview
@@ -885,7 +885,7 @@ realizes: REQ-PAY-032, REQ-PAY-033
 ```
 resolves RefundRequest from approveRefund.refundRequestId
 
-policy refundMustBeUnderReview(RefundRequest)
+precondition refundMustBeUnderReview(RefundRequest)
 
 sets RefundRequest {
     status = approved
@@ -895,7 +895,7 @@ sets RefundRequest {
     reviewedAt = now()
 }
 
-policy approvedAmountDoesNotExceedRequested(RefundRequest)
+precondition approvedAmountDoesNotExceedRequested(RefundRequest)
 
 emits RefundApproved {
     refundRequestId = RefundRequest.id
@@ -914,7 +914,7 @@ realizes: REQ-PAY-030
 ```
 resolves RefundRequest from rejectRefund.refundRequestId
 
-policy refundMustBeUnderReview(RefundRequest)
+precondition refundMustBeUnderReview(RefundRequest)
 
 sets RefundRequest {
     status = rejected
@@ -1831,7 +1831,7 @@ temporal event WeeklyPayoutCycleDue {
 }
 ```
 
-### Temporal event → policy → command chains
+### Temporal event → reaction → command chains
 
 | Temporal Event | Triggers Policy | Policy Effects Command |
 |---|---|---|
@@ -1844,7 +1844,7 @@ temporal event WeeklyPayoutCycleDue {
 // Trigger updated from "scheduled event" to temporal event CreditExpiryReached.
 
 // realizes: REQ-PAY-022
-policy initiateWeeklyPayouts {
+reaction initiateWeeklyPayouts {
     trigger : WeeklyPayoutCycleDue
     guard   : true
     effect  : ProcessWeeklyPayout { for each DriverBalance where balance > minimumPayoutThreshold }
@@ -2122,7 +2122,7 @@ realizes: REQ-PAY-012
 ### BlockNewRidesOnDebt
 realizes: REQ-PAY-013
 
-**Trigger:** AuthorizePayment (precondition policy)
+**Trigger:** AuthorizePayment (precondition)
 **Guard:** RiderAccount.outstandingDebt.amount > 0.
 **Effect:** Reject the authorization — the rider must settle the debt before requesting a new ride.
 
@@ -2258,14 +2258,14 @@ External or internal invoicing adapter for generating consolidated monthly invoi
 | REQ-PAY-010 | Payment, CapturePayment, PaymentCaptured, PaymentGateway.captureCharge |
 | REQ-PAY-011 | Payment, AuthorizePayment, PaymentAuthorized, PaymentGateway.placeHold |
 | REQ-PAY-012 | Payment (RecordPaymentFailure), RiderAccount (outstandingDebt), PaymentFailed, RecordDebtOnPaymentFailure |
-| REQ-PAY-013 | RiderAccount (outstandingDebt), riderHasNoOutstandingDebt policy, BlockNewRidesOnDebt, SettleDebt |
-| REQ-PAY-014 | Payment (RetryPayment), retryLimitNotExceeded policy, RetryPaymentOnTransientFailure |
+| REQ-PAY-013 | RiderAccount (outstandingDebt), riderHasNoOutstandingDebt precondition, BlockNewRidesOnDebt, SettleDebt |
+| REQ-PAY-014 | Payment (RetryPayment), retryLimitNotExceeded precondition, RetryPaymentOnTransientFailure |
 | REQ-PAY-015 | Payment (FallbackPaymentMethod), RiderAccount (paymentMethods), FallbackOnRetryExhaustion |
 | REQ-PAY-020 | DriverBalance (CreditDriverEarnings), FareCalculationService.computeDriverEarnings, CreditDriverAfterCapture |
 | REQ-PAY-021 | CommissionRate, FareCalculationService.computeDriverEarnings, DriverBalance (CreditDriverEarnings) |
 | REQ-PAY-022 | DriverBalance (ProcessWeeklyPayout, CompletePayout), PayoutCompleted, BankTransferService |
 | REQ-PAY-023 | DriverBalance (ProcessInstantPayout), InstantPayoutProcessed, BankTransferService |
-| REQ-PAY-024 | balanceExceedsPayoutMinimum policy, ProcessWeeklyPayout, ProcessInstantPayout |
+| REQ-PAY-024 | balanceExceedsPayoutMinimum precondition, ProcessWeeklyPayout, ProcessInstantPayout |
 | REQ-PAY-030 | RefundRequest (RequestRefund, BeginRefundReview, RejectRefund), FindPendingRefundRequests |
 | REQ-PAY-031 | Payment (ReleasePaymentHold, ProcessFullRefund), AutoRefundOnSystemCancellation |
 | REQ-PAY-032 | Payment (ProcessPartialRefund), RefundRequest (ApproveRefund, ExecuteRefund), PartialRefundProcessed |

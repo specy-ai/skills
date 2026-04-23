@@ -199,34 +199,6 @@ entity Rider :: "A person who uses RideNow to request rides" {
         appeal : Appeal 0..1
     }
 
-    policies {
-        riderMustBeUnverified(rider: Rider) :: "Only unverified riders can submit a verification code" {
-            rider.status = unverified
-        }
-
-        riderMustBeActive(rider: Rider) :: "Rider must be active to perform profile actions" {
-            rider.status = active
-        }
-
-        verificationNotLocked(rider: Rider) :: "Verification must not be locked due to too many failed attempts" {
-            rider.verificationAttempt.lockedUntil is not defined
-            or rider.verificationAttempt.lockedUntil < now()
-        }
-
-        riderMustBeBanned(rider: Rider) :: "Only banned riders can submit an appeal" {
-            rider.status = banned
-        }
-
-        riderProfileComplete(rider: Rider) :: "Rider must have a verified phone and at least one active payment method to request a ride" {
-            rider.status = active
-            and isNotEmpty(rider.paymentMethods)
-            and some pm in rider.paymentMethods { pm.isActive = true }
-        }
-
-        maxSavedAddresses(rider: Rider) :: "A rider can have at most 20 saved addresses" {
-            count(rider.savedAddresses) < 20
-        }
-    }
 
     invariants {
         averageRatingRange :: "Average rating must be between 1.0 and 5.0 when defined" {
@@ -269,8 +241,8 @@ entity Rider :: "A person who uses RideNow to request rides" {
         "Verify rider phone number" on VerifyPhone {
             resolves Rider from verifyPhone.riderId
 
-            policy riderMustBeUnverified(Rider)
-            policy verificationNotLocked(Rider)
+            precondition riderMustBeUnverified(Rider)
+            precondition verificationNotLocked(Rider)
 
             // Happy path: code matches
             sets Rider {
@@ -289,8 +261,8 @@ entity Rider :: "A person who uses RideNow to request rides" {
         "Reject invalid verification code" on SubmitInvalidVerificationCode {
             resolves Rider from submitInvalidVerificationCode.riderId
 
-            policy riderMustBeUnverified(Rider)
-            policy verificationNotLocked(Rider)
+            precondition riderMustBeUnverified(Rider)
+            precondition verificationNotLocked(Rider)
 
             sets Rider {
                 verificationAttempt = VerificationAttempt {
@@ -313,8 +285,8 @@ entity Rider :: "A person who uses RideNow to request rides" {
         "Save an address to rider profile" on SaveAddress {
             resolves Rider from saveAddress.riderId
 
-            policy riderMustBeActive(Rider)
-            policy maxSavedAddresses(Rider)
+            precondition riderMustBeActive(Rider)
+            precondition maxSavedAddresses(Rider)
 
             sets Rider {
                 savedAddresses = Rider.savedAddresses + SavedAddress {
@@ -339,7 +311,7 @@ entity Rider :: "A person who uses RideNow to request rides" {
         "Add a payment method to rider profile" on AddPaymentMethod {
             resolves Rider from addPaymentMethod.riderId
 
-            policy riderMustBeActive(Rider)
+            precondition riderMustBeActive(Rider)
 
             PaymentValidationService.validatePaymentMethod(addPaymentMethod.paymentMethodId)
 
@@ -392,7 +364,7 @@ entity Rider :: "A person who uses RideNow to request rides" {
             resolves Rider from warnLowRating.riderId
 
             // Guard: only when >10 rides and avg < 4.0 and not yet banned
-            policy riderMustBeActive(Rider)
+            precondition riderMustBeActive(Rider)
 
             NotificationService.sendLowRatingWarning(Rider.id, Rider.averageRating)
 
@@ -407,7 +379,7 @@ entity Rider :: "A person who uses RideNow to request rides" {
         "Ban rider due to critically low rating" when RiderRated then BanRiderForLowRating {
             resolves Rider from banRiderForLowRating.riderId
 
-            policy riderMustBeActive(Rider)
+            precondition riderMustBeActive(Rider)
 
             sets Rider {
                 status = banned
@@ -427,7 +399,7 @@ entity Rider :: "A person who uses RideNow to request rides" {
         "Submit a ban appeal" on SubmitBanAppeal {
             resolves Rider from submitBanAppeal.riderId
 
-            policy riderMustBeBanned(Rider)
+            precondition riderMustBeBanned(Rider)
 
             sets Rider {
                 status = appealInReview
@@ -800,7 +772,7 @@ service RatingCalculator {
 > realizes: REQ-RDR-011
 
 ```
-policy riderEligibleForWarning(rider: Rider) :: "A rider is eligible for a low rating warning when they have completed more than 10 rides and their average rating drops below 4.0" {
+precondition riderEligibleForWarning(rider: Rider) :: "A rider is eligible for a low rating warning when they have completed more than 10 rides and their average rating drops below 4.0" {
     rider.totalRides > 10
     and rider.averageRating < 4.0
     and rider.status = active
@@ -811,7 +783,7 @@ policy riderEligibleForWarning(rider: Rider) :: "A rider is eligible for a low r
 > realizes: REQ-RDR-012
 
 ```
-policy riderEligibleForBan(rider: Rider) :: "A rider must be banned when they have completed more than 10 rides and their average rating drops below 3.5" {
+precondition riderEligibleForBan(rider: Rider) :: "A rider must be banned when they have completed more than 10 rides and their average rating drops below 3.5" {
     rider.totalRides > 10
     and rider.averageRating < 3.5
     and rider.status = active
@@ -822,7 +794,7 @@ policy riderEligibleForBan(rider: Rider) :: "A rider must be banned when they ha
 > realizes: REQ-RDR-006
 
 ```
-policy riderProfileComplete(rider: Rider) :: "Rider must have a verified phone and at least one active payment method to request a ride" {
+precondition riderProfileComplete(rider: Rider) :: "Rider must have a verified phone and at least one active payment method to request a ride" {
     rider.status = active
     and isNotEmpty(rider.paymentMethods)
     and some pm in rider.paymentMethods { pm.isActive = true }
@@ -880,11 +852,11 @@ service NotificationService {
 |---|---|
 | REQ-RDR-001 | RegisterRider (command), RiderRegistered (event), Rider."Register a new rider" (operation), PhoneNumber (value), VerificationCode (value), NotificationService.sendVerificationCode |
 | REQ-RDR-002 | VerifyPhone (command), RiderPhoneVerified (event), Rider."Verify rider phone number" (operation) |
-| REQ-RDR-003 | SubmitInvalidVerificationCode (command), VerificationFailed (event), Rider."Reject invalid verification code" (operation), VerificationAttempt (value), verificationNotLocked (policy) |
+| REQ-RDR-003 | SubmitInvalidVerificationCode (command), VerificationFailed (event), Rider."Reject invalid verification code" (operation), VerificationAttempt (value), verificationNotLocked (precondition) |
 | REQ-RDR-004 | SaveAddress (command), AddressSaved (event), Rider."Save an address to rider profile" (operation), SavedAddress (value) |
 | REQ-RDR-005 | AddPaymentMethod (command), PaymentMethodAdded (event), Rider."Add a payment method to rider profile" (operation), PaymentMethodRef (value), PaymentValidationService (infrastructure service) |
-| REQ-RDR-006 | riderProfileComplete (policy), Rider.riderProfileComplete (entity policy), GetRiderProfile (query) |
+| REQ-RDR-006 | riderProfileComplete (precondition), Rider.riderProfileComplete (entity precondition), GetRiderProfile (query) |
 | REQ-RDR-010 | RecordRiderRating (command), RiderRated (event), Rider."Record a rating for a rider" (operation), Rating (value), RatingCalculator (domain service) |
-| REQ-RDR-011 | WarnLowRating (command), LowRatingWarningIssued (event), Rider."Warn rider of low rating" (operation), riderEligibleForWarning (policy), NotificationService.sendLowRatingWarning |
-| REQ-RDR-012 | BanRiderForLowRating (command), RiderBanned (event), Rider."Ban rider due to critically low rating" (operation), riderEligibleForBan (policy), NotificationService.sendBanNotification |
+| REQ-RDR-011 | WarnLowRating (command), LowRatingWarningIssued (event), Rider."Warn rider of low rating" (operation), riderEligibleForWarning (precondition), NotificationService.sendLowRatingWarning |
+| REQ-RDR-012 | BanRiderForLowRating (command), RiderBanned (event), Rider."Ban rider due to critically low rating" (operation), riderEligibleForBan (precondition), NotificationService.sendBanNotification |
 | REQ-RDR-013 | SubmitBanAppeal (command), BanAppealSubmitted (event), Rider."Submit a ban appeal" (operation), Appeal (value), AppealStatus (enum) |

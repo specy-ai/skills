@@ -133,17 +133,6 @@ entity DriverPosition :: "Real-time geographic position of a driver — continuo
         receivedAt : datetime
     }
 
-    policies {
-        locationMustBeFresh(recordedAt: datetime) :: "Discard location updates older than 30 seconds" {
-            realizes: REQ-GEO-003
-            now() - recordedAt <= 30s
-        }
-
-        locationMustBeAccurate(accuracy: LocationAccuracy) :: "Discard location updates with horizontal accuracy worse than 100 meters" {
-            realizes: REQ-GEO-004
-            accuracy.horizontalAccuracyMeters <= 100
-        }
-    }
 
     invariants {
         positionHasTimestamp :: "Every driver position must have a recording timestamp" {
@@ -155,8 +144,8 @@ entity DriverPosition :: "Real-time geographic position of a driver — continuo
         "Update driver location" on UpdateDriverLocation {
             realizes: REQ-GEO-001, REQ-GEO-002
 
-            policy locationMustBeFresh(updateDriverLocation.recordedAt)
-            policy locationMustBeAccurate(updateDriverLocation.accuracy)
+            precondition locationMustBeFresh(updateDriverLocation.recordedAt)
+            precondition locationMustBeAccurate(updateDriverLocation.accuracy)
 
             sets DriverPosition {
                 position = updateDriverLocation.position
@@ -203,30 +192,6 @@ entity SurgeZone :: "A geographic zone where demand/supply imbalance triggers su
         deactivatedAt : datetime optional
     }
 
-    policies {
-        ratioExceedsThreshold(zone: SurgeZone) :: "Demand/supply ratio must exceed surge threshold to activate" {
-            realizes: REQ-GEO-020
-            zone.demandSupplyRatio > zone.surgeThreshold
-        }
-
-        ratioBelowThreshold(zone: SurgeZone) :: "Demand/supply ratio must be below surge threshold to deactivate" {
-            realizes: REQ-GEO-021
-            zone.demandSupplyRatio <= zone.surgeThreshold
-        }
-
-        multiplierWithinCap(multiplier: SurgeMultiplier) :: "Surge multiplier must not exceed the maximum of 5.0x" {
-            realizes: REQ-GEO-022
-            multiplier.value <= 5.0
-        }
-
-        zoneMustBeInactive(zone: SurgeZone) :: "Zone must be inactive to activate surge" {
-            zone.status = inactive
-        }
-
-        zoneMustBeActive(zone: SurgeZone) :: "Zone must be active to deactivate surge" {
-            zone.status = active
-        }
-    }
 
     invariants {
         activeZoneHasMultiplier :: "An active surge zone must have a multiplier" {
@@ -250,9 +215,9 @@ entity SurgeZone :: "A geographic zone where demand/supply imbalance triggers su
 
             resolves SurgeZone from activateSurge.zoneId
 
-            policy zoneMustBeInactive(SurgeZone)
-            policy ratioExceedsThreshold(SurgeZone)
-            policy multiplierWithinCap(activateSurge.multiplier)
+            precondition zoneMustBeInactive(SurgeZone)
+            precondition ratioExceedsThreshold(SurgeZone)
+            precondition multiplierWithinCap(activateSurge.multiplier)
 
             sets SurgeZone {
                 status = active
@@ -275,8 +240,8 @@ entity SurgeZone :: "A geographic zone where demand/supply imbalance triggers su
 
             resolves SurgeZone from deactivateSurge.zoneId
 
-            policy zoneMustBeActive(SurgeZone)
-            policy ratioBelowThreshold(SurgeZone)
+            precondition zoneMustBeActive(SurgeZone)
+            precondition ratioBelowThreshold(SurgeZone)
 
             sets SurgeZone {
                 status = inactive
@@ -298,8 +263,8 @@ entity SurgeZone :: "A geographic zone where demand/supply imbalance triggers su
 
             resolves SurgeZone from updateSurgeMultiplier.zoneId
 
-            policy zoneMustBeActive(SurgeZone)
-            policy multiplierWithinCap(updateSurgeMultiplier.multiplier)
+            precondition zoneMustBeActive(SurgeZone)
+            precondition multiplierWithinCap(updateSurgeMultiplier.multiplier)
 
             sets SurgeZone {
                 currentMultiplier = updateSurgeMultiplier.multiplier
@@ -413,7 +378,7 @@ service MappingProvider :: "External mapping and geocoding provider — infrastr
 // File-level Policies (cross-entity)
 // =============================================================================
 
-policy surgeConfirmationRequired(zone: SurgeZone) :: "Rider must see surge multiplier and confirm before ride request proceeds" {
+precondition surgeConfirmationRequired(zone: SurgeZone) :: "Rider must see surge multiplier and confirm before ride request proceeds" {
     realizes: REQ-GEO-023
     if zone.status = active {
         zone.currentMultiplier is defined
@@ -585,13 +550,13 @@ event RouteRecalculated {
 |---|---|
 | REQ-GEO-001 | GeoCoordinate, DriverPosition, UpdateDriverLocation (cmd + op), DriverLocationUpdated |
 | REQ-GEO-002 | DriverPosition, UpdateDriverLocation (cmd + op) |
-| REQ-GEO-003 | DriverPosition.locationMustBeFresh (policy) |
-| REQ-GEO-004 | LocationAccuracy, DriverPosition.locationMustBeAccurate (policy) |
+| REQ-GEO-003 | DriverPosition.locationMustBeFresh (precondition) |
+| REQ-GEO-004 | LocationAccuracy, DriverPosition.locationMustBeAccurate (precondition) |
 | REQ-GEO-010 | BoundingBox, ProximityService.findNearbyDrivers, FindNearbyDrivers (query) |
 | REQ-GEO-011 | ETA, Duration, RoutingService.computeETA, TrafficDataProvider, ComputeETA (query) |
 | REQ-GEO-012 | Route, Polyline, Distance, Duration, RoutingService.computeRoute, MappingProvider, ComputeRoute (query) |
 | REQ-GEO-013 | RoutingService.recalculateRoute, TrafficDataProvider, RouteRecalculated (event) |
 | REQ-GEO-020 | SurgeMultiplier, SurgeZone, SurgeDetectionService.evaluateZone, ActivateSurge (cmd + op), SurgeActivated |
 | REQ-GEO-021 | SurgeZone, SurgeDetectionService.evaluateZone, DeactivateSurge (cmd + op), SurgeDeactivated |
-| REQ-GEO-022 | SurgeMultiplier (invariant: max 5.0), SurgeZone.multiplierWithinCap (policy), UpdateSurgeMultiplier (cmd + op), SurgeMultiplierUpdated |
-| REQ-GEO-023 | surgeConfirmationRequired (file-level policy), GetSurgeZoneInfo (query) |
+| REQ-GEO-022 | SurgeMultiplier (invariant: max 5.0), SurgeZone.multiplierWithinCap (precondition), UpdateSurgeMultiplier (cmd + op), SurgeMultiplierUpdated |
+| REQ-GEO-023 | surgeConfirmationRequired (cross-context agreement — enforced in Ride Management), GetSurgeZoneInfo (query) |
