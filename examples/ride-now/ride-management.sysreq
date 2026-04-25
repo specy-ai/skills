@@ -1,0 +1,426 @@
+requirements "Ride Request & Upfront Fare" scoped-to RideManagement {
+  prd-source "ride-now.prd"
+
+  REQ-RIDE-001 "Ride request" : event-driven
+    source "Feature: Request a ride — Story: See the committed fare before I confirm — AC: Fare estimate displayed before confirmation"
+    :: "The core transaction — rider wants to go somewhere"
+    "When a rider confirms a ride request with pickup and dropoff
+     locations, the Ride Management system shall create a ride in
+     requested status and initiate driver matching."
+    priority must
+
+  REQ-RIDE-002 "Ride request requires ready-to-ride rider" : ubiquitous
+    source "Feature: Frictionless rider signup — AC: Account is ready to request a ride once phone is verified and at least one payment method is added"
+    :: "Unverified or payment-less riders cannot request rides"
+    "The Ride Management system shall reject ride requests from riders
+     who do not satisfy the Rider Management ready-to-ride gate."
+    priority must
+
+  REQ-RIDE-003 "Upfront fare display" : event-driven
+    source "Feature: Request a ride — Story: See the committed fare before I confirm — AC: Fare estimate is displayed within 3 seconds of confirming destination"
+    :: "Riders must see the fare before committing — largest funnel leak"
+    "When a rider enters a destination, the Ride Management system
+     shall request a fare estimate from the Payment system and display
+     it to the rider within 3 seconds."
+    priority must
+
+  REQ-RIDE-004 "Committed fare is the charged fare" : ubiquitous
+    source "Feature: Request a ride — Story: See the committed fare before I confirm — AC: Fare shown at confirm is the fare charged unless the route materially changes mid-ride"
+    :: "Upfront fare is the PRD's core trust differentiator vs competitors"
+    "The Ride Management system shall charge the rider the fare committed
+     at confirmation, unless the actual route materially deviates from
+     the requested route, in which case the deviation and its fare
+     impact shall be shown to the rider for acceptance mid-ride."
+    priority must
+
+  REQ-RIDE-005 "Fare breakdown shown on confirm" : ubiquitous
+    source "Feature: Request a ride — Story: See the committed fare before I confirm — AC: Fare breakdown shows base fare, distance, time, and surge if applicable"
+    :: "Transparency — fare must be legible, not a single opaque number"
+    "The Ride Management system shall present the committed fare with
+     a breakdown showing base fare, distance, time, and surge component
+     if applicable."
+    priority must
+
+  REQ-RIDE-006 "Free cancellation before matching" : state-driven
+    source "Feature: Request a ride — Story: See the committed fare before I confirm — AC: Rider can cancel with no fee before a driver is assigned"
+    :: "Non-committed rider must be able to abandon without penalty"
+    "While the ride is in requested status with no driver assigned,
+     the Ride Management system shall permit rider cancellation with
+     no fee."
+    priority must
+
+  REQ-RIDE-007 "Scheduled ride booking window" : optional
+    source "Feature: Request a ride — Story: Schedule a ride for later — AC: Rider can schedule a ride up to 7 days in advance"
+    :: "Scheduled rides extend use beyond on-demand — airport/early-morning"
+    "Where scheduled rides are supported, the Ride Management system
+     shall allow riders to schedule a ride up to 7 days in advance."
+    priority could
+
+  REQ-RIDE-008 "Scheduled ride matching start" : complex
+    source "Feature: Request a ride — Story: Schedule a ride for later — AC: Matching starts 15 minutes before scheduled pickup"
+    :: "Matching lead time tuned for airport and commute scheduling"
+    "Where scheduled rides are supported, when the current time is 15
+     minutes before a scheduled ride's pickup time, the Ride Management
+     system shall initiate driver matching for that ride."
+    priority could
+
+  REQ-RIDE-009 "Scheduled ride reminder" : complex
+    source "Feature: Request a ride — Story: Schedule a ride for later — AC: Rider receives a confirmation at booking and a reminder 30 minutes before pickup"
+    :: "Scheduled riders forget — a reminder prevents no-shows"
+    "Where scheduled rides are supported, when the current time is 30
+     minutes before a scheduled ride's pickup time, the Ride Management
+     system shall send a reminder notification to the rider."
+    priority could
+}
+
+
+requirements "Driver Matching" scoped-to RideManagement {
+  prd-source "ride-now.prd"
+
+  REQ-RIDE-020 "Nearby driver query" : event-driven
+    source "Feature: Driver matching — Story: Driver confirmed within seconds — AC: Eligible drivers are queried from Geolocation on each ride request"
+    :: "Fast matching is the core competitive advantage"
+    "When a ride enters requested status, the Ride Management system
+     shall query the Geolocation system for online, match-eligible
+     drivers near the pickup location."
+    priority must
+
+  REQ-RIDE-021 "Offer to closest driver" : event-driven
+    source "Feature: Driver matching — Story: Driver confirmed within seconds"
+    :: "Proximity minimizes pickup time and distance"
+    "When the Ride Management system receives the nearby-driver list,
+     the Ride Management system shall offer the ride to the closest
+     eligible driver."
+    priority must
+
+  REQ-RIDE-022 "Offer payload content" : ubiquitous
+    source "Feature: Driver matching — Story: See ride offers with full destination and estimated earnings — AC: Offer shows pickup, destination, estimated distance, duration, and estimated earnings"
+    :: "Drivers accept informed — incumbent platforms hide destination"
+    "The Ride Management system shall include pickup, destination,
+     estimated distance, estimated duration, and estimated driver
+     earnings in every ride offer."
+    priority must
+
+  REQ-RIDE-023 "Offer timeout" : unwanted
+    source "Feature: Driver matching — Story: See ride offers with full destination and estimated earnings — AC: Driver has 15 seconds to accept or decline"
+    :: "Unresponsive drivers must not block riders"
+    "If a driver does not respond to a ride offer within 15 seconds,
+     then the Ride Management system shall retract the offer and
+     offer the ride to the next closest eligible driver."
+    priority must
+
+  REQ-RIDE-024 "No driver available" : unwanted
+    source "Feature: Driver matching — Story: Driver confirmed within seconds — AC: If no driver accepts within the search, rider is notified with a clear reason"
+    :: "Transparency — rider should know when no one is coming"
+    "If no eligible driver accepts the ride within the configured search
+     radius and timeout, then the Ride Management system shall cancel
+     the ride with reason 'no-driver-available' and notify the rider."
+    priority must
+
+  REQ-RIDE-025 "Driver accepts ride" : event-driven
+    source "Feature: Driver matching — Story: Driver confirmed within seconds"
+    :: "Commitment — driver is now en route to pickup"
+    "When a driver accepts a ride offer, the Ride Management system
+     shall transition the ride to driver-assigned status, notify the
+     rider with driver and vehicle details, and publish a RideAccepted
+     event."
+    priority must
+
+  REQ-RIDE-026 "Driver acceptance-rate visibility" : ubiquitous
+    source "Feature: Driver matching — Story: See ride offers with full destination and estimated earnings — AC: Driver sees their own acceptance rate on the driver home screen"
+    :: "Transparency — drivers need to see their own performance"
+    "The Ride Management system shall expose the driver's 30-day offer
+     acceptance rate on the driver home screen."
+    priority should
+}
+
+
+requirements "Pickup to Completion" scoped-to RideManagement {
+  prd-source "ride-now.prd"
+
+  REQ-RIDE-040 "Live driver location during assignment" : state-driven
+    source "Feature: Pickup to completion — Story: See the live location of my driver en route — AC: Live driver location updates at least every 3 seconds while the ride is active"
+    :: "Rider plans when to walk to pickup — stale location undermines trust"
+    "While the ride is in driver-assigned or driver-arrived status,
+     the Ride Management system shall update the rider-facing driver
+     location at least every 3 seconds."
+    priority must
+
+  REQ-RIDE-041 "Pickup ETA refresh" : state-driven
+    source "Feature: Pickup to completion — Story: See the live location of my driver en route — AC: ETA to pickup is refreshed on each update"
+    :: "ETA is only useful when it reflects current conditions"
+    "While the ride is in driver-assigned status, the Ride Management
+     system shall refresh the rider-facing pickup ETA on each driver
+     location update."
+    priority must
+
+  REQ-RIDE-042 "Driver arrival" : event-driven
+    source "Feature: Pickup to completion — Story: One-tap Start Ride and End Ride — AC: Start Ride is enabled once driver is within 100m of pickup and rider is present"
+    :: "Arrival at pickup is a distinct step — triggers boarding"
+    "When the driver's location is within 100 meters of the pickup
+     point, the Ride Management system shall transition the ride to
+     driver-arrived status and notify the rider."
+    priority must
+
+  REQ-RIDE-043 "Rider no-show" : complex
+    source "Feature: Cancellations with fair fees and penalties — Story: Policy-enforced no-shows and late cancels — AC: Rider who does not board within 5 minutes of driver arrival is treated as no-show and charged"
+    :: "Drivers should not wait indefinitely — compensate and free them"
+    "While the ride is in driver-arrived status, if the rider does not
+     board within 5 minutes, then the Ride Management system shall
+     cancel the ride with reason 'rider-no-show', request a cancellation
+     fee charge from the Payment system, and free the driver."
+    priority must
+
+  REQ-RIDE-044 "Ride start" : event-driven
+    source "Feature: Pickup to completion — Story: One-tap Start Ride and End Ride — AC: Start Ride triggers the ride lifecycle"
+    :: "Meter starts — the ride is now in progress"
+    "When the driver starts the ride, the Ride Management system shall
+     transition the ride to in-progress status, record the actual
+     pickup location and time, and publish a RideStarted event."
+    priority must
+
+  REQ-RIDE-045 "Ride tracking during trip" : state-driven
+    source "Feature: Pickup to completion — Story: See the live location of my driver en route — AC: Live location updates at least every 3 seconds while the ride is active"
+    :: "Real-time safety — know where every active ride is"
+    "While the ride is in progress, the Ride Management system shall
+     receive location updates from the Geolocation system at least
+     every 3 seconds and track the ride route in real time."
+    priority must
+
+  REQ-RIDE-046 "Destination ETA refresh during trip" : state-driven
+    source "Feature: ETA and routing — Story: ETA to destination stays accurate during the ride — AC: ETA to destination is refreshed at least every 30 seconds during the ride"
+    :: "Rider informs the person they are meeting when they will arrive"
+    "While the ride is in progress, the Ride Management system shall
+     refresh the destination ETA on the rider app at least every
+     30 seconds."
+    priority must
+
+  REQ-RIDE-047 "Ride completion" : event-driven
+    source "Feature: Pickup to completion — Story: One-tap Start Ride and End Ride — AC: End Ride triggers fare finalization"
+    :: "End of trip — trigger fare finalization and payment"
+    "When the driver ends the ride, the Ride Management system shall
+     transition the ride to completed status, record the actual
+     dropoff location and time, and publish a RideCompleted event."
+    priority must
+
+  REQ-RIDE-048 "Fare finalization on completion" : event-driven
+    depends-on REQ-RIDE-047
+    source "Feature: Auto-charge on completion — Story: Clear receipt with fare breakdown immediately after the ride — AC: Receipt is delivered in-app within 60 seconds of ride completion"
+    :: "Actual fare may differ from estimate — distance and time now known"
+    "When a ride is completed, the Ride Management system shall request
+     final fare computation from the Payment system using actual
+     distance and duration."
+    priority must
+
+  REQ-RIDE-049 "Automatic payment on completion" : event-driven
+    depends-on REQ-RIDE-048
+    source "Feature: Auto-charge on completion — value-proposition: Cashless, instant, and transparent at the end of every ride"
+    :: "Cashless — payment happens without rider action"
+    "When the final fare is computed, the Ride Management system shall
+     initiate payment capture through the Payment system."
+    priority must
+
+  REQ-RIDE-050 "Earnings breakdown latency" : event-driven
+    source "Feature: Pickup to completion — Story: One-tap Start Ride and End Ride — AC: End Ride triggers fare finalization and earnings display within 5 seconds"
+    :: "Earnings transparency is a PRD-level goal — measured in seconds"
+    "When a ride is completed, the Ride Management system shall ensure
+     the driver earnings breakdown is displayed in the driver app
+     within 5 seconds at p95."
+    priority must
+}
+
+
+requirements "Cancellations with Fair Fees and Penalties" scoped-to RideManagement {
+  prd-source "ride-now.prd"
+
+  REQ-RIDE-060 "Rider cancellation before assignment" : complex
+    source "Feature: Cancellations with fair fees and penalties — Story: Cancel before a driver is assigned at no cost — AC: Cancelling before driver-assigned status incurs no fee"
+    :: "Free cancellation while no driver is committed"
+    "While the ride is in requested status, when the rider cancels,
+     the Ride Management system shall cancel the ride with no fee,
+     request release of any payment hold from the Payment system,
+     and publish a RideCancelledByRider event."
+    priority must
+
+  REQ-RIDE-061 "Rider cancellation after assignment" : complex
+    source "Feature: Cancellations with fair fees and penalties — Story: Cancel before a driver is assigned at no cost — AC: Cancelling after driver-assigned status incurs a published cancellation fee"
+    :: "Driver already committed — rider pays cancellation fee"
+    "While the ride is in driver-assigned or driver-arrived status,
+     when the rider cancels, the Ride Management system shall cancel
+     the ride, request a cancellation fee charge from the Payment
+     system, free the driver, and publish a RideCancelledByRider event."
+    priority must
+
+  REQ-RIDE-062 "Cancellation fee transparency" : ubiquitous
+    source "Feature: Cancellations with fair fees and penalties — Story: Cancel before a driver is assigned at no cost — AC: Cancelling after driver-assigned status incurs a published cancellation fee"
+    :: "Fees must be published — surprise fees erode trust"
+    "The Ride Management system shall display the applicable cancellation
+     fee policy on the rider app at any time the rider can cancel."
+    priority must
+
+  REQ-RIDE-063 "Driver cancellation" : complex
+    source "Feature: Cancellations with fair fees and penalties — Story: Policy-enforced no-shows and late cancels"
+    :: "Drivers who cancel after committing degrade reliability — track and rematch"
+    "While the ride is in driver-assigned status, when the driver
+     cancels, the Ride Management system shall cancel the ride with
+     no rider charge, increment the driver's cancellation count,
+     re-enter the ride into matching, and publish a
+     RideCancelledByDriver event."
+    priority must
+
+  REQ-RIDE-064 "Excessive driver cancellation penalty" : complex
+    source "Feature: Cancellations with fair fees and penalties — Story: Policy-enforced no-shows and late cancels — AC: Driver who cancels more than 3 rides in 24h is suspended for 30 minutes"
+    :: "Drivers who cancel too often degrade service quality"
+    "While a driver has cancelled more than 3 rides in the last 24 hours,
+     if the driver cancels again, then the Ride Management system shall
+     temporarily suspend the driver for 30 minutes and notify the Driver
+     Management system."
+    priority must
+
+  REQ-RIDE-065 "Driver no-show" : complex
+    source "Feature: Cancellations with fair fees and penalties — Story: Policy-enforced no-shows and late cancels"
+    :: "Drivers who accept then vanish waste rider time"
+    "While the ride is in driver-assigned status, if the driver does
+     not arrive at the pickup point within the estimated ETA plus 5
+     minutes, then the Ride Management system shall cancel the ride
+     with reason 'driver-no-show', re-enter the ride into matching,
+     and increment the driver's no-show count."
+    priority must
+
+  REQ-RIDE-066 "Excessive driver no-show penalty" : complex
+    source "Feature: Cancellations with fair fees and penalties — Story: Policy-enforced no-shows and late cancels — AC: Driver who no-shows more than 2 times in 24h is suspended for 1 hour"
+    :: "Chronic no-shows are as damaging as cancellations"
+    "While a driver has accumulated more than 2 no-shows in the last
+     24 hours, if the driver no-shows again, then the Ride Management
+     system shall suspend the driver for 1 hour and notify the Driver
+     Management system."
+    priority must
+
+  REQ-RIDE-067 "Rider rematch after driver no-show" : event-driven
+    depends-on REQ-RIDE-065
+    source "Feature: Cancellations with fair fees and penalties — Story: Policy-enforced no-shows and late cancels"
+    :: "Rider should not restart from scratch when driver fails them"
+    "When a ride is cancelled with reason 'driver-no-show', the Ride
+     Management system shall notify the rider that a new driver is
+     being found and provide an updated pickup ETA."
+    priority must
+}
+
+
+requirements "Safety During and After the Ride" scoped-to RideManagement {
+  prd-source "ride-now.prd"
+
+  REQ-RIDE-080 "Trip sharing" : event-driven
+    source "Feature: Safety during and after the ride — Story: Share live trip status with a contact — AC: Rider can designate emergency contacts and share a live-tracking link in one tap"
+    :: "Social safety — let someone trusted know where the rider is"
+    "When a rider activates trip sharing, the Ride Management system
+     shall send a real-time tracking link to the rider's designated
+     emergency contacts showing location and ETA while the ride is
+     active."
+    priority must
+
+  REQ-RIDE-081 "Emergency button event" : event-driven
+    source "Feature: Safety during and after the ride — Story: Emergency button — AC: Emergency event records timestamp, ride context, and current location"
+    :: "Rider and driver safety — direct escalation path"
+    "When a rider or driver presses the emergency button during a ride,
+     the Ride Management system shall record an emergency event with
+     timestamp, ride context, and current location and notify the
+     safety team."
+    priority must
+
+  REQ-RIDE-082 "Emergency acknowledgment SLA" : event-driven
+    source "Feature: Safety during and after the ride — Story: Emergency button — AC: Safety team is notified within 60 seconds"
+    :: "Emergency response time is the single most important safety metric"
+    "When an emergency event is recorded, the Ride Management system
+     shall deliver the notification to the safety team within 60 seconds
+     at p95."
+    priority must
+
+  REQ-RIDE-083 "Emergency location sharing with services" : optional
+    source "Feature: Safety during and after the ride — Story: Emergency button — AC: If configured, local emergency services receive the location link"
+    :: "Market-by-market integration — not all jurisdictions accept platform notifications"
+    "Where emergency services integration is enabled in the rider's
+     market, when an emergency event is recorded, the Ride Management
+     system shall send a location link to the configured local
+     emergency services endpoint."
+    priority should
+
+  REQ-RIDE-084 "Unusual stop detection" : complex
+    source "Feature: Safety during and after the ride — summary mentions unusual-stop detection during a ride"
+    :: "Anomaly detection — flag rides that deviate dangerously"
+    "While the ride is in progress, if the vehicle stops for more than
+     5 minutes at a location not on the planned route, then the Ride
+     Management system shall send a safety check notification to the
+     rider."
+    priority should
+
+  REQ-RIDE-085 "Post-ride safety report window" : event-driven
+    source "Feature: Safety during and after the ride — Story: Post-ride safety reports attached to the ride record — AC: Reports can be filed within 30 days of ride completion"
+    :: "Surface incidents that did not trigger real-time alerts"
+    "When a rider or driver files a safety report within 30 days of
+     ride completion, the Ride Management system shall record the
+     report, attach it to the ride record, flag the ride, and escalate
+     to the safety queue."
+    priority must
+
+  REQ-RIDE-086 "Late safety report handling" : unwanted
+    source "Feature: Safety during and after the ride — Story: Post-ride safety reports attached to the ride record — AC: Reports can be filed within 30 days of ride completion"
+    :: "Fixed window — late reports go to a separate triage channel"
+    "If a safety report is filed more than 30 days after ride completion,
+     then the Ride Management system shall route the report to the
+     manual-triage queue rather than the automated escalation path."
+    priority should
+}
+
+
+requirements "Ride Management — Non-Functional" scoped-to RideManagement {
+  prd-source "ride-now.prd"
+
+  REQ-RIDE-NFR-001 "Match latency p50" : event-driven
+    source "Goal: Reduce rider wait time and abandonment — metric: p50 time from RideRequested to driver-assigned < 30 seconds"
+    :: "Flagship performance commitment — first-order rider experience metric"
+    "When a ride is requested, the Ride Management system shall
+     achieve a driver-assigned transition within 30 seconds at p50
+     and within 90 seconds at p95 per market."
+    priority must
+
+  REQ-RIDE-NFR-002 "Fare estimate latency" : event-driven
+    source "Feature: Request a ride — AC: Fare estimate is displayed within 3 seconds of confirming destination"
+    :: "Upfront fare is the commitment moment — latency must not erode it"
+    "When a rider enters a destination, the Ride Management system
+     shall display the fare estimate within 3 seconds at p95."
+    priority must
+
+  REQ-RIDE-NFR-003 "Ride completion rate" : ubiquitous
+    source "Goal: Run rides reliably end-to-end — metric: Ride completion rate > 95%"
+    :: "Completion rate is the reliability headline metric"
+    "The Ride Management system shall sustain a ride completion rate
+     above 95% measured monthly per market."
+    priority must
+
+  REQ-RIDE-NFR-004 "Emergency path availability" : ubiquitous
+    source "Feature: Safety during and after the ride — AC: Safety team is notified within 60 seconds"
+    depends-on REQ-NFR-001
+    :: "Emergency flows must survive degraded platform conditions"
+    "The Ride Management system shall maintain the emergency button
+     and trip sharing features available at 99.99% measured monthly,
+     even when non-emergency features are degraded."
+    priority must
+
+  REQ-RIDE-NFR-005 "Audit trail for cancellations" : ubiquitous
+    source "Constraint: Local ride-hailing operating licences"
+    :: "Regulators may audit cancellation and no-show policy enforcement"
+    "The Ride Management system shall record every cancellation event
+     with rider identity, driver identity, ride state at cancellation,
+     reason, fee outcome, and timestamp in an append-only audit log
+     retained for at least 7 years."
+    priority must
+
+  REQ-RIDE-NFR-006 "Deployment independence" : ubiquitous
+    source "Goal: Run rides reliably end-to-end"
+    :: "Ride Management is the central coordinator — it must deploy without blocking other BCs"
+    "The Ride Management system shall be deployable independently of
+     Driver Management, Rider Management, Geolocation, and Payment,
+     subject to published inter-context compatibility contracts."
+    priority should
+}

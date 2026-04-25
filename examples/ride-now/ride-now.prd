@@ -1,0 +1,1373 @@
+product "RideNow" {
+
+  vision "A ride-hailing marketplace that connects urban riders with independent drivers in under a minute,
+          with upfront fares, transparent driver earnings, and an operational safety net that works during
+          and after every ride — launched market by market, not city by city."
+
+  scope {
+    "Full rider lifecycle: signup, request, match, ride, pay, rate"
+    "Full driver lifecycle: onboarding, verification, availability, earnings, rating, suspension"
+    "Real-time geolocation, routing, ETA, surge zoning"
+    "Cashless payments: pre-authorization, capture, refunds, driver payouts"
+    "Trust & safety tooling: ratings, incident reporting, emergency escalation, account suspension"
+    "Operational backoffice for trust & safety operators and market launch teams"
+  }
+
+  non-goals {
+    "Own or lease a vehicle fleet — RideNow is a marketplace, not a fleet operator"
+    "Classify drivers as employees — drivers are independent contractors by design; jurisdictions that require employment are out of scope"
+    "Replace public transit — we price and position as a complement to transit, not a substitute"
+    "Serve rural or low-density markets at launch — unit economics require urban density"
+    "Food delivery, parcel delivery, freight — RideNow is passenger transport only"
+    "Drive cash payments — cashless by design; markets that require cash acceptance are out of scope"
+    "Act as a bank or issuer — we integrate with payment processors and banks, we do not hold deposits"
+  }
+
+  problem {
+    situation "Urban residents and visitors need on-demand point-to-point transportation every day.
+               They use a patchwork of options — taxis, public transit, personal cars, existing
+               ride-hailing apps — each with different trade-offs on price, wait time, predictability,
+               and trust. On the supply side, drivers earn a living (or supplement one) by moving
+               people through the city, relying on platforms to find riders."
+
+    complication "Taxis are scarce at peak times and opaque on price. Public transit does not serve
+                  every route or every hour. Incumbent ride-hailing apps have eroded rider trust with
+                  surprise surge pricing, opaque cancellation fees, and no-shows; they have eroded
+                  driver trust with shrinking take-home rates, unexplained deactivations, and payout
+                  delays. Safety incidents remain frequent enough to be a first-order switching trigger
+                  for both sides. Regulators in several markets are actively pushing back on surge
+                  pricing and driver classification, making purely extractive platforms strategically
+                  fragile."
+
+    question "How can we run a ride-hailing marketplace that commits to upfront fares, fair
+              cancellation rules, transparent driver pay, and first-class safety — and still sustains
+              sub-minute match times in the markets we launch?"
+  }
+
+  evidence "Rider abandonment at fare reveal" {
+    type analytics
+    summary "Across comparable ride-hailing funnels, 18–24% of rider sessions that reach the
+             destination entry step are abandoned at or immediately after fare reveal — the single
+             largest drop in the request funnel. Focus groups cite surge opacity and fare uncertainty
+             as top reasons."
+    source-reference "Mobility Funnel Benchmarks Report, Jan 2026 — section 3"
+    date 2026-01-15
+    confidence moderate
+    supports "Reduce rider wait time and abandonment"
+  }
+
+  evidence "Driver churn in first 60 days" {
+    type customer-feedback
+    summary "Independent driver surveys show 38% of new drivers leave competing platforms within
+             60 days. Top cited reasons: payout delays (31%), unexplained deactivations (22%),
+             opaque earnings breakdown (18%)."
+    source-reference "Independent Driver Sentiment Survey 2025, conducted by Rideshare Guy"
+    date 2025-11-30
+    confidence moderate
+    supports "Sustain driver supply and earnings transparency"
+  }
+
+  evidence "Safety incidents as switching trigger" {
+    type user-research
+    summary "In 14 rider interviews across 3 pilot markets, 11 had personally experienced or
+             directly witnessed a safety incident on a competing platform. 9 said they would switch
+             platforms permanently if a new platform shipped audited safety features."
+    source-reference "Rider Discovery Interviews, pilot markets A/B/C — Nov 2025"
+    date 2025-11-20
+    confidence weak
+    supports "Establish safety and trust baseline"
+  }
+
+  evidence "Regulatory trend on surge pricing" {
+    type market-research
+    summary "Four major metropolitan regulators have introduced or proposed caps on dynamic pricing
+             during declared emergencies or peak transit disruption. Expectation: by 2027, at least
+             two of the top 20 addressable markets will have enforceable caps."
+    source-reference "Mobility Regulation Scan Q4-2025, internal legal brief"
+    date 2025-12-05
+    confidence moderate
+    supports "Sustain driver supply and earnings transparency"
+  }
+
+  persona "Daily commuter rider" {
+    role "A working professional who commutes 3-5 days per week, often mixing RideNow with transit"
+    goals {
+      "Arrive at work on time, predictably, without planning around surge"
+      "Know the exact fare before committing to a ride"
+      "Avoid cash; pay with stored method automatically"
+      "Get a ride quickly even during morning rush"
+    }
+    frustrations {
+      "Wait times balloon unpredictably during rush hour"
+      "Driver cancels after accepting — rider restarts the clock"
+      "Surge pricing appears without warning mid-funnel"
+      "No clear recourse when the driver does not arrive"
+    }
+    context "Smartphone-primary, commutes in dense urban core, price-sensitive but time-sensitive,
+             typical trip 3-8 km, uses the app 5-15 times per week"
+    weight primary
+  }
+
+  persona "Occasional traveler rider" {
+    role "A visitor, traveler, or evening/weekend user taking longer trips with luggage or a group"
+    goals {
+      "Reliable airport or event pickup with clear ETA"
+      "Confidence the driver and vehicle match what the app showed"
+      "Share the trip with a family member or friend for safety"
+    }
+    frustrations {
+      "Driver cannot find the pickup location at airports or venues"
+      "No clear way to share the trip in real time with a third party"
+      "Surprise fees on longer or multi-stop trips"
+    }
+    context "Uses the app occasionally — weekly or less. Values reliability and trust over price.
+             Trips often to/from airports, stations, restaurants, venues."
+    weight primary
+  }
+
+  persona "Part-time driver" {
+    role "A vehicle owner who drives evenings and weekends to supplement primary income"
+    goals {
+      "Choose hours freely and still earn enough to justify the session"
+      "Know per-ride earnings immediately after the ride ends"
+      "Cash out earnings quickly when needed"
+      "Avoid fake requests, disruptive riders, and unsafe pickups"
+    }
+    frustrations {
+      "Long idle time between rides during off-peak hours"
+      "Riders who cancel after driver is already en route"
+      "Opaque commission and bonus structure"
+      "Payouts delayed by 5-7 days on competing platforms"
+    }
+    context "Owns or leases a vehicle, smartphone-primary, drives 10-25 hours per week,
+             values autonomy, often switches between platforms based on session earnings"
+    weight primary
+  }
+
+  persona "Full-time driver" {
+    role "A driver whose primary income comes from ride-hailing, driving 30+ hours per week"
+    goals {
+      "Maximize consistent weekly earnings within legal driving hours"
+      "Maintain a high rating to access higher-value trips and bonuses"
+      "Receive payouts on a predictable schedule for household budgeting"
+      "Understand exactly why any suspension or deactivation happened"
+    }
+    frustrations {
+      "Ratings can drop from one unfair complaint with no recourse"
+      "Unexplained deactivations with no human appeals process"
+      "Peak-hour surge opaque — hard to plan where to drive"
+      "Commission and bonus structure changes without notice"
+    }
+    context "Rental or owner-operator, drives in one primary market, dependent on platform
+             for income, rating-sensitive, actively monitors earnings per hour"
+    weight primary
+  }
+
+  persona "Trust and safety operator" {
+    role "An internal operations specialist who triages incident reports, reviews suspensions,
+          and handles escalations involving riders, drivers, or vehicles"
+    goals {
+      "Resolve incidents within SLA with complete information at hand"
+      "Apply suspension and deactivation policy consistently"
+      "Preserve an auditable trail for legal and regulatory review"
+    }
+    frustrations {
+      "Context scattered across multiple tools — ride history, chat, payment, rating"
+      "No single source of truth on driver or rider reliability score"
+      "Manual work to notify riders or drivers of policy decisions"
+    }
+    context "Works from internal backoffice tools, handles 30-80 cases per day, accountable
+             to regulators and internal audit, needs complete audit trail per case"
+    weight secondary
+  }
+
+  job "Get to destination quickly when running late" {
+    persona "Daily commuter rider"
+    statement "When I am running late for work and need to get there fast,
+               I want to get a ride confirmed within seconds,
+               so I can arrive on time without the stress of uncertain transportation."
+    type functional
+    importance critical
+    satisfaction underserved
+    related-to "Know total cost before committing to a ride"
+    desired-outcomes {
+      "Minimize the time between opening the app and seeing a confirmed driver" {
+        importance high
+        current-satisfaction low
+      }
+      "Minimize the likelihood of the confirmed driver cancelling" {
+        importance high
+        current-satisfaction low
+      }
+      "Minimize the uncertainty about the arrival time at destination" {
+        importance high
+        current-satisfaction medium
+      }
+    }
+  }
+
+  job "Know total cost before committing to a ride" {
+    persona "Daily commuter rider"
+    statement "When I need a ride but have a fixed budget for the trip,
+               I want to see the exact fare before I confirm,
+               so I can decide whether to take the ride or find an alternative."
+    type functional
+    importance critical
+    satisfaction underserved
+    desired-outcomes {
+      "Minimize the gap between estimated fare and final fare" {
+        importance high
+        current-satisfaction low
+      }
+      "Minimize the likelihood of being surprised by surge pricing at the last moment" {
+        importance high
+        current-satisfaction low
+      }
+    }
+  }
+
+  job "Cancel without penalty when plans change" {
+    persona "Daily commuter rider"
+    statement "When I have requested a ride but my plans change before a driver is assigned,
+               I want to cancel with no fee,
+               so I can change my mind without feeling locked in."
+    type emotional
+    importance important
+    satisfaction underserved
+    desired-outcomes {
+      "Minimize the anxiety about committing to a ride request" {
+        importance high
+        current-satisfaction low
+      }
+      "Minimize the fees charged when no driver has committed yet" {
+        importance high
+        current-satisfaction low
+      }
+    }
+  }
+
+  job "Meet my driver at a busy pickup point without confusion" {
+    persona "Occasional traveler rider"
+    statement "When I am at an airport, station, or event venue with many people and vehicles,
+               I want the driver and I to find each other quickly and correctly,
+               so I do not miss my ride and board the right vehicle."
+    type functional
+    importance critical
+    satisfaction underserved
+    desired-outcomes {
+      "Minimize the time between the driver arriving and pickup starting" {
+        importance high
+        current-satisfaction low
+      }
+      "Minimize the likelihood of boarding the wrong vehicle" {
+        importance high
+        current-satisfaction medium
+      }
+    }
+  }
+
+  job "Feel safe when riding alone at night" {
+    persona "Occasional traveler rider"
+    statement "When I am riding alone late at night or in an unfamiliar area,
+               I want tools that let someone know where I am and let me raise an alarm instantly,
+               so I feel safe during the ride and my family knows I am okay."
+    type emotional
+    importance critical
+    satisfaction underserved
+    related-to "Meet my driver at a busy pickup point without confusion"
+    desired-outcomes {
+      "Maximize the ease of sharing live trip status with a trusted contact" {
+        importance high
+        current-satisfaction low
+      }
+      "Minimize the time between pressing the emergency button and a real response" {
+        importance high
+        current-satisfaction low
+      }
+    }
+  }
+
+  job "Earn predictably during chosen hours" {
+    persona "Part-time driver"
+    statement "When I have a few free hours and want to earn money,
+               I want consistent ride requests and clear per-ride earnings,
+               so I can decide whether the session is worth my time before I commit."
+    type functional
+    importance critical
+    satisfaction underserved
+    desired-outcomes {
+      "Minimize the idle time between ride completions during chosen hours" {
+        importance high
+        current-satisfaction low
+      }
+      "Minimize the time between completing a ride and seeing the earnings breakdown" {
+        importance high
+        current-satisfaction medium
+      }
+    }
+  }
+
+  job "Get paid quickly when I need the cash" {
+    persona "Part-time driver"
+    statement "When I have finished a driving session and need cash for household expenses,
+               I want to cash out earned balance into my bank account on demand,
+               so I do not have to wait a week to access money I have already earned."
+    type functional
+    importance important
+    satisfaction underserved
+    desired-outcomes {
+      "Minimize the time between initiating a payout and funds arriving in my account" {
+        importance high
+        current-satisfaction low
+      }
+      "Minimize the fee charged for fast payout" {
+        importance medium
+        current-satisfaction low
+      }
+    }
+  }
+
+  job "Protect my rating from unfair complaints" {
+    persona "Full-time driver"
+    statement "When a rider files a complaint or a low rating that I believe is unfair,
+               I want a clear appeals process with a human review,
+               so one incident does not jeopardize my income."
+    type social
+    importance critical
+    satisfaction unserved
+    desired-outcomes {
+      "Maximize the transparency of how rating and suspension decisions are made" {
+        importance high
+        current-satisfaction low
+      }
+      "Minimize the time between filing an appeal and receiving a decision" {
+        importance high
+        current-satisfaction low
+      }
+    }
+  }
+
+  job "Resolve a safety incident with complete context" {
+    persona "Trust and safety operator"
+    statement "When a rider or driver reports a safety incident during or after a ride,
+               I want every relevant artifact — ride trace, chat, ratings, prior incidents — in one view,
+               so I can decide, document, and notify within SLA without chasing context across tools."
+    type functional
+    importance critical
+    satisfaction underserved
+    desired-outcomes {
+      "Minimize the time between a report being filed and context being assembled" {
+        importance high
+        current-satisfaction low
+      }
+      "Maximize the completeness of the audit trail for regulatory review" {
+        importance high
+        current-satisfaction medium
+      }
+    }
+  }
+
+  goal "Reduce rider wait time and abandonment" {
+    statement "In every served market, the time from ride request to confirmed driver is under
+               30 seconds at p50 and under 90 seconds at p95, and the fare-reveal abandonment
+               rate is under 10%."
+    horizon short-term
+    owner "Head of Rider Experience"
+    metric {
+      indicator "p50 time from RideRequested to driver-assigned, per market"
+      target "< 30 seconds at p50; < 90 seconds at p95"
+      baseline "Not applicable — pre-launch"
+      measurement "Event timestamp delta in production telemetry"
+    }
+    metric {
+      indicator "Abandonment rate at fare reveal step"
+      target "< 10% per market"
+      baseline "18-24% on comparable platforms (see evidence)"
+      measurement "Client funnel analytics"
+    }
+  }
+
+  goal "Sustain driver supply and earnings transparency" {
+    statement "In every served market, at least 70% of drivers onboarded in a quarter are still
+               active 60 days later, and every driver can see a per-ride earnings breakdown within
+               5 seconds of ride completion."
+    horizon mid-term
+    owner "Head of Driver Experience"
+    metric {
+      indicator "60-day driver retention rate, per cohort, per market"
+      target "> 70%"
+      baseline "62% industry comparable"
+      measurement "Driver lifecycle cohort analysis"
+    }
+    metric {
+      indicator "Time from RideCompleted to earnings breakdown displayed in driver app"
+      target "< 5 seconds at p95"
+      baseline "Not applicable — pre-launch"
+      measurement "Client-side instrumentation"
+    }
+  }
+
+  goal "Run rides reliably end-to-end" {
+    statement "Confirmed rides reach completion at least 95% of the time, with driver no-show
+               under 3% and rider no-show under 5%."
+    horizon short-term
+    owner "Head of Ride Operations"
+    metric {
+      indicator "Ride completion rate = completed / confirmed, per market"
+      target "> 95%"
+      baseline "Not applicable — pre-launch"
+      measurement "Ride lifecycle events in production"
+    }
+    metric {
+      indicator "Driver no-show rate"
+      target "< 3%"
+      baseline "Not applicable — pre-launch"
+      measurement "Cancellations with reason driver-no-show / confirmed rides"
+    }
+  }
+
+  goal "Earn trust on payments and payouts" {
+    statement "Every rider fare is captured within 1 minute of ride completion, every driver
+               weekly payout arrives within 2 business days of the cutoff, and any disputed
+               fare is refunded or resolved within 24 hours."
+    horizon short-term
+    owner "Head of Payments"
+    metric {
+      indicator "Time from RideCompleted to successful payment capture"
+      target "< 60 seconds at p95"
+      baseline "Not applicable — pre-launch"
+      measurement "Payment telemetry"
+    }
+    metric {
+      indicator "Weekly payout on-time arrival rate"
+      target "> 99% within 2 business days"
+      baseline "Not applicable — pre-launch"
+      measurement "Payout batch reconciliation"
+    }
+    metric {
+      indicator "Disputed fare resolution time at p95"
+      target "< 24 hours"
+      baseline "Not applicable — pre-launch"
+      measurement "Case management tool"
+    }
+  }
+
+  goal "Establish safety and trust baseline" {
+    statement "Every driver onboarded is identity-verified before the first ride. Emergency
+               reports are acknowledged by the safety team within 60 seconds and resolved with
+               a complete audit trail within defined SLAs."
+    horizon short-term
+    owner "Head of Trust and Safety"
+    metric {
+      indicator "Percentage of active drivers with completed identity verification"
+      target "100%"
+      baseline "Not applicable — pre-launch"
+      measurement "Driver management system"
+    }
+    metric {
+      indicator "Time from emergency button press to safety team acknowledgment"
+      target "< 60 seconds at p95"
+      baseline "Not applicable — pre-launch"
+      measurement "Safety tooling telemetry"
+    }
+  }
+
+  hypothesis "Upfront fare reduces abandonment" {
+    intervention "Show the final committed fare before the rider confirms the ride request,
+                  with a clear surge indicator when applicable"
+    expected-outcome "Rider fare-reveal abandonment drops below 10% in pilot markets within
+                      90 days of launch"
+    mechanism "Removing fare uncertainty at the commitment step eliminates the largest funnel
+               drop; a committed fare also eliminates the trust-eroding surprise of surge applied
+               post-commit"
+    validation-method "A/B test in two pilot markets — control: estimated range, variant:
+                       committed fare. Measure abandonment and conversion over 30 days."
+    status proposed
+    proposes "Request a ride"
+    predicts "Reduce rider wait time and abandonment"
+  }
+
+  hypothesis "Instant payout improves driver retention" {
+    intervention "Offer drivers on-demand cashout of available balance to a linked debit card,
+                  capped per day, for a small transparent fee"
+    expected-outcome "60-day retention for drivers who use instant payout at least once is at
+                      least 10 points higher than for drivers who do not"
+    mechanism "Access to earned cash when needed reduces the friction that sends drivers to
+               competing platforms with faster payouts"
+    validation-method "Cohort analysis — drivers onboarded in the same week, matched on
+                       hours driven, compare retention by instant-payout usage"
+    status proposed
+    proposes "Instant payout"
+    predicts "Sustain driver supply and earnings transparency"
+  }
+
+  hypothesis "Audited safety tooling converts trust-sensitive riders" {
+    intervention "Ship and publicly audit a bundle of safety features: emergency button, trip
+                  sharing with contacts, unusual-stop detection"
+    expected-outcome "In pilot markets, at least 25% of new riders in month 3 cite safety
+                      features as a top-3 reason for choosing RideNow over competitors"
+    mechanism "Safety features are a low-cost high-signal differentiator — riders who have
+               experienced incidents on competitors switch when a credible alternative exists"
+    validation-method "Post-signup survey sampling new riders in pilot markets, with third-party
+                       audit report published on the safety page"
+    status proposed
+    proposes "Safety during and after the ride"
+    predicts "Establish safety and trust baseline"
+  }
+
+  // ── Driver Management ─────────────────────────────────────────────
+
+  feature "Driver onboarding and identity verification" {
+    summary "A new driver signs up, submits identity and license documents, and is verified before
+             the first ride is offered"
+    persona "Part-time driver"
+    value-proposition "A single clean onboarding flow that gets a qualified driver from signup
+                       to first ride in under 72 hours, with clear status visibility"
+    priority must
+    status accepted
+    addresses "Earn predictably during chosen hours"
+    advances "Establish safety and trust baseline"
+    non-goals {
+      "Conduct the background check in-house — we use a certified third party and consume the result"
+      "Accept unverified drivers for any ride, even a demo — no ride is offered until identity is verified"
+    }
+    stories {
+      "As a part-time driver, I want to submit my identity and license documents from my phone,
+       so that I can start the onboarding process without visiting an office." {
+        acceptance-criteria {
+          "Driver can upload a government-issued ID, driver's licence, and selfie from the app"
+          "Driver sees the verification status at every step (submitted, under review, verified, rejected)"
+          "Driver is offered no rides while status is not verified"
+          "On rejection, driver sees the specific reason and the appeal path"
+        }
+      }
+      "As a part-time driver, I want to know how long verification will take,
+       so that I can plan when I can start driving." {
+        acceptance-criteria {
+          "Driver sees an estimated time-to-verify on the status screen"
+          "Driver receives a notification within 24 hours of status change"
+        }
+      }
+    }
+  }
+
+  feature "Vehicle registration and inspection" {
+    summary "A driver registers a vehicle with its documents and inspection status; only eligible
+             vehicles can be used to serve rides"
+    persona "Part-time driver"
+    value-proposition "Every ride is served by a documented, inspected vehicle — protecting rider
+                       trust and regulatory posture"
+    priority must
+    status accepted
+    addresses "Earn predictably during chosen hours"
+    advances "Establish safety and trust baseline", "Run rides reliably end-to-end"
+    non-goals {
+      "Run the vehicle inspection ourselves — we integrate with certified inspection partners"
+      "Allow a driver to serve rides with an expired document — expired means unavailable"
+    }
+    stories {
+      "As a part-time driver, I want to register my vehicle with registration, insurance, and
+       inspection documents, so that I can be offered rides in that vehicle." {
+        acceptance-criteria {
+          "Driver can upload registration, insurance, and inspection documents"
+          "Vehicle is marked eligible only when all required documents are valid and unexpired"
+          "When any document expires, the vehicle is automatically marked ineligible and the driver is notified"
+        }
+      }
+    }
+  }
+
+  feature "Driver availability" {
+    summary "A driver can go online to receive ride offers, go offline to stop, and is automatically
+             taken offline if a document expires or the driver is suspended"
+    persona "Part-time driver"
+    value-proposition "Drivers control their hours; the system guarantees only eligible drivers
+                       ever see a ride offer"
+    priority must
+    status accepted
+    addresses "Earn predictably during chosen hours"
+    advances "Run rides reliably end-to-end"
+    stories {
+      "As a part-time driver, I want to toggle online and offline with one tap,
+       so that I can start and stop my session freely." {
+        acceptance-criteria {
+          "Online toggle is a single tap, confirmed within 1 second"
+          "Offline driver receives no ride offers"
+          "Online driver is visible to the matching system with a current location"
+        }
+      }
+    }
+  }
+
+  feature "Driver rating and suspension" {
+    summary "Riders rate drivers after each ride; drivers with sustained low ratings or repeated
+             cancellations are subject to warning, suspension, or deactivation following a published policy"
+    persona "Full-time driver"
+    value-proposition "A transparent policy that protects quality on the rider side and gives
+                       drivers a clear, appealable process"
+    priority must
+    status accepted
+    addresses "Protect my rating from unfair complaints"
+    advances "Establish safety and trust baseline", "Run rides reliably end-to-end"
+    non-goals {
+      "Deactivate a driver automatically without a human review for ratings-only reasons"
+      "Publish individual rider ratings publicly — ratings are between driver, rider, and RideNow"
+    }
+    stories {
+      "As a full-time driver, I want to see my current rating and trajectory,
+       so that I know where I stand and can take action before a suspension." {
+        acceptance-criteria {
+          "Driver can see current rating and its 30-day trend"
+          "Driver is notified when rating crosses the warning threshold"
+          "Driver can open an appeal on any rating below 3 with a free-text reason"
+        }
+      }
+      "As a trust and safety operator, I want to review every suspension proposal with full context,
+       so that I can approve, reject, or escalate consistently." {
+        acceptance-criteria {
+          "Suspension proposals queue with ride trace, rating history, prior incidents, and payout state"
+          "Operator decision is logged with reason and timestamp in a permanent audit trail"
+        }
+      }
+    }
+  }
+
+  // ── Rider Management ──────────────────────────────────────────────
+
+  feature "Frictionless rider signup" {
+    summary "A new rider signs up with phone number and payment method only; the app is usable
+             within 2 minutes"
+    persona "Daily commuter rider"
+    value-proposition "Shortest path from install to first ride, no identity friction for
+                       low-risk users"
+    priority must
+    status accepted
+    addresses "Get to destination quickly when running late"
+    advances "Reduce rider wait time and abandonment"
+    non-goals {
+      "Require a government ID at signup — identity verification is triggered only when risk signals warrant it"
+      "Force a full profile before the first ride — name and payment method only"
+    }
+    stories {
+      "As a daily commuter rider, I want to sign up with my phone number and a payment method,
+       so that I can request my first ride without filling a long form." {
+        acceptance-criteria {
+          "Phone verification completes with a single one-time code"
+          "After three failed code attempts, the phone is locked for 15 minutes"
+          "Account is ready to request a ride once phone is verified and at least one payment method is added"
+        }
+      }
+    }
+  }
+
+  feature "Saved addresses and preferences" {
+    summary "A rider saves frequent destinations (Home, Work, custom) and preferences (accessibility
+             needs, quiet ride, default payment method)"
+    persona "Daily commuter rider"
+    value-proposition "Reduces destination entry to one tap for daily trips"
+    priority should
+    status accepted
+    addresses "Get to destination quickly when running late"
+    advances "Reduce rider wait time and abandonment"
+    stories {
+      "As a daily commuter rider, I want to save Home and Work addresses,
+       so that I can request a commute ride in one tap." {
+        acceptance-criteria {
+          "Rider can save, edit, and delete named addresses"
+          "Rider can select a saved address as destination in one tap from the home screen"
+        }
+      }
+    }
+  }
+
+  feature "Rider rating and ban policy" {
+    summary "Drivers rate riders after each ride; riders with sustained low ratings or repeated
+             violations are subject to warning or ban"
+    persona "Trust and safety operator"
+    value-proposition "Protects drivers from chronically disruptive riders; balances the driver-only
+                       rating asymmetry of competing platforms"
+    priority should
+    status accepted
+    addresses "Resolve a safety incident with complete context"
+    advances "Establish safety and trust baseline"
+    stories {
+      "As a trust and safety operator, I want to review banned-rider proposals with full context,
+       so that I can apply the policy consistently." {
+        acceptance-criteria {
+          "Ban proposals list every rating below threshold with driver comment and ride reference"
+          "Rider can appeal a ban within 30 days; operator response within 5 business days"
+        }
+      }
+    }
+  }
+
+  // ── Ride Management ───────────────────────────────────────────────
+
+  feature "Request a ride" {
+    summary "A rider enters a destination, sees an upfront committed fare, and confirms to start
+             matching — or cancels freely if no driver is assigned"
+    persona "Daily commuter rider"
+    value-proposition "Upfront, honest fare and zero-penalty pre-assignment cancellation —
+                       the commitment step the category has eroded"
+    priority must
+    status accepted
+    addresses "Get to destination quickly when running late", "Know total cost before committing to a ride", "Cancel without penalty when plans change"
+    advances "Reduce rider wait time and abandonment", "Run rides reliably end-to-end"
+    tested-by "Upfront fare reduces abandonment"
+    design-references {
+      "Request flow — destination entry to confirm" -> "figma.com/file/ridenow/request-flow"
+      "Fare breakdown modal" -> "figma.com/file/ridenow/fare-breakdown"
+    }
+    non-goals {
+      "Let riders negotiate the fare — pricing is algorithmic and non-negotiable"
+      "Let riders pick a specific driver — matching is driven by proximity and eligibility"
+      "Show competitor prices inside our app — we present our price, not a comparison"
+    }
+    stories {
+      "As a daily commuter rider, I want to see the committed fare before I confirm,
+       so that I know exactly what I will pay." {
+        acceptance-criteria {
+          "Fare estimate is displayed within 3 seconds of confirming destination"
+          "Fare breakdown shows base fare, distance, time, and surge if applicable"
+          "Fare shown at confirm is the fare charged unless the route materially changes mid-ride"
+          "Rider can cancel with no fee before a driver is assigned"
+        }
+      }
+      "As a daily commuter rider, I want to schedule a ride for later,
+       so that I can guarantee a ride at a specific time." {
+        acceptance-criteria {
+          "Rider can schedule a ride up to 7 days in advance"
+          "Matching starts 15 minutes before scheduled pickup"
+          "Rider receives a confirmation at booking and a reminder 30 minutes before pickup"
+        }
+      }
+    }
+  }
+
+  feature "Driver matching" {
+    summary "On ride request, the system finds the closest eligible driver and routes the offer
+             to them, rotating through candidates until one accepts or the search is exhausted"
+    persona "Daily commuter rider"
+    value-proposition "Fast, transparent matching that does not hide wait time behind animation"
+    priority must
+    status accepted
+    addresses "Get to destination quickly when running late"
+    advances "Reduce rider wait time and abandonment", "Run rides reliably end-to-end"
+    stories {
+      "As a daily commuter rider, I want a driver confirmed within seconds,
+       so that I can stop watching the app and get ready." {
+        acceptance-criteria {
+          "Eligible drivers are queried from Geolocation on each ride request"
+          "Driver offer auto-retracts after 15 seconds of no response and rolls to next candidate"
+          "If no driver accepts within the search, rider is notified with a clear reason"
+        }
+      }
+      "As a full-time driver, I want to see ride offers with full destination and estimated earnings,
+       so that I can accept informed." {
+        acceptance-criteria {
+          "Offer shows pickup, destination, estimated distance, duration, and estimated earnings"
+          "Driver has 15 seconds to accept or decline"
+          "Driver sees their own acceptance rate on the driver home screen"
+        }
+      }
+    }
+  }
+
+  feature "Pickup to completion" {
+    summary "The ride progresses through driver-arrived, in-progress, and completed, with live
+             tracking and real-time ETA; the rider's fare is finalized and captured on completion"
+    persona "Daily commuter rider"
+    value-proposition "The rider always knows where the driver is; the driver always knows what
+                       they will earn"
+    priority must
+    status accepted
+    addresses "Get to destination quickly when running late", "Meet my driver at a busy pickup point without confusion"
+    advances "Run rides reliably end-to-end", "Earn trust on payments and payouts"
+    stories {
+      "As a daily commuter rider, I want to see the live location of my driver en route,
+       so that I can plan when to walk to the pickup point." {
+        acceptance-criteria {
+          "Live driver location updates at least every 3 seconds while the ride is active"
+          "ETA to pickup is refreshed on each update"
+        }
+      }
+      "As a part-time driver, I want a one-tap Start Ride and End Ride control,
+       so that the ride lifecycle is clean without menu navigation." {
+        acceptance-criteria {
+          "Start Ride is enabled once driver is within 100m of pickup and rider is present"
+          "End Ride triggers fare finalization and earnings display within 5 seconds"
+        }
+      }
+    }
+  }
+
+  feature "Cancellations with fair fees and penalties" {
+    summary "Free rider cancellation before a driver is assigned; fair rider fee after assignment;
+             driver cancellation and no-show penalties with published thresholds"
+    persona "Daily commuter rider"
+    value-proposition "A transparent, symmetric cancellation policy — riders cancel freely when
+                       nobody is committed, and both sides face proportional penalties when they break commitment"
+    priority must
+    status accepted
+    addresses "Cancel without penalty when plans change", "Protect my rating from unfair complaints"
+    advances "Run rides reliably end-to-end"
+    stories {
+      "As a daily commuter rider, I want to cancel before a driver is assigned at no cost,
+       so that I do not feel locked in the instant I tap request." {
+        acceptance-criteria {
+          "Cancelling before driver-assigned status incurs no fee"
+          "Cancelling after driver-assigned status incurs a published cancellation fee"
+        }
+      }
+      "As a full-time driver, I want excessive no-shows and late cancels by the other side to be
+       policy-enforced, so that my time is respected." {
+        acceptance-criteria {
+          "Rider who does not board within 5 minutes of driver arrival is treated as no-show and charged"
+          "Driver who cancels more than 3 rides in 24h is suspended for 30 minutes"
+          "Driver who no-shows more than 2 times in 24h is suspended for 1 hour"
+        }
+      }
+    }
+  }
+
+  feature "Safety during and after the ride" {
+    summary "Emergency button, live trip sharing with contacts, unusual-stop detection during a ride,
+             and a post-ride safety report path"
+    persona "Occasional traveler rider"
+    value-proposition "Safety tooling that works when it is needed — and is auditable by third parties"
+    priority must
+    status accepted
+    addresses "Feel safe when riding alone at night", "Resolve a safety incident with complete context"
+    advances "Establish safety and trust baseline"
+    tested-by "Audited safety tooling converts trust-sensitive riders"
+    design-references {
+      "Emergency flow" -> "figma.com/file/ridenow/safety-emergency"
+      "Trip sharing" -> "figma.com/file/ridenow/trip-sharing"
+    }
+    non-goals {
+      "Replace local emergency services — we notify and share location, we do not dispatch"
+    }
+    stories {
+      "As an occasional traveler rider, I want to share live trip status with a contact,
+       so that someone I trust knows where I am." {
+        acceptance-criteria {
+          "Rider can designate emergency contacts and share a live-tracking link in one tap"
+          "Shared link shows real-time location and ETA while the ride is active"
+        }
+      }
+      "As an occasional traveler rider, I want an emergency button during the ride,
+       so that I can raise an alarm and share my location instantly if needed." {
+        acceptance-criteria {
+          "Emergency event records timestamp, ride context, and current location"
+          "Safety team is notified within 60 seconds"
+          "If configured, local emergency services receive the location link"
+        }
+      }
+      "As a trust and safety operator, I want post-ride safety reports attached to the ride record,
+       so that I can triage and escalate with complete context." {
+        acceptance-criteria {
+          "Reports can be filed within 30 days of ride completion"
+          "Ride is flagged and escalated to the safety queue"
+        }
+      }
+    }
+  }
+
+  // ── Geolocation and Routing ───────────────────────────────────────
+
+  feature "Real-time driver positioning" {
+    summary "Online drivers stream location to the system at a regular interval; the matcher
+             consumes this stream to answer proximity queries"
+    persona "Full-time driver"
+    value-proposition "Accurate positioning underwrites fast matching and reliable ETAs for everyone"
+    priority must
+    status accepted
+    addresses "Earn predictably during chosen hours"
+    advances "Reduce rider wait time and abandonment", "Run rides reliably end-to-end"
+    stories {
+      "As a full-time driver, I want my position to update in the background,
+       so that I stay match-eligible without manual action." {
+        acceptance-criteria {
+          "Position updates at least every 5 seconds while online"
+          "Stale positions older than 60 seconds mark the driver ineligible for matching"
+        }
+      }
+    }
+  }
+
+  feature "ETA and routing" {
+    summary "The system computes pickup ETA at offer time, route and ETA to destination at ride
+             start, and refreshed ETAs as conditions change during the ride"
+    persona "Daily commuter rider"
+    value-proposition "Trustworthy ETAs at each commitment step — so both sides can plan"
+    priority must
+    status accepted
+    addresses "Get to destination quickly when running late"
+    advances "Reduce rider wait time and abandonment", "Run rides reliably end-to-end"
+    stories {
+      "As a daily commuter rider, I want the ETA to destination to stay accurate during the ride,
+       so that I can let the person I am meeting know when I will arrive." {
+        acceptance-criteria {
+          "ETA to destination is refreshed at least every 30 seconds during the ride"
+          "ETA variance alert is raised if the remaining ETA grows more than 5 minutes from the prior value"
+        }
+      }
+    }
+  }
+
+  feature "Surge zone transparency" {
+    summary "When dynamic pricing is active in a zone, both rider and driver see the multiplier,
+             the zone, and a clear reason on-screen"
+    persona "Daily commuter rider"
+    value-proposition "Surge is never a surprise — riders see it before they commit, drivers see it
+                       before they reposition"
+    priority should
+    status accepted
+    addresses "Know total cost before committing to a ride", "Earn predictably during chosen hours"
+    advances "Reduce rider wait time and abandonment", "Sustain driver supply and earnings transparency"
+    non-goals {
+      "Apply surge silently — surge is always visible or it is not applied"
+    }
+    stories {
+      "As a daily commuter rider, I want to see the surge multiplier before I confirm,
+       so that there are no surprises." {
+        acceptance-criteria {
+          "When surge is active, the multiplier and contributing factor are shown on the fare estimate screen"
+          "Fare committed at confirm is not increased by later surge"
+        }
+      }
+    }
+  }
+
+  // ── Payment ───────────────────────────────────────────────────────
+
+  feature "Payment method validation" {
+    summary "Before a rider's first ride, at least one payment method is validated; at every
+             ride request, the default method is checked for usability"
+    persona "Daily commuter rider"
+    value-proposition "Cashless by design — no rides end in a broken payment"
+    priority must
+    status accepted
+    addresses "Get to destination quickly when running late"
+    advances "Earn trust on payments and payouts"
+    stories {
+      "As a daily commuter rider, I want my stored card to be validated in advance,
+       so that I never get stuck at the end of a ride with a declined payment." {
+        acceptance-criteria {
+          "Added payment method is validated with a zero-value authorization on save"
+          "On ride request, the default method is revalidated; if invalid, rider is prompted to update before matching starts"
+        }
+      }
+    }
+  }
+
+  feature "Pre-authorization at request" {
+    summary "At ride request, the system pre-authorizes the estimated fare on the rider's
+             payment method; the hold is released on cancellation or replaced by the actual
+             capture on completion"
+    persona "Daily commuter rider"
+    value-proposition "Protects drivers from uncollectable fares without surprise charges for riders"
+    priority must
+    status accepted
+    addresses "Know total cost before committing to a ride"
+    advances "Earn trust on payments and payouts"
+    stories {
+      "As a daily commuter rider, I want the pre-authorization amount and release policy shown in my receipts,
+       so that the hold on my card is not a mystery." {
+        acceptance-criteria {
+          "Pre-authorization amount equals the committed fare shown at confirm"
+          "On free cancellation, the hold is released within 1 business day"
+          "On completion, the hold is captured at the final fare or adjusted and captured"
+        }
+      }
+    }
+  }
+
+  feature "Auto-charge on completion" {
+    summary "At ride completion, the final fare is computed from actual distance and duration,
+             captured from the pre-auth, and shown to the rider as a receipt"
+    persona "Daily commuter rider"
+    value-proposition "Cashless, instant, and transparent at the end of every ride"
+    priority must
+    status accepted
+    addresses "Get to destination quickly when running late"
+    advances "Earn trust on payments and payouts"
+    stories {
+      "As a daily commuter rider, I want a clear receipt with fare breakdown immediately after the ride,
+       so that I can review what I paid." {
+        acceptance-criteria {
+          "Receipt is delivered in-app within 60 seconds of ride completion"
+          "Receipt shows base fare, distance, time, surge if any, fees, total, and payment method"
+        }
+      }
+    }
+  }
+
+  feature "Driver weekly payout" {
+    summary "Driver earnings for the prior week are paid out to the driver's bank account on
+             Monday of each week, with a clear breakdown in the driver app"
+    persona "Full-time driver"
+    value-proposition "Predictable, reliable weekly income cadence drivers can budget around"
+    priority must
+    status accepted
+    addresses "Get paid quickly when I need the cash", "Earn predictably during chosen hours"
+    advances "Sustain driver supply and earnings transparency", "Earn trust on payments and payouts"
+    stories {
+      "As a full-time driver, I want my weekly earnings deposited every Monday,
+       so that I can rely on a regular income schedule." {
+        acceptance-criteria {
+          "Payout batch runs Mondays at 00:00 local market time"
+          "Payout transfers only above a minimum balance threshold; below threshold rolls over"
+          "Driver receives a notification with amount and expected arrival date"
+        }
+      }
+    }
+  }
+
+  feature "Instant payout" {
+    summary "A driver can cash out available balance on demand to a linked debit card for a small
+             transparent fee, subject to a daily cap"
+    persona "Part-time driver"
+    value-proposition "Access earned cash when needed without switching platforms"
+    priority could
+    status proposed
+    addresses "Get paid quickly when I need the cash"
+    advances "Sustain driver supply and earnings transparency"
+    tested-by "Instant payout improves driver retention"
+    stories {
+      "As a part-time driver, I want to cash out my available balance within minutes,
+       so that I can pay a bill without waiting for the weekly payout." {
+        acceptance-criteria {
+          "Driver sees the fee and the expected arrival time before confirming the payout"
+          "Funds arrive within 30 minutes at p95"
+          "Daily cap is published and enforced"
+        }
+      }
+    }
+  }
+
+  feature "Refunds on cancellation and disputes" {
+    summary "Cancellation by the system or a driver triggers automatic refund of any pre-auth or
+             capture; rider-filed fare disputes are reviewed and resolved within SLA"
+    persona "Daily commuter rider"
+    value-proposition "Riders never fight to get their money back when something goes wrong"
+    priority must
+    status accepted
+    addresses "Cancel without penalty when plans change"
+    advances "Earn trust on payments and payouts"
+    stories {
+      "As a daily commuter rider, I want an automatic refund when the system cancels my ride,
+       so that I do not have to chase customer support." {
+        acceptance-criteria {
+          "Automatic full refund is initiated within 5 minutes of system-driven cancellation"
+          "Refund arrives at the rider's card within the processor's standard window (typically 5-10 business days)"
+        }
+      }
+      "As a trust and safety operator, I want driver-fault refunds deducted from driver balance,
+       so that costs land where fault lies." {
+        acceptance-criteria {
+          "Driver-fault refund creates a deduction against the driver's payable balance"
+          "Deduction is visible in the driver earnings breakdown"
+        }
+      }
+    }
+  }
+
+  journey "Commuter morning ride" for "Daily commuter rider" {
+    trigger "Rider is running late and needs to leave home for the office"
+    outcome "Rider arrives at the office with a charged, receipted ride"
+    steps {
+      "Rider opens the RideNow app and taps Work" {
+        channel app
+        system-response "Home screen shows saved destinations; tapping Work prefills destination"
+        emotional-tone anxious
+        order 1
+      }
+      "Rider reviews committed fare and taps Confirm" {
+        channel app
+        system-response "Committed fare with breakdown and surge indicator is shown; a Confirm button starts matching"
+        emotional-tone neutral
+        order 2
+      }
+      "Rider waits for the driver assignment" {
+        channel app
+        system-response "Matching spinner shows estimated time to assignment; a driver is assigned within seconds"
+        emotional-tone confident
+        order 3
+      }
+      "Rider walks to the pickup point" {
+        channel external
+        system-response "App shows driver live location and pickup ETA updating in real time"
+        emotional-tone neutral
+        order 4
+      }
+      "Driver arrives; rider boards after verifying license plate" {
+        channel physical
+        system-response "App notifies rider of arrival; vehicle plate and model are shown"
+        emotional-tone confident
+        order 5
+      }
+      "Ride is in progress; ETA to destination refreshes" {
+        channel app
+        system-response "Live route, ETA to destination, and emergency/share controls are visible"
+        emotional-tone confident
+        order 6
+      }
+      "Ride completes; rider sees receipt and rates driver" {
+        channel app
+        system-response "Receipt delivered within a minute; rating prompt appears"
+        emotional-tone delighted
+        order 7
+      }
+    }
+  }
+
+  journey "Driver evening session" for "Part-time driver" {
+    trigger "Driver has free evening hours and opens the RideNow Driver app"
+    outcome "Driver completes a session with clear earnings and a cashout to the bank"
+    steps {
+      "Driver opens the app and taps Go Online" {
+        channel app
+        system-response "Eligibility and documents are checked; driver goes online and becomes match-eligible"
+        emotional-tone neutral
+        order 1
+      }
+      "Driver receives a ride offer with pickup, destination, and estimated earnings" {
+        channel app
+        system-response "Offer has 15 seconds; decline or accept"
+        emotional-tone confident
+        order 2
+      }
+      "Driver accepts and is routed to pickup" {
+        channel app
+        system-response "Navigation opens to pickup point; rider name and contact are visible"
+        emotional-tone neutral
+        order 3
+      }
+      "Driver completes the ride" {
+        channel app
+        system-response "Fare is finalized; earnings breakdown appears within 5 seconds"
+        emotional-tone delighted
+        order 4
+      }
+      "Driver ends the session and reviews earnings" {
+        channel app
+        system-response "Session earnings, hours, and trip count are summarized"
+        emotional-tone confident
+        order 5
+      }
+      "Driver initiates an instant payout" {
+        channel app
+        system-response "Fee and arrival time are shown; confirm moves funds to the linked debit card"
+        emotional-tone delighted
+        order 6
+      }
+    }
+  }
+
+  assumption "GPS accuracy is sufficient for matching and tracking" {
+    statement "Driver and rider smartphones in launch markets report location accuracy within
+               20 meters at least 90% of the time in urban conditions"
+    impact-if-wrong "Matching assigns wrong-side-of-street drivers, ETAs degrade, no-show rate rises,
+                     rider trust collapses"
+    validation-plan "Measure reported GPS accuracy on 100 driver devices across dense urban zones
+                     in the first pilot market for 14 days before go-live"
+    status unvalidated
+    underpins "Driver matching", "ETA and routing", "Real-time driver positioning"
+  }
+
+  assumption "Drivers will accept weekly payout as the default cadence" {
+    statement "Target driver personas accept a weekly payout cadence and will not churn for
+               platforms with daily automatic payout, provided instant payout on demand is available"
+    impact-if-wrong "Drivers switch to competitors with daily payout; supply side collapses in markets
+                     where that is the norm"
+    validation-plan "Driver sentiment survey in two candidate launch markets, sample size 200 per market,
+                     before commit to weekly-default architecture"
+    status unvalidated
+    underpins "Driver weekly payout", "Instant payout"
+  }
+
+  assumption "Third-party identity verification meets our SLA" {
+    statement "Our selected identity verification provider can process driver verification end-to-end
+               within 48 hours at p95, at the volume of expected launch cohorts"
+    impact-if-wrong "Driver onboarding stalls; supply ramp misses launch plan; rider experience degrades
+                     at go-live due to thin supply"
+    validation-plan "Contract SLA and a 4-week pre-launch load test against the provider's sandbox
+                     at 2x expected peak volume"
+    status unvalidated
+    underpins "Driver onboarding and identity verification"
+  }
+
+  assumption "Payment processor supports pre-auth with release at our scale" {
+    statement "Our chosen payment processor supports pre-authorization with timely release on
+               cancellation across target markets and card networks, including local debit schemes"
+    impact-if-wrong "We cannot offer upfront fare with pre-auth in some markets; fallback to
+                     capture-at-completion erodes driver protection against no-pay rides"
+    validation-plan "Processor capability matrix confirmed per market before launch; smoke test
+                     of release latency during beta"
+    status unvalidated
+    underpins "Pre-authorization at request", "Refunds on cancellation and disputes"
+  }
+
+  risk "Regulator caps or bans surge pricing in a key market" {
+    statement "A regulator in one of the top 3 launch markets introduces a surge cap or outright ban"
+    likelihood medium
+    impact high
+    mitigation mitigate
+    owner "Head of Legal"
+    threatens "Reduce rider wait time and abandonment", "Surge zone transparency"
+  }
+
+  risk "Driver classification reclassified as employment" {
+    statement "A court or regulator rules that platform drivers must be employees, triggering
+               labor law obligations that break the marketplace model in that market"
+    likelihood medium
+    impact critical
+    mitigation avoid
+    owner "Head of Legal"
+    threatens "Sustain driver supply and earnings transparency", "Driver onboarding and identity verification"
+  }
+
+  risk "Payment fraud via stolen cards and collusion" {
+    statement "Fraudsters use stolen cards for free rides or collude with drivers to drain payouts"
+    likelihood high
+    impact high
+    mitigation mitigate
+    owner "Head of Payments"
+    threatens "Pre-authorization at request", "Driver weekly payout", "Instant payout"
+  }
+
+  risk "Safety incident with public fallout before safety tooling matures" {
+    statement "A high-profile safety incident in a launch market hits the press before the safety
+               features have launched and been audited"
+    likelihood medium
+    impact critical
+    mitigation mitigate
+    owner "Head of Trust and Safety"
+    threatens "Establish safety and trust baseline", "Safety during and after the ride"
+  }
+
+  constraint "PCI-DSS Level 1 compliance" {
+    statement "All payment card data must be stored, transmitted, and processed in compliance
+               with PCI-DSS Level 1"
+    source regulatory
+    constrains "Payment method validation", "Pre-authorization at request", "Auto-charge on completion", "Refunds on cancellation and disputes"
+  }
+
+  constraint "GDPR and equivalent privacy regimes" {
+    statement "Personal data of riders, drivers, and operators must be handled under GDPR
+               (EU), CCPA (California), and equivalent regimes in every market — including
+               right to access, correction, erasure, and data minimization"
+    source regulatory
+    constrains "Frictionless rider signup", "Driver onboarding and identity verification", "Safety during and after the ride"
+  }
+
+  constraint "Local ride-hailing operating licences" {
+    statement "In every launch market, RideNow must hold the applicable ride-hailing operating
+               licence and comply with local vehicle, driver, and insurance rules"
+    source regulatory
+    constrains "Vehicle registration and inspection", "Driver onboarding and identity verification"
+  }
+
+  constraint "Background checks must use certified providers" {
+    statement "Driver background checks must be performed by a provider certified in the
+               applicable jurisdiction; we do not perform them in-house"
+    source regulatory
+    constrains "Driver onboarding and identity verification"
+  }
+
+  open-question "Cancellation fee in competitor-free markets" {
+    question "Should we charge post-assignment cancellation fees in markets where major
+              competitors do not?"
+    context "Fees protect drivers' committed time but may push price-sensitive riders back to
+             competitors. The answer affects cancellation policy and driver compensation math."
+    owner "Head of Product"
+    deadline 2026-06-01
+    status open
+    blocks "Cancellations with fair fees and penalties"
+  }
+
+  open-question "Minimum driver density for launch" {
+    question "What is the minimum online driver density (drivers per km²) required to sustain
+              a sub-30-second p50 match time at expected launch demand?"
+    context "Launching below the threshold produces bad first experience and damages market
+             reputation; launching above requires costly driver incentives. Answer drives
+             launch readiness criteria and incentive budget."
+    owner "Head of Ride Operations"
+    deadline 2026-05-15
+    status investigating
+  }
+
+  open-question "Rider identity verification threshold" {
+    question "When should a rider be required to submit identity for verification — at signup,
+              after a risk signal, or never?"
+    context "Signup friction depresses conversion; never verifying invites fraud and safety risk.
+             The policy must match local regulations and platform economics."
+    owner "Head of Trust and Safety"
+    deadline 2026-07-01
+    status open
+    blocks "Frictionless rider signup"
+  }
+
+  release "R1 — Core ride loop" {
+    target-date "Q3 2026"
+    theme "Request, match, ride, pay — the minimum viable loop in one pilot market"
+    status planned
+    includes {
+      "Driver onboarding and identity verification"
+      "Vehicle registration and inspection"
+      "Driver availability"
+      "Frictionless rider signup"
+      "Payment method validation"
+      "Request a ride"
+      "Driver matching"
+      "Pickup to completion"
+      "Cancellations with fair fees and penalties"
+      "Real-time driver positioning"
+      "ETA and routing"
+      "Pre-authorization at request"
+      "Auto-charge on completion"
+    }
+    exit-criteria {
+      "All included must-features pass acceptance"
+      "No P0 bugs open for 7 consecutive days"
+      "Pilot market onboarded with 100+ verified drivers and 500+ beta riders"
+      "Ride completion rate above 90% across beta cohort"
+    }
+  }
+
+  release "R2 — Trust and payouts" {
+    target-date "Q4 2026"
+    theme "Ratings, safety tooling, and reliable driver payouts"
+    status planned
+    depends-on "R1 — Core ride loop"
+    includes {
+      "Driver rating and suspension"
+      "Rider rating and ban policy"
+      "Safety during and after the ride"
+      "Driver weekly payout"
+      "Refunds on cancellation and disputes"
+      "Saved addresses and preferences"
+      "Surge zone transparency"
+    }
+    exit-criteria {
+      "Safety tooling external audit passed and audit report published"
+      "Weekly payout on-time rate above 99% across 4 consecutive payout cycles"
+      "Driver rating and suspension policy published and enforced end-to-end"
+    }
+  }
+
+  release "R3 — Driver retention and expansion" {
+    target-date "Q2 2027"
+    theme "Earnings flexibility and second-market launch"
+    status planned
+    depends-on "R2 — Trust and payouts"
+    includes {
+      "Instant payout"
+    }
+    exit-criteria {
+      "Instant payout shipped in pilot market with fee and arrival-time SLA met"
+      "Second launch market live with all R1 and R2 features available"
+    }
+  }
+}

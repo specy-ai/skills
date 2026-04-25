@@ -66,15 +66,25 @@ module.exports = grammar({
       field('name', $.string_literal),
       ':',
       field('pattern', $.ears_pattern),
-      optional($.rationale),
-      optional($.source_decl),
+      // accept rationale, source, and traceability decls in any order before the statement
+      repeat(choice(
+        $.rationale,
+        $.source_decl,
+        $.depends_on_decl,
+        $.conflicts_with_decl,
+        $.decomposed_into_block,
+        $.satisfied_by_block,
+      )),
       field('statement', $.ears_statement),
       'priority',
       field('priority', $.moscow_priority),
-      optional($.depends_on_decl),
-      optional($.conflicts_with_decl),
-      optional($.decomposed_into_block),
-      optional($.satisfied_by_block),
+      // backward-compat: same decls may also follow priority
+      repeat(choice(
+        $.depends_on_decl,
+        $.conflicts_with_decl,
+        $.decomposed_into_block,
+        $.satisfied_by_block,
+      )),
     ),
 
     // -------------------------------------------------------------------------

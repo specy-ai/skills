@@ -34,12 +34,9 @@
 (external_event_def "event" @keyword.type)
 (error_event_def "error" @keyword.type)
 (error_event_def "event" @keyword.type)
-(relative_temporal_event "temporal" @keyword.type)
-(relative_temporal_event "event" @keyword.type)
-(absolute_temporal_event "temporal" @keyword.type)
-(absolute_temporal_event "event" @keyword.type)
-(recurring_temporal_event "temporal" @keyword.type)
-(recurring_temporal_event "event" @keyword.type)
+(temporal_event_def "temporal" @keyword.type)
+(temporal_event_def "event" @keyword.type)
+(temporal_event_def "temporal-event" @keyword.type)
 
 (policy_def "policy" @keyword.type)
 (invariant_def "invariant" @keyword.type)
@@ -74,8 +71,11 @@
 "duplicate" @keyword
 "offset" @keyword
 "reference" @keyword
+"relative-to" @keyword
 "instant" @keyword
 "schedule" @keyword
+"recurring" @keyword
+"per-market" @keyword
 "compensation" @keyword
 
 (state_def "state" @keyword)
@@ -155,9 +155,7 @@
 (event_def name: (type_name) @type.definition)
 (external_event_def name: (type_name) @type.definition)
 (error_event_def name: (type_name) @type.definition)
-(relative_temporal_event name: (type_name) @type.definition)
-(absolute_temporal_event name: (type_name) @type.definition)
-(recurring_temporal_event name: (type_name) @type.definition)
+(temporal_event_def name: (type_name) @type.definition)
 (domain_service_def name: (type_name) @type.definition)
 (application_service_def name: (type_name) @type.definition)
 (infrastructure_service_def name: (type_name) @type.definition)

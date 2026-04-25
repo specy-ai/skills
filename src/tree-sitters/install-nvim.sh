@@ -22,6 +22,10 @@ MARKER="-- [specy-tree-sitter]"
 # Pre-flight checks
 # ---------------------------------------------------------------------------
 
+# shellcheck source=./check-tree-sitter.sh
+source "$SCRIPT_DIR/check-tree-sitter.sh"
+check_tree_sitter_cli
+
 # Check parsers are built
 parser_ext="dylib"
 [[ "$(uname)" == "Linux" ]] && parser_ext="so"

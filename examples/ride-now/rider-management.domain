@@ -1,0 +1,488 @@
+context RiderManagement :: "Rider signup, phone verification, profile, ratings, bans, appeals" {
+    requirements-source "rider-management.sysreq"
+
+    enum RiderStatus { unverified, active, banned, appealInReview, permanentlyBanned }
+    enum PaymentMethodType { creditCard, debitCard, paypal, applePay, googlePay }
+    enum AppealStatus { pending, approved, rejected }
+
+    // -----------------------------------------------------------------
+    // Value types
+    // -----------------------------------------------------------------
+
+    value PhoneNumber {
+        fields { countryCode : string; number : string }
+    }
+
+    value VerificationCode {
+        satisfies [REQ-RDR-001, REQ-RDR-002]
+        fields {
+            code : string minLength(4) maxLength(6)
+            issuedAt : datetime
+            expiresAt : datetime
+        }
+        invariants {
+            shortLifetime { expiresAt <= issuedAt + 10min }
+        }
+    }
+
+    value VerificationAttempt {
+        satisfies [REQ-RDR-003]
+        fields {
+            failedCount : int min(0) max(3)
+            lockedUntil : datetime optional
+        }
+        invariants {
+            lockoutTriggered :: "Three failures locks the phone for 15 minutes" enforcement reject {
+                if failedCount >= 3 { lockedUntil is defined }
+            }
+        }
+    }
+
+    value SavedAddress {
+        satisfies [REQ-RDR-010, REQ-RDR-011, REQ-RDR-012]
+        fields {
+            label : string maxLength(50)
+            street : string
+            city : string
+            zipCode : string
+            country : string
+            latitude : decimal
+            longitude : decimal
+        }
+    }
+
+    value PaymentMethodRef {
+        satisfies [REQ-RDR-006]
+        fields {
+            paymentMethodId : uuid
+            type : PaymentMethodType
+            label : string
+            isActive : boolean default(false)
+            addedAt : datetime
+        }
+    }
+
+    value RatingScore {
+        fields { value : int min(1) max(5) }
+    }
+
+    value AverageRiderRating {
+        satisfies [REQ-RDR-020, REQ-RDR-021]
+        fields {
+            value : decimal min(1.0) max(5.0)
+            totalRatings : int min(0)
+        }
+    }
+
+    value AccessibilityPreference {
+        satisfies [REQ-RDR-013]
+        fields {
+            wheelchairAccessible : boolean default(false)
+            quietRide : boolean default(false)
+            largerVehicle : boolean default(false)
+        }
+    }
+
+    value Appeal {
+        satisfies [REQ-RDR-025, REQ-RDR-026, REQ-RDR-027]
+        fields {
+            reason : string maxLength(2000)
+            submittedAt : datetime
+            status : AppealStatus default("pending")
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // Entities
+    // -----------------------------------------------------------------
+
+    entity Rider :: "Rider lifecycle root — signup, profile, ratings, bans" {
+        satisfies [REQ-RDR-001, REQ-RDR-002, REQ-RDR-003, REQ-RDR-004, REQ-RDR-005,
+                   REQ-RDR-006, REQ-RDR-010, REQ-RDR-011, REQ-RDR-012, REQ-RDR-013,
+                   REQ-RDR-020, REQ-RDR-021, REQ-RDR-022, REQ-RDR-023, REQ-RDR-024,
+                   REQ-RDR-025, REQ-RDR-026, REQ-RDR-027]
+
+        identifier riderId : UUID
+
+        fields {
+            phoneNumber : PhoneNumber
+            phoneVerified : boolean default(false)
+            firstName : string optional
+            lastName : string optional
+            email : string optional
+            status : RiderStatus default("unverified")
+            verificationCode : VerificationCode optional
+            verificationAttempt : VerificationAttempt
+            savedAddresses : list<SavedAddress>
+            paymentMethods : list<PaymentMethodRef>
+            accessibility : AccessibilityPreference
+            averageRating : AverageRiderRating optional
+            totalRides : int min(0) default(0)
+            appeal : Appeal optional
+            createdAt : datetime
+            updatedAt : datetime
+        }
+
+        invariants {
+            readyToRideRequiresVerifiedPhoneAndPayment :: "Active rider must have verified phone + active payment" enforcement reject {
+                if status = active {
+                    phoneVerified = true
+                    and exists pm in paymentMethods where pm.isActive = true
+                }
+            }
+            noGovernmentIdAtSignup :: "Government ID is not collected at signup" enforcement reject {
+                if status = unverified { firstName is null and lastName is null }
+            }
+        }
+
+        operations {
+            "Sign up rider" on RegisterRider {
+                satisfies [REQ-RDR-001, REQ-RDR-004]
+                sets Rider {
+                    phoneNumber = registerRider.phoneNumber
+                    status = unverified
+                    verificationCode = generateCode()
+                    verificationAttempt = VerificationAttempt(failedCount = 0)
+                    createdAt = now()
+                    updatedAt = now()
+                }
+                emits RiderRegistered {
+                    riderId = Rider.riderId
+                    phoneNumber = Rider.phoneNumber
+                    code = Rider.verificationCode
+                    registeredAt = Rider.createdAt
+                }
+            }
+
+            "Verify phone" on VerifyPhone {
+                satisfies [REQ-RDR-002]
+                precondition codeOutstanding { Rider.verificationCode is defined }
+                precondition codeNotExpired { Rider.verificationCode.expiresAt > now() }
+                precondition notLocked {
+                    Rider.verificationAttempt.lockedUntil is null
+                    or Rider.verificationAttempt.lockedUntil <= now()
+                }
+                precondition codeMatches { verifyPhone.submittedCode = Rider.verificationCode.code }
+
+                sets Rider {
+                    phoneVerified = true
+                    verificationCode = null
+                    verificationAttempt = VerificationAttempt(failedCount = 0)
+                }
+                emits RiderPhoneVerified {
+                    riderId = Rider.riderId
+                    verifiedAt = now()
+                }
+            }
+
+            "Submit invalid verification code" on SubmitInvalidVerificationCode {
+                satisfies [REQ-RDR-003]
+                sets Rider {
+                    verificationAttempt = VerificationAttempt(
+                        failedCount = Rider.verificationAttempt.failedCount + 1,
+                        lockedUntil = if Rider.verificationAttempt.failedCount + 1 >= 3 then now() + 15min else null
+                    )
+                }
+                emits VerificationFailed {
+                    riderId = Rider.riderId
+                    failedCount = Rider.verificationAttempt.failedCount
+                    lockedUntil = Rider.verificationAttempt.lockedUntil
+                    failedAt = now()
+                }
+            }
+
+            "Add payment method" on AddPaymentMethod {
+                satisfies [REQ-RDR-006]
+                precondition phoneVerified { Rider.phoneVerified = true }
+                sets Rider {
+                    paymentMethods = Rider.paymentMethods + addPaymentMethod.method
+                    status = if Rider.status = unverified then active else Rider.status
+                }
+                emits PaymentMethodAdded {
+                    riderId = Rider.riderId
+                    method = addPaymentMethod.method
+                    addedAt = now()
+                }
+            }
+
+            "Save address" on SaveAddress {
+                satisfies [REQ-RDR-010]
+                sets Rider {
+                    savedAddresses = Rider.savedAddresses + saveAddress.address
+                }
+                emits AddressSaved {
+                    riderId = Rider.riderId
+                    address = saveAddress.address
+                    savedAt = now()
+                }
+            }
+
+            "Set accessibility preference" on SetAccessibilityPreference {
+                satisfies [REQ-RDR-013]
+                sets Rider { accessibility = setAccessibilityPreference.accessibility }
+                emits AccessibilityPreferenceUpdated {
+                    riderId = Rider.riderId
+                    preference = Rider.accessibility
+                    updatedAt = now()
+                }
+            }
+
+            "Record rider rating" on RecordRiderRating {
+                satisfies [REQ-RDR-020, REQ-RDR-021]
+                precondition validRange {
+                    recordRiderRating.score.value >= 1 and recordRiderRating.score.value <= 5
+                }
+                sets Rider {
+                    averageRating = recompute(Rider.averageRating, recordRiderRating.score)
+                    totalRides = Rider.totalRides + 1
+                }
+                emits RiderRated {
+                    riderId = Rider.riderId
+                    rideId = recordRiderRating.rideId
+                    score = recordRiderRating.score
+                    comment = recordRiderRating.comment
+                    newAverage = Rider.averageRating
+                    totalRides = Rider.totalRides
+                    submittedAt = now()
+                }
+            }
+
+            "Issue low-rating warning" on WarnLowRating {
+                satisfies [REQ-RDR-022]
+                precondition matureRider { Rider.totalRides > 10 }
+                precondition belowWarningThreshold { Rider.averageRating.value < 4.0 }
+                emits LowRatingWarningIssued {
+                    riderId = Rider.riderId
+                    averageRating = Rider.averageRating
+                    issuedAt = now()
+                }
+            }
+
+            "Propose ban" on ProposeRiderBan {
+                satisfies [REQ-RDR-023]
+                precondition matureRider { Rider.totalRides > 10 }
+                precondition belowBanThreshold { Rider.averageRating.value < 3.5 }
+                emits RiderBanProposalCreated {
+                    riderId = Rider.riderId
+                    averageRating = Rider.averageRating
+                    proposedAt = now()
+                }
+            }
+
+            "Apply rider ban" on BanRider {
+                satisfies [REQ-RDR-024, REQ-RDR-NFR-004]
+                precondition operatorApproved { banRider.operatorId is defined }
+                sets Rider { status = banned }
+                emits RiderBanned {
+                    riderId = Rider.riderId
+                    operatorId = banRider.operatorId
+                    reason = banRider.reason
+                    bannedAt = now()
+                }
+            }
+
+            "Submit ban appeal" on SubmitBanAppeal {
+                satisfies [REQ-RDR-025]
+                precondition isBanned { Rider.status = banned }
+                precondition withinAppealWindow {
+                    now() - banAppealWindowStart(Rider) <= 30days
+                }
+                sets Rider {
+                    status = appealInReview
+                    appeal = Appeal(reason = submitBanAppeal.reason, submittedAt = now(), status = pending)
+                }
+                emits BanAppealSubmitted {
+                    riderId = Rider.riderId
+                    submittedAt = now()
+                }
+            }
+
+            "Reject late appeal" on RejectLateAppeal {
+                satisfies [REQ-RDR-027]
+                precondition isBanned { Rider.status = banned }
+                precondition outsideWindow {
+                    now() - banAppealWindowStart(Rider) > 30days
+                }
+                emits RiderBanAppealRejectedAsLate {
+                    riderId = Rider.riderId
+                    rejectedAt = now()
+                }
+            }
+
+            "Resolve ban appeal" on ResolveBanAppeal {
+                satisfies [REQ-RDR-026, REQ-RDR-NFR-004]
+                precondition appealUnderReview { Rider.status = appealInReview }
+                sets Rider {
+                    status = if resolveBanAppeal.outcome = approved then active else permanentlyBanned
+                    appeal = Appeal(
+                        reason = Rider.appeal.reason,
+                        submittedAt = Rider.appeal.submittedAt,
+                        status = if resolveBanAppeal.outcome = approved then approved else rejected
+                    )
+                }
+                emits BanAppealResolved {
+                    riderId = Rider.riderId
+                    operatorId = resolveBanAppeal.operatorId
+                    outcome = resolveBanAppeal.outcome
+                    resolvedAt = now()
+                }
+            }
+        }
+    }
+
+    aggregate RiderAggregate root Rider
+
+    statemachine RiderLifecycle on Rider {
+        start unverified
+        state unverified {}
+        state active {
+            invariant phoneVerified { Rider.phoneVerified = true }
+        }
+        state banned {}
+        state appealInReview {}
+        state permanentlyBanned {}
+
+        transition unverified -> active on AddPaymentMethod                // first active payment method completes profile
+        transition active -> banned on BanRider
+        transition banned -> appealInReview on SubmitBanAppeal
+        transition appealInReview -> active on ResolveBanAppeal             // outcome = approved
+        transition appealInReview -> permanentlyBanned on ResolveBanAppeal  // outcome = rejected
+
+        final permanentlyBanned
+    }
+
+    // -----------------------------------------------------------------
+    // Domain services
+    // -----------------------------------------------------------------
+
+    service RiderRatingCalculator :: "Recomputes rider average rating" {
+        satisfies [REQ-RDR-020]
+        operations {
+            recompute(prior: AverageRiderRating, newScore: RatingScore) : AverageRiderRating
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // Infrastructure services
+    // -----------------------------------------------------------------
+
+    infrastructure-service VerificationCodeChannel :: "Telephony provider for SMS verification codes" {
+        satisfies [REQ-RDR-001, REQ-RDR-NFR-003]
+        operations {
+            sendCode(phoneNumber: PhoneNumber, code: string) : void
+        }
+    }
+
+    infrastructure-service PaymentValidationGateway :: "ACL to Payment for method validation" {
+        satisfies [REQ-RDR-006]
+        operations {
+            validatePaymentMethod(paymentMethodId: uuid) : boolean
+        }
+    }
+
+    infrastructure-service RiderNotificationService :: "Push, SMS, email to riders" {
+        satisfies [REQ-RDR-022, REQ-RDR-024, REQ-RDR-026]
+        operations {
+            notifyRider(riderId: uuid, subject: string, message: string) : void
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // Commands
+    // -----------------------------------------------------------------
+
+    command RegisterRider { fields { phoneNumber: PhoneNumber; correlationId: uuid } }
+    command VerifyPhone { fields { riderId: uuid; submittedCode: string; correlationId: uuid } }
+    command SubmitInvalidVerificationCode { fields { riderId: uuid; correlationId: uuid } }
+    command AddPaymentMethod { fields { riderId: uuid; method: PaymentMethodRef; correlationId: uuid } }
+    command SaveAddress { fields { riderId: uuid; address: SavedAddress; correlationId: uuid } }
+    command SetAccessibilityPreference { fields { riderId: uuid; accessibility: AccessibilityPreference; correlationId: uuid } }
+    command RecordRiderRating { fields { riderId: uuid; rideId: uuid; score: RatingScore; comment: string optional; correlationId: uuid } }
+    command WarnLowRating { fields { riderId: uuid; correlationId: uuid } }
+    command ProposeRiderBan { fields { riderId: uuid; correlationId: uuid } }
+    command BanRider { fields { riderId: uuid; operatorId: uuid; reason: string; correlationId: uuid } }
+    command SubmitBanAppeal { fields { riderId: uuid; reason: string; correlationId: uuid } }
+    command RejectLateAppeal { fields { riderId: uuid; correlationId: uuid } }
+    command ResolveBanAppeal { fields { riderId: uuid; operatorId: uuid; outcome: AppealStatus; correlationId: uuid } }
+
+    // -----------------------------------------------------------------
+    // Events
+    // -----------------------------------------------------------------
+
+    event RiderRegistered { satisfies [REQ-RDR-001] fields { riderId: uuid; phoneNumber: PhoneNumber; code: VerificationCode; registeredAt: datetime } }
+    event RiderPhoneVerified { satisfies [REQ-RDR-002] fields { riderId: uuid; verifiedAt: datetime } }
+    event VerificationFailed { satisfies [REQ-RDR-003] fields { riderId: uuid; failedCount: int; lockedUntil: datetime optional; failedAt: datetime } }
+    event PaymentMethodAdded { satisfies [REQ-RDR-006] fields { riderId: uuid; method: PaymentMethodRef; addedAt: datetime } }
+    event AddressSaved { satisfies [REQ-RDR-010] fields { riderId: uuid; address: SavedAddress; savedAt: datetime } }
+    event AccessibilityPreferenceUpdated { satisfies [REQ-RDR-013] fields { riderId: uuid; preference: AccessibilityPreference; updatedAt: datetime } }
+    event RiderRated { satisfies [REQ-RDR-020] fields { riderId: uuid; rideId: uuid; score: RatingScore; comment: string optional; newAverage: AverageRiderRating; totalRides: int; submittedAt: datetime } }
+    event LowRatingWarningIssued { satisfies [REQ-RDR-022] fields { riderId: uuid; averageRating: AverageRiderRating; issuedAt: datetime } }
+    event RiderBanProposalCreated { satisfies [REQ-RDR-023] fields { riderId: uuid; averageRating: AverageRiderRating; proposedAt: datetime } }
+    event RiderBanned { satisfies [REQ-RDR-024, REQ-RDR-NFR-004] fields { riderId: uuid; operatorId: uuid; reason: string; bannedAt: datetime } }
+    event BanAppealSubmitted { satisfies [REQ-RDR-025] fields { riderId: uuid; submittedAt: datetime } }
+    event RiderBanAppealRejectedAsLate { satisfies [REQ-RDR-027] fields { riderId: uuid; rejectedAt: datetime } }
+    event BanAppealResolved { satisfies [REQ-RDR-026, REQ-RDR-NFR-004] fields { riderId: uuid; operatorId: uuid; outcome: AppealStatus; resolvedAt: datetime } }
+
+    // -----------------------------------------------------------------
+    // External events (consumed)
+    // -----------------------------------------------------------------
+
+    external-event RideCompleted from RideManagement
+    external-event PaymentMethodValidated from Payment
+
+    // -----------------------------------------------------------------
+    // Reactions
+    // -----------------------------------------------------------------
+
+    reaction sendCodeOnRegistration :: "Dispatch SMS code immediately on signup" {
+        satisfies [REQ-RDR-001]
+        trigger RiderRegistered
+        effect VerificationCodeChannel.sendCode(phoneNumber = event.phoneNumber, code = event.code.code)
+    }
+
+    reaction warnRiderOnLowRating :: "Warn at avg < 4.0 with 10+ rides" {
+        satisfies [REQ-RDR-022]
+        trigger RiderRated
+        guard event.totalRides > 10 and event.newAverage.value < 4.0 and event.newAverage.value >= 3.5
+        effect WarnLowRating(riderId = event.riderId)
+    }
+
+    reaction proposeBanOnVeryLowRating :: "Queue ban proposal at avg < 3.5 with 10+ rides" {
+        satisfies [REQ-RDR-023]
+        trigger RiderRated
+        guard event.totalRides > 10 and event.newAverage.value < 3.5
+        effect ProposeRiderBan(riderId = event.riderId)
+    }
+
+    reaction recordRatingOnRideCompleted :: "Bridge from RideManagement — record driver rating of rider" {
+        satisfies [REQ-RDR-020]
+        trigger RideCompleted
+        guard event.riderRating is defined
+        effect RecordRiderRating(
+            riderId = event.riderId,
+            rideId = event.rideId,
+            score = event.riderRating.score,
+            comment = event.riderRating.comment
+        )
+    }
+
+    reaction notifyOnBan :: "Notify rider of ban with reason and appeal path" {
+        satisfies [REQ-RDR-024]
+        trigger RiderBanned
+        effect RiderNotificationService.notifyRider(
+            riderId = event.riderId,
+            subject = "Account banned",
+            message = event.reason + " You may appeal within 30 days."
+        )
+    }
+
+    reaction notifyOnAppealResolution :: "Notify rider of appeal outcome" {
+        satisfies [REQ-RDR-026]
+        trigger BanAppealResolved
+        effect RiderNotificationService.notifyRider(
+            riderId = event.riderId,
+            subject = "Appeal resolved",
+            message = "Outcome: " + event.outcome
+        )
+    }
+}

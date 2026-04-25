@@ -429,13 +429,16 @@ module.exports = grammar({
       'release',
       field('name', $.string_literal),
       '{',
-      'target-date', $.string_literal,
-      'theme', $.string_literal,
-      'status', $.release_status,
-      optional($.depends_on_clause),
-      optional($.includes_block),
-      optional($.entry_criteria_block),
-      optional($.exit_criteria_block),
+      // any subset of fields, in any order
+      repeat(choice(
+        seq('target-date', $.string_literal),
+        seq('theme', $.string_literal),
+        seq('status', $.release_status),
+        $.depends_on_clause,
+        $.includes_block,
+        $.entry_criteria_block,
+        $.exit_criteria_block,
+      )),
       '}',
     ),
 
@@ -494,13 +497,17 @@ module.exports = grammar({
 
     step_def: $ => seq(
       optional('step'),
+      // step name doubles as action when no `action` keyword is present
       field('name', choice($.string_literal, $.integer)),
       '{',
-      'action', $.string_literal,
-      optional(seq('system-response', $.string_literal)),
-      'channel', $.channel_type,
-      optional(seq('emotional-tone', $.emotional_tone)),
-      optional(seq('order', $.integer)),
+      // any subset of fields, in any order
+      repeat(choice(
+        seq('action', $.string_literal),
+        seq('system-response', $.string_literal),
+        seq('channel', $.channel_type),
+        seq('emotional-tone', $.emotional_tone),
+        seq('order', $.integer),
+      )),
       '}',
     ),
 
@@ -535,6 +542,10 @@ module.exports = grammar({
     // Comments
     // -------------------------------------------------------------------------
 
-    comment: $ => token(seq('#', /.*/)),
+    comment: $ => token(choice(
+      seq('//', /[^\n]*/),
+      seq('#', /[^\n]*/),
+      seq('/*', /([^*]|\*+[^*\/])*\*+\//),
+    )),
   },
 });

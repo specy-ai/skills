@@ -1,0 +1,198 @@
+requirements "Platform Reliability" scoped-to RideNowOrganization {
+  prd-source "ride-now.prd"
+
+  REQ-NFR-001 "Platform availability" : ubiquitous
+    source "Problem: Incumbent ride-hailing apps have eroded rider trust... Safety incidents remain frequent enough to be a first-order switching trigger"
+    :: "Availability is the contractual floor underwriting every rider- and driver-facing commitment"
+    "The RideNow platform shall maintain 99.9% availability for all
+     rider-facing and driver-facing services measured monthly."
+    priority must
+    decomposed-into {
+      REQ-RIDE-NFR-004   // Ride Management emergency-path availability
+      REQ-GEO-NFR-001    // Geolocation query latency
+      REQ-GEO-NFR-003    // Geolocation ingestion throughput
+      REQ-PAY-NFR-005    // Payment processor fail-over
+    }
+
+  REQ-NFR-002 "Graceful degradation" : ubiquitous
+    source "Risk: Safety incident with public fallout before safety tooling matures"
+    :: "Partial failures must not cascade to full outages"
+    "The RideNow platform shall degrade non-critical features before
+     impairing the emergency button, trip sharing, and active-ride
+     tracking paths."
+    priority must
+
+  REQ-NFR-003 "Disaster recovery" : ubiquitous
+    source "Goal: Run rides reliably end-to-end"
+    :: "A regional outage must not destroy rider or driver financial state"
+    "The RideNow platform shall maintain a recovery point objective
+     of no more than 5 minutes and a recovery time objective of no
+     more than 1 hour for all rider-, driver-, and payment-state data."
+    priority must
+}
+
+
+requirements "Security and Data Protection" scoped-to RideNowOrganization {
+  prd-source "ride-now.prd"
+
+  REQ-NFR-010 "Vendor due diligence" : ubiquitous
+    source "Constraint: Background checks must use certified providers"
+    :: "Third-party breaches become our breaches"
+    "The RideNow platform shall use only identity verification,
+     background check, and payment processing vendors that hold
+     current certification under the applicable jurisdiction's
+     regulatory regime."
+    priority must
+    decomposed-into {
+      REQ-DRV-NFR-001    // Driver identity verification SLA
+      REQ-PAY-NFR-001    // PCI-DSS compliance
+    }
+
+  REQ-NFR-020 "Encryption in transit and at rest" : ubiquitous
+    source "Constraint: GDPR and equivalent privacy regimes"
+    :: "Baseline security posture — no exceptions"
+    "The RideNow platform shall encrypt all personal data, payment
+     data, and location data in transit using TLS 1.2 or higher and
+     at rest using at least AES-256."
+    priority must
+    decomposed-into {
+      REQ-DRV-NFR-002    // Driver document encryption
+      REQ-RDR-NFR-001    // Rider PII encryption
+    }
+
+  REQ-NFR-021 "Authentication and authorization baseline" : ubiquitous
+    source "Constraint: GDPR and equivalent privacy regimes"
+    :: "Every human and service actor must authenticate; every action must authorize"
+    "The RideNow platform shall require authenticated access for all
+     backoffice tools and authenticated, authorized service-to-service
+     calls across bounded contexts."
+    priority must
+
+  REQ-NFR-022 "Data retention and erasure" : ubiquitous
+    source "Constraint: GDPR and equivalent privacy regimes"
+    :: "GDPR right to erasure, right to data minimization"
+    "The RideNow platform shall honor valid rider and driver right-to-erasure
+     requests within 30 days by deleting or anonymizing personal data
+     across all bounded contexts, retaining only records with a
+     documented regulatory retention obligation."
+    priority must
+    decomposed-into {
+      REQ-DRV-NFR-003    // Driver document retention
+      REQ-RDR-NFR-002    // Rider right to erasure
+      REQ-GEO-NFR-004    // Location retention
+    }
+
+  REQ-NFR-023 "Data sovereignty per market" : ubiquitous
+    source "Constraint: Local ride-hailing operating licences"
+    :: "Some markets require in-region data residency"
+    "The RideNow platform shall store and process rider, driver, and
+     ride data within the geographic boundaries required by each
+     market's applicable regulation."
+    priority must
+}
+
+
+requirements "Payments & Financial Compliance" scoped-to RideNowOrganization {
+  prd-source "ride-now.prd"
+
+  REQ-NFR-030 "PCI-DSS Level 1 compliance" : ubiquitous
+    source "Constraint: PCI-DSS Level 1 compliance"
+    :: "Non-negotiable scope reduction — card data handling is isolated"
+    "The RideNow platform shall restrict handling of payment card
+     data to PCI-DSS Level 1 certified components and shall ensure
+     no other component processes, stores, or transmits raw card data."
+    priority must
+    decomposed-into {
+      REQ-PAY-NFR-001    // Payment PCI-DSS compliance
+      REQ-PAY-NFR-004    // Financial audit trail
+    }
+
+  REQ-NFR-031 "Anti-fraud controls" : ubiquitous
+    source "Risk: Payment fraud via stolen cards and collusion"
+    :: "Fraud is a high-likelihood high-impact risk"
+    "The RideNow platform shall apply real-time fraud scoring to every
+     payment authorization, instant payout request, and new-account
+     signup, and shall reject or escalate transactions that exceed
+     configured risk thresholds."
+    priority must
+
+  REQ-NFR-032 "Financial audit trail" : ubiquitous
+    source "Constraint: PCI-DSS Level 1 compliance"
+    :: "7-year audit retention is the industry floor"
+    "The RideNow platform shall store every authorization, capture,
+     refund, deduction, payout, and dispute decision in an append-only
+     audit log retained for at least 7 years."
+    priority must
+}
+
+
+requirements "Observability and Incident Response" scoped-to RideNowOrganization {
+  prd-source "ride-now.prd"
+
+  REQ-NFR-040 "Observability baseline" : ubiquitous
+    source "Goal: Reduce rider wait time and abandonment — metric: p50 time from RideRequested to driver-assigned"
+    :: "Every headline PRD metric must be observable in production"
+    "The RideNow platform shall expose metrics, structured logs, and
+     distributed traces for every cross-context operation such that
+     each PRD success metric can be computed from production telemetry."
+    priority must
+
+  REQ-NFR-041 "Incident response SLA" : event-driven
+    source "Goal: Establish safety and trust baseline — metric: Time from emergency button press to safety team acknowledgment < 60 seconds at p95"
+    :: "Safety and severity-1 incidents require bounded response"
+    "When a severity-1 incident is detected — platform outage, safety
+     event, or financial-loss event — the RideNow platform shall
+     page the on-call responder within 60 seconds and engage the
+     incident commander within 5 minutes."
+    priority must
+
+  REQ-NFR-042 "Operational audit trail" : ubiquitous
+    source "Persona: Trust and safety operator — goals: Preserve an auditable trail for legal and regulatory review"
+    :: "Every operator action must be traceable for regulators and legal"
+    "The RideNow platform shall record every operator action — driver
+     suspension, rider ban, refund decision, identity override — in
+     an append-only audit log retained for at least 7 years."
+    priority must
+    decomposed-into {
+      REQ-DRV-NFR-005    // Driver audit trail
+      REQ-RDR-NFR-004    // Rider audit trail
+      REQ-RIDE-NFR-005   // Ride audit trail
+      REQ-PAY-NFR-004    // Payment audit trail
+    }
+}
+
+
+requirements "Regulatory and Operational Boundaries" scoped-to RideNowOrganization {
+  prd-source "ride-now.prd"
+
+  REQ-NFR-050 "Per-market operating licence" : ubiquitous
+    source "Constraint: Local ride-hailing operating licences"
+    :: "No market operates without its licence"
+    "The RideNow platform shall not accept ride requests, driver
+     onboarding, or ride offers in a market until the applicable
+     ride-hailing operating licence is active."
+    priority must
+
+  REQ-NFR-051 "Surge cap per market" : ubiquitous
+    source "Risk: Regulator caps or bans surge pricing in a key market — mitigation: mitigate"
+    :: "Dynamic pricing must respect per-market caps"
+    "The RideNow platform shall apply per-market surge caps such that
+     in no market shall the surge multiplier exceed the lower of the
+     platform cap (5.0x) and the regulatory cap for that market."
+    priority must
+
+  REQ-NFR-052 "Driver classification non-goal" : ubiquitous
+    source "Non-goal: Classify drivers as employees"
+    :: "Reinforce the marketplace model through product behavior, not only legal structure"
+    "The RideNow platform shall not offer employment benefits,
+     guaranteed hours, or direct hourly compensation to drivers
+     through any platform feature."
+    priority must
+
+  REQ-NFR-053 "Cashless operation" : ubiquitous
+    source "Non-goal: Drive cash payments"
+    :: "Cashless by design — no market operates on cash"
+    "The RideNow platform shall not accept or disburse cash as a
+     payment channel between rider, driver, and platform."
+    priority must
+}

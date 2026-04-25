@@ -4,6 +4,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
+# shellcheck source=./check-tree-sitter.sh
+source "$SCRIPT_DIR/check-tree-sitter.sh"
+check_tree_sitter_cli
+
 GRAMMARS=(
   "tree-sitter-specy-prd"
   "tree-sitter-specy-sysreq"
@@ -14,9 +18,18 @@ EXAMPLES=(
   "examples/business-loan/business-loan.prd"
   "examples/business-loan/business-loan.sysreq"
   "examples/business-loan/business-loan.domain"
-  "examples/url-shortener/url-shortener.prd"
-  "examples/url-shortener/url-shortener.sysreq"
-  "examples/url-shortener/url-shortener.domain"
+  "examples/ride-now/ride-now.prd"
+  "examples/ride-now/driver-management.sysreq"
+  "examples/ride-now/rider-management.sysreq"
+  "examples/ride-now/ride-management.sysreq"
+  "examples/ride-now/geolocation-routing.sysreq"
+  "examples/ride-now/payment.sysreq"
+  "examples/ride-now/platform-nfr.sysreq"
+  "examples/ride-now/driver-management.domain"
+  "examples/ride-now/rider-management.domain"
+  "examples/ride-now/ride-management.domain"
+  "examples/ride-now/geolocation-routing.domain"
+  "examples/ride-now/payment.domain"
 )
 
 RED='\033[0;31m'
@@ -56,12 +69,13 @@ for example in "${EXAMPLES[@]}"; do
 
   # Find the right parser by trying each grammar dir
   parsed=0
+  matched_dir=""
   for grammar in "${GRAMMARS[@]}"; do
     dir="$SCRIPT_DIR/$grammar"
     errors=$(cd "$dir" && tree-sitter parse "$file" 2>&1 | grep -c ERROR || true)
     if [ "$errors" = "0" ]; then
-      printf "${GREEN}0 errors${RESET}\n"
       parsed=1
+      matched_dir="$dir"
       break
     fi
   done
@@ -76,8 +90,29 @@ for example in "${EXAMPLES[@]}"; do
         best=$errors
       fi
     done
-    printf "${RED}%d errors${RESET}\n" "$best"
+    printf "${RED}%d parse errors${RESET}\n" "$best"
     fail=1
+    continue
+  fi
+
+  # Parse succeeded — also validate that the highlights query loads cleanly
+  # against the file. This is what Neovim does on file open, and catches
+  # stale node references in queries that `tree-sitter parse` does not.
+  query_file="$matched_dir/queries/highlights.scm"
+  if [ ! -f "$query_file" ]; then
+    printf "${GREEN}parse OK${RESET} ${BOLD}(no query file)${RESET}\n"
+    continue
+  fi
+
+  query_output=$(cd "$matched_dir" && tree-sitter query "$query_file" "$file" 2>&1) || query_failed=1
+  if [ "${query_failed:-0}" = "1" ]; then
+    printf "${RED}query failed${RESET}\n"
+    # show first non-empty error lines to make staleness obvious
+    echo "$query_output" | grep -v '^$' | head -3 | sed 's/^/      /'
+    fail=1
+    unset query_failed
+  else
+    printf "${GREEN}OK${RESET} (parse + query)\n"
   fi
 done
 

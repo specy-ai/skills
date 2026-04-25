@@ -1,0 +1,194 @@
+requirements "Rider Registration & Profile" scoped-to RiderManagement {
+  prd-source "ride-now.prd"
+
+  REQ-RDR-001 "Rider signup" : event-driven
+    source "Feature: Frictionless rider signup — Story: Sign up with phone number and payment method — AC: Phone verification completes with a single one-time code"
+    :: "Frictionless signup — minimum barrier to first ride"
+    "When a person signs up with a phone number, the Rider Management
+     system shall create a rider profile and send a one-time verification
+     code to the phone number."
+    priority must
+
+  REQ-RDR-002 "Phone verification" : event-driven
+    source "Feature: Frictionless rider signup — Story: Sign up with phone number and payment method — AC: Phone verification completes with a single one-time code"
+    :: "Verified phone is the minimum identity for accountability"
+    "When the rider submits the correct verification code, the Rider
+     Management system shall mark the rider's phone verified and
+     publish a RiderPhoneVerified event."
+    priority must
+
+  REQ-RDR-003 "Verification code brute-force lockout" : unwanted
+    source "Feature: Frictionless rider signup — Story: Sign up with phone number and payment method — AC: After three failed code attempts, the phone is locked for 15 minutes"
+    :: "Prevent brute-force verification bypass"
+    "If the rider submits an incorrect verification code three times
+     in a row, then the Rider Management system shall lock verification
+     attempts on that phone number for 15 minutes."
+    priority must
+
+  REQ-RDR-004 "No government ID at signup" : ubiquitous
+    source "Feature: Frictionless rider signup — non-goal: Require a government ID at signup"
+    :: "Non-goal — identity verification is triggered only by risk signals"
+    "The Rider Management system shall not require a government-issued
+     identity document at rider signup."
+    priority must
+
+  REQ-RDR-005 "Ready-to-ride gate" : ubiquitous
+    source "Feature: Frictionless rider signup — Story: Sign up with phone number and payment method — AC: Account is ready to request a ride once phone is verified and at least one payment method is added"
+    :: "Minimum viable profile — phone verified + active payment method"
+    "The Rider Management system shall prevent a rider from requesting
+     a ride unless the rider has a verified phone and at least one
+     active payment method."
+    priority must
+
+  REQ-RDR-006 "Payment method association" : event-driven
+    source "Feature: Payment method validation — Story: Stored card validated in advance — AC: Added payment method is validated with a zero-value authorization on save"
+    :: "A rider needs at least one validated payment method before requesting a ride"
+    "When a rider adds a payment method, the Rider Management system
+     shall request validation from the Payment system and associate
+     the method with the rider profile only if the validation succeeds."
+    priority must
+}
+
+
+requirements "Saved Addresses & Preferences" scoped-to RiderManagement {
+  prd-source "ride-now.prd"
+
+  REQ-RDR-010 "Save address" : event-driven
+    source "Feature: Saved addresses and preferences — Story: Save Home and Work addresses — AC: Rider can save, edit, and delete named addresses"
+    :: "Convenience — riders reuse frequent destinations"
+    "When a rider saves an address, the Rider Management system shall
+     store the address with a label on the rider profile."
+    priority should
+
+  REQ-RDR-011 "Edit or delete saved address" : event-driven
+    source "Feature: Saved addresses and preferences — Story: Save Home and Work addresses — AC: Rider can save, edit, and delete named addresses"
+    :: "Full control over saved profile data"
+    "When a rider edits or deletes a saved address, the Rider Management
+     system shall apply the change to the rider profile immediately."
+    priority should
+
+  REQ-RDR-012 "One-tap saved-address selection" : ubiquitous
+    source "Feature: Saved addresses and preferences — Story: Save Home and Work addresses — AC: Rider can select a saved address as destination in one tap from the home screen"
+    :: "Shortens the happy path to ride request"
+    "The Rider Management system shall expose saved addresses to the
+     rider app such that selecting a saved address as destination
+     requires a single tap from the home screen."
+    priority should
+
+  REQ-RDR-013 "Accessibility preferences" : event-driven
+    source "Feature: Saved addresses and preferences — summary mentions accessibility needs"
+    :: "Accessibility needs must be honoured across every ride"
+    "When a rider sets an accessibility preference on their profile,
+     the Rider Management system shall propagate the preference to
+     subsequent ride requests."
+    priority should
+}
+
+
+requirements "Rider Ratings & Bans" scoped-to RiderManagement {
+  prd-source "ride-now.prd"
+
+  REQ-RDR-020 "Rider rating submission" : event-driven
+    source "Feature: Rider rating and ban policy — Story: Review banned-rider proposals with full context — AC: Every rating below threshold lists with driver comment and ride reference"
+    :: "Drivers rate riders — abusive riders degrade driver retention"
+    "When a driver submits a rating and optional comment for a completed
+     ride, the Rider Management system shall record the rating and
+     comment and recompute the rider's average rating."
+    priority must
+
+  REQ-RDR-021 "Rating range" : ubiquitous
+    source "Feature: Rider rating and ban policy — summary: balances driver-only rating asymmetry"
+    :: "Rating must be 1 to 5 — no gaming"
+    "The Rider Management system shall accept ratings only in the
+     integer range one through five inclusive."
+    priority must
+
+  REQ-RDR-022 "Low-rating warning" : complex
+    source "Feature: Rider rating and ban policy — summary: riders with sustained low ratings or repeated violations are subject to warning or ban"
+    :: "Give riders a chance to improve before banning"
+    "While the rider has completed more than 10 rides, if the rider's
+     average rating drops below 4.0, then the Rider Management system
+     shall send the rider a warning notification with the rating
+     threshold and the ban policy."
+    priority should
+
+  REQ-RDR-023 "Ban proposal on sustained low rating" : complex
+    source "Feature: Rider rating and ban policy — Story: Review banned-rider proposals with full context — AC: Ban proposals list every rating below threshold with driver comment and ride reference"
+    :: "Protect drivers from chronically abusive riders — human review required"
+    "While the rider has completed more than 10 rides, if the rider's
+     average rating drops below 3.5, then the Rider Management system
+     shall create a ban proposal in the operator review queue listing
+     every rating below threshold with driver comment and ride reference."
+    priority must
+
+  REQ-RDR-024 "Operator ban decision" : event-driven
+    source "Feature: Rider rating and ban policy — Story: Review banned-rider proposals with full context — AC: Operator decision is logged in an audit trail"
+    :: "Ban decisions are made by operators, not algorithms alone"
+    "When a trust and safety operator resolves a ban proposal, the
+     Rider Management system shall apply the decision, record it with
+     the operator identity, reason, and timestamp, and notify the rider."
+    priority must
+
+  REQ-RDR-025 "Rider ban appeal window" : event-driven
+    source "Feature: Rider rating and ban policy — Story: Review banned-rider proposals with full context — AC: Rider can appeal a ban within 30 days"
+    :: "Due process — riders can contest bans"
+    "When a banned rider submits an appeal within 30 days of the ban,
+     the Rider Management system shall record the appeal and place
+     it in the operator review queue."
+    priority should
+
+  REQ-RDR-026 "Rider appeal response SLA" : event-driven
+    source "Feature: Rider rating and ban policy — Story: Review banned-rider proposals with full context — AC: Operator response within 5 business days"
+    :: "Contested bans must be resolved within an SLA — drift erodes trust"
+    "When a rider ban appeal is submitted, the Rider Management system
+     shall deliver an operator decision to the rider within 5 business
+     days."
+    priority should
+
+  REQ-RDR-027 "Late appeal rejection" : unwanted
+    source "Feature: Rider rating and ban policy — Story: Review banned-rider proposals with full context — AC: Appeal window is 30 days"
+    :: "Fixed appeal window — late appeals are closed to keep backlog bounded"
+    "If a banned rider submits an appeal more than 30 days after the
+     ban, then the Rider Management system shall reject the appeal
+     as out of window and notify the rider."
+    priority should
+}
+
+
+requirements "Rider Management — Non-Functional" scoped-to RiderManagement {
+  prd-source "ride-now.prd"
+
+  REQ-RDR-NFR-001 "PII encryption at rest" : ubiquitous
+    source "Constraint: GDPR and equivalent privacy regimes"
+    depends-on REQ-NFR-020
+    :: "Phone numbers, saved addresses, and ratings are PII"
+    "The Rider Management system shall store rider personal data
+     encrypted at rest using at least AES-256."
+    priority must
+
+  REQ-RDR-NFR-002 "Right to erasure" : event-driven
+    source "Constraint: GDPR and equivalent privacy regimes"
+    depends-on REQ-NFR-022
+    :: "GDPR right to erasure — coordinated with other contexts"
+    "When a rider exercises a valid right-to-erasure request, the
+     Rider Management system shall delete or anonymize the rider's
+     personal data within 30 days, retaining only records with a
+     documented regulatory retention obligation."
+    priority must
+
+  REQ-RDR-NFR-003 "Signup success rate" : ubiquitous
+    source "Feature: Frictionless rider signup — value proposition: shortest path from install to first ride"
+    :: "Signup reliability is the first impression; outages cost installs"
+    "The Rider Management system shall maintain at least 99.5% signup
+     success rate measured monthly, excluding failures attributable
+     to the telephony provider."
+    priority should
+
+  REQ-RDR-NFR-004 "Audit trail for rider ban decisions" : ubiquitous
+    source "Feature: Rider rating and ban policy — AC: Operator response within 5 business days"
+    :: "Driver-safety regulators may audit ban policy enforcement"
+    "The Rider Management system shall store every rider ban and
+     appeal decision in an append-only audit log retained for at
+     least seven years."
+    priority must
+}

@@ -1,0 +1,173 @@
+requirements "Driver Location Tracking" scoped-to GeolocationRouting {
+  prd-source "ride-now.prd"
+
+  REQ-GEO-001 "Driver location update" : event-driven
+    source "Feature: Real-time driver positioning — Story: Position updates in the background — AC: Position updates at least every 5 seconds while online"
+    :: "Real-time positioning is the foundation of matching and ETA"
+    "When an online driver's device sends a location update, the
+     Geolocation system shall record the position with a timestamp
+     and make it available for proximity queries."
+    priority must
+
+  REQ-GEO-002 "Minimum update frequency" : state-driven
+    source "Feature: Real-time driver positioning — Story: Position updates in the background — AC: Position updates at least every 5 seconds while online"
+    :: "Balance accuracy against battery and bandwidth"
+    "While the driver is online, the Geolocation system shall accept
+     and persist location updates at a minimum frequency of one every
+     5 seconds."
+    priority must
+
+  REQ-GEO-003 "Stale position ineligibility" : unwanted
+    source "Feature: Real-time driver positioning — Story: Position updates in the background — AC: Stale positions older than 60 seconds mark the driver ineligible for matching"
+    :: "Old positions corrupt matching — exclude them from eligibility"
+    "If a driver's last location update is older than 60 seconds,
+     then the Geolocation system shall mark the driver ineligible
+     for proximity queries and notify the Driver Management system."
+    priority must
+
+  REQ-GEO-004 "Low-accuracy position filtering" : unwanted
+    source "Assumption: GPS accuracy is sufficient for matching and tracking"
+    :: "Low-accuracy GPS fixes produce wrong ETAs and matching"
+    "If a location update reports horizontal accuracy worse than 100
+     meters, then the Geolocation system shall discard the update."
+    priority should
+}
+
+
+requirements "Proximity, ETA, and Routing" scoped-to GeolocationRouting {
+  prd-source "ride-now.prd"
+
+  REQ-GEO-010 "Nearby driver query" : event-driven
+    source "Feature: Driver matching — Story: Driver confirmed within seconds — AC: Eligible drivers are queried from Geolocation on each ride request"
+    :: "Matching needs to find the closest drivers fast"
+    "When the Ride Management system queries for nearby available
+     drivers with a pickup location and a search radius, the Geolocation
+     system shall return the list of online, match-eligible drivers
+     within the radius, ordered by estimated time to pickup."
+    priority must
+
+  REQ-GEO-011 "Pickup ETA computation" : event-driven
+    source "Feature: ETA and routing — Story: ETA to destination stays accurate during the ride"
+    :: "Riders see ETA before and during ride — core UX"
+    "When an ETA is requested between a driver's current location and
+     a pickup point, the Geolocation system shall compute the estimated
+     travel time using current traffic conditions and return it."
+    priority must
+
+  REQ-GEO-012 "Route computation" : event-driven
+    source "Feature: ETA and routing — summary: ETA at ride start and refreshed ETAs as conditions change"
+    :: "Turn-by-turn navigation for drivers and route tracking for riders"
+    "When a route is requested between pickup and dropoff locations,
+     the Geolocation system shall compute the optimal route and return
+     a polyline with total distance and estimated duration."
+    priority must
+
+  REQ-GEO-013 "Destination ETA refresh cadence" : state-driven
+    source "Feature: ETA and routing — Story: ETA to destination stays accurate during the ride — AC: ETA to destination is refreshed at least every 30 seconds during the ride"
+    :: "ETAs drift quickly in urban traffic — refresh frequently"
+    "While a ride is in progress, the Geolocation system shall publish
+     a refreshed destination ETA to the Ride Management system at
+     least every 30 seconds."
+    priority must
+
+  REQ-GEO-014 "ETA variance alert" : complex
+    source "Feature: ETA and routing — Story: ETA to destination stays accurate during the ride — AC: ETA variance alert is raised if the remaining ETA grows more than 5 minutes from the prior value"
+    :: "Sudden ETA growth signals an unexpected delay — surface it"
+    "While a ride is in progress, if the refreshed destination ETA
+     grows more than 5 minutes from the previous published value,
+     then the Geolocation system shall raise an ETA variance alert
+     to the Ride Management system."
+    priority should
+
+  REQ-GEO-015 "Dynamic route recalculation" : complex
+    source "Feature: ETA and routing — summary: refreshed ETAs as conditions change"
+    :: "Traffic changes — keep the driver on the best path"
+    "While a ride is in progress, when traffic conditions change
+     significantly on the current route, the Geolocation system shall
+     recompute the route and notify the Ride Management system."
+    priority should
+}
+
+
+requirements "Surge Zones" scoped-to GeolocationRouting {
+  prd-source "ride-now.prd"
+
+  REQ-GEO-020 "Surge zone activation" : event-driven
+    source "Feature: Surge zone transparency — summary: dynamic pricing active in a zone"
+    :: "Supply-demand imbalance — incentivize drivers to move to high-demand areas"
+    "When the ratio of ride requests to available drivers in a
+     geographic zone exceeds the surge threshold, the Geolocation
+     system shall declare the zone as surging and publish a
+     SurgeActivated event with the surge multiplier and contributing
+     factor."
+    priority must
+
+  REQ-GEO-021 "Surge zone deactivation" : event-driven
+    source "Feature: Surge zone transparency — non-goal: Apply surge silently"
+    :: "Surge must end when supply catches up"
+    "When the supply-demand ratio in a surging zone returns below
+     the surge threshold for at least 5 minutes, the Geolocation
+     system shall deactivate the surge and publish a SurgeDeactivated
+     event."
+    priority must
+
+  REQ-GEO-022 "Surge multiplier cap" : ubiquitous
+    source "Risk: Regulator caps or bans surge pricing in a key market — mitigation: mitigate"
+    :: "Regulatory and PR risk — surge must not be predatory"
+    "The Geolocation system shall enforce a platform-wide maximum
+     surge multiplier of 5.0x, and a lower cap per market where
+     regulation requires it."
+    priority must
+
+  REQ-GEO-023 "Surge visible at fare estimate" : event-driven
+    source "Feature: Surge zone transparency — Story: See the surge multiplier before I confirm — AC: When surge is active, the multiplier and contributing factor are shown on the fare estimate screen"
+    :: "Riders must see surge before they commit — PRD non-goal to apply silently"
+    "When a rider requests a fare estimate in a surging zone, the
+     Geolocation system shall include the surge multiplier and
+     contributing factor in the response to the Ride Management
+     system for display on the fare estimate screen."
+    priority must
+
+  REQ-GEO-024 "Surge frozen at confirmation" : ubiquitous
+    source "Feature: Surge zone transparency — Story: See the surge multiplier before I confirm — AC: Fare committed at confirm is not increased by later surge"
+    :: "Upfront fare is the commitment — later surge must not retroactively apply"
+    "The Geolocation system shall not apply surge adjustments to a
+     ride after the fare has been committed at confirmation."
+    priority must
+}
+
+
+requirements "Geolocation — Non-Functional" scoped-to GeolocationRouting {
+  prd-source "ride-now.prd"
+
+  REQ-GEO-NFR-001 "Nearby driver query latency" : event-driven
+    source "Goal: Reduce rider wait time and abandonment — metric: p50 match < 30 seconds"
+    :: "Matching latency budget flows into Geolocation response time"
+    "When a nearby-driver query is received, the Geolocation system
+     shall return results within 500 milliseconds at p95."
+    priority must
+
+  REQ-GEO-NFR-002 "ETA computation latency" : event-driven
+    source "Feature: Request a ride — AC: Fare estimate is displayed within 3 seconds of confirming destination"
+    :: "ETA is on the fare-estimate critical path"
+    "When an ETA is requested, the Geolocation system shall return
+     the result within 500 milliseconds at p95."
+    priority must
+
+  REQ-GEO-NFR-003 "Location update ingestion throughput" : ubiquitous
+    source "Feature: Real-time driver positioning"
+    :: "At peak, every online driver pushes a position every 5s per BC"
+    "The Geolocation system shall sustain ingestion of at least 10,000
+     location updates per second per market without degrading query
+     latency beyond its stated budgets."
+    priority must
+
+  REQ-GEO-NFR-004 "Location data retention" : ubiquitous
+    source "Constraint: GDPR and equivalent privacy regimes"
+    depends-on REQ-NFR-022
+    :: "Granular location history is sensitive — retain minimum necessary"
+    "The Geolocation system shall retain per-driver granular location
+     history no longer than 90 days and shall aggregate older data
+     into non-personal summaries for operational analysis."
+    priority must
+}

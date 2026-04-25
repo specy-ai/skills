@@ -1,0 +1,358 @@
+requirements "Payment Method Validation" scoped-to Payment {
+  prd-source "ride-now.prd"
+
+  REQ-PAY-001 "Payment method validation on add" : event-driven
+    source "Feature: Payment method validation — Story: Stored card validated in advance — AC: Added payment method is validated with a zero-value authorization on save"
+    :: "Validate before the rider depends on the method"
+    "When a rider adds a payment method, the Payment system shall
+     perform a zero-value authorization with the processor and mark
+     the method active only if the authorization succeeds."
+    priority must
+
+  REQ-PAY-002 "Payment method revalidation at request" : event-driven
+    source "Feature: Payment method validation — Story: Stored card validated in advance — AC: On ride request, the default method is revalidated; if invalid, rider is prompted to update before matching starts"
+    :: "Cards get cancelled, expire, or fail — catch before the ride"
+    "When a rider confirms a ride request, the Payment system shall
+     revalidate the rider's default payment method before matching
+     begins."
+    priority must
+
+  REQ-PAY-003 "Invalid default method blocks request" : unwanted
+    source "Feature: Payment method validation — Story: Stored card validated in advance — AC: On ride request, the default method is revalidated; if invalid, rider is prompted to update before matching starts"
+    :: "Matching must not start with a broken payment"
+    "If the default payment method revalidation fails, then the Payment
+     system shall prompt the rider to update the method and reject
+     the ride request until a valid method is in place."
+    priority must
+}
+
+
+requirements "Fare Calculation" scoped-to Payment {
+  prd-source "ride-now.prd"
+
+  REQ-PAY-010 "Fare estimate" : event-driven
+    source "Feature: Request a ride — Story: See the committed fare before I confirm — AC: Fare breakdown shows base fare, distance, time, and surge if applicable"
+    :: "Riders see the price upfront — builds trust"
+    "When a fare estimate is requested with pickup location, dropoff
+     location, and ride type, the Payment system shall compute the
+     estimated fare from base fare, per-kilometer rate, per-minute
+     rate, and the applicable surge multiplier."
+    priority must
+
+  REQ-PAY-011 "Upfront committed fare" : event-driven
+    source "Feature: Request a ride — Story: See the committed fare before I confirm — AC: Fare shown at confirm is the fare charged unless the route materially changes mid-ride"
+    :: "PRD differentiator — the committed fare is the charged fare"
+    "When a rider confirms a ride request, the Payment system shall
+     lock the displayed fare as the committed fare for the ride,
+     binding the rider to that amount unless the route materially
+     deviates."
+    priority must
+
+  REQ-PAY-012 "Final fare computation" : event-driven
+    source "Feature: Auto-charge on completion — Story: Clear receipt with fare breakdown immediately after the ride — AC: Receipt shows base fare, distance, time, surge if any, fees, total, and payment method"
+    :: "Actual ride metrics replace estimates after completion"
+    "When a final fare is requested with actual distance and duration,
+     the Payment system shall compute the final fare applying any
+     promotions or adjustments, bounded below by the committed fare
+     except in cases of material route deviation."
+    priority must
+
+  REQ-PAY-013 "Minimum fare" : ubiquitous
+    source "Feature: Auto-charge on completion — value proposition: Cashless, instant, and transparent"
+    :: "Short rides must still cover fixed costs"
+    "The Payment system shall enforce a per-market minimum fare; if
+     the computed fare is below the minimum, the minimum fare applies."
+    priority must
+
+  REQ-PAY-014 "Fare breakdown availability" : ubiquitous
+    source "Feature: Auto-charge on completion — Story: Clear receipt with fare breakdown immediately after the ride — AC: Receipt shows base fare, distance, time, surge if any, fees, total, and payment method"
+    :: "Transparency — riders must see what they are paying for"
+    "The Payment system shall provide a fare breakdown showing base
+     fare, distance charge, time charge, surge charge, tolls,
+     promotions, fees, and total for every ride."
+    priority must
+
+  REQ-PAY-015 "Cancellation fee computation" : event-driven
+    source "Feature: Cancellations with fair fees and penalties — Story: Cancel before a driver is assigned at no cost — AC: Cancelling after driver-assigned status incurs a published cancellation fee"
+    :: "Compensate drivers for wasted time on rider cancellations"
+    "When a ride is cancelled by a rider after driver assignment, the
+     Payment system shall compute the cancellation fee based on the
+     per-market published policy and the time elapsed since driver
+     assignment."
+    priority must
+}
+
+
+requirements "Pre-Authorization, Capture, and Debt" scoped-to Payment {
+  prd-source "ride-now.prd"
+
+  REQ-PAY-020 "Pre-authorization at request" : event-driven
+    source "Feature: Pre-authorization at request — Story: Pre-authorization amount and release policy in receipts — AC: Pre-authorization amount equals the committed fare shown at confirm"
+    :: "Pre-auth avoids post-ride payment failures and protects drivers"
+    "When a rider confirms a ride request, the Payment system shall
+     place a hold on the rider's default payment method for the
+     committed fare amount."
+    priority must
+
+  REQ-PAY-021 "Hold release on free cancellation" : event-driven
+    source "Feature: Pre-authorization at request — Story: Pre-authorization amount and release policy in receipts — AC: On free cancellation, the hold is released within 1 business day"
+    :: "Mistaken or pre-match cancellations must not trap rider funds"
+    "When a ride is cancelled with no fee, the Payment system shall
+     request release of the associated pre-authorization hold within
+     1 business day."
+    priority must
+
+  REQ-PAY-022 "Capture on completion" : event-driven
+    source "Feature: Pre-authorization at request — Story: Pre-authorization amount and release policy in receipts — AC: On completion, the hold is captured at the final fare or adjusted and captured"
+    :: "Cashless core — capture happens automatically on completion"
+    "When the Ride Management system initiates payment capture for a
+     completed ride, the Payment system shall capture the final fare
+     from the pre-authorized hold, adjusting the hold amount where
+     necessary."
+    priority must
+
+  REQ-PAY-023 "Payment failure without blocking the ride" : unwanted
+    source "Feature: Auto-charge on completion"
+    :: "Failed payment must not block the rider in the car"
+    "If payment capture fails, then the Payment system shall record
+     the debt on the rider's account, notify the rider, and allow
+     the ride to reach completed status."
+    priority must
+
+  REQ-PAY-024 "Outstanding debt blocks new rides" : state-driven
+    source "Feature: Auto-charge on completion — value proposition: Cashless, instant, and transparent"
+    :: "Riders with unpaid debt must settle before riding again"
+    "While the rider has an outstanding payment debt, the Payment
+     system shall reject payment authorization for new ride requests."
+    priority must
+
+  REQ-PAY-025 "Payment retry on transient failure" : event-driven
+    source "Risk: Payment fraud via stolen cards and collusion — mitigation: mitigate"
+    :: "Transient failures are common — retry before escalating"
+    "When a payment capture fails with a transient error, the Payment
+     system shall retry the capture up to 3 times with exponential
+     backoff."
+    priority must
+
+  REQ-PAY-026 "Fallback to secondary method" : event-driven
+    source "Feature: Payment method validation"
+    :: "Fallback payment reduces failed rides"
+    "When the primary payment method fails after all retries, the
+     Payment system shall attempt to capture from the rider's next
+     active payment method."
+    priority should
+}
+
+
+requirements "Driver Earnings & Payouts" scoped-to Payment {
+  prd-source "ride-now.prd"
+
+  REQ-PAY-040 "Per-ride earnings" : event-driven
+    source "Feature: Pickup to completion — Story: One-tap Start Ride and End Ride — AC: End Ride triggers fare finalization and earnings display within 5 seconds"
+    :: "Drivers see earnings immediately — transparency builds trust"
+    "When a ride is completed and the final fare is computed, the
+     Payment system shall compute the driver's earnings as the fare
+     minus the platform commission and credit the amount to the
+     driver's payable balance."
+    priority must
+
+  REQ-PAY-041 "Earnings breakdown visibility" : event-driven
+    source "Goal: Sustain driver supply and earnings transparency — metric: Time from RideCompleted to earnings breakdown displayed in driver app < 5 seconds at p95"
+    :: "Earnings breakdown is a PRD-level goal"
+    "When a ride is completed, the Payment system shall publish the
+     driver earnings breakdown to the driver app within 5 seconds
+     at p95."
+    priority must
+
+  REQ-PAY-042 "Platform commission" : ubiquitous
+    source "Constraint: Local ride-hailing operating licences"
+    :: "Revenue model — platform takes a percentage of each fare"
+    "The Payment system shall deduct a per-market platform commission
+     from each fare before crediting the driver's balance."
+    priority must
+
+  REQ-PAY-043 "Weekly payout schedule" : event-driven
+    source "Feature: Driver weekly payout — Story: Weekly earnings deposited every Monday — AC: Payout batch runs Mondays at 00:00 local market time"
+    :: "Predictable payouts — drivers depend on this income"
+    "When the weekly payout cutoff occurs on Monday at 00:00 local
+     market time, the Payment system shall initiate payout of each
+     driver's accumulated balance to their registered bank account
+     and publish a PayoutInitiated event."
+    priority must
+
+  REQ-PAY-044 "Payout minimum threshold" : ubiquitous
+    source "Feature: Driver weekly payout — Story: Weekly earnings deposited every Monday — AC: Payout transfers only above a minimum balance threshold; below threshold rolls over"
+    :: "Avoid micro-transfers that cost more in fees than they deliver"
+    "The Payment system shall execute a weekly payout only if the
+     driver's balance exceeds the per-market minimum payout threshold;
+     balances below threshold shall roll over to the next cycle."
+    priority must
+
+  REQ-PAY-045 "Payout arrival SLA" : event-driven
+    source "Goal: Earn trust on payments and payouts — metric: Weekly payout on-time arrival rate > 99% within 2 business days"
+    :: "Payout reliability is the headline trust metric for drivers"
+    "When a weekly payout is initiated, the Payment system shall
+     ensure funds arrive in the driver's bank account within 2
+     business days at p99."
+    priority must
+
+  REQ-PAY-046 "Payout notification" : event-driven
+    source "Feature: Driver weekly payout — Story: Weekly earnings deposited every Monday — AC: Driver receives a notification with amount and expected arrival date"
+    :: "Drivers plan around payouts — no silent transfers"
+    "When a weekly payout is initiated, the Payment system shall
+     notify the driver with the amount and expected arrival date."
+    priority must
+
+  REQ-PAY-047 "Instant payout request" : optional
+    source "Feature: Instant payout — Story: Cash out available balance within minutes — AC: Driver sees the fee and the expected arrival time before confirming the payout"
+    :: "Premium feature — drivers pay a fee for immediate cash-out"
+    "Where instant payouts are enabled in the driver's market, when
+     a driver confirms an instant payout with a fee and arrival-time
+     quote, the Payment system shall transfer the available balance
+     to the driver's linked debit card minus the instant payout fee."
+    priority could
+
+  REQ-PAY-048 "Instant payout arrival SLA" : optional
+    source "Feature: Instant payout — AC: Funds arrive within 30 minutes at p95"
+    :: "Instant payout speed is the value proposition"
+    "Where instant payouts are enabled, when an instant payout is
+     confirmed, the Payment system shall ensure funds arrive in the
+     driver's linked debit card within 30 minutes at p95."
+    priority could
+
+  REQ-PAY-049 "Instant payout daily cap" : optional
+    source "Feature: Instant payout — AC: Daily cap is published and enforced"
+    :: "Caps protect the platform from drain and fraud"
+    "Where instant payouts are enabled, the Payment system shall
+     enforce a per-market published daily cap on instant payout
+     amount per driver."
+    priority could
+}
+
+
+requirements "Refunds, Adjustments, and Disputes" scoped-to Payment {
+  prd-source "ride-now.prd"
+
+  REQ-PAY-060 "Automatic refund on system cancellation" : event-driven
+    source "Feature: Refunds on cancellation and disputes — Story: Automatic refund when the system cancels my ride — AC: Automatic full refund is initiated within 5 minutes of system-driven cancellation"
+    :: "Platform-initiated cancellations must not charge the rider"
+    "When a ride is cancelled by the system (for example reason
+     'no-driver-available'), the Payment system shall initiate a full
+     refund of any captured amount and release any pre-authorization
+     hold within 5 minutes."
+    priority must
+
+  REQ-PAY-061 "Rider refund request" : event-driven
+    source "Goal: Earn trust on payments and payouts — metric: Disputed fare resolution time at p95 < 24 hours"
+    :: "Dispute resolution — rider claims they were overcharged"
+    "When a rider requests a refund for a completed ride, the Payment
+     system shall record the request and place it in the operator
+     review queue."
+    priority must
+
+  REQ-PAY-062 "Refund dispute resolution SLA" : event-driven
+    source "Goal: Earn trust on payments and payouts — metric: Disputed fare resolution time at p95 < 24 hours"
+    :: "Dispute speed is a PRD goal metric"
+    "When a rider refund request is recorded, the Payment system
+     shall deliver an operator decision within 24 hours at p95."
+    priority must
+
+  REQ-PAY-063 "Partial refund" : event-driven
+    source "Feature: Refunds on cancellation and disputes — summary: rider-filed fare disputes are reviewed and resolved within SLA"
+    :: "Not all disputes warrant a full refund — route deviation, wait"
+    "When an operator approves a partial refund, the Payment system
+     shall refund the specified amount to the rider's original
+     payment method and adjust the driver's earnings accordingly."
+    priority must
+
+  REQ-PAY-064 "Driver-fault refund deduction" : event-driven
+    depends-on REQ-PAY-063
+    source "Feature: Refunds on cancellation and disputes — Story: Driver-fault refunds deducted from driver balance — AC: Driver-fault refund creates a deduction against the driver's payable balance"
+    :: "Costs must land where fault lies"
+    "When a refund is classified as driver-fault, the Payment system
+     shall create a deduction against the driver's payable balance
+     and expose the deduction in the driver earnings breakdown."
+    priority must
+
+  REQ-PAY-065 "Refund arrival window" : event-driven
+    source "Feature: Refunds on cancellation and disputes — Story: Automatic refund when the system cancels my ride — AC: Refund arrives at the rider's card within the processor's standard window (typically 5-10 business days)"
+    :: "Set expectation — the processor, not the platform, paces the transfer"
+    "When a refund is issued, the Payment system shall present the
+     rider with the processor's standard arrival window."
+    priority should
+}
+
+
+requirements "Receipts" scoped-to Payment {
+  prd-source "ride-now.prd"
+
+  REQ-PAY-080 "Ride receipt" : event-driven
+    source "Feature: Auto-charge on completion — Story: Clear receipt with fare breakdown immediately after the ride — AC: Receipt is delivered in-app within 60 seconds of ride completion"
+    :: "Every completed ride produces a receipt — regulatory minimum"
+    "When a ride is completed and payment is captured, the Payment
+     system shall deliver a receipt in the rider app within 60
+     seconds, showing base fare, distance, time, surge if any, fees,
+     total, route summary, driver details, and payment method."
+    priority must
+
+  REQ-PAY-081 "Corrected receipt on refund" : event-driven
+    depends-on REQ-PAY-063
+    source "Feature: Refunds on cancellation and disputes — Story: Automatic refund when the system cancels my ride"
+    :: "Amended receipt must reflect the final amount paid"
+    "When a refund is issued for a completed ride, the Payment
+     system shall generate a corrected receipt reflecting the
+     adjusted fare and deliver it to the rider."
+    priority must
+}
+
+
+requirements "Payment — Non-Functional" scoped-to Payment {
+  prd-source "ride-now.prd"
+
+  REQ-PAY-NFR-001 "PCI-DSS compliance" : ubiquitous
+    source "Constraint: PCI-DSS Level 1 compliance"
+    depends-on REQ-NFR-030
+    :: "Non-negotiable — card data must never pass outside compliant boundaries"
+    "The Payment system shall handle, store, and transmit payment
+     card data in compliance with PCI-DSS Level 1."
+    priority must
+
+  REQ-PAY-NFR-002 "Capture latency" : event-driven
+    source "Goal: Earn trust on payments and payouts — metric: Time from RideCompleted to successful payment capture < 60 seconds at p95"
+    :: "Capture speed keeps receipts near-instantaneous"
+    "When payment capture is initiated, the Payment system shall
+     complete the capture within 60 seconds at p95."
+    priority must
+
+  REQ-PAY-NFR-003 "Capture idempotency" : ubiquitous
+    source "Risk: Payment fraud via stolen cards and collusion — mitigation: mitigate"
+    :: "Double-capture is a direct financial-loss risk"
+    "The Payment system shall treat payment capture operations as
+     idempotent such that retries with the same capture identifier
+     do not result in duplicate charges."
+    priority must
+
+  REQ-PAY-NFR-004 "Audit trail for financial events" : ubiquitous
+    source "Constraint: PCI-DSS Level 1 compliance"
+    :: "Financial audit, chargeback defense, regulatory review"
+    "The Payment system shall record every authorization, capture,
+     refund, deduction, and payout in an append-only audit log
+     retained for at least 7 years."
+    priority must
+
+  REQ-PAY-NFR-005 "Processor outage degraded mode" : state-driven
+    source "Assumption: Payment processor supports pre-auth with release at our scale"
+    :: "Processor outages must degrade gracefully, not cascade to rider-facing failures"
+    "While a primary payment processor is unavailable, the Payment
+     system shall fail over to a secondary processor for new
+     authorizations and captures within 30 seconds of detection."
+    priority should
+
+  REQ-PAY-NFR-006 "Payout reconciliation" : ubiquitous
+    source "Goal: Earn trust on payments and payouts — metric: Weekly payout on-time arrival rate > 99%"
+    :: "Reconcile payout batches against bank settlements to detect drift"
+    "The Payment system shall reconcile each weekly payout batch
+     against bank settlement within 24 hours of the expected arrival
+     date and flag any discrepancy for operator review."
+    priority must
+}

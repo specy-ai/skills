@@ -1,0 +1,284 @@
+requirements "Driver Onboarding & Identity" scoped-to DriverManagement {
+  prd-source "ride-now.prd"
+
+  REQ-DRV-001 "Driver application" : event-driven
+    source "Feature: Driver onboarding and identity verification — Story: Submit identity and license documents — AC: Driver can upload ID, licence, and selfie"
+    :: "Every driver must go through onboarding before being offered a ride"
+    "When a person submits a driver application, the Driver Management
+     system shall create a driver profile in pending-verification status."
+    priority must
+
+  REQ-DRV-002 "Identity document capture" : event-driven
+    source "Feature: Driver onboarding and identity verification — Story: Submit identity and license documents — AC: Driver can upload government-issued ID, driver's licence, and selfie from the app"
+    :: "Regulatory requirement — drivers must prove identity before activation"
+    "When a driver uploads identity and licence documents, the Driver
+     Management system shall store the documents and initiate identity
+     verification with the certified third-party provider."
+    priority must
+
+  REQ-DRV-003 "Verification status visibility" : ubiquitous
+    source "Feature: Driver onboarding and identity verification — Story: Submit identity and license documents — AC: Driver sees the verification status at every step"
+    :: "Status opacity is a top driver onboarding frustration"
+    "The Driver Management system shall expose the driver's verification
+     status — submitted, under review, verified, or rejected — on the
+     driver app at every step."
+    priority must
+
+  REQ-DRV-004 "No rides before verification" : state-driven
+    source "Feature: Driver onboarding and identity verification — Story: Submit identity and license documents — AC: Driver is offered no rides while status is not verified"
+    :: "Safety obligation — no unverified driver reaches a rider"
+    "While the driver is not in verified status, the Driver Management
+     system shall prevent the driver from receiving any ride offer."
+    priority must
+
+  REQ-DRV-005 "Verification success transition" : event-driven
+    source "Feature: Driver onboarding and identity verification — Story: Submit identity and license documents — AC: Verified status unlocks ride offers"
+    :: "Clear onboarding outcome triggers activation"
+    "When the identity verification provider returns a successful result,
+     the Driver Management system shall transition the driver to verified
+     status and publish a DriverVerified event."
+    priority must
+
+  REQ-DRV-006 "Verification rejection with reason" : unwanted
+    source "Feature: Driver onboarding and identity verification — Story: Submit identity and license documents — AC: On rejection, driver sees the specific reason and the appeal path"
+    :: "Opaque deactivation is a top driver frustration — reasons are mandatory"
+    "If the identity verification provider returns a negative result,
+     then the Driver Management system shall reject the application,
+     record the specific rejection reason, notify the driver with the
+     reason and the appeal path."
+    priority must
+
+  REQ-DRV-007 "Estimated time to verify" : ubiquitous
+    source "Feature: Driver onboarding and identity verification — Story: Know how long verification will take — AC: Driver sees an estimated time-to-verify on the status screen"
+    :: "Drivers need to plan when they can start earning"
+    "The Driver Management system shall display an estimated time-to-verify
+     on the driver status screen while verification is in progress."
+    priority should
+
+  REQ-DRV-008 "Verification status change notification" : event-driven
+    source "Feature: Driver onboarding and identity verification — Story: Know how long verification will take — AC: Driver receives a notification within 24 hours of status change"
+    :: "Asynchronous verification — drivers must not refresh the app to learn outcome"
+    "When the driver's verification status changes, the Driver Management
+     system shall notify the driver through the app and push channel
+     within 24 hours of the change."
+    priority must
+}
+
+
+requirements "Vehicle Registration & Eligibility" scoped-to DriverManagement {
+  prd-source "ride-now.prd"
+
+  REQ-DRV-020 "Vehicle registration" : event-driven
+    source "Feature: Vehicle registration and inspection — Story: Register a vehicle with documents — AC: Driver can upload registration, insurance, and inspection documents"
+    :: "Every ride is served by a documented vehicle — regulatory and insurance"
+    "When a driver registers a vehicle, the Driver Management system
+     shall store the vehicle details with its registration, insurance,
+     and inspection documents, and associate the vehicle with the driver."
+    priority must
+
+  REQ-DRV-021 "Vehicle eligibility requires valid documents" : ubiquitous
+    source "Feature: Vehicle registration and inspection — Story: Register a vehicle with documents — AC: Vehicle is marked eligible only when all required documents are valid and unexpired"
+    :: "Fleet safety and regulatory compliance"
+    "The Driver Management system shall mark a vehicle eligible only
+     when the vehicle's registration, insurance, and inspection documents
+     are all present, valid, and unexpired."
+    priority must
+
+  REQ-DRV-022 "Document expiry deactivates vehicle" : unwanted
+    source "Feature: Vehicle registration and inspection — Story: Register a vehicle with documents — AC: When any document expires, the vehicle is automatically marked ineligible and the driver is notified"
+    :: "Expired documents create legal liability and insurance gaps"
+    "If any of a vehicle's registration, insurance, or inspection documents
+     expires, then the Driver Management system shall mark the vehicle
+     ineligible and notify the driver to upload renewed documents."
+    priority must
+
+  REQ-DRV-023 "Ineligible vehicle prevents online" : state-driven
+    source "Feature: Vehicle registration and inspection — Story: Register a vehicle with documents — AC: Expired means unavailable"
+    :: "Ineligible vehicles must not serve rides"
+    "While the driver's selected vehicle is ineligible, the Driver
+     Management system shall prevent the driver from going online in
+     that vehicle."
+    priority must
+}
+
+
+requirements "Driver Availability" scoped-to DriverManagement {
+  prd-source "ride-now.prd"
+
+  REQ-DRV-030 "Go online" : complex
+    source "Feature: Driver availability — Story: Toggle online and offline with one tap — AC: Online toggle is a single tap, confirmed within 1 second"
+    :: "Drivers control their hours — the toggle must feel instant"
+    "While the driver is verified, not suspended, and has an eligible
+     selected vehicle, when the driver requests to go online, the Driver
+     Management system shall transition the driver to online status
+     within one second and publish a DriverWentOnline event."
+    priority must
+
+  REQ-DRV-031 "Go offline" : event-driven
+    source "Feature: Driver availability — Story: Toggle online and offline with one tap — AC: Offline driver receives no ride offers"
+    :: "Drivers stop their session at will"
+    "When an online driver requests to go offline, the Driver Management
+     system shall transition the driver to offline status and publish
+     a DriverWentOffline event."
+    priority must
+
+  REQ-DRV-032 "Online driver match-eligibility" : state-driven
+    source "Feature: Driver availability — Story: Toggle online and offline with one tap — AC: Online driver is visible to the matching system with a current location"
+    :: "Matching sees only eligible, currently-located drivers"
+    "While the driver is online, the Driver Management system shall
+     expose the driver as match-eligible to the Ride Management system
+     together with the driver's current location."
+    priority must
+
+  REQ-DRV-033 "Suspended driver cannot go online" : state-driven
+    source "Feature: Driver rating and suspension — Story: Review suspension with full context — AC: Suspension prevents new rides"
+    :: "Safety enforcement — suspended drivers must not reach riders"
+    "While the driver is suspended, the Driver Management system shall
+     reject any attempt to go online."
+    priority must
+
+  REQ-DRV-034 "Automatic offline on stale position" : unwanted
+    source "Feature: Real-time driver positioning — AC: Stale positions older than 60 seconds mark the driver ineligible for matching"
+    :: "Ghost online drivers degrade matching — remove them after timeout"
+    "If an online driver's last position update is older than 60 seconds,
+     then the Driver Management system shall transition the driver to
+     offline, notify the driver, and publish a DriverWentOffline event."
+    priority must
+}
+
+
+requirements "Driver Ratings & Suspension" scoped-to DriverManagement {
+  prd-source "ride-now.prd"
+
+  REQ-DRV-040 "Rating submission" : event-driven
+    source "Feature: Driver rating and suspension — Story: See current rating and trajectory — AC: Rating average is updated after each ride"
+    :: "Rider feedback drives quality — collected after every completed ride"
+    "When a rider submits a rating for a completed ride, the Driver
+     Management system shall record the rating and recompute the
+     driver's average rating."
+    priority must
+
+  REQ-DRV-041 "Rating range" : ubiquitous
+    source "Feature: Driver rating and suspension — Story: See current rating and trajectory — AC: Ratings outside 1-5 rejected"
+    :: "Rating must be 1 to 5 — no gaming"
+    "The Driver Management system shall accept ratings only in the
+     integer range one through five inclusive."
+    priority must
+
+  REQ-DRV-042 "Rating visibility to driver" : ubiquitous
+    source "Feature: Driver rating and suspension — Story: See current rating and trajectory — AC: Driver can see current rating and its 30-day trend"
+    :: "Transparency — drivers must know where they stand"
+    "The Driver Management system shall expose the driver's current
+     average rating and its 30-day trend in the driver app."
+    priority must
+
+  REQ-DRV-043 "Warning at warning threshold" : complex
+    source "Feature: Driver rating and suspension — Story: See current rating and trajectory — AC: Driver is notified when rating crosses the warning threshold"
+    :: "Give drivers a chance to correct before suspension"
+    "While the driver has completed more than 20 rides, if the driver's
+     average rating drops below 4.2, then the Driver Management system
+     shall send the driver a warning notification with the rating
+     threshold and the suspension policy."
+    priority must
+
+  REQ-DRV-044 "Suspension proposal on sustained low rating" : complex
+    source "Feature: Driver rating and suspension — Story: Review suspension with full context — AC: Suspension proposals queue with ride trace, rating history, prior incidents, and payout state"
+    :: "Chronic low quality endangers riders — proposals are reviewed, not auto-executed"
+    "While the driver has completed more than 20 rides, if the driver's
+     average rating drops below the suspension threshold, then the Driver
+     Management system shall create a suspension proposal in the operator
+     review queue with the driver's ride trace, rating history, prior
+     incidents, and current payout state."
+    priority must
+
+  REQ-DRV-045 "Operator decision is logged" : event-driven
+    source "Feature: Driver rating and suspension — Story: Review suspension with full context — AC: Operator decision is logged with reason and timestamp in a permanent audit trail"
+    :: "Regulatory and internal audit requires every decision to be traceable"
+    "When a trust and safety operator approves, rejects, or escalates
+     a suspension proposal, the Driver Management system shall record
+     the decision with the operator identity, reason, and timestamp
+     in a permanent audit trail."
+    priority must
+
+  REQ-DRV-046 "No automatic ratings-only deactivation" : ubiquitous
+    source "Feature: Driver rating and suspension — non-goals: Deactivate a driver automatically without a human review for ratings-only reasons"
+    :: "Opaque deactivation is a top driver frustration — human review is mandatory for ratings-only suspensions"
+    "The Driver Management system shall not execute a deactivation or
+     suspension triggered solely by rating thresholds without a trust
+     and safety operator approval."
+    priority must
+
+  REQ-DRV-047 "Rating appeal" : event-driven
+    source "Feature: Driver rating and suspension — Story: See current rating and trajectory — AC: Driver can open an appeal on any rating below 3 with a free-text reason"
+    :: "Due process — one unfair rating must not jeopardize income"
+    "When a driver opens an appeal on a rating below 3, the Driver
+     Management system shall record the appeal with the free-text
+     reason and place it in the operator review queue."
+    priority should
+
+  REQ-DRV-048 "Suspension appeal" : event-driven
+    source "Job: Protect my rating from unfair complaints — outcome: Minimize the time between filing an appeal and receiving a decision"
+    :: "Due process — drivers can contest suspensions"
+    "When a suspended driver submits an appeal, the Driver Management
+     system shall record the appeal and transition the driver to
+     appeal-in-review status."
+    priority should
+
+  REQ-DRV-049 "Appeal resolution" : event-driven
+    source "Job: Protect my rating from unfair complaints — outcome: Maximize the transparency of how rating and suspension decisions are made"
+    :: "Backoffice resolves appeals — reinstate or confirm suspension"
+    "When an operator resolves a suspension appeal, the Driver
+     Management system shall transition the driver to either verified
+     or permanently-suspended status, record the resolution rationale,
+     and notify the driver."
+    priority should
+}
+
+
+requirements "Driver Management — Non-Functional" scoped-to DriverManagement {
+  prd-source "ride-now.prd"
+
+  REQ-DRV-NFR-001 "Identity verification SLA" : event-driven
+    source "Assumption: Third-party identity verification meets our SLA"
+    depends-on REQ-NFR-010
+    :: "Onboarding throughput depends on third-party SLA adherence"
+    "When the Driver Management system submits an identity verification
+     request to the third-party provider, the Driver Management system
+     shall receive a decision within 48 hours at p95 or escalate to
+     manual review."
+    priority must
+
+  REQ-DRV-NFR-002 "Document storage encryption at rest" : ubiquitous
+    source "Constraint: GDPR and equivalent privacy regimes"
+    depends-on REQ-NFR-020
+    :: "Identity and licence documents are sensitive PII"
+    "The Driver Management system shall store driver identity documents,
+     licences, and selfies encrypted at rest using at least AES-256."
+    priority must
+
+  REQ-DRV-NFR-003 "Document retention and erasure" : ubiquitous
+    source "Constraint: GDPR and equivalent privacy regimes"
+    depends-on REQ-NFR-022
+    :: "GDPR right to erasure; regulatory minimum retention"
+    "The Driver Management system shall retain driver identity documents
+     for the regulatory minimum retention period applicable in the
+     driver's market and shall delete them within 30 days of a valid
+     erasure request made after deactivation."
+    priority must
+
+  REQ-DRV-NFR-004 "Go-online response time" : event-driven
+    source "Feature: Driver availability — AC: Online toggle is a single tap, confirmed within 1 second"
+    :: "Driver-facing latency budget from the PRD acceptance criterion"
+    "When a driver requests to go online, the Driver Management system
+     shall confirm the transition to the driver app within 1 second
+     at p95."
+    priority must
+
+  REQ-DRV-NFR-005 "Audit trail immutability" : ubiquitous
+    source "Feature: Driver rating and suspension — AC: Operator decision is logged with reason and timestamp in a permanent audit trail"
+    :: "Regulatory audits and driver classification disputes depend on immutable trails"
+    "The Driver Management system shall store all suspension, deactivation,
+     and appeal decisions in an append-only audit log retained for at
+     least seven years."
+    priority must
+}

@@ -61,7 +61,11 @@ module.exports = grammar({
       '}',
     ),
 
-    shortname: $ => seq('(', $.identifier, ')'),
+    shortname: $ => choice(
+      seq('shortname', $.identifier),
+      seq('shortname', '(', $.identifier, ')'),
+      seq('(', $.identifier, ')'),
+    ),
 
     requirements_source_decl: $ => seq('requirements-source', $.string_literal),
 
@@ -198,7 +202,7 @@ module.exports = grammar({
       ']',
     ),
 
-    requirement_id: $ => token(/REQ-[A-Z][A-Z0-9]*-\d{3}/),
+    requirement_id: $ => token(/REQ-[A-Z][A-Z0-9]*(-[A-Z][A-Z0-9]*)*-\d{3}/),
 
     // =========================================================================
     // Value Type — flexible body (with or without fields{} wrapper)
@@ -291,9 +295,16 @@ module.exports = grammar({
       field('name', $.type_name),
       optional($.description),
       optional($.metadata_block),
-      '{',
-      repeat($._aggregate_body_item),
-      '}',
+      choice(
+        // long form: aggregate X { root Y; entities { ... }; ... }
+        seq('{', repeat($._aggregate_body_item), '}'),
+        // short form: aggregate X root Y                          (no body)
+        // short form: aggregate X root Y { contains [E1, E2] }    (contains-only body)
+        seq(
+          'root', field('root', $.type_name),
+          optional(seq('{', $.aggregate_contains_decl, '}')),
+        ),
+      ),
     ),
 
     _aggregate_body_item: $ => choice(
@@ -318,10 +329,11 @@ module.exports = grammar({
 
     aggregate_entities_decl: $ => seq('entities', '{', repeat($.type_name), '}'),
 
-    aggregate_contains_decl: $ => seq(
-      'contains',
-      $.type_name,
-      repeat(seq(',', $.type_name)),
+    aggregate_contains_decl: $ => choice(
+      // bare comma list: contains E1, E2, E3
+      seq('contains', $.type_name, repeat(seq(',', $.type_name))),
+      // bracketed list: contains [E1, E2, E3]
+      seq('contains', '[', $.type_name, repeat(seq(',', $.type_name)), ']'),
     ),
 
     // =========================================================================
@@ -331,6 +343,8 @@ module.exports = grammar({
     statemachine_def: $ => seq(
       'statemachine',
       field('name', $.type_name),
+      // optional 'on EntityName' header form: `statemachine X on Entity { ... }`
+      optional(seq('on', field('entity', $.type_name))),
       '{',
       repeat($._statemachine_item),
       '}',
@@ -344,26 +358,49 @@ module.exports = grammar({
       $.final_state,
     ),
 
-    statemachine_start: $ => seq('start', $.type_name),
+    // State names may be PascalCase (canonical) or camelCase (also used).
+    _state_name: $ => choice($.type_name, $.identifier),
+
+    statemachine_start: $ => seq('start', $._state_name),
 
     state_def_simple: $ => seq(
       'state',
-      field('name', $.type_name),
+      field('name', $._state_name),
+      // optional empty body and empty/identifier-named invariants
+      optional(seq(
+        '{',
+        repeat(choice($.inline_invariant, $.inline_invariant_simple, $.scoped_invariant_def)),
+        '}',
+      )),
+    ),
+
+    // Simple inline invariant: `invariant <ident> { <expression> }`
+    // (Used inside `state { ... }` and elsewhere where a full inline_invariant
+    // with must_block / message / etc. would be heavy.)
+    inline_invariant_simple: $ => seq(
+      'invariant',
+      field('name', $.identifier),
+      optional($.description),
+      optional(seq('enforcement', choice('reject', 'warn', 'rejection', 'compensation', 'alert'))),
       '{',
-      repeat($.inline_invariant),
+      optional($.satisfies_decl),
+      $.expression,
       '}',
     ),
 
     transition_inline: $ => seq(
       'transition',
-      field('from', $.type_name),
+      field('from', $._state_name),
       '->',
-      field('to', $.type_name),
-      'triggered-by',
-      field('trigger', $.string_literal),
+      field('to', $._state_name),
+      // accept either `triggered-by "string"` (canonical) or `on CommandOrEvent` (Specy v3 idiom)
+      choice(
+        seq('triggered-by', field('trigger', $.string_literal)),
+        seq('on', field('trigger', $.type_name)),
+      ),
     ),
 
-    final_state: $ => seq('final', $.type_name),
+    final_state: $ => seq('final', $._state_name),
 
     // =========================================================================
     // Reaction
@@ -371,7 +408,10 @@ module.exports = grammar({
 
     reaction_def: $ => seq(
       'reaction',
-      field('name', $.string_literal),
+      // url-shortener uses string-literal names; ride-now uses identifier names
+      field('name', choice($.identifier, $.type_name, $.string_literal)),
+      optional($.description),
+      optional($.metadata_block),
       '{',
       repeat($._reaction_item),
       '}',
@@ -381,11 +421,31 @@ module.exports = grammar({
       $.satisfies_decl,
       $.description,
       $.triggered_by_clause,
+      $.trigger_clause,
+      $.guard_clause,
       $.effects_clause,
+      $.effect_clause,
     ),
 
     triggered_by_clause: $ => seq('triggered-by', $.type_name),
     effects_clause: $ => seq('effects', $.type_name),
+
+    // ride-now style: singular `trigger` / `effect` / explicit `guard`
+    trigger_clause: $ => seq('trigger', $.type_name),
+    guard_clause: $ => seq('guard', $.expression),
+    effect_clause: $ => seq(
+      'effect',
+      choice(
+        // effect publish EventName(args) [to OtherContext]
+        seq('publish',
+            $.type_name,
+            optional(seq('(', optional($.arg_list), ')')),
+            optional(seq('to', $.type_name))),
+        $.service_call_expr,
+        $.function_call,
+        $.type_name,
+      ),
+    ),
 
     // =========================================================================
     // Named Operation (inline in entity/service/interface bodies)
@@ -481,6 +541,7 @@ module.exports = grammar({
       ':',
       $.field_type_opt,
       repeat($.constraint),
+      optional(choice(';', ',')),
     ),
 
     _field_name: $ => choice(
@@ -501,7 +562,8 @@ module.exports = grammar({
     ),
 
     primitive_type: $ => choice(
-      'string', 'int', 'long', 'decimal', 'boolean', 'date', 'datetime', 'time', 'duration', 'uuid', 'void',
+      'string', 'int', 'long', 'decimal', 'boolean', 'date', 'datetime', 'time', 'duration',
+      'uuid', 'void', 'bytes', 'any',
     ),
 
     collection_type: $ => seq(
@@ -534,6 +596,7 @@ module.exports = grammar({
       seq('minLength', '(', $.number, ')'),
       seq('maxLength', '(', $.number, ')'),
       seq('pattern', '(', $.string_literal, ')'),
+      seq('format', '(', $.identifier, ')'),
       'past',
       'future',
       'pastOrPresent',
@@ -627,10 +690,11 @@ module.exports = grammar({
       optional($.description),
       optional($.metadata_block),
       '{',
+      // multi-line bodies are conjunctions of expressions, implicit `and`
       $.expression,
+      repeat($.expression),
       '}',
-      'rejects',
-      $.string_literal,
+      optional(seq('rejects', $.string_literal)),
     ),
 
     postcondition_clause: $ => seq(
@@ -639,7 +703,9 @@ module.exports = grammar({
       optional($.description),
       optional($.metadata_block),
       '{',
+      // multi-line bodies are conjunctions of expressions, implicit `and` between lines
       $.expression,
+      repeat($.expression),
       '}',
     ),
 
@@ -672,6 +738,7 @@ module.exports = grammar({
       field('field', $.identifier),
       '=',
       $._value_expr,
+      optional(choice(';', ',')),
     ),
 
     returns_clause: $ => choice(
@@ -824,18 +891,28 @@ module.exports = grammar({
     // =========================================================================
 
     external_event_def: $ => seq(
-      'external', 'event',
+      // accept both `external event` (two tokens) and `external-event` (one token)
+      choice(seq('external', 'event'), 'external-event'),
       field('name', $.type_name),
-      optional($.description),
-      optional($.metadata_block),
-      '{',
-      optional($.satisfies_decl),
-      'from', $.type_name,
-      'triggers', '{',
-      $.type_name,
-      repeat(seq(',', $.type_name)),
-      '}',
-      '}',
+      choice(
+        // long form: [description] { satisfies, from X, triggers { Y, Z } }
+        seq(
+          optional($.description),
+          optional($.metadata_block),
+          '{',
+          optional($.satisfies_decl),
+          'from', $.type_name,
+          optional(seq(
+            'triggers', '{',
+            $.type_name,
+            repeat(seq(',', $.type_name)),
+            '}',
+          )),
+          '}',
+        ),
+        // short form: external-event Name from Context  (no body)
+        seq('from', field('source_context', $.type_name)),
+      ),
     ),
 
     // =========================================================================
@@ -856,51 +933,50 @@ module.exports = grammar({
     // Temporal Events
     // =========================================================================
 
-    temporal_event_def: $ => choice(
-      $.relative_temporal_event,
-      $.absolute_temporal_event,
-      $.recurring_temporal_event,
-    ),
-
-    relative_temporal_event: $ => seq(
-      'temporal', 'event',
+    // Unified temporal-event — accepts relative, absolute, and recurring kinds
+    // through item-based body, with both legacy and modern keyword spellings.
+    temporal_event_def: $ => seq(
+      // accept `temporal event` (two tokens) or `temporal-event` (single token)
+      choice(seq('temporal', 'event'), 'temporal-event'),
       field('name', $.type_name),
       optional($.description),
       optional($.metadata_block),
       '{',
-      optional($.satisfies_decl),
-      'reference', $.type_name,
-      'offset', $._value_expr,
-      optional(seq('guard', '{', $.expression, '}')),
-      $.fields_block,
+      repeat($._temporal_event_item),
       '}',
     ),
 
-    absolute_temporal_event: $ => seq(
-      'temporal', 'event',
-      field('name', $.type_name),
-      optional($.description),
-      optional($.metadata_block),
-      '{',
-      optional($.satisfies_decl),
-      'instant', $.dot_path,
-      optional(seq('guard', '{', $.expression, '}')),
+    _temporal_event_item: $ => choice(
+      $.satisfies_decl,
+      $.description,
+      $.relative_to_clause,
+      $.absolute_instant_clause,
+      $.recurring_clause,
+      $.guard_clause,           // un-braced  (also used in reactions)
+      $.guard_clause_braced,    // braced     (legacy)
       $.fields_block,
-      '}',
     ),
 
-    recurring_temporal_event: $ => seq(
-      'temporal', 'event',
-      field('name', $.type_name),
-      optional($.description),
-      optional($.metadata_block),
-      '{',
-      optional($.satisfies_decl),
-      'schedule', $.string_literal,
-      optional(seq('guard', '{', $.expression, '}')),
-      $.fields_block,
-      '}',
+    // `relative-to <Ref> offset <Duration>` (modern) and
+    // `reference <Ref> offset <Value>` (legacy)
+    // (dot_path subsumes a bare type_name as a single-segment path)
+    relative_to_clause: $ => seq(
+      choice('relative-to', 'reference'),
+      choice($.dot_path, $.paren_expr),
+      optional(seq('offset', $._value_expr)),
     ),
+
+    absolute_instant_clause: $ => seq('instant', $.dot_path),
+
+    // `recurring "<cron>" [per-market]` (modern) and
+    // `schedule "<cron>"` (legacy)
+    recurring_clause: $ => seq(
+      choice('recurring', 'schedule'),
+      $.string_literal,
+      optional('per-market'),
+    ),
+
+    guard_clause_braced: $ => seq('guard', '{', $.expression, '}'),
 
     // =========================================================================
     // Services — flexible body
@@ -1052,6 +1128,7 @@ module.exports = grammar({
     scoped_invariant_def: $ => seq(
       field('name', $.identifier),
       optional($.description),
+      optional(seq('enforcement', choice('reject', 'warn', 'rejection', 'compensation', 'alert'))),
       optional($.metadata_block),
       '{',
       optional($.satisfies_decl),
@@ -1083,8 +1160,10 @@ module.exports = grammar({
 
     participants_clause: $ => seq(
       'participants',
-      $.type_name,
-      repeat(seq(',', $.type_name)),
+      choice(
+        seq($.type_name, repeat(seq(',', $.type_name))),
+        seq('[', $.type_name, repeat(seq(',', $.type_name)), ']'),
+      ),
     ),
 
     predicate_block: $ => seq('predicate', '{', $.predicate_expr, '}'),
@@ -1110,7 +1189,8 @@ module.exports = grammar({
 
     reconciliation_def: $ => seq(
       'reconciliation',
-      field('name', choice($.type_name, $.string_literal)),
+      // identifier-named reconciliations are common in ride-now style
+      field('name', choice($.identifier, $.type_name, $.string_literal)),
       optional($.description),
       optional($.metadata_block),
       '{',
@@ -1121,9 +1201,11 @@ module.exports = grammar({
     _reconciliation_item: $ => choice(
       seq('trigger', $.reconciliation_trigger),
       seq('detection', $.detection_strategy),
+      seq('response', $.identifier),                                    // new
       seq('compensation', $.type_name, repeat(seq(',', $.type_name))),
       seq('coordination', $.coordination_style),
       $.escalation_chain_def,
+      $.escalation_list,                                                // new
     ),
 
     reconciliation_trigger: $ => choice(
@@ -1131,7 +1213,15 @@ module.exports = grammar({
       seq('schedule', $.string_literal),
     ),
 
-    detection_strategy: $ => choice('query', 'event-sourced', 'query-based'),
+    // Detection strategy: a closed enum, OR a freeform predicate string.
+    detection_strategy: $ => choice('query', 'event-sourced', 'query-based', $.string_literal),
+
+    // Bracketed escalation list: `escalation [stepA, stepB]`
+    escalation_list: $ => seq(
+      'escalation', '[',
+      $.identifier, repeat(seq(',', $.identifier)),
+      ']',
+    ),
 
     coordination_style: $ => choice('choreography', 'orchestration'),
 
@@ -1215,7 +1305,14 @@ module.exports = grammar({
     // Expressions
     // =========================================================================
 
-    expression: $ => $.or_expr,
+    expression: $ => $.coalesce_expr,
+
+    // Elvis / null-coalescing: `a ?: b` evaluates to `b` when `a` is null.
+    // Lowest binary precedence — binds looser than `or`/`and`/comparison.
+    coalesce_expr: $ => prec.left(0, seq(
+      $.or_expr,
+      repeat(seq('?:', $.or_expr)),
+    )),
 
     or_expr: $ => prec.left(1, seq($.and_expr, repeat(seq('or', $.and_expr)))),
 
@@ -1252,9 +1349,12 @@ module.exports = grammar({
     unary_expr: $ => prec(7, choice(
       $.if_expr,
       $.every_expr,
+      $.quantifier_expr,
       $.no_field_contains_expr,
       $.is_defined_expr,
       $.is_not_defined_expr,
+      $.is_null_expr,
+      $.is_not_null_expr,
       $.in_expr,
       $.not_in_expr,
       $.service_call_expr,
@@ -1265,14 +1365,30 @@ module.exports = grammar({
       $.paren_expr,
     )),
 
+    // Quantifier inside expressions: `exists pm in paymentMethods where pm.isActive`
+    quantifier_expr: $ => seq(
+      choice('exists', 'forall'),
+      field('var', $.identifier),
+      'in',
+      field('collection', $.dot_path),
+      optional(seq('where', field('predicate', $.expression))),
+    ),
+
     no_field_contains_expr: $ => seq('no', 'field', 'contains', $.dot_path),
 
-    if_expr: $ => seq('if', $.expression, '{', $.expression, '}'),
+    if_expr: $ => choice(
+      // braced form: if <cond> { <then-expr> }
+      seq('if', $.expression, '{', $.expression, '}'),
+      // ternary form: if <cond> then <then-expr> else <else-expr>
+      prec.right(seq('if', $.expression, 'then', $.expression, 'else', $.expression)),
+    ),
 
     every_expr: $ => seq('every', $.type_name, 'in', $.dot_path, '{', $.expression, '}'),
 
     is_defined_expr: $ => prec(8, seq($.dot_path, 'is', 'defined')),
     is_not_defined_expr: $ => prec(8, seq($.dot_path, 'is', 'not', 'defined')),
+    is_null_expr: $ => prec(8, seq($.dot_path, 'is', 'null')),
+    is_not_null_expr: $ => prec(8, seq($.dot_path, 'is', 'not', 'null')),
 
     in_expr: $ => prec(8, seq($.dot_path, 'in', '{', $.value_list, '}')),
     not_in_expr: $ => prec(8, seq($.dot_path, 'not', 'in', '{', $.value_list, '}')),
@@ -1282,10 +1398,17 @@ module.exports = grammar({
       '(',
       optional($.arg_list),
       ')',
+      // optional chained member access after the call: f().a, f().a.b, f()?.a
+      repeat(seq(choice('.', '?.'), $._path_segment)),
     ),
 
+    // function_name accepts the canonical built-ins plus any identifier or
+    // type name — the latter covers domain helpers (`recompute`, `lookupX`)
+    // and value-type constructors (`Money`, `AppealResolution`).
     function_name: $ => choice(
       'count', 'sum', 'now', 'today', 'size', 'isEmpty', 'isNotEmpty', 'append',
+      $.identifier,
+      $.type_name,
     ),
 
     paren_expr: $ => seq('(', $.expression, ')'),
@@ -1310,6 +1433,8 @@ module.exports = grammar({
       '(',
       optional($.arg_list),
       ')',
+      // optional chained member access: Service.fn(args).result, Service.fn().a.b
+      repeat(seq(choice('.', '?.'), $._path_segment)),
     )),
 
     value_list: $ => seq($._value_expr, repeat(seq(',', $._value_expr))),
@@ -1320,7 +1445,8 @@ module.exports = grammar({
 
     dot_path: $ => seq(
       $._path_segment,
-      repeat(seq('.', $._path_segment)),
+      // accept both `.` (regular) and `?.` (safe-navigation) as separators
+      repeat(seq(choice('.', '?.'), $._path_segment)),
     ),
 
     _path_segment: $ => seq(
@@ -1344,7 +1470,10 @@ module.exports = grammar({
       $.string_literal,
       $.number,
       $.boolean,
+      $.null_literal,
     ),
+
+    null_literal: $ => 'null',
 
     literal: $ => $.literal_value,
 
@@ -1352,10 +1481,17 @@ module.exports = grammar({
 
     number: $ => token(/-?\d+(\.\d+)?/),
 
-    // Duration literal: 24 months, 30 days, 1 year, etc.
-    duration_literal: $ => seq(
-      $.number,
-      choice('months', 'days', 'years', 'hours', 'minutes', 'seconds', 'weeks'),
+    // Duration literal:
+    //   - spaced: 24 months, 30 days, 1 year
+    //   - compact: 60s, 5min, 24h, 30days, 1businessDay, 2businessDays
+    //     (compact form uses token.immediate so the unit must be adjacent
+    //      to the number — no whitespace allowed)
+    duration_literal: $ => choice(
+      seq($.number, choice('months', 'days', 'years', 'hours', 'minutes', 'seconds', 'weeks')),
+      seq(
+        $.number,
+        token.immediate(/(?:businessDays|businessDay|seconds|minutes|months|hours|weeks|years|days|min|ms|s|h|d|w|y)/),
+      ),
     ),
 
     boolean: $ => choice('true', 'false'),
@@ -1371,6 +1507,8 @@ module.exports = grammar({
     comment: $ => token(choice(
       seq('//', /[^\n]*/),
       seq('#', /[^\n]*/),
+      // C-style block comment — non-nesting
+      seq('/*', /([^*]|\*+[^*\/])*\*+\//),
     )),
   },
 });

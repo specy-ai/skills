@@ -1,0 +1,569 @@
+context DriverManagement :: "Driver onboarding, identity, vehicles, availability, ratings, suspension" {
+    requirements-source "driver-management.sysreq"
+
+    enum VerificationState { pendingVerification, verified, rejected, suspended, appealInReview, permanentlySuspended }
+    enum AvailabilityState { offline, online }
+    enum DocumentType { driversLicence, passport, nationalId, selfie }
+    enum BackgroundCheckResult { clear, failed }
+    enum OfflineReason { voluntary, stalePosition, suspension, documentExpired }
+    enum AppealOutcome { reinstated, permanentlySuspended }
+    enum NotificationChannel { email, sms, push }
+
+    // -----------------------------------------------------------------
+    // Value types
+    // -----------------------------------------------------------------
+
+    value EmailAddress { fields { value : string format(email) } }
+    value PhoneNumber { fields { countryCode : string; number : string } }
+    value FullName { fields { firstName : string maxLength(100); lastName : string maxLength(100) } }
+    value Rating { fields { value : int min(1) max(5) } }
+
+    value AverageRating :: "Running aggregate of ratings for a driver" {
+        satisfies [REQ-DRV-040, REQ-DRV-041, REQ-DRV-042]
+        fields {
+            value : decimal min(1.0) max(5.0)
+            totalRatings : int min(0)
+            ratingSum : int min(0)
+        }
+        invariants {
+            consistentAggregate :: "Average is sum / count" enforcement reject {
+                if totalRatings > 0 { value = ratingSum / totalRatings }
+            }
+        }
+    }
+
+    value VehicleDetails {
+        fields {
+            make : string
+            model : string
+            year : int min(1990)
+            color : string
+            licencePlate : string
+        }
+    }
+
+    value InspectionResult {
+        satisfies [REQ-DRV-021, REQ-DRV-022]
+        fields {
+            passed : boolean
+            inspectedAt : datetime
+            expiresAt : datetime
+            partner : string
+        }
+        invariants {
+            expiryAfterInspection { expiresAt > inspectedAt }
+        }
+    }
+
+    value AppealDetails {
+        fields { reason : string maxLength(2000); submittedAt : datetime }
+    }
+
+    value AppealResolution {
+        satisfies [REQ-DRV-049, REQ-DRV-NFR-005]
+        fields {
+            outcome : AppealOutcome
+            operatorId : uuid
+            resolvedAt : datetime
+            justification : string maxLength(2000)
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // Entities
+    // -----------------------------------------------------------------
+
+    entity IdentityDocument :: "Driver-provided identity, licence, or selfie" {
+        satisfies [REQ-DRV-002, REQ-DRV-NFR-002, REQ-DRV-NFR-003]
+
+        identifier documentId : UUID
+        fields {
+            driverId : UUID
+            documentType : DocumentType
+            documentNumber : string
+            storageRef : string
+            uploadedAt : datetime
+            expiresAt : datetime optional
+            verified : boolean default(false)
+        }
+
+        operations {
+            "Upload identity document" on UploadIdentityDocument {
+                satisfies [REQ-DRV-002]
+                sets IdentityDocument {
+                    driverId = uploadIdentityDocument.driverId
+                    documentType = uploadIdentityDocument.documentType
+                    documentNumber = uploadIdentityDocument.documentNumber
+                    storageRef = uploadIdentityDocument.storageRef
+                    uploadedAt = now()
+                    expiresAt = uploadIdentityDocument.expiresAt
+                }
+                emits IdentityDocumentUploaded {
+                    documentId = IdentityDocument.documentId
+                    driverId = IdentityDocument.driverId
+                    documentType = IdentityDocument.documentType
+                    uploadedAt = IdentityDocument.uploadedAt
+                }
+            }
+        }
+    }
+
+    entity Vehicle :: "Driver vehicle with documents and inspection state" {
+        satisfies [REQ-DRV-020, REQ-DRV-021, REQ-DRV-022, REQ-DRV-023]
+
+        identifier vehicleId : UUID
+        fields {
+            driverId : UUID
+            details : VehicleDetails
+            registrationExpiresAt : datetime
+            insuranceExpiresAt : datetime
+            inspection : InspectionResult
+            eligible : boolean default(false)
+            registeredAt : datetime
+        }
+
+        invariants {
+            eligibilityRequiresValidDocs :: "Eligible only when all docs valid" enforcement reject {
+                if eligible = true {
+                    inspection.passed = true
+                    and inspection.expiresAt > now()
+                    and registrationExpiresAt > now()
+                    and insuranceExpiresAt > now()
+                }
+            }
+        }
+
+        operations {
+            "Register vehicle" on RegisterVehicle {
+                satisfies [REQ-DRV-020]
+                sets Vehicle {
+                    driverId = registerVehicle.driverId
+                    details = registerVehicle.details
+                    registrationExpiresAt = registerVehicle.registrationExpiresAt
+                    insuranceExpiresAt = registerVehicle.insuranceExpiresAt
+                    registeredAt = now()
+                    eligible = false
+                }
+                emits VehicleRegistered {
+                    vehicleId = Vehicle.vehicleId
+                    driverId = Vehicle.driverId
+                    registeredAt = Vehicle.registeredAt
+                }
+            }
+
+            "Record inspection result" on RecordVehicleInspection {
+                satisfies [REQ-DRV-020, REQ-DRV-021]
+                sets Vehicle {
+                    inspection = recordVehicleInspection.inspection
+                    eligible = recordVehicleInspection.inspection.passed
+                                and recordVehicleInspection.inspection.expiresAt > now()
+                                and Vehicle.registrationExpiresAt > now()
+                                and Vehicle.insuranceExpiresAt > now()
+                }
+                emits VehicleInspectionRecorded {
+                    vehicleId = Vehicle.vehicleId
+                    passed = Vehicle.inspection.passed
+                    eligibleNow = Vehicle.eligible
+                }
+            }
+
+            "Mark vehicle ineligible due to expired document" on MarkVehicleIneligible {
+                satisfies [REQ-DRV-022, REQ-DRV-023]
+                precondition documentExpired {
+                    Vehicle.registrationExpiresAt <= now()
+                    or Vehicle.insuranceExpiresAt <= now()
+                    or Vehicle.inspection.expiresAt <= now()
+                }
+                sets Vehicle { eligible = false }
+                emits VehicleBecameIneligible {
+                    vehicleId = Vehicle.vehicleId
+                    driverId = Vehicle.driverId
+                    reason = markVehicleIneligible.reason
+                    detectedAt = now()
+                }
+            }
+        }
+    }
+
+    entity Driver :: "Driver lifecycle root — verification, availability, ratings, appeals" {
+        satisfies [REQ-DRV-001, REQ-DRV-003, REQ-DRV-004, REQ-DRV-005, REQ-DRV-006,
+                   REQ-DRV-030, REQ-DRV-031, REQ-DRV-032, REQ-DRV-033,
+                   REQ-DRV-040, REQ-DRV-043, REQ-DRV-044, REQ-DRV-046,
+                   REQ-DRV-047, REQ-DRV-048, REQ-DRV-049]
+
+        identifier driverId : UUID
+        fields {
+            fullName : FullName
+            email : EmailAddress
+            phone : PhoneNumber
+            verificationState : VerificationState default("pendingVerification")
+            availability : AvailabilityState default("offline")
+            selectedVehicleId : UUID optional
+            averageRating : AverageRating optional
+            totalRidesCompleted : int min(0) default(0)
+            cancellationCountWindow : int min(0) default(0)
+            noShowCountWindow : int min(0) default(0)
+            appeal : AppealDetails optional
+            appealResolution : AppealResolution optional
+            registeredAt : datetime
+        }
+
+        invariants {
+            singleVehicleSelected :: "Driver may have at most one selected vehicle at a time" enforcement reject {
+                selectedVehicleId is null or count(selectedVehicleId) = 1
+            }
+            verifiedHasNoOpenAppeal :: "Verified drivers do not carry an open appeal" enforcement alert {
+                if verificationState = verified { appeal is null }
+            }
+        }
+
+        operations {
+            "Register driver" on RegisterDriver {
+                satisfies [REQ-DRV-001]
+                sets Driver {
+                    fullName = registerDriver.fullName
+                    email = registerDriver.email
+                    phone = registerDriver.phone
+                    verificationState = pendingVerification
+                    availability = offline
+                    registeredAt = now()
+                }
+                emits DriverRegistered {
+                    driverId = Driver.driverId
+                    registeredAt = Driver.registeredAt
+                }
+            }
+
+            "Complete background check" on CompleteBackgroundCheck {
+                satisfies [REQ-DRV-005]
+                precondition awaitingVerification { Driver.verificationState = pendingVerification }
+                precondition resultIsClear { completeBackgroundCheck.result = clear }
+                sets Driver { verificationState = verified }
+                emits DriverVerified {
+                    driverId = Driver.driverId
+                    verifiedAt = now()
+                }
+            }
+
+            "Reject driver application" on RejectDriverApplication {
+                satisfies [REQ-DRV-006]
+                precondition awaitingVerification { Driver.verificationState = pendingVerification }
+                sets Driver { verificationState = rejected }
+                emits DriverApplicationRejected {
+                    driverId = Driver.driverId
+                    reason = rejectDriverApplication.reason
+                    rejectedAt = now()
+                }
+            }
+
+            "Go online" on GoOnline {
+                satisfies [REQ-DRV-030, REQ-DRV-032, REQ-DRV-033, REQ-DRV-NFR-004]
+                precondition isVerified { Driver.verificationState = verified }
+                precondition notSuspended { Driver.verificationState != suspended }
+                precondition hasEligibleVehicle { Driver.selectedVehicleId is defined }
+                sets Driver { availability = online }
+                emits DriverWentOnline {
+                    driverId = Driver.driverId
+                    selectedVehicleId = Driver.selectedVehicleId
+                    onlineAt = now()
+                }
+            }
+
+            "Go offline" on GoOffline {
+                satisfies [REQ-DRV-031]
+                precondition wasOnline { Driver.availability = online }
+                sets Driver { availability = offline }
+                emits DriverWentOffline {
+                    driverId = Driver.driverId
+                    reason = goOffline.reason
+                    offlineAt = now()
+                }
+            }
+
+            "Submit rating" on SubmitRating {
+                satisfies [REQ-DRV-040, REQ-DRV-041, REQ-DRV-042]
+                precondition validRange {
+                    submitRating.rating.value >= 1
+                    and submitRating.rating.value <= 5
+                }
+                sets Driver {
+                    averageRating = recompute(Driver.averageRating, submitRating.rating)
+                    totalRidesCompleted = Driver.totalRidesCompleted + 1
+                }
+                emits RatingSubmitted {
+                    driverId = Driver.driverId
+                    rating = submitRating.rating
+                    newAverage = Driver.averageRating
+                    totalRides = Driver.totalRidesCompleted
+                    submittedAt = now()
+                }
+            }
+
+            "Issue rating warning" on IssueRatingWarning {
+                satisfies [REQ-DRV-043]
+                precondition matureDriver { Driver.totalRidesCompleted > 20 }
+                precondition belowWarningThreshold { Driver.averageRating.value < 4.2 }
+                emits RatingWarningIssued {
+                    driverId = Driver.driverId
+                    averageRating = Driver.averageRating
+                    issuedAt = now()
+                }
+            }
+
+            "Propose suspension" on ProposeSuspension {
+                satisfies [REQ-DRV-044, REQ-DRV-046]
+                precondition matureDriver { Driver.totalRidesCompleted > 20 }
+                precondition belowSuspensionThreshold { Driver.averageRating.value < 4.0 }
+                emits SuspensionProposalCreated {
+                    driverId = Driver.driverId
+                    averageRating = Driver.averageRating
+                    cancellationCount = Driver.cancellationCountWindow
+                    noShowCount = Driver.noShowCountWindow
+                    proposedAt = now()
+                }
+            }
+
+            "Suspend driver" on SuspendDriver {
+                satisfies [REQ-DRV-044, REQ-DRV-045, REQ-DRV-046, REQ-DRV-NFR-005]
+                precondition operatorApproved { suspendDriver.operatorId is defined }
+                sets Driver {
+                    verificationState = suspended
+                    availability = offline
+                }
+                emits DriverSuspended {
+                    driverId = Driver.driverId
+                    operatorId = suspendDriver.operatorId
+                    reason = suspendDriver.reason
+                    durationMinutes = suspendDriver.durationMinutes
+                    suspendedAt = now()
+                }
+            }
+
+            "Submit suspension appeal" on SubmitAppeal {
+                satisfies [REQ-DRV-047, REQ-DRV-048]
+                precondition isSuspended { Driver.verificationState = suspended }
+                sets Driver {
+                    verificationState = appealInReview
+                    appeal = AppealDetails(reason = submitAppeal.reason, submittedAt = now())
+                }
+                emits AppealSubmitted {
+                    driverId = Driver.driverId
+                    submittedAt = now()
+                }
+            }
+
+            "Resolve appeal" on ResolveAppeal {
+                satisfies [REQ-DRV-049, REQ-DRV-NFR-005]
+                precondition appealUnderReview { Driver.verificationState = appealInReview }
+                sets Driver {
+                    verificationState = if resolveAppeal.outcome = reinstated then verified else permanentlySuspended
+                    appealResolution = AppealResolution(
+                        outcome = resolveAppeal.outcome,
+                        operatorId = resolveAppeal.operatorId,
+                        resolvedAt = now(),
+                        justification = resolveAppeal.justification
+                    )
+                    appeal = null
+                }
+                emits AppealResolved {
+                    driverId = Driver.driverId
+                    outcome = resolveAppeal.outcome
+                    operatorId = resolveAppeal.operatorId
+                    resolvedAt = now()
+                }
+            }
+        }
+    }
+
+    aggregate DriverAggregate root Driver { contains [Vehicle, IdentityDocument] }
+
+    statemachine DriverLifecycle on Driver {
+        start pendingVerification
+
+        state pendingVerification {
+            invariant noRidesYet { Driver.totalRidesCompleted = 0 }
+        }
+        state verified {}
+        state rejected {}
+        state suspended {
+            invariant offlineWhileSuspended { Driver.availability = offline }
+        }
+        state appealInReview {}
+        state permanentlySuspended {}
+
+        transition pendingVerification -> verified on CompleteBackgroundCheck
+        transition pendingVerification -> rejected on RejectDriverApplication
+        transition verified -> suspended on SuspendDriver
+        transition suspended -> appealInReview on SubmitAppeal
+        transition appealInReview -> verified on ResolveAppeal           // outcome = reinstated
+        transition appealInReview -> permanentlySuspended on ResolveAppeal // outcome = permanentlySuspended
+
+        final rejected
+        final permanentlySuspended
+    }
+
+    // -----------------------------------------------------------------
+    // Domain services
+    // -----------------------------------------------------------------
+
+    service DocumentExpiryChecker :: "Detects upcoming/expired documents" {
+        satisfies [REQ-DRV-022]
+        operations {
+            checkDocumentExpiry(now: datetime) : void
+        }
+    }
+
+    service VerificationStatusReporter :: "Exposes onboarding status to driver app" {
+        satisfies [REQ-DRV-003, REQ-DRV-007, REQ-DRV-008]
+        operations {
+            getCurrentStatus(driverId: uuid) : VerificationState
+            getEstimatedTimeToVerify(driverId: uuid) : Duration
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // Infrastructure services
+    // -----------------------------------------------------------------
+
+    infrastructure-service IdentityVerificationProvider :: "Certified third-party identity & background check" {
+        satisfies [REQ-DRV-002, REQ-DRV-005, REQ-DRV-006, REQ-DRV-NFR-001, REQ-NFR-010]
+        operations {
+            requestVerification(driverId: uuid, documents: list<DocumentRef>) : void
+            getStatus(requestId: uuid) : VerificationState
+        }
+    }
+
+    infrastructure-service DocumentStorageService :: "Encrypted document store" {
+        satisfies [REQ-DRV-NFR-002, REQ-NFR-020]
+        operations {
+            storeDocument(driverId: uuid, documentType: DocumentType, fileContent: bytes) : string
+            getDocumentUrl(storageRef: string, ttl: Duration) : string
+            deleteDocument(storageRef: string) : void
+        }
+    }
+
+    infrastructure-service DriverNotificationService :: "Push, SMS, and email to drivers" {
+        satisfies [REQ-DRV-006, REQ-DRV-008, REQ-DRV-022, REQ-DRV-043, REQ-DRV-044, REQ-DRV-049]
+        operations {
+            notifyDriver(driverId: uuid, subject: string, message: string, channel: NotificationChannel) : void
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // Commands (correlationId omitted for brevity except where critical)
+    // -----------------------------------------------------------------
+
+    command RegisterDriver { fields { fullName: FullName; email: EmailAddress; phone: PhoneNumber; correlationId: uuid } }
+    command UploadIdentityDocument { fields { driverId: uuid; documentType: DocumentType; documentNumber: string; storageRef: string; expiresAt: datetime optional; correlationId: uuid } }
+    command CompleteBackgroundCheck { fields { driverId: uuid; result: BackgroundCheckResult; correlationId: uuid } }
+    command RejectDriverApplication { fields { driverId: uuid; reason: string; correlationId: uuid } }
+    command RegisterVehicle { fields { driverId: uuid; details: VehicleDetails; registrationExpiresAt: datetime; insuranceExpiresAt: datetime; correlationId: uuid } }
+    command RecordVehicleInspection { fields { vehicleId: uuid; inspection: InspectionResult; correlationId: uuid } }
+    command MarkVehicleIneligible { fields { vehicleId: uuid; reason: string; correlationId: uuid } }
+    command GoOnline { fields { driverId: uuid; correlationId: uuid } }
+    command GoOffline { fields { driverId: uuid; reason: OfflineReason; correlationId: uuid } }
+    command SubmitRating { fields { driverId: uuid; rideId: uuid; rating: Rating; correlationId: uuid } }
+    command IssueRatingWarning { fields { driverId: uuid; correlationId: uuid } }
+    command ProposeSuspension { fields { driverId: uuid; correlationId: uuid } }
+    command SuspendDriver { fields { driverId: uuid; operatorId: uuid; reason: string; durationMinutes: int; correlationId: uuid } }
+    command SubmitAppeal { fields { driverId: uuid; reason: string; correlationId: uuid } }
+    command ResolveAppeal { fields { driverId: uuid; operatorId: uuid; outcome: AppealOutcome; justification: string; correlationId: uuid } }
+
+    // -----------------------------------------------------------------
+    // Events — internal
+    // -----------------------------------------------------------------
+
+    event DriverRegistered { satisfies [REQ-DRV-001] fields { driverId: uuid; registeredAt: datetime } }
+    event IdentityDocumentUploaded { satisfies [REQ-DRV-002] fields { documentId: uuid; driverId: uuid; documentType: DocumentType; uploadedAt: datetime } }
+    event DriverVerified { satisfies [REQ-DRV-005] fields { driverId: uuid; verifiedAt: datetime } }
+    event DriverApplicationRejected { satisfies [REQ-DRV-006] fields { driverId: uuid; reason: string; rejectedAt: datetime } }
+    event VehicleRegistered { satisfies [REQ-DRV-020] fields { vehicleId: uuid; driverId: uuid; registeredAt: datetime } }
+    event VehicleInspectionRecorded { satisfies [REQ-DRV-021] fields { vehicleId: uuid; passed: boolean; eligibleNow: boolean } }
+    event VehicleBecameIneligible { satisfies [REQ-DRV-022] fields { vehicleId: uuid; driverId: uuid; reason: string; detectedAt: datetime } }
+    event DriverWentOnline { satisfies [REQ-DRV-030] fields { driverId: uuid; selectedVehicleId: uuid; onlineAt: datetime } }
+    event DriverWentOffline { satisfies [REQ-DRV-031, REQ-DRV-034] fields { driverId: uuid; reason: OfflineReason; offlineAt: datetime } }
+    event RatingSubmitted { satisfies [REQ-DRV-040] fields { driverId: uuid; rating: Rating; newAverage: AverageRating; totalRides: int; submittedAt: datetime } }
+    event RatingWarningIssued { satisfies [REQ-DRV-043] fields { driverId: uuid; averageRating: AverageRating; issuedAt: datetime } }
+    event SuspensionProposalCreated { satisfies [REQ-DRV-044] fields { driverId: uuid; averageRating: AverageRating; cancellationCount: int; noShowCount: int; proposedAt: datetime } }
+    event DriverSuspended { satisfies [REQ-DRV-044, REQ-DRV-045, REQ-DRV-NFR-005] fields { driverId: uuid; operatorId: uuid; reason: string; durationMinutes: int; suspendedAt: datetime } }
+    event AppealSubmitted { satisfies [REQ-DRV-047, REQ-DRV-048] fields { driverId: uuid; submittedAt: datetime } }
+    event AppealResolved { satisfies [REQ-DRV-049, REQ-DRV-NFR-005] fields { driverId: uuid; outcome: AppealOutcome; operatorId: uuid; resolvedAt: datetime } }
+
+    // -----------------------------------------------------------------
+    // Events — external (consumed from other contexts)
+    // -----------------------------------------------------------------
+
+    external-event RideCompleted from RideManagement
+    external-event DriverNoShowRecorded from RideManagement
+    external-event DriverPositionStale from GeolocationRouting
+
+    // -----------------------------------------------------------------
+    // Reactions
+    // -----------------------------------------------------------------
+
+    reaction warnOnLowRating :: "Issue rating warning when driver dips below 4.2 with maturity" {
+        satisfies [REQ-DRV-043]
+        trigger RatingSubmitted
+        guard event.totalRides > 20 and event.newAverage.value < 4.2 and event.newAverage.value >= 4.0
+        effect IssueRatingWarning(driverId = event.driverId)
+    }
+
+    reaction proposeSuspensionOnSustainedLowRating :: "Queue suspension proposal when driver drops below 4.0" {
+        satisfies [REQ-DRV-044, REQ-DRV-046]
+        trigger RatingSubmitted
+        guard event.totalRides > 20 and event.newAverage.value < 4.0
+        effect ProposeSuspension(driverId = event.driverId)
+    }
+
+    reaction suspendOnVehicleIneligibility :: "Take driver offline when their vehicle becomes ineligible" {
+        satisfies [REQ-DRV-022, REQ-DRV-023]
+        trigger VehicleBecameIneligible
+        effect GoOffline(driverId = event.driverId, reason = documentExpired)
+    }
+
+    reaction takeOfflineOnStalePosition :: "Take driver offline on stale position from Geolocation" {
+        satisfies [REQ-DRV-034]
+        trigger DriverPositionStale
+        effect GoOffline(driverId = event.driverId, reason = stalePosition)
+    }
+
+    reaction notifyOnRejection :: "Notify driver and include reason on rejection" {
+        satisfies [REQ-DRV-006, REQ-DRV-008]
+        trigger DriverApplicationRejected
+        effect DriverNotificationService.notifyDriver(
+            driverId = event.driverId,
+            subject = "Application rejected",
+            message = event.reason,
+            channel = push
+        )
+    }
+
+    reaction notifyOnVerified :: "Notify driver within 24h of verification status change" {
+        satisfies [REQ-DRV-008]
+        trigger DriverVerified
+        effect DriverNotificationService.notifyDriver(
+            driverId = event.driverId,
+            subject = "You are verified",
+            message = "You can now go online and start driving.",
+            channel = push
+        )
+    }
+
+    reaction notifyOnSuspensionDecision :: "Notify driver on appeal resolution" {
+        satisfies [REQ-DRV-049]
+        trigger AppealResolved
+        effect DriverNotificationService.notifyDriver(
+            driverId = event.driverId,
+            subject = "Appeal resolved",
+            message = "Outcome: " + event.outcome,
+            channel = push
+        )
+    }
+
+    reaction tickRatingsOnRideCompleted :: "Bridge from RideManagement — record rider rating of driver" {
+        satisfies [REQ-DRV-040]
+        trigger RideCompleted
+        guard event.driverRating is defined
+        effect SubmitRating(driverId = event.driverId, rideId = event.rideId, rating = event.driverRating)
+    }
+}
