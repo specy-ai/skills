@@ -1,0 +1,56 @@
+{
+  "name": "specy-domain",
+  "scopeName": "source.specy-domain",
+  "fileTypes": [
+    ".domain"
+  ],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "name": "keyword.control.specy-domain",
+      "match": "\\b(ACL|CS|Conformist|OHS|Partnership|PublishedLanguage|SeparateWays|SharedKernel|accepts|action|active|aggregate|agreement|alert|and|append|application|application-service|as|boolean|cancelled|choreography|command|compensate|compensation|condition|contain|contains|context|coordination|count|creates|date|datetime|days|decimal|default|defined|depends|detection|does|domain|domain-service|downstream|duplicate|duration|effect|effects|emits|enforcement|entities|entity|enum|error|escalation|event|event-sourced|every|exists|exposes|external|false|field|fields|final|forall|foreach|from|future|futureOrPresent|guard|hours|id|identifier|identity|if|immutable|in|infrastructure|infrastructure-service|instant|int|interface|internal|invariant|invariants|is|isEmpty|isNotEmpty|list|long|machine|manual|manual-intervention|map|matches|max|max-attempts|maxLength|message|meta|min|minLength|minutes|module|months|must|name|no|not|now|number|offset|on|operation|operations|optional|or|orchestration|ordered|organization|participants|past|pastOrPresent|pattern|policies|policy|postcondition|prd-source|precondition|predicate|query|query-based|range|reaction|reconciliation|reference|references|reject|rejection|rejects|required|requirements-source|resolves|retry|returns|root|satisfies|schedule|searching|seconds|service|set|sets|shortname|size|some|start|state|statemachine|states|status|step|string|sum|suspend|symmetric|temporal|then|time|today|transition|transitions|trigger|triggered-by|triggers|true|type|unique|upstream|uses|uuid|value|violation|void|warn|weeks|when|where|years)\\b"
+    },
+    {
+      "name": "string.quoted.double.specy-domain",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "include": "#string-character-escape"
+        }
+      ]
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "begin": "//",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.whitespace.comment.leading.specy-domain"
+            }
+          },
+          "end": "(?=$)",
+          "name": "comment.line.specy-domain"
+        },
+        {
+          "begin": "#",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.whitespace.comment.leading.specy-domain"
+            }
+          },
+          "end": "(?=$)",
+          "name": "comment.line.specy-domain"
+        }
+      ]
+    },
+    "string-character-escape": {
+      "name": "constant.character.escape.specy-domain",
+      "match": "\\\\(x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|u\\{[0-9A-Fa-f]+\\}|[0-2][0-7]{0,2}|3[0-6][0-7]?|37[0-7]?|[4-7][0-7]?|.|$)"
+    }
+  }
+}

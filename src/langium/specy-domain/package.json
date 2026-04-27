@@ -1,0 +1,32 @@
+{
+  "name": "specy-domain-langium",
+  "version": "1.0.0",
+  "description": "Langium-based parser and LSP server for Specy Domain DSL (.domain)",
+  "type": "module",
+  "main": "out/language/specy-domain-module.js",
+  "bin": {
+    "specy-domain": "out/cli/index.js"
+  },
+  "scripts": {
+    "langium:generate": "langium generate",
+    "build": "npm run langium:generate && tsc",
+    "watch": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "langium": "^3.3.0",
+    "vscode-languageclient": "^9.0.1",
+    "vscode-languageserver": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "langium-cli": "^3.3.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

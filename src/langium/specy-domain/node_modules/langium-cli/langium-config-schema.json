@@ -1,0 +1,219 @@
+{
+    "$schema": "https://json-schema.org/draft-07/schema#",
+    "$defs": {
+        "chevrotainParserConfig": {
+            "description": "An object to describe the Chevrotain parser configuration",
+            "type": "object",
+            "properties": {
+                "recoveryEnabled": {
+                    "description": "Is the error recovery / fault tolerance of the Chevrotain Parser enabled",
+                    "type": "boolean"
+                },
+                "maxLookahead": {
+                    "description": "Maximum number of tokens the parser will use to choose between alternatives",
+                    "type": "number"
+                },
+                "dynamicTokensEnabled": {
+                    "description": "A flag to support Dynamically defined Tokens",
+                    "type": "boolean"
+                },
+                "nodeLocationTracking": {
+                    "description": "Enable computation of CST nodes location",
+                    "type": "string"
+                },
+                "traceInitPerf": {
+                    "description": "A flag to print performance tracing logs during parser initialization",
+                    "type": [
+                        "boolean",
+                        "number"
+                    ]
+                },
+                "skipValidations": {
+                    "description": "A flag to avoid running the grammar validations during Parser initialization",
+                    "type": "boolean"
+                }
+            }
+        },
+        "languageItem": {
+            "type": "object",
+            "description": "A single language configuration",
+            "additionalProperties": false,
+            "properties": {
+                "id": {
+                    "description": "The Id used to refer to the DSL",
+                    "type": "string"
+                },
+                "grammar": {
+                    "description": "The relative file path to the .langium grammar file",
+                    "type": "string"
+                },
+                "fileExtensions": {
+                    "description": "The file extensions used by the DSL",
+                    "type": "array",
+                    "items": [
+                        {
+                            "type": "string"
+                        }
+                    ]
+                },
+                "fileNames": {
+                    "description": "The file names used by the DSL",
+                    "type": "array",
+                    "items": [
+                        {
+                            "type": "string"
+                        }
+                    ]
+                },
+                "caseInsensitive": {
+                    "description": "Enable case-insensitive keywords parsing",
+                    "type": "boolean"
+                },
+                "textMate": {
+                    "description": "An object to describe the textMate grammar properties",
+                    "type": "object",
+                    "properties": {
+                        "out": {
+                            "description": "The output file path to the generated textMate grammar",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "out"
+                    ]
+                },
+                "monarch": {
+                    "description": "An object to describe the monarch grammar properties",
+                    "type": "object",
+                    "properties": {
+                        "out": {
+                            "description": "The output file path to the generated monarch grammar",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "out"
+                    ]
+                },
+                "prism": {
+                    "description": "An object to describe the prism grammar properties",
+                    "type": "object",
+                    "properties": {
+                        "out": {
+                            "description": "The output file path to the generated prism grammar",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "out"
+                    ]
+                },
+                "railroad": {
+                    "description": "An object to describe railroad syntax diagram properties",
+                    "type": "object",
+                    "properties": {
+                        "out": {
+                            "description": "The output path to the generated railroad diagrams",
+                            "type": "string"
+                        },
+                        "css": {
+                            "description": "File path containing css that will be included in the generated svg/html files",
+                            "type": "string"
+                        },
+                        "mode": {
+                            "description": "Whether to print diagrams all into a single html file or in separate svg files",
+                            "type": {
+                                "enum": [
+                                    "html", "svg"
+                                ]
+                            }
+                        }
+                    },
+                    "required": [
+                        "out"
+                    ]
+                },
+                "chevrotainParserConfig": {
+                    "$ref": "#/$defs/chevrotainParserConfig"
+                },
+                "bnf": {
+                    "description": "An object to describe bnf generator properties.",
+                    "type": "object",
+                    "properties": {
+                        "out": {
+                            "description": "The output path for the BNF file.",
+                            "type": "string"
+                        },
+                        "comment": {
+                            "description": "By default, comments are generated according to the dialect. GBNF uses `#`, EBNF uses `(* *)`. Use this option to force a specific comment style. Use `parentheses` for `(* comment *)`, `slash` for `/* comment *\/`, `hash` for `# comment` and `skip` to disable comment generation.",
+                            "type": {
+                                "enum": [
+                                    "skip", "parentheses", "slash", "hash"
+                                ]
+                            }
+                        },
+                        "dialect": {
+                            "description": "Dialect of the generated BNF file. GBNF is the default. In EBNF RegEx terminals are not supported.",
+                            "type": {
+                                "enum": [
+                                    "GBNF", "EBNF"
+                                ]
+                            }
+                        }
+                    },
+                    "required": [
+                        "out"
+                    ]
+                }
+            },
+            "required": [
+                "id",
+                "grammar",
+                "fileExtensions"
+            ]
+        }
+    },
+    "type": "object",
+    "description": "A langium cli configuration",
+    "additionalProperties": false,
+    "properties": {
+        "projectName": {
+            "description": "The name of your Langium project",
+            "type": "string",
+            "pattern": "^[a-zA-Z_$][0-9a-zA-Z_$]*$"
+        },
+        "languages": {
+            "description": "Your language configurations",
+            "type": "array",
+            "additionalItems": false,
+            "items": {
+                "$ref": "#/$defs/languageItem"
+            }
+        },
+        "out": {
+            "description": "The relative directory to the code generated by the langium-cli",
+            "type": "string"
+        },
+        "importExtension": {
+            "description": "File extension used for TypeScript import statements. `.js` by default",
+            "type": "string"
+        },
+        "mode": {
+            "description": "Mode for generating optimized code for the current environment",
+            "type": "string",
+            "enum": ["development", "production"]
+        },
+        "chevrotainParserConfig": {
+            "$ref": "#/$defs/chevrotainParserConfig"
+        },
+        "langiumInternal": {
+            "description": "A flag to determine whether langium uses itself to bootstrap",
+            "type": "boolean"
+        }
+    },
+    "required": [
+        "languages",
+        "projectName",
+        "out"
+    ]
+}

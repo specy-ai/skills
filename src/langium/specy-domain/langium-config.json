@@ -1,0 +1,15 @@
+{
+  "projectName": "SpecyDomain",
+  "languages": [
+    {
+      "id": "specy-domain",
+      "grammar": "src/language/specy-domain.langium",
+      "fileExtensions": [".domain"],
+      "textMate": {
+        "out": "syntaxes/specy-domain.tmLanguage.json"
+      }
+    }
+  ],
+  "out": "src/generated",
+  "mode": "production"
+}
