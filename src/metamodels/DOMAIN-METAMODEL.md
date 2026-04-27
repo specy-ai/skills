@@ -302,7 +302,23 @@ Relations:
 
 ### Read-only Entity (Master Data)
 
-Frequently a software system needs to have access to domain concept that form the basis of its operations but in read-only way. Think of the usual "Party" (Customer, Supplier, etc.) or "Product" master data that are needed to performs higher-level operations. Usually such part of the subsystem are either maintained synchronously (by issuing a query to the subsystem in dependency) or asynchronously (with external events consumed to maintain a local read-only version of that entities whenever a change occured). Such entities can be modelled as entity but in a read-only way with no operations that would change their state and the associated repository has only read operations and no side-effect ones (store, delete, etc.).
+
+A read-only entity is an entity whose state is owned by another bounded context or an external system. Within this bounded context it is observable but not mutable — operations that change its state do not exist locally, and its repository exposes only read operations.
+
+Common examples are the master-data archetypes: `Customer`, `Supplier`, `Product`. They are referenced by higher-level operations of this context (e.g. an `Order` references a `Product`) but their lifecycle is governed elsewhere.
+
+A read-only entity is kept in sync with its source through one of two patterns:
+
+- **Synchronous lookup**: this context issues a query to the upstream context every time it needs the entity's current state. No local copy.
+- **Asynchronous projection**: this context subscribes to the upstream context's events and maintains a local read-model that is updated each time a relevant event arrives.
+
+The entity declares its sync pattern explicitly. Its repository derives only read operations (`getById`, `findByField`, `search`) — no `store`, no `delete`, no `update`. Domain operations defined locally on a read-only entity are forbidden; the entity is structural, not behavioural.
+
+Relations:
+- ◁ "is-a" relation with entity (inheritance — all entity rules apply except it owns no operations)
+- 1..1 "sourced from" relation with an upstream bounded context or external system
+- 0..1 "synced via" relation with a sync pattern (`synchronous-query` or `asynchronous-projection`)
+
 
 ## Aggregate
 
@@ -457,10 +473,24 @@ Relations:
 
 ## Enums (Referential)
 
-Enums holds set of values, either primitive with just a String or Number, or from an existing Value Type. In the case of an existing Value Type, it must have a code that will serve as an identifier to reference that value (with a name like Id or code), but its has no lifecycle. Example: the Amount value type has a code for the Currency (taken from the ISO 4217 alphabetic code, e.g. USD, EUR, etc.) and a precision with the default fraction digits, a display name and a symbol, etc. The Currencies enum holds all the Currency value and can be referenced in other part of the system unambiguously with just that code. 
+An enum is a closed, named set of values used to constrain a field to a known finite range. The values may be primitive (a string or a number) or instances of an existing value type. Enums have no identity and no lifecycle of their own — they are purely referential.
+
+When an enum's values are instances of a value type, the value type must declare a **code field** (typically named `id`, `code`, or `symbol`) that serves as the unambiguous reference to each value. The code is what other parts of the system use to refer to the value.
+
+**Example.** The `Currency` value type carries:
+- a code — the ISO 4217 alphabetic code (`USD`, `EUR`, `GBP`, …)
+- a precision — the default number of fraction digits
+- a display name (e.g. "US Dollar")
+- a symbol (e.g. "$")
+
+The `Currencies` enum holds every defined `Currency` value. Other parts of the system reference a currency by its code alone (e.g. an `Amount` field of type `currency: Currency` can be set with `Currencies.USD`), making the reference unambiguous and stable as the value type's other fields evolve.
+
+**Naming**: enums are named with a noun, typically pluralized when they hold value-type instances (`Currencies`, `Roles`) and singular when they hold a closed set of primitive labels (`Severity`, `PaymentMethodType`).
 
 Relations:
-- 1..1 " "reference" of the value type
+- 1..1 "references" relation with the value type whose instances populate the enum (omitted when the enum holds primitive values)
+- 1..n "holds" relation with values (the closed set of enum members)
+- 0..n "constrains" relation with fields (a field of enum-typed type is restricted to one of the enum's values)
 
 ## Domain Service
 
