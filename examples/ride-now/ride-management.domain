@@ -17,16 +17,15 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
     // -----------------------------------------------------------------
 
     value Location { fields { latitude: decimal; longitude: decimal } }
-    value Route { fields { waypoints: list<Location>; distanceMeters: decimal min(0); durationSeconds: int min(0) } }
+    value Route { fields { waypoints: list<Location>; distance: Distance; duration: Duration } }
 
     value FareEstimate :: "Committed fare shown at confirm" {
         satisfies [REQ-RIDE-003, REQ-RIDE-004, REQ-RIDE-005, REQ-RIDE-NFR-002]
         fields {
-            amount : decimal min(0)
-            currency : string
+            amount : Amount
             surgeMultiplier : decimal min(1.0)
-            distanceMeters : decimal min(0)
-            durationSeconds : int min(0)
+            distance : Distance
+            duration : Duration
             committedAt : datetime
         }
     }
@@ -34,11 +33,10 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
     value FinalFare {
         satisfies [REQ-RIDE-048]
         fields {
-            amount : decimal min(0)
-            currency : string
+            amount : Amount
             surgeMultiplier : decimal min(1.0)
-            actualDistanceMeters : decimal min(0)
-            actualDurationSeconds : int min(0)
+            actualDistance : Distance
+            actualDuration : Duration
             computedAt : datetime
         }
     }
@@ -50,7 +48,7 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
             cancelledBy : string
             cancelledAt : datetime
             feeCharged : boolean
-            feeAmount : decimal optional
+            feeAmount : Amount optional
         }
     }
 
@@ -298,7 +296,7 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
             "Driver arrives at pickup" on SignalDriverArrival {
                 satisfies [REQ-RIDE-042]
                 precondition isAssigned { Ride.status = driverAssigned }
-                precondition near100m { signalDriverArrival.distanceMeters <= 100 }
+                precondition near100m { signalDriverArrival.distance.meters <= 100 }
                 sets Ride { status = driverArrived }
                 emits DriverArrived {
                     rideId = Ride.rideId
@@ -346,8 +344,8 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
                     rideId = Ride.rideId
                     riderId = Ride.riderId
                     driverId = Ride.driverId
-                    actualDistanceMeters = completeRide.actualDistanceMeters
-                    actualDurationSeconds = completeRide.actualDurationSeconds
+                    actualDistance = completeRide.actualDistance
+                    actualDuration = completeRide.actualDuration
                     completedAt = Ride.actualDropoffTime
                 }
             }
@@ -563,7 +561,7 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
     infrastructure-service GeolocationGateway :: "ACL to GeolocationRouting" {
         satisfies [REQ-RIDE-020, REQ-RIDE-040, REQ-RIDE-045, REQ-RIDE-046]
         operations {
-            findNearbyEligibleDrivers(pickup: Location, radiusMeters: decimal) : list<DriverRef>
+            findNearbyEligibleDrivers(pickup: Location, radius: Distance) : list<DriverRef>
             estimateDriverArrival(driverId: uuid, pickup: Location) : datetime
             getCurrentLocation(rideId: uuid) : Location
             getCurrentRoute(rideId: uuid) : Route
@@ -575,12 +573,12 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
         satisfies [REQ-RIDE-003, REQ-RIDE-048, REQ-RIDE-049, REQ-RIDE-061]
         operations {
             computeFareEstimate(pickup: Location, dropoff: Location) : FareEstimate
-            computeFinalFare(rideRequestId: uuid, actualDistance: decimal, actualDuration: int) : FinalFare
+            computeFinalFare(rideRequestId: uuid, actualDistance: Distance, actualDuration: Duration) : FinalFare
             preAuthorize(riderId: uuid, fare: FareEstimate) : void
             capturePayment(rideId: uuid) : void
             releaseHold(rideRequestId: uuid) : void
-            chargeCancellationFee(riderId: uuid, rideRequestId: uuid) : decimal
-            chargeNoShowFee(riderId: uuid, rideId: uuid) : decimal
+            chargeCancellationFee(riderId: uuid, rideRequestId: uuid) : Amount
+            chargeNoShowFee(riderId: uuid, rideId: uuid) : Amount
         }
     }
 
@@ -594,7 +592,7 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
     infrastructure-service DriverManagementGateway :: "ACL to DriverManagement" {
         satisfies [REQ-RIDE-064, REQ-RIDE-066]
         operations {
-            requestTemporarySuspension(driverId: uuid, durationMinutes: int, reason: string) : void
+            requestTemporarySuspension(driverId: uuid, duration: Duration, reason: string) : void
             getCancellationCount(driverId: uuid, windowHours: int) : int
             getNoShowCount(driverId: uuid, windowHours: int) : int
         }
@@ -621,13 +619,13 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
     command CancelRequestByRider { fields { requestId: uuid; riderId: uuid; correlationId: uuid } }
     command CancelRequestNoDriver { fields { requestId: uuid; searchExhausted: boolean; correlationId: uuid } }
     command CreateRide { fields { requestId: uuid; riderId: uuid; driverId: uuid; pickupLocation: Location; dropoffLocation: Location; committedFare: FareEstimate; estimatedDriverArrivalTime: datetime; correlationId: uuid } }
-    command SignalDriverArrival { fields { rideId: uuid; distanceMeters: decimal; correlationId: uuid } }
+    command SignalDriverArrival { fields { rideId: uuid; distance: Distance; correlationId: uuid } }
     command StartRide { fields { rideId: uuid; pickupLocation: Location; correlationId: uuid } }
     command UpdateRideTracking { fields { rideId: uuid; route: Route; correlationId: uuid } }
-    command CompleteRide { fields { rideId: uuid; dropoffLocation: Location; actualDistanceMeters: decimal; actualDurationSeconds: int; correlationId: uuid } }
-    command CancelRideByRider { fields { rideId: uuid; feeAmount: decimal; correlationId: uuid } }
+    command CompleteRide { fields { rideId: uuid; dropoffLocation: Location; actualDistance: Distance; actualDuration: Duration; correlationId: uuid } }
+    command CancelRideByRider { fields { rideId: uuid; feeAmount: Amount; correlationId: uuid } }
     command CancelRideByDriver { fields { rideId: uuid; correlationId: uuid } }
-    command CancelRideRiderNoShow { fields { rideId: uuid; arrivedAt: datetime; feeAmount: decimal; correlationId: uuid } }
+    command CancelRideRiderNoShow { fields { rideId: uuid; arrivedAt: datetime; feeAmount: Amount; correlationId: uuid } }
     command CancelRideDriverNoShow { fields { rideId: uuid; correlationId: uuid } }
     command ActivateTripSharing { fields { rideId: uuid; link: TripSharingLink; correlationId: uuid } }
     command TriggerEmergency { fields { rideId: uuid; type: EmergencyEventType; location: Location; correlationId: uuid } }
@@ -647,10 +645,10 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
     event DriverArrived { satisfies [REQ-RIDE-042] fields { rideId: uuid; riderId: uuid; driverId: uuid; arrivedAt: datetime } }
     event RideStarted { satisfies [REQ-RIDE-044] fields { rideId: uuid; pickupLocation: Location; startedAt: datetime } }
     event RideLocationUpdated { satisfies [REQ-RIDE-045, REQ-RIDE-046] fields { rideId: uuid; route: Route; updatedAt: datetime } }
-    event RideCompleted { satisfies [REQ-RIDE-047, REQ-RIDE-048] fields { rideId: uuid; riderId: uuid; driverId: uuid; actualDistanceMeters: decimal; actualDurationSeconds: int; riderRating: any optional; driverRating: any optional; completedAt: datetime } }
-    event RideCancelledByRider { satisfies [REQ-RIDE-061] fields { rideId: uuid; riderId: uuid; feeAmount: decimal; cancelledAt: datetime } }
+    event RideCompleted { satisfies [REQ-RIDE-047, REQ-RIDE-048] fields { rideId: uuid; riderId: uuid; driverId: uuid; actualDistance: Distance; actualDuration: Duration; riderRating: any optional; driverRating: any optional; completedAt: datetime } }
+    event RideCancelledByRider { satisfies [REQ-RIDE-061] fields { rideId: uuid; riderId: uuid; feeAmount: Amount; cancelledAt: datetime } }
     event RideCancelledByDriver { satisfies [REQ-RIDE-063] fields { rideId: uuid; riderId: uuid; driverId: uuid; cancelledAt: datetime } }
-    event RideCancelledRiderNoShow { satisfies [REQ-RIDE-043] fields { rideId: uuid; riderId: uuid; feeAmount: decimal; cancelledAt: datetime } }
+    event RideCancelledRiderNoShow { satisfies [REQ-RIDE-043] fields { rideId: uuid; riderId: uuid; feeAmount: Amount; cancelledAt: datetime } }
     event RideCancelledDriverNoShow { satisfies [REQ-RIDE-065, REQ-RIDE-067] fields { rideId: uuid; riderId: uuid; driverId: uuid; cancelledAt: datetime } }
     event TripSharingActivated { satisfies [REQ-RIDE-080] fields { rideId: uuid; link: TripSharingLink; activatedAt: datetime } }
     event EmergencyTriggered { satisfies [REQ-RIDE-081, REQ-RIDE-082] fields { rideId: uuid; riderId: uuid; driverId: uuid; type: EmergencyEventType; location: Location; triggeredAt: datetime } }
@@ -760,7 +758,7 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
         guard DriverManagementGateway.getCancellationCount(event.driverId, 24) > 3
         effect DriverManagementGateway.requestTemporarySuspension(
             driverId = event.driverId,
-            durationMinutes = 30,
+            duration = Duration(seconds = 1800),
             reason = "Excessive cancellations in 24h"
         )
     }
@@ -771,7 +769,7 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
         guard DriverManagementGateway.getNoShowCount(event.driverId, 24) > 2
         effect DriverManagementGateway.requestTemporarySuspension(
             driverId = event.driverId,
-            durationMinutes = 60,
+            duration = Duration(seconds = 3600),
             reason = "Excessive no-shows in 24h"
         )
     }

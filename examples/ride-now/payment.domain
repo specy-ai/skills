@@ -1,7 +1,8 @@
 context Payment :: "Method validation, fares, pre-auth/capture, payouts, refunds, receipts" {
     requirements-source "payment.sysreq"
 
-    enum Currency { usd, eur, gbp, cad, aud }
+    // Currency is co-owned in the Shared context (see shared.domain).
+
     enum PaymentStatus { authorized, captured, partiallyRefunded, fullyRefunded, failed }
     enum PaymentMethodType { creditCard, debitCard, paypal, applePay, googlePay }
     enum PaymentMethodValidationStatus { pending, valid, invalid, expired }
@@ -14,43 +15,45 @@ context Payment :: "Method validation, fares, pre-auth/capture, payouts, refunds
     // -----------------------------------------------------------------
     // Value types
     // -----------------------------------------------------------------
-
-    value Money {
-        fields { amount : decimal min(0); currency : Currency }
-        invariants {
-            nonNegative :: "Amount is non-negative" enforcement reject { amount >= 0 }
-        }
-    }
+    // Amount, Distance, Duration are co-owned in the Shared context.
 
     value FareBreakdown {
         satisfies [REQ-PAY-014]
         fields {
-            baseFare : decimal min(0)
-            distanceCharge : decimal min(0)
-            timeCharge : decimal min(0)
-            surgeCharge : decimal min(0)
-            tolls : decimal min(0)
-            promotionDiscount : decimal min(0)
-            cancellationFee : decimal min(0) optional
-            fees : decimal min(0)
-            total : decimal min(0)
-            currency : Currency
+            baseFare : Amount
+            distanceCharge : Amount
+            timeCharge : Amount
+            surgeCharge : Amount
+            tolls : Amount
+            promotionDiscount : Amount
+            cancellationFee : Amount optional
+            fees : Amount
+            total : Amount
         }
         invariants {
             componentsSumToTotal :: "Total equals sum of components minus discounts" enforcement reject {
-                total = baseFare + distanceCharge + timeCharge + surgeCharge + tolls + fees - promotionDiscount + (cancellationFee ?: 0)
+                total.value = baseFare.value + distanceCharge.value + timeCharge.value + surgeCharge.value + tolls.value + fees.value - promotionDiscount.value + (cancellationFee?.value ?: 0)
+            }
+            currenciesAligned :: "All components share the same currency" enforcement reject {
+                baseFare.currency = total.currency
+                and distanceCharge.currency = total.currency
+                and timeCharge.currency = total.currency
+                and surgeCharge.currency = total.currency
+                and tolls.currency = total.currency
+                and promotionDiscount.currency = total.currency
+                and fees.currency = total.currency
+                and (if cancellationFee is defined { cancellationFee.currency = total.currency })
             }
         }
     }
 
     value FareParameters {
         fields {
-            baseFare : decimal min(0)
-            perKmRate : decimal min(0)
-            perMinuteRate : decimal min(0)
+            baseFare : Amount
+            perKmRate : Amount
+            perMinuteRate : Amount
             surgeMultiplier : decimal min(1.0) max(5.0)
-            minimumFare : decimal min(0)
-            currency : Currency
+            minimumFare : Amount
             market : string
         }
     }
@@ -78,15 +81,15 @@ context Payment :: "Method validation, fares, pre-auth/capture, payouts, refunds
         fields {
             payoutId : uuid
             type : PayoutType
-            amount : Money
-            fee : Money optional
-            netAmount : Money
+            amount : Amount
+            fee : Amount optional
+            netAmount : Amount
             initiatedAt : datetime
             expectedArrivalAt : datetime
             settledAt : datetime optional
         }
         invariants {
-            netConsistency { netAmount.amount = amount.amount - (fee?.amount ?: 0) }
+            netConsistency { netAmount.value = amount.value - (fee?.value ?: 0) }
         }
     }
 
@@ -100,12 +103,12 @@ context Payment :: "Method validation, fares, pre-auth/capture, payouts, refunds
         fields {
             riderId : UUID unique
             paymentMethods : list<PaymentMethodInfo>
-            outstandingDebt : Money default("0")
+            outstandingDebt : Amount
             createdAt : datetime
         }
         invariants {
             debtNonNegative :: "Debt is never negative" enforcement reject {
-                outstandingDebt.amount >= 0
+                outstandingDebt.value >= 0
             }
         }
 
@@ -135,9 +138,9 @@ context Payment :: "Method validation, fares, pre-auth/capture, payouts, refunds
 
             "Settle outstanding debt" on SettleDebt {
                 satisfies [REQ-PAY-024]
-                precondition hasDebt { RiderAccount.outstandingDebt.amount > 0 }
+                precondition hasDebt { RiderAccount.outstandingDebt.value > 0 }
                 sets RiderAccount {
-                    outstandingDebt = Money(amount = 0, currency = RiderAccount.outstandingDebt.currency)
+                    outstandingDebt = Amount(value = 0, currency = RiderAccount.outstandingDebt.currency)
                 }
                 emits DebtSettled {
                     accountId = RiderAccount.accountId
@@ -158,11 +161,11 @@ context Payment :: "Method validation, fares, pre-auth/capture, payouts, refunds
             rideId : UUID optional
             riderId : UUID
             status : PaymentStatus default("authorized")
-            committedFare : Money
-            finalFare : Money optional
+            committedFare : Amount
+            finalFare : Amount optional
             fareBreakdown : FareBreakdown optional
             paymentMethodUsed : PaymentMethodInfo
-            refundedAmount : Money default("0")
+            refundedAmount : Amount
             retryCount : int min(0) default(0)
             debtRecorded : boolean default(false)
             authorizedAt : datetime
@@ -174,7 +177,7 @@ context Payment :: "Method validation, fares, pre-auth/capture, payouts, refunds
 
         invariants {
             refundDoesNotExceedCapture :: "Refunded amount cannot exceed final fare" enforcement reject {
-                if finalFare is defined { refundedAmount.amount <= finalFare.amount }
+                if finalFare is defined { refundedAmount.value <= finalFare.value }
             }
         }
 
@@ -186,6 +189,7 @@ context Payment :: "Method validation, fares, pre-auth/capture, payouts, refunds
                     riderId = authorizePayment.riderId
                     committedFare = authorizePayment.committedFare
                     paymentMethodUsed = authorizePayment.method
+                    refundedAmount = Amount(value = 0, currency = authorizePayment.committedFare.currency)
                     status = authorized
                     authorizedAt = now()
                     createdAt = now()
@@ -277,11 +281,11 @@ context Payment :: "Method validation, fares, pre-auth/capture, payouts, refunds
                 satisfies [REQ-PAY-063, REQ-PAY-NFR-003]
                 precondition isCaptured { Payment.status = captured or Payment.status = partiallyRefunded }
                 sets Payment {
-                    refundedAmount = Money(
-                        amount = Payment.refundedAmount.amount + processPartialRefund.amount.amount,
+                    refundedAmount = Amount(
+                        value = Payment.refundedAmount.value + processPartialRefund.amount.value,
                         currency = Payment.refundedAmount.currency
                     )
-                    status = if Payment.refundedAmount.amount + processPartialRefund.amount.amount >= Payment.finalFare.amount then fullyRefunded else partiallyRefunded
+                    status = if Payment.refundedAmount.value + processPartialRefund.amount.value >= Payment.finalFare.value then fullyRefunded else partiallyRefunded
                 }
                 emits PartialRefundProcessed {
                     paymentId = Payment.paymentId
@@ -316,11 +320,11 @@ context Payment :: "Method validation, fares, pre-auth/capture, payouts, refunds
         identifier balanceId : UUID
         fields {
             driverId : UUID unique
-            availableBalance : Money default("0")
-            pendingBalance : Money default("0")
-            totalEarnings : Money default("0")
-            totalPayouts : Money default("0")
-            instantPayoutsTodayAmount : Money default("0")
+            availableBalance : Amount
+            pendingBalance : Amount
+            totalEarnings : Amount
+            totalPayouts : Amount
+            instantPayoutsTodayAmount : Amount
             instantPayoutsTodayDate : date
             lastWeeklyPayoutAt : datetime optional
             createdAt : datetime
@@ -328,10 +332,10 @@ context Payment :: "Method validation, fares, pre-auth/capture, payouts, refunds
 
         invariants {
             balanceNonNegative :: "Available balance ≥ 0" enforcement reject {
-                availableBalance.amount >= 0
+                availableBalance.value >= 0
             }
             earningsConsistency :: "Total earnings equal balance + payouts + pending" enforcement alert {
-                totalEarnings.amount = availableBalance.amount + totalPayouts.amount + pendingBalance.amount
+                totalEarnings.value = availableBalance.value + totalPayouts.value + pendingBalance.value
             }
         }
 
@@ -339,12 +343,12 @@ context Payment :: "Method validation, fares, pre-auth/capture, payouts, refunds
             "Credit driver earnings on capture" on CreditDriverEarnings {
                 satisfies [REQ-PAY-040, REQ-PAY-041, REQ-PAY-042]
                 sets DriverBalance {
-                    availableBalance = Money(
-                        amount = DriverBalance.availableBalance.amount + creditDriverEarnings.netEarnings.amount,
+                    availableBalance = Amount(
+                        value = DriverBalance.availableBalance.value + creditDriverEarnings.netEarnings.value,
                         currency = DriverBalance.availableBalance.currency
                     )
-                    totalEarnings = Money(
-                        amount = DriverBalance.totalEarnings.amount + creditDriverEarnings.netEarnings.amount,
+                    totalEarnings = Amount(
+                        value = DriverBalance.totalEarnings.value + creditDriverEarnings.netEarnings.value,
                         currency = DriverBalance.totalEarnings.currency
                     )
                 }
@@ -361,11 +365,11 @@ context Payment :: "Method validation, fares, pre-auth/capture, payouts, refunds
             "Initiate weekly payout" on InitiateWeeklyPayout {
                 satisfies [REQ-PAY-043, REQ-PAY-044, REQ-PAY-045, REQ-PAY-046]
                 precondition aboveMinimum {
-                    DriverBalance.availableBalance.amount > weeklyPayoutThreshold(DriverBalance.driverId)
+                    DriverBalance.availableBalance.value > weeklyPayoutThreshold(DriverBalance.driverId)
                 }
                 sets DriverBalance {
                     pendingBalance = DriverBalance.availableBalance
-                    availableBalance = Money(amount = 0, currency = DriverBalance.availableBalance.currency)
+                    availableBalance = Amount(value = 0, currency = DriverBalance.availableBalance.currency)
                     lastWeeklyPayoutAt = now()
                 }
                 emits WeeklyPayoutInitiated {
@@ -379,9 +383,9 @@ context Payment :: "Method validation, fares, pre-auth/capture, payouts, refunds
             "Complete payout on bank settlement" on CompletePayout {
                 satisfies [REQ-PAY-045, REQ-PAY-NFR-006]
                 sets DriverBalance {
-                    pendingBalance = Money(amount = 0, currency = DriverBalance.pendingBalance.currency)
-                    totalPayouts = Money(
-                        amount = DriverBalance.totalPayouts.amount + completePayout.amount.amount,
+                    pendingBalance = Amount(value = 0, currency = DriverBalance.pendingBalance.currency)
+                    totalPayouts = Amount(
+                        value = DriverBalance.totalPayouts.value + completePayout.amount.value,
                         currency = DriverBalance.totalPayouts.currency
                     )
                 }
@@ -396,23 +400,23 @@ context Payment :: "Method validation, fares, pre-auth/capture, payouts, refunds
             "Process instant payout" on ProcessInstantPayout {
                 satisfies [REQ-PAY-047, REQ-PAY-048, REQ-PAY-049]
                 precondition belowDailyCap {
-                    DriverBalance.instantPayoutsTodayAmount.amount + processInstantPayout.amount.amount <= instantPayoutDailyCap(DriverBalance.driverId)
+                    DriverBalance.instantPayoutsTodayAmount.value + processInstantPayout.amount.value <= instantPayoutDailyCap(DriverBalance.driverId)
                 }
                 precondition feeAndArrivalQuoted {
                     processInstantPayout.feeQuoted is defined
                     and processInstantPayout.expectedArrival is defined
                 }
                 sets DriverBalance {
-                    availableBalance = Money(
-                        amount = DriverBalance.availableBalance.amount - processInstantPayout.amount.amount,
+                    availableBalance = Amount(
+                        value = DriverBalance.availableBalance.value - processInstantPayout.amount.value,
                         currency = DriverBalance.availableBalance.currency
                     )
-                    instantPayoutsTodayAmount = Money(
-                        amount = DriverBalance.instantPayoutsTodayAmount.amount + processInstantPayout.amount.amount,
+                    instantPayoutsTodayAmount = Amount(
+                        value = DriverBalance.instantPayoutsTodayAmount.value + processInstantPayout.amount.value,
                         currency = DriverBalance.instantPayoutsTodayAmount.currency
                     )
-                    totalPayouts = Money(
-                        amount = DriverBalance.totalPayouts.amount + processInstantPayout.amount.amount - processInstantPayout.feeQuoted.amount,
+                    totalPayouts = Amount(
+                        value = DriverBalance.totalPayouts.value + processInstantPayout.amount.value - processInstantPayout.feeQuoted.value,
                         currency = DriverBalance.totalPayouts.currency
                     )
                 }
@@ -428,8 +432,8 @@ context Payment :: "Method validation, fares, pre-auth/capture, payouts, refunds
             "Deduct driver-fault refund from balance" on DeductDriverBalance {
                 satisfies [REQ-PAY-064]
                 sets DriverBalance {
-                    availableBalance = Money(
-                        amount = DriverBalance.availableBalance.amount - deductDriverBalance.amount.amount,
+                    availableBalance = Amount(
+                        value = DriverBalance.availableBalance.value - deductDriverBalance.amount.value,
                         currency = DriverBalance.availableBalance.currency
                     )
                 }
@@ -453,8 +457,8 @@ context Payment :: "Method validation, fares, pre-auth/capture, payouts, refunds
             riderId : UUID
             paymentId : UUID
             driverId : UUID
-            requestedAmount : Money
-            approvedAmount : Money optional
+            requestedAmount : Amount
+            approvedAmount : Amount optional
             status : RefundRequestStatus default("pending")
             faultType : RefundFaultType optional
             reason : string maxLength(2000)
@@ -548,9 +552,9 @@ context Payment :: "Method validation, fares, pre-auth/capture, payouts, refunds
             driverId : UUID
             paymentId : UUID
             fareBreakdown : FareBreakdown
-            originalTotal : Money
-            adjustedTotal : Money optional
-            refundAmount : Money default("0")
+            originalTotal : Amount
+            adjustedTotal : Amount optional
+            refundAmount : Amount
             status : ReceiptStatus default("generated")
             generatedAt : datetime
             correctedAt : datetime optional
@@ -565,7 +569,8 @@ context Payment :: "Method validation, fares, pre-auth/capture, payouts, refunds
                     driverId = generateReceipt.driverId
                     paymentId = generateReceipt.paymentId
                     fareBreakdown = generateReceipt.fareBreakdown
-                    originalTotal = Money(amount = generateReceipt.fareBreakdown.total, currency = generateReceipt.fareBreakdown.currency)
+                    originalTotal = generateReceipt.fareBreakdown.total
+                    refundAmount = Amount(value = 0, currency = generateReceipt.fareBreakdown.total.currency)
                     status = generated
                     generatedAt = now()
                 }
@@ -585,8 +590,8 @@ context Payment :: "Method validation, fares, pre-auth/capture, payouts, refunds
                 satisfies [REQ-PAY-081]
                 sets Receipt {
                     refundAmount = correctReceipt.refundAmount
-                    adjustedTotal = Money(
-                        amount = Receipt.originalTotal.amount - correctReceipt.refundAmount.amount,
+                    adjustedTotal = Amount(
+                        value = Receipt.originalTotal.value - correctReceipt.refundAmount.value,
                         currency = Receipt.originalTotal.currency
                     )
                     status = corrected
@@ -662,9 +667,9 @@ context Payment :: "Method validation, fares, pre-auth/capture, payouts, refunds
                    REQ-PAY-040, REQ-PAY-042]
         operations {
             computeEstimate(pickup: any, dropoff: any, params: FareParameters) : FareBreakdown
-            computeFinalFare(rideId: uuid, actualDistance: decimal, actualDuration: int, params: FareParameters) : FareBreakdown
-            computeCancellationFee(rideId: uuid, minutesSinceAssignment: int, params: FareParameters) : Money
-            computeDriverEarnings(grossFare: Money, commission: CommissionRate) : Money
+            computeFinalFare(rideId: uuid, actualDistance: Distance, actualDuration: Duration, params: FareParameters) : FareBreakdown
+            computeCancellationFee(rideId: uuid, minutesSinceAssignment: int, params: FareParameters) : Amount
+            computeDriverEarnings(grossFare: Amount, commission: CommissionRate) : Amount
         }
     }
 
@@ -680,7 +685,7 @@ context Payment :: "Method validation, fares, pre-auth/capture, payouts, refunds
         satisfies [REQ-NFR-031]
         operations {
             scoreAuthorization(payment: Payment) : decimal
-            scoreInstantPayout(driverId: uuid, amount: Money) : decimal
+            scoreInstantPayout(driverId: uuid, amount: Amount) : decimal
         }
     }
 
@@ -692,17 +697,17 @@ context Payment :: "Method validation, fares, pre-auth/capture, payouts, refunds
         satisfies [REQ-PAY-NFR-001, REQ-PAY-NFR-005, REQ-NFR-030]
         operations {
             zeroValueAuthorize(method: PaymentMethodInfo) : PaymentMethodValidationStatus
-            placeHold(method: PaymentMethodInfo, amount: Money, idempotencyKey: uuid) : void
-            captureCharge(method: PaymentMethodInfo, amount: Money, idempotencyKey: uuid) : void
+            placeHold(method: PaymentMethodInfo, amount: Amount, idempotencyKey: uuid) : void
+            captureCharge(method: PaymentMethodInfo, amount: Amount, idempotencyKey: uuid) : void
             releaseHold(method: PaymentMethodInfo, holdId: uuid) : void
-            refund(method: PaymentMethodInfo, amount: Money, idempotencyKey: uuid) : void
+            refund(method: PaymentMethodInfo, amount: Amount, idempotencyKey: uuid) : void
         }
     }
 
     infrastructure-service BankTransferService :: "Bank ACH/SEPA payouts to driver accounts" {
         satisfies [REQ-PAY-043, REQ-PAY-045, REQ-PAY-NFR-006]
         operations {
-            transferToBank(bankAccount: any, amount: Money, idempotencyKey: uuid) : uuid
+            transferToBank(bankAccount: any, amount: Amount, idempotencyKey: uuid) : uuid
             getTransferStatus(transferId: uuid) : PayoutStatus
         }
     }
@@ -710,8 +715,8 @@ context Payment :: "Method validation, fares, pre-auth/capture, payouts, refunds
     infrastructure-service InstantPayoutNetwork :: "Push-to-card debit-card instant transfer" {
         satisfies [REQ-PAY-047, REQ-PAY-048]
         operations {
-            transferToDebitCard(card: any, amount: Money, idempotencyKey: uuid) : uuid
-            getQuotedFee(card: any, amount: Money) : Money
+            transferToDebitCard(card: any, amount: Amount, idempotencyKey: uuid) : uuid
+            getQuotedFee(card: any, amount: Amount) : Amount
             getEstimatedArrival(card: any) : Duration
         }
     }
@@ -719,8 +724,8 @@ context Payment :: "Method validation, fares, pre-auth/capture, payouts, refunds
     infrastructure-service PaymentNotificationService {
         satisfies [REQ-PAY-023, REQ-PAY-046, REQ-PAY-080]
         operations {
-            notifyRiderOfDebt(riderId: uuid, amount: Money) : void
-            notifyDriverOfPayout(driverId: uuid, amount: Money, expectedArrival: datetime) : void
+            notifyRiderOfDebt(riderId: uuid, amount: Amount) : void
+            notifyDriverOfPayout(driverId: uuid, amount: Amount, expectedArrival: datetime) : void
             deliverReceipt(riderId: uuid, receiptId: uuid) : void
         }
     }
@@ -731,27 +736,27 @@ context Payment :: "Method validation, fares, pre-auth/capture, payouts, refunds
 
     command AddPaymentMethod { fields { accountId: uuid; riderId: uuid; method: PaymentMethodInfo; correlationId: uuid } }
     command ValidatePaymentMethod { fields { accountId: uuid; paymentMethodId: uuid; outcome: PaymentMethodValidationStatus; correlationId: uuid } }
-    command SettleDebt { fields { accountId: uuid; amount: Money; correlationId: uuid } }
-    command AuthorizePayment { fields { rideRequestId: uuid; riderId: uuid; committedFare: Money; method: PaymentMethodInfo; correlationId: uuid } }
+    command SettleDebt { fields { accountId: uuid; amount: Amount; correlationId: uuid } }
+    command AuthorizePayment { fields { rideRequestId: uuid; riderId: uuid; committedFare: Amount; method: PaymentMethodInfo; correlationId: uuid } }
     command ReleasePaymentHold { fields { paymentId: uuid; correlationId: uuid } }
-    command CapturePayment { fields { paymentId: uuid; rideId: uuid; finalFare: Money; fareBreakdown: FareBreakdown; correlationId: uuid } }
+    command CapturePayment { fields { paymentId: uuid; rideId: uuid; finalFare: Amount; fareBreakdown: FareBreakdown; correlationId: uuid } }
     command RetryPayment { fields { paymentId: uuid; correlationId: uuid } }
     command FallbackPaymentMethod { fields { paymentId: uuid; nextMethod: PaymentMethodInfo; correlationId: uuid } }
     command RecordPaymentFailure { fields { paymentId: uuid; reason: string; correlationId: uuid } }
-    command ProcessPartialRefund { fields { paymentId: uuid; amount: Money; faultType: RefundFaultType; correlationId: uuid } }
+    command ProcessPartialRefund { fields { paymentId: uuid; amount: Amount; faultType: RefundFaultType; correlationId: uuid } }
     command ProcessFullRefund { fields { paymentId: uuid; correlationId: uuid } }
-    command CreditDriverEarnings { fields { driverId: uuid; rideId: uuid; grossFare: Money; commission: Money; netEarnings: Money; correlationId: uuid } }
-    command InitiateWeeklyPayout { fields { driverId: uuid; amount: Money; correlationId: uuid } }
-    command CompletePayout { fields { driverId: uuid; payoutId: uuid; amount: Money; correlationId: uuid } }
-    command ProcessInstantPayout { fields { driverId: uuid; amount: Money; feeQuoted: Money; expectedArrival: datetime; correlationId: uuid } }
-    command DeductDriverBalance { fields { driverId: uuid; rideId: uuid; amount: Money; correlationId: uuid } }
-    command RequestRefund { fields { rideId: uuid; riderId: uuid; paymentId: uuid; driverId: uuid; amount: Money; reason: string; correlationId: uuid } }
+    command CreditDriverEarnings { fields { driverId: uuid; rideId: uuid; grossFare: Amount; commission: Amount; netEarnings: Amount; correlationId: uuid } }
+    command InitiateWeeklyPayout { fields { driverId: uuid; amount: Amount; correlationId: uuid } }
+    command CompletePayout { fields { driverId: uuid; payoutId: uuid; amount: Amount; correlationId: uuid } }
+    command ProcessInstantPayout { fields { driverId: uuid; amount: Amount; feeQuoted: Amount; expectedArrival: datetime; correlationId: uuid } }
+    command DeductDriverBalance { fields { driverId: uuid; rideId: uuid; amount: Amount; correlationId: uuid } }
+    command RequestRefund { fields { rideId: uuid; riderId: uuid; paymentId: uuid; driverId: uuid; amount: Amount; reason: string; correlationId: uuid } }
     command BeginRefundReview { fields { refundRequestId: uuid; correlationId: uuid } }
-    command ApproveRefund { fields { refundRequestId: uuid; approvedAmount: Money; faultType: RefundFaultType; notes: string; correlationId: uuid } }
+    command ApproveRefund { fields { refundRequestId: uuid; approvedAmount: Amount; faultType: RefundFaultType; notes: string; correlationId: uuid } }
     command RejectRefund { fields { refundRequestId: uuid; notes: string; correlationId: uuid } }
     command ExecuteRefund { fields { refundRequestId: uuid; correlationId: uuid } }
     command GenerateReceipt { fields { rideId: uuid; riderId: uuid; driverId: uuid; paymentId: uuid; fareBreakdown: FareBreakdown; capturedAt: datetime; correlationId: uuid } }
-    command CorrectReceipt { fields { receiptId: uuid; refundAmount: Money; correlationId: uuid } }
+    command CorrectReceipt { fields { receiptId: uuid; refundAmount: Amount; correlationId: uuid } }
 
     // -----------------------------------------------------------------
     // Events — internal
@@ -759,27 +764,27 @@ context Payment :: "Method validation, fares, pre-auth/capture, payouts, refunds
 
     event PaymentMethodAdded { satisfies [REQ-PAY-001] fields { accountId: uuid; riderId: uuid; method: PaymentMethodInfo; addedAt: datetime } }
     event PaymentMethodValidated { satisfies [REQ-PAY-001, REQ-PAY-002] fields { accountId: uuid; paymentMethodId: uuid; status: PaymentMethodValidationStatus; validatedAt: datetime } }
-    event DebtSettled { satisfies [REQ-PAY-024] fields { accountId: uuid; settledAmount: Money; settledAt: datetime } }
-    event PaymentAuthorized { satisfies [REQ-PAY-020] fields { paymentId: uuid; rideRequestId: uuid; riderId: uuid; amount: Money; authorizedAt: datetime } }
+    event DebtSettled { satisfies [REQ-PAY-024] fields { accountId: uuid; settledAmount: Amount; settledAt: datetime } }
+    event PaymentAuthorized { satisfies [REQ-PAY-020] fields { paymentId: uuid; rideRequestId: uuid; riderId: uuid; amount: Amount; authorizedAt: datetime } }
     event PaymentHoldReleased { satisfies [REQ-PAY-021] fields { paymentId: uuid; rideRequestId: uuid; releasedAt: datetime } }
-    event PaymentCaptured { satisfies [REQ-PAY-022, REQ-PAY-NFR-002] fields { paymentId: uuid; rideId: uuid; riderId: uuid; finalFare: Money; fareBreakdown: FareBreakdown; paymentMethodUsed: PaymentMethodInfo; capturedAt: datetime } }
+    event PaymentCaptured { satisfies [REQ-PAY-022, REQ-PAY-NFR-002] fields { paymentId: uuid; rideId: uuid; riderId: uuid; finalFare: Amount; fareBreakdown: FareBreakdown; paymentMethodUsed: PaymentMethodInfo; capturedAt: datetime } }
     event PaymentRetryAttempted { satisfies [REQ-PAY-025] fields { paymentId: uuid; attempt: int; attemptedAt: datetime } }
     event PaymentRetryExhausted { satisfies [REQ-PAY-025] fields { paymentId: uuid; exhaustedAt: datetime } }
     event PaymentMethodFallback { satisfies [REQ-PAY-026] fields { paymentId: uuid; newMethod: PaymentMethodInfo; fallbackAt: datetime } }
-    event PaymentFailed { satisfies [REQ-PAY-023] fields { paymentId: uuid; riderId: uuid; debtAmount: Money; reason: string; failedAt: datetime } }
-    event PartialRefundProcessed { satisfies [REQ-PAY-063] fields { paymentId: uuid; riderId: uuid; amount: Money; faultType: RefundFaultType; refundedAt: datetime } }
-    event FullRefundProcessed { satisfies [REQ-PAY-060, REQ-PAY-063] fields { paymentId: uuid; riderId: uuid; amount: Money; refundedAt: datetime } }
-    event DriverEarningsCredited { satisfies [REQ-PAY-040, REQ-PAY-041] fields { driverId: uuid; rideId: uuid; grossFare: Money; commission: Money; netEarnings: Money; creditedAt: datetime } }
-    event WeeklyPayoutInitiated { satisfies [REQ-PAY-043, REQ-PAY-046] fields { driverId: uuid; amount: Money; expectedArrivalAt: datetime; initiatedAt: datetime } }
-    event PayoutCompleted { satisfies [REQ-PAY-045] fields { driverId: uuid; payoutId: uuid; amount: Money; settledAt: datetime } }
-    event InstantPayoutProcessed { satisfies [REQ-PAY-047, REQ-PAY-048, REQ-PAY-049] fields { driverId: uuid; amount: Money; fee: Money; expectedArrival: datetime; initiatedAt: datetime } }
-    event DriverBalanceDeducted { satisfies [REQ-PAY-064] fields { driverId: uuid; rideId: uuid; amount: Money; reason: string; deductedAt: datetime } }
+    event PaymentFailed { satisfies [REQ-PAY-023] fields { paymentId: uuid; riderId: uuid; debtAmount: Amount; reason: string; failedAt: datetime } }
+    event PartialRefundProcessed { satisfies [REQ-PAY-063] fields { paymentId: uuid; riderId: uuid; amount: Amount; faultType: RefundFaultType; refundedAt: datetime } }
+    event FullRefundProcessed { satisfies [REQ-PAY-060, REQ-PAY-063] fields { paymentId: uuid; riderId: uuid; amount: Amount; refundedAt: datetime } }
+    event DriverEarningsCredited { satisfies [REQ-PAY-040, REQ-PAY-041] fields { driverId: uuid; rideId: uuid; grossFare: Amount; commission: Amount; netEarnings: Amount; creditedAt: datetime } }
+    event WeeklyPayoutInitiated { satisfies [REQ-PAY-043, REQ-PAY-046] fields { driverId: uuid; amount: Amount; expectedArrivalAt: datetime; initiatedAt: datetime } }
+    event PayoutCompleted { satisfies [REQ-PAY-045] fields { driverId: uuid; payoutId: uuid; amount: Amount; settledAt: datetime } }
+    event InstantPayoutProcessed { satisfies [REQ-PAY-047, REQ-PAY-048, REQ-PAY-049] fields { driverId: uuid; amount: Amount; fee: Amount; expectedArrival: datetime; initiatedAt: datetime } }
+    event DriverBalanceDeducted { satisfies [REQ-PAY-064] fields { driverId: uuid; rideId: uuid; amount: Amount; reason: string; deductedAt: datetime } }
     event RefundRequested { satisfies [REQ-PAY-061] fields { refundRequestId: uuid; rideId: uuid; riderId: uuid; requestedAt: datetime } }
-    event RefundApproved { satisfies [REQ-PAY-062, REQ-PAY-063] fields { refundRequestId: uuid; rideId: uuid; riderId: uuid; driverId: uuid; approvedAmount: Money; faultType: RefundFaultType; reviewedAt: datetime } }
+    event RefundApproved { satisfies [REQ-PAY-062, REQ-PAY-063] fields { refundRequestId: uuid; rideId: uuid; riderId: uuid; driverId: uuid; approvedAmount: Amount; faultType: RefundFaultType; reviewedAt: datetime } }
     event RefundRejected { satisfies [REQ-PAY-062] fields { refundRequestId: uuid; rejectedAt: datetime } }
-    event RefundExecuted { satisfies [REQ-PAY-063] fields { refundRequestId: uuid; paymentId: uuid; amount: Money; faultType: RefundFaultType; executedAt: datetime } }
-    event ReceiptGenerated { satisfies [REQ-PAY-080] fields { receiptId: uuid; rideId: uuid; riderId: uuid; total: Money; generatedAt: datetime } }
-    event ReceiptCorrected { satisfies [REQ-PAY-081] fields { receiptId: uuid; rideId: uuid; refundAmount: Money; adjustedTotal: Money; correctedAt: datetime } }
+    event RefundExecuted { satisfies [REQ-PAY-063] fields { refundRequestId: uuid; paymentId: uuid; amount: Amount; faultType: RefundFaultType; executedAt: datetime } }
+    event ReceiptGenerated { satisfies [REQ-PAY-080] fields { receiptId: uuid; rideId: uuid; riderId: uuid; total: Amount; generatedAt: datetime } }
+    event ReceiptCorrected { satisfies [REQ-PAY-081] fields { receiptId: uuid; rideId: uuid; refundAmount: Amount; adjustedTotal: Amount; correctedAt: datetime } }
 
     // -----------------------------------------------------------------
     // Temporal events
@@ -823,7 +828,7 @@ context Payment :: "Method validation, fares, pre-auth/capture, payouts, refunds
         effect AuthorizePayment(
             rideRequestId = event.requestId,
             riderId = event.riderId,
-            committedFare = Money(amount = event.committedFare.amount, currency = event.committedFare.currency),
+            committedFare = Amount(value = event.committedFare.amount.value, currency = event.committedFare.amount.currency),
             method = lookupDefaultMethod(event.riderId)
         )
     }
@@ -840,8 +845,8 @@ context Payment :: "Method validation, fares, pre-auth/capture, payouts, refunds
         effect CapturePayment(
             paymentId = lookupPaymentByRide(event.rideId),
             rideId = event.rideId,
-            finalFare = FareCalculationService.computeFinalFare(event.rideId, event.actualDistanceMeters, event.actualDurationSeconds, marketParams(event.rideId)).total,
-            fareBreakdown = FareCalculationService.computeFinalFare(event.rideId, event.actualDistanceMeters, event.actualDurationSeconds, marketParams(event.rideId))
+            finalFare = FareCalculationService.computeFinalFare(event.rideId, event.actualDistance, event.actualDuration, marketParams(event.rideId)).total,
+            fareBreakdown = FareCalculationService.computeFinalFare(event.rideId, event.actualDistance, event.actualDuration, marketParams(event.rideId))
         )
     }
 

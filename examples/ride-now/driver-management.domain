@@ -334,7 +334,7 @@ context DriverManagement :: "Driver onboarding, identity, vehicles, availability
                     driverId = Driver.driverId
                     operatorId = suspendDriver.operatorId
                     reason = suspendDriver.reason
-                    durationMinutes = suspendDriver.durationMinutes
+                    duration = suspendDriver.duration
                     suspendedAt = now()
                 }
             }
@@ -465,7 +465,7 @@ context DriverManagement :: "Driver onboarding, identity, vehicles, availability
     command SubmitRating { fields { driverId: uuid; rideId: uuid; rating: Rating; correlationId: uuid } }
     command IssueRatingWarning { fields { driverId: uuid; correlationId: uuid } }
     command ProposeSuspension { fields { driverId: uuid; correlationId: uuid } }
-    command SuspendDriver { fields { driverId: uuid; operatorId: uuid; reason: string; durationMinutes: int; correlationId: uuid } }
+    command SuspendDriver { fields { driverId: uuid; operatorId: uuid; reason: string; duration: Duration; correlationId: uuid } }
     command SubmitAppeal { fields { driverId: uuid; reason: string; correlationId: uuid } }
     command ResolveAppeal { fields { driverId: uuid; operatorId: uuid; outcome: AppealOutcome; justification: string; correlationId: uuid } }
 
@@ -485,7 +485,7 @@ context DriverManagement :: "Driver onboarding, identity, vehicles, availability
     event RatingSubmitted { satisfies [REQ-DRV-040] fields { driverId: uuid; rating: Rating; newAverage: AverageRating; totalRides: int; submittedAt: datetime } }
     event RatingWarningIssued { satisfies [REQ-DRV-043] fields { driverId: uuid; averageRating: AverageRating; issuedAt: datetime } }
     event SuspensionProposalCreated { satisfies [REQ-DRV-044] fields { driverId: uuid; averageRating: AverageRating; cancellationCount: int; noShowCount: int; proposedAt: datetime } }
-    event DriverSuspended { satisfies [REQ-DRV-044, REQ-DRV-045, REQ-DRV-NFR-005] fields { driverId: uuid; operatorId: uuid; reason: string; durationMinutes: int; suspendedAt: datetime } }
+    event DriverSuspended { satisfies [REQ-DRV-044, REQ-DRV-045, REQ-DRV-NFR-005] fields { driverId: uuid; operatorId: uuid; reason: string; duration: Duration; suspendedAt: datetime } }
     event AppealSubmitted { satisfies [REQ-DRV-047, REQ-DRV-048] fields { driverId: uuid; submittedAt: datetime } }
     event AppealResolved { satisfies [REQ-DRV-049, REQ-DRV-NFR-005] fields { driverId: uuid; outcome: AppealOutcome; operatorId: uuid; resolvedAt: datetime } }
 

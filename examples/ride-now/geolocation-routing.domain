@@ -23,8 +23,7 @@ context GeolocationRouting :: "Real-time positioning, proximity queries, ETA, ro
         fields { encodedPath : string; coordinates : list<GeoCoordinate> }
     }
 
-    value Distance { fields { meters : decimal min(0) } }
-    value Duration { fields { seconds : int min(0) } }
+    // Distance and Duration are co-owned in the Shared context (see shared.domain).
 
     value ETA :: "Estimated time of arrival between two points" {
         satisfies [REQ-GEO-011, REQ-GEO-NFR-002]
@@ -241,7 +240,7 @@ context GeolocationRouting :: "Real-time positioning, proximity queries, ETA, ro
     service ProximityService :: "Spatial queries over real-time driver positions" {
         satisfies [REQ-GEO-010, REQ-GEO-NFR-001, REQ-GEO-NFR-003]
         operations {
-            findNearbyDrivers(pickup: GeoCoordinate, radiusMeters: decimal, maxResults: int) : list<DriverPosition>
+            findNearbyDrivers(pickup: GeoCoordinate, radius: Distance, maxResults: int) : list<DriverPosition>
                 :: "Online, eligible drivers within radius, ordered by ETA to pickup"
         }
     }
