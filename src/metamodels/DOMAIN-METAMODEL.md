@@ -288,7 +288,7 @@ A domain concept with a fixed identity and a lifecycle. An entity changes throug
 
 **Duplicate detection**: An entity declares a duplicate detection predicate over candidate fields, evaluated through its repository.
 
-**Repository**: Each entity derives a repository with core operations (store, getById, remove, search) plus findByField operations deduced from use cases. If the entity belongs to an aggregate, only the aggregate root has a repository.
+**Repository**: Each entity derives a repository with core operations (store, getById, remove, search) plus findByField operations deduced from use cases. If the entity belongs to an aggregate, only the aggregate root has a repository. An entity's repository can have only "read" operations and no side-effect operations because the entity used came from 
 
 **Naming**: Entity types are named with a noun.
 
@@ -299,6 +299,10 @@ Relations:
 - 0..1 "derives" relation with repository (absent if the entity belongs to an aggregate as a non-root child)
 - 0..n "relates to" relation with other entities
 - 0..n "constrained by" relation with invariants
+
+### Read-only Entity (Master Data)
+
+Frequently a software system needs to have access to domain concept that form the basis of its operations but in read-only way. Think of the usual "Party" (Customer, Supplier, etc.) or "Product" master data that are needed to performs higher-level operations. Usually such part of the subsystem are either maintained synchronously (by issuing a query to the subsystem in dependency) or asynchronously (with external events consumed to maintain a local read-only version of that entities whenever a change occured). Such entities can be modelled as entity but in a read-only way with no operations that would change their state and the associated repository has only read operations and no side-effect ones (store, delete, etc.).
 
 ## Aggregate
 
@@ -451,6 +455,12 @@ Relations:
 - 0..n "embedded in" relation with entities (the entities that use this value type as a field type)
 - 0..n "has" relation with operations (behavior on the value; operations return new values)
 
+## Enums (Referential)
+
+Enums holds set of values, either primitive with just a String or Number, or from an existing Value Type. In the case of an existing Value Type, it must have a code that will serve as an identifier to reference that value (with a name like Id or code), but its has no lifecycle. Example: the Amount value type has a code for the Currency (taken from the ISO 4217 alphabetic code, e.g. USD, EUR, etc.) and a precision with the default fraction digits, a display name and a symbol, etc. The Currencies enum holds all the Currency value and can be referenced in other part of the system unambiguously with just that code. 
+
+Relations:
+- 1..1 " "reference" of the value type
 
 ## Domain Service
 
