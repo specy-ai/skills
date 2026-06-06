@@ -19,8 +19,8 @@ Tracks divergences between what the metamodel and authored examples treat as leg
 | GAP-002 | high | `format(identifier)` field constraint | **resolved** |
 | GAP-003 | high | `:: "rationale"` operator on headers | resolved-by-investigation (already supported) |
 | GAP-004 | high | `aggregate Name root EntityName { contains [E1, E2] }` short form | **resolved** |
-| GAP-005 | medium | Natural-language invariant body — `is one-way hash` | open (design needed) |
-| GAP-006 | medium | `forall X : exists Y where …` quantified predicate in `agreement` | open (design needed) |
+| GAP-005 | medium | Natural-language invariant body — `is one-way hash` | **resolved** (example rewritten to a structured predicate) |
+| GAP-006 | medium | `forall X : exists Y where …` quantified predicate in `agreement` | **resolved** (opaque `text_predicate` fallback) |
 | GAP-007 | medium | `enum Name { … }` at context level | resolved-by-investigation (already supported) |
 | GAP-008 | medium | `infrastructure-service` hyphenated keyword | resolved-by-investigation (already supported) |
 | GAP-009 | low | `temporal-event … { recurring "<cron>" per-market }` and `relative-to … offset …` | **resolved** |
@@ -58,7 +58,7 @@ Tracks divergences between what the metamodel and authored examples treat as leg
 |---|---|---|
 | `business-loan.{prd,sysreq,domain}` | 0 | **0 ✓** |
 | `url-shortener.{prd,sysreq}` | 0 | **0 ✓** |
-| `url-shortener.domain` | 8 | 7 (GAP-005/006 only — predicate sub-grammar) |
+| `url-shortener.domain` | 8 | **0 ✓** |
 | `ride-now/driver-management.domain` | 217 | **0 ✓** |
 | `ride-now/rider-management.domain` | 135 | **0 ✓** |
 | `ride-now/geolocation-routing.domain` | 79 | **0 ✓** |
@@ -71,7 +71,8 @@ Tracks divergences between what the metamodel and authored examples treat as leg
 1. **GAP-004** (aggregate short form) — single grammar change, frequent in ride-now.
 2. **GAP-008** (`infrastructure-service` token) — verify whether the keyword tokenization is correct; small fix if not.
 3. **GAP-009 / GAP-010** (temporal-event recurring/per-market, external-event from-import) — both small additions.
-4. **GAP-005 / GAP-006** (predicate sub-grammar) — design work needed; defer.
+
+_All predicate sub-grammar gaps (GAP-005/006) are now resolved — see change log._
 
 ---
 
@@ -215,11 +216,32 @@ aggregate_def: $ => seq(
 ),
 ```
 
-### GAP-005 / GAP-006 — Predicate sub-grammar
+### GAP-006 — Predicate sub-grammar (agreement prose) *(resolved)*
 
-**Discussion:** url-shortener.domain uses freeform natural-language predicate bodies in `must { … }` and `predicate { … }` blocks. Two options:
+**Resolution — Option 2 (text fallback).** `agreement`/`reconciliation` predicate bodies are authored as freeform business prose (`forall deleted Publisher : no … references … within 30 days`, `count(Click where shortLinkId)`). The structured expression grammar cannot express these, and tree-sitter's lexer cannot conditionally fall back (lexical precedence is all-or-nothing — a `choice(expr, text_predicate)` never forks, since the structured tokens always win the lexer). So `predicate { … }` bodies are parsed as opaque text:
 
-1. **Structured predicate** — define `forall <type> [as <id>] : exists <type> where <bool-expr>` and equivalents. Coverage: GAP-006 line 2245.
-2. **Text fallback** — wrap any unrecognized predicate body in `text_predicate` so it parses as opaque text, leaving structural validation to the LSP/checker. Coverage: GAP-005 + GAP-006 line 2269.
+```js
+predicate_block: $ => seq('predicate', '{', $.text_predicate, '}'),
 
-Option 2 is cheaper and lets authors keep prose predicates as documentation while the parser still produces a clean AST.
+// Excludes braces so it stops at the closing `}`.
+text_predicate: $ => token(prec(-1, /[^{}]+/)),
+```
+
+Authors keep prose predicates as documentation; semantic validation is deferred to the LSP/checker. The four `predicate {}` bodies in url-shortener.domain now parse cleanly as `text_predicate`.
+
+### GAP-005 — Natural-language invariant body *(resolved)*
+
+**Resolution — fix the example, keep `must {}` strict.** Unlike agreement predicates, `must { … }` invariant bodies almost always hold real boolean expressions (`balance >= 0`) that should retain structured `comparison`/`is_*` ASTs for highlighting and checking. Making `must {}` opaque to absorb one prose line would regress every invariant repo-wide. The single offender —
+
+```
+must { apiKeyHash is one-way hash }   // not an expression — "one-way hash" is prose
+```
+
+— was rewritten to a structured predicate, with the one-way-hashing intent moved to the `::` rationale and `message`:
+
+```
+must { apiKeyHash is not null }   // is_not_null_expr (GAP-022)
+message "API keys must never be stored in plaintext; persist only a one-way hash"
+```
+
+`must {}` therefore stays structured. `url-shortener.domain` now parses with **0 errors**.

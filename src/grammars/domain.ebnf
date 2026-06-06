@@ -485,7 +485,7 @@ fieldType        = primitiveType
                  | typeName ;
 
 primitiveType    = "string"
-                 | "int"
+                 | "int" | "integer"
                  | "long"
                  | "decimal"
                  | "boolean"

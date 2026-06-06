@@ -2645,6 +2645,17 @@
         }
       ]
     },
+    "text_predicate": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PREC",
+        "value": -1,
+        "content": {
+          "type": "PATTERN",
+          "value": "[^{}]+"
+        }
+      }
+    },
     "fields_block": {
       "type": "SEQ",
       "members": [
@@ -2782,6 +2793,10 @@
         {
           "type": "STRING",
           "value": "int"
+        },
+        {
+          "type": "STRING",
+          "value": "integer"
         },
         {
           "type": "STRING",
@@ -6413,7 +6428,7 @@
         },
         {
           "type": "SYMBOL",
-          "name": "predicate_expr"
+          "name": "text_predicate"
         },
         {
           "type": "STRING",

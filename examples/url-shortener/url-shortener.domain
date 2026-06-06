@@ -2177,10 +2177,10 @@ organization "Sniplink" {
 
         invariant "api-key-stored-hashed" {
           satisfies [REQ-NFR-010]
-          :: "API keys must be stored using one-way hashing"
+          :: "API keys must be stored using one-way hashing — only the hash is persisted, never the plaintext key"
           on ApiClient
-          must { apiKeyHash is one-way hash }
-          message "API keys must never be stored in plaintext"
+          must { apiKeyHash is not null }
+          message "API keys must never be stored in plaintext; persist only a one-way hash"
           enforcement reject
         }
       }

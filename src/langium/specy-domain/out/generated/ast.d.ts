@@ -16,7 +16,7 @@ export declare const SpecyDomainTerminals: {
     REGEX: RegExp;
 };
 export type SpecyDomainTerminalNames = keyof typeof SpecyDomainTerminals;
-export type SpecyDomainKeywordNames = "!=" | "(" | ")" | "*" | "+" | "," | "-" | "-->" | "->" | "." | "/" | ":" | "::" | "<" | "<=" | "=" | ">" | ">=" | "?" | "ACL" | "CS" | "Conformist" | "OHS" | "Partnership" | "PublishedLanguage" | "SeparateWays" | "SharedKernel" | "[" | "[*]" | "]" | "accepts" | "action" | "active" | "aggregate" | "agreement" | "alert" | "and" | "append" | "application" | "application-service" | "as" | "boolean" | "cancelled" | "choreography" | "command" | "compensate" | "compensation" | "condition" | "contain" | "contains" | "context" | "coordination" | "count" | "creates" | "date" | "datetime" | "days" | "decimal" | "default" | "defined" | "depends" | "detection" | "does" | "domain" | "domain-service" | "downstream" | "duplicate" | "duration" | "effect" | "effects" | "emits" | "enforcement" | "entities" | "entity" | "enum" | "error" | "escalation" | "event" | "event-sourced" | "every" | "exists" | "exposes" | "external" | "false" | "field" | "fields" | "final" | "forall" | "foreach" | "from" | "future" | "futureOrPresent" | "guard" | "hours" | "id" | "identifier" | "identity" | "if" | "immutable" | "in" | "infrastructure" | "infrastructure-service" | "instant" | "int" | "interface" | "internal" | "invariant" | "invariants" | "is" | "isEmpty" | "isNotEmpty" | "list" | "long" | "machine" | "manual" | "manual-intervention" | "map" | "matches" | "max" | "max-attempts" | "maxLength" | "message" | "meta" | "min" | "minLength" | "minutes" | "module" | "months" | "must" | "name" | "no" | "not" | "now" | "number" | "offset" | "on" | "operation" | "operations" | "optional" | "or" | "orchestration" | "ordered" | "organization" | "participants" | "past" | "pastOrPresent" | "pattern" | "policies" | "policy" | "postcondition" | "prd-source" | "precondition" | "predicate" | "query" | "query-based" | "range" | "reaction" | "reconciliation" | "reference" | "references" | "reject" | "rejection" | "rejects" | "required" | "requirements-source" | "resolves" | "retry" | "returns" | "root" | "satisfies" | "schedule" | "searching" | "seconds" | "service" | "set" | "sets" | "shortname" | "size" | "some" | "start" | "state" | "statemachine" | "states" | "status" | "step" | "string" | "sum" | "suspend" | "symmetric" | "temporal" | "then" | "time" | "today" | "transition" | "transitions" | "trigger" | "triggered-by" | "triggers" | "true" | "type" | "unique" | "upstream" | "uses" | "uuid" | "value" | "violation" | "void" | "warn" | "weeks" | "when" | "where" | "years" | "{" | "}";
+export type SpecyDomainKeywordNames = "!=" | "(" | ")" | "*" | "+" | "," | "-" | "-->" | "->" | "." | "/" | ":" | "::" | "<" | "<=" | "=" | ">" | ">=" | "?" | "ACL" | "CS" | "Conformist" | "OHS" | "Partnership" | "PublishedLanguage" | "SeparateWays" | "SharedKernel" | "[" | "[*]" | "]" | "accepts" | "action" | "active" | "aggregate" | "agreement" | "alert" | "and" | "append" | "application" | "application-service" | "as" | "boolean" | "cancelled" | "choreography" | "command" | "compensate" | "compensation" | "condition" | "contain" | "contains" | "context" | "coordination" | "count" | "creates" | "date" | "datetime" | "days" | "decimal" | "default" | "defined" | "depends" | "detection" | "does" | "domain" | "domain-service" | "downstream" | "duplicate" | "duration" | "effect" | "effects" | "emits" | "enforcement" | "entities" | "entity" | "enum" | "error" | "escalation" | "event" | "event-sourced" | "every" | "exists" | "exposes" | "external" | "false" | "field" | "fields" | "final" | "forall" | "foreach" | "from" | "future" | "futureOrPresent" | "guard" | "hours" | "id" | "identifier" | "identity" | "if" | "immutable" | "in" | "infrastructure" | "infrastructure-service" | "instant" | "int" | "integer" | "interface" | "internal" | "invariant" | "invariants" | "is" | "isEmpty" | "isNotEmpty" | "list" | "long" | "machine" | "manual" | "manual-intervention" | "map" | "matches" | "max" | "max-attempts" | "maxLength" | "message" | "meta" | "min" | "minLength" | "minutes" | "module" | "months" | "must" | "name" | "no" | "not" | "now" | "number" | "offset" | "on" | "operation" | "operations" | "optional" | "or" | "orchestration" | "ordered" | "organization" | "participants" | "past" | "pastOrPresent" | "pattern" | "policies" | "policy" | "postcondition" | "prd-source" | "precondition" | "predicate" | "query" | "query-based" | "range" | "reaction" | "reconciliation" | "reference" | "references" | "reject" | "rejection" | "rejects" | "required" | "requirements-source" | "resolves" | "retry" | "returns" | "root" | "satisfies" | "schedule" | "searching" | "seconds" | "service" | "set" | "sets" | "shortname" | "size" | "some" | "start" | "state" | "statemachine" | "states" | "status" | "step" | "string" | "sum" | "suspend" | "symmetric" | "temporal" | "then" | "time" | "today" | "transition" | "transitions" | "trigger" | "triggered-by" | "triggers" | "true" | "type" | "unique" | "upstream" | "uses" | "uuid" | "value" | "violation" | "void" | "warn" | "weeks" | "when" | "where" | "years" | "{" | "}";
 export type SpecyDomainTokenNames = SpecyDomainTerminalNames | SpecyDomainKeywordNames;
 export type AggregateBodyItem = AggregateContainsDecl | AggregateEntitiesDecl | AggregateRootDecl | Description | DuplicateDetection | FieldDecl | FieldsBlock | IdentityDecl | InvariantsBlock | OperationsBlock | PoliciesBlock | ReferencesBlock | SatisfiesDecl | StatesBlock | TransitionsBlock;
 export declare const AggregateBodyItem = "AggregateBodyItem";
@@ -62,7 +62,7 @@ export type FunctionName = 'append' | 'count' | 'isEmpty' | 'isNotEmpty' | 'now'
 export declare function isFunctionName(item: unknown): item is FunctionName;
 export type Ident = KeywordAsIdent | string;
 export declare function isIdent(item: unknown): item is Ident;
-export type KeywordAsIdent = 'accepts' | 'action' | 'active' | 'aggregate' | 'agreement' | 'alert' | 'and' | 'append' | 'application' | 'as' | 'boolean' | 'cancelled' | 'command' | 'compensate' | 'compensation' | 'condition' | 'contains' | 'context' | 'coordination' | 'count' | 'creates' | 'date' | 'datetime' | 'days' | 'decimal' | 'default' | 'depends' | 'detection' | 'domain' | 'downstream' | 'duration' | 'effect' | 'emits' | 'enforcement' | 'entities' | 'entity' | 'enum' | 'error' | 'escalation' | 'event' | 'every' | 'exists' | 'exposes' | 'external' | 'false' | 'field' | 'fields' | 'final' | 'forall' | 'foreach' | 'from' | 'future' | 'futureOrPresent' | 'guard' | 'hours' | 'id' | 'identifier' | 'if' | 'immutable' | 'in' | 'infrastructure' | 'instant' | 'int' | 'interface' | 'internal' | 'invariant' | 'is' | 'isEmpty' | 'isNotEmpty' | 'list' | 'long' | 'machine' | 'manual' | 'map' | 'max' | 'maxLength' | 'message' | 'min' | 'minLength' | 'minutes' | 'module' | 'months' | 'must' | 'name' | 'no' | 'not' | 'now' | 'number' | 'offset' | 'on' | 'operation' | 'optional' | 'or' | 'ordered' | 'organization' | 'participants' | 'past' | 'pastOrPresent' | 'pattern' | 'policy' | 'postcondition' | 'precondition' | 'predicate' | 'query' | 'range' | 'reaction' | 'reconciliation' | 'reference' | 'reject' | 'required' | 'resolves' | 'retry' | 'returns' | 'root' | 'satisfies' | 'schedule' | 'searching' | 'seconds' | 'service' | 'set' | 'sets' | 'shortname' | 'size' | 'some' | 'start' | 'state' | 'statemachine' | 'status' | 'step' | 'string' | 'sum' | 'suspend' | 'symmetric' | 'temporal' | 'then' | 'time' | 'today' | 'transition' | 'trigger' | 'true' | 'type' | 'unique' | 'upstream' | 'uses' | 'uuid' | 'value' | 'violation' | 'void' | 'warn' | 'weeks' | 'when' | 'where' | 'years';
+export type KeywordAsIdent = 'accepts' | 'action' | 'active' | 'aggregate' | 'agreement' | 'alert' | 'and' | 'append' | 'application' | 'as' | 'boolean' | 'cancelled' | 'command' | 'compensate' | 'compensation' | 'condition' | 'contains' | 'context' | 'coordination' | 'count' | 'creates' | 'date' | 'datetime' | 'days' | 'decimal' | 'default' | 'depends' | 'detection' | 'domain' | 'downstream' | 'duration' | 'effect' | 'emits' | 'enforcement' | 'entities' | 'entity' | 'enum' | 'error' | 'escalation' | 'event' | 'every' | 'exists' | 'exposes' | 'external' | 'false' | 'field' | 'fields' | 'final' | 'forall' | 'foreach' | 'from' | 'future' | 'futureOrPresent' | 'guard' | 'hours' | 'id' | 'identifier' | 'if' | 'immutable' | 'in' | 'infrastructure' | 'instant' | 'int' | 'integer' | 'interface' | 'internal' | 'invariant' | 'is' | 'isEmpty' | 'isNotEmpty' | 'list' | 'long' | 'machine' | 'manual' | 'map' | 'max' | 'maxLength' | 'message' | 'min' | 'minLength' | 'minutes' | 'module' | 'months' | 'must' | 'name' | 'no' | 'not' | 'now' | 'number' | 'offset' | 'on' | 'operation' | 'optional' | 'or' | 'ordered' | 'organization' | 'participants' | 'past' | 'pastOrPresent' | 'pattern' | 'policy' | 'postcondition' | 'precondition' | 'predicate' | 'query' | 'range' | 'reaction' | 'reconciliation' | 'reference' | 'reject' | 'required' | 'resolves' | 'retry' | 'returns' | 'root' | 'satisfies' | 'schedule' | 'searching' | 'seconds' | 'service' | 'set' | 'sets' | 'shortname' | 'size' | 'some' | 'start' | 'state' | 'statemachine' | 'status' | 'step' | 'string' | 'sum' | 'suspend' | 'symmetric' | 'temporal' | 'then' | 'time' | 'today' | 'transition' | 'trigger' | 'true' | 'type' | 'unique' | 'upstream' | 'uses' | 'uuid' | 'value' | 'violation' | 'void' | 'warn' | 'weeks' | 'when' | 'where' | 'years';
 export declare function isKeywordAsIdent(item: unknown): item is KeywordAsIdent;
 export type LiteralValue = BooleanLiteral | NumberLiteral | StringLiteral;
 export declare const LiteralValue = "LiteralValue";
@@ -76,7 +76,7 @@ export declare function isOperationClause(item: unknown): item is OperationClaus
 export type OperationDef = CommandTriggeredOp | EventTriggeredOp | InternalOp;
 export declare const OperationDef = "OperationDef";
 export declare function isOperationDef(item: unknown): item is OperationDef;
-export type PrimitiveTypeKw = 'boolean' | 'date' | 'datetime' | 'decimal' | 'duration' | 'int' | 'long' | 'string' | 'time' | 'uuid' | 'void';
+export type PrimitiveTypeKw = 'boolean' | 'date' | 'datetime' | 'decimal' | 'duration' | 'int' | 'integer' | 'long' | 'string' | 'time' | 'uuid' | 'void';
 export declare function isPrimitiveTypeKw(item: unknown): item is PrimitiveTypeKw;
 export type QueryBodyItem = Description | FieldDecl | FieldsBlock | ReturnsDecl | SatisfiesDecl;
 export declare const QueryBodyItem = "QueryBodyItem";
@@ -116,7 +116,7 @@ export declare function isUpstreamPattern(item: unknown): item is UpstreamPatter
 export type ValueBodyItem = Description | FieldDecl | FieldsBlock | InlineEnumBlock | InlineInvariant | InvariantsBlock | SatisfiesDecl | ValueOperationsBlock;
 export declare const ValueBodyItem = "ValueBodyItem";
 export declare function isValueBodyItem(item: unknown): item is ValueBodyItem;
-export type ValueExpr = ArrayLiteral | Expression | ServiceCallExpr;
+export type ValueExpr = ArrayLiteral | Expression;
 export declare const ValueExpr = "ValueExpr";
 export declare function isValueExpr(item: unknown): item is ValueExpr;
 export interface AbsoluteTemporalEvent extends langium.AstNode {
@@ -193,7 +193,7 @@ export interface ApplicationServiceDef extends langium.AstNode {
 export declare const ApplicationServiceDef = "ApplicationServiceDef";
 export declare function isApplicationServiceDef(item: unknown): item is ApplicationServiceDef;
 export interface ArgList extends langium.AstNode {
-    readonly $container: ExprServiceCall | FunctionCallExpr | PolicyCallClause | ServiceCallClause | ServiceCallExpr;
+    readonly $container: ExprServiceCall | FunctionCallExpr | PolicyCallClause | ServiceCallClause;
     readonly $type: 'ArgList';
     args: Array<Expression>;
     namedArgs?: NamedArgList;
@@ -390,7 +390,7 @@ export interface DomainServiceDef extends langium.AstNode {
 export declare const DomainServiceDef = "DomainServiceDef";
 export declare function isDomainServiceDef(item: unknown): item is DomainServiceDef;
 export interface DotPath extends langium.AstNode {
-    readonly $container: AbsoluteTemporalEvent | ContainsExpr | DotPathExpr | EventInstant | EveryExpr | ExposesClause | ForeachClause | InExpr | IsDefinedExpr | IsNotDefinedExpr | NoFieldContainsExpr | NotInExpr | ResolvesClause | ServiceCallClause | ServiceCallExpr | SomeExpr;
+    readonly $container: AbsoluteTemporalEvent | ContainsExpr | DotPathExpr | EventInstant | EveryExpr | ExposesClause | ForeachClause | InExpr | IsDefinedExpr | IsNotDefinedExpr | NoFieldContainsExpr | NotInExpr | ResolvesClause | ServiceCallClause | SomeExpr;
     readonly $type: 'DotPath';
     segments: Array<PathSegment>;
 }
@@ -1254,14 +1254,6 @@ export interface ServiceCallClause extends langium.AstNode {
 }
 export declare const ServiceCallClause = "ServiceCallClause";
 export declare function isServiceCallClause(item: unknown): item is ServiceCallClause;
-export interface ServiceCallExpr extends langium.AstNode {
-    readonly $container: ArrayLiteral | AssignmentClause | NamedArg | RelativeTemporalEvent | ReturnsClause | ValueList;
-    readonly $type: 'ServiceCallExpr';
-    args?: ArgList;
-    path: DotPath;
-}
-export declare const ServiceCallExpr = "ServiceCallExpr";
-export declare function isServiceCallExpr(item: unknown): item is ServiceCallExpr;
 export interface ServiceDef extends langium.AstNode {
     readonly $container: ContextDef | DomainFile | ModuleBody;
     readonly $type: 'ServiceDef';
@@ -1634,7 +1626,6 @@ export type SpecyDomainAstType = {
     ScopedPolicyDef: ScopedPolicyDef;
     ServiceBodyItem: ServiceBodyItem;
     ServiceCallClause: ServiceCallClause;
-    ServiceCallExpr: ServiceCallExpr;
     ServiceDef: ServiceDef;
     SetsClause: SetsClause;
     Shortname: Shortname;
