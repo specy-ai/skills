@@ -4,9 +4,13 @@ import { Command } from 'commander';
 import { NodeFileSystem } from 'langium/node';
 import { createSpecyDomainServices } from '../language/specy-domain-module.js';
 import { astToJson } from './json-serializer.js';
+import { normalizeDomain } from './domain-model.js';
+import { modelToMarkdown } from './markdown-serializer.js';
 import { URI } from 'langium';
+import { stringify as yamlStringify } from 'yaml';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import type { DomainFile } from '../generated/ast.js';
 
 const program = new Command();
 
@@ -17,11 +21,12 @@ program
 
 program
     .command('parse')
-    .description('Parse a .domain file and output JSON or Markdown')
+    .description('Parse a .domain file and output JSON, YAML, or Markdown')
     .argument('<file>', 'Path to .domain file')
-    .option('-f, --format <format>', 'Output format: json or markdown', 'json')
+    .option('-f, --format <format>', 'Output format: json, yaml, or markdown', 'json')
     .option('--pretty', 'Pretty-print JSON output')
-    .action(async (file: string, options: { format: string; pretty?: boolean }) => {
+    .option('--raw', 'Emit the faithful Langium AST instead of the clean domain model (json/yaml only)')
+    .action(async (file: string, options: { format: string; pretty?: boolean; raw?: boolean }) => {
         const filePath = path.resolve(file);
         if (!fs.existsSync(filePath)) {
             console.error(`File not found: ${filePath}`);
@@ -54,18 +59,22 @@ program
             process.exit(1);
         }
 
-        const ast = document.parseResult.value;
+        const ast = document.parseResult.value as DomainFile;
+        const format = options.format.toLowerCase();
 
-        if (options.format === 'json') {
-            const json = astToJson(ast);
-            const output = options.pretty
-                ? JSON.stringify(json, null, 2)
-                : JSON.stringify(json);
-            console.log(output);
-        } else if (options.format === 'markdown') {
-            // TODO: Implement markdown serializer
-            console.error('Markdown format not yet implemented');
-            process.exit(1);
+        if (format === 'markdown' || format === 'md') {
+            if (options.raw) {
+                console.error('--raw is only supported for json and yaml formats');
+                process.exit(1);
+            }
+            console.log(modelToMarkdown(normalizeDomain(ast)));
+        } else if (format === 'json' || format === 'yaml' || format === 'yml') {
+            const data = options.raw ? astToJson(ast) : normalizeDomain(ast);
+            if (format === 'json') {
+                console.log(JSON.stringify(data, null, options.pretty ? 2 : undefined));
+            } else {
+                console.log(yamlStringify(data));
+            }
         } else {
             console.error(`Unknown format: ${options.format}`);
             process.exit(1);

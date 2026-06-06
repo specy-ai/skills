@@ -1,6 +1,9 @@
 # Specy Skills
 
-Specy is a Domain-Driven Design toolkit that makes business knowledge explicit, portable, and verifiable. It provides AI-assisted skills that reverse-engineer, explore, specify, and formalize domain models using a structured DSL (`.prd`, `.sysreq`, `.domain` files).
+Specy is a Domain-Driven Design toolkit that makes business knowledge explicit, portable, and verifiable. It provides AI-assisted skills that reverse-engineer, explore, specify, and formalize domain models using either:
+- a structured DSL (`.prd`, `.sysreq`, `.domain` files).
+- a YAML  (`.prd.yaml`, `.sysreq.yaml`, `.domain.yaml` files).
+- a Markdown files (`.prd.md`, `.sysreq.md`, `.domain.md` files) 
 
 Business knowledge — rules, invariants, constraints, operational decisions — is the real asset. Code is a derivation. Specy captures that knowledge so it survives rewrites, anchors AI-generated code to real intent, and evolves with the business.
 
@@ -290,7 +293,7 @@ specy-skill/
 
 **`src/tree-sitters/`** — Tree-sitter parser generators for Specy file formats. Used for syntax highlighting, parsing validation, and tooling integration.
 
-**`src/langium/`** — [Langium](https://langium.org/)-based LSP server and parser CLI for the `.domain` DSL. Provides editor diagnostics, AST access, and a `parse` command that emits JSON. See [LSP Server](#lsp-server) below.
+**`src/langium/`** — [Langium](https://langium.org/)-based LSP server and parser CLI for the `.domain` DSL. Provides editor diagnostics, AST access, and a `parse` command that emits JSON, YAML, or Markdown. See [LSP Server](#lsp-server) below.
 
 **`examples/`** — Complete example projects demonstrating Specy files across different domains.
 
@@ -358,7 +361,7 @@ In your target project, Specy files live under `specy/` at the project root.
 Specy ships a [Langium](https://langium.org/)-based Language Server and parser CLI for `.domain` files, located in `src/langium/specy-domain/`. It provides:
 
 - **Editor integration** — diagnostics, syntax validation, and AST navigation via LSP (VS Code extension entrypoint in `src/extension/main.ts`).
-- **Parser CLI** (`specy-domain`) — parses a `.domain` file into a JSON AST or validates it from the command line.
+- **Parser CLI** (`specy-domain`) — parses a `.domain` file into **JSON, YAML, or Markdown**, or validates it from the command line.
 
 ### Build
 
@@ -366,38 +369,58 @@ Specy ships a [Langium](https://langium.org/)-based Language Server and parser C
 ./src/langium/specy-domain/build.sh
 ```
 
-The script runs `npm install`, generates the Langium artifacts, compiles TypeScript to `out/`, and smoke-tests the CLI against `examples/business-loan/business-loan.domain` and `examples/ecommerce/v2/orders.domain`.
+The script runs `npm install`, generates the Langium artifacts, compiles TypeScript to `out/`, and smoke-tests the CLI against the bundled examples in JSON, YAML, and Markdown.
 
-### Parse a `.domain` file to JSON
+### Parse a `.domain` file
 
-From `src/langium/specy-domain/`, the `parse` command emits the typed AST as JSON:
+The easiest entry point is the `parse-domain.sh` wrapper at the repository root. It builds the parser on first use and works from any directory:
 
 ```bash
-# Pretty-printed JSON AST from an example
-node out/cli/index.js parse ../../../examples/business-loan/business-loan.domain --pretty
+# Markdown documentation
+./parse-domain.sh examples/ecommerce/v2/orders.domain -f markdown
 
-# Compact JSON (pipe to jq for exploration)
-node out/cli/index.js parse ../../../examples/business-loan/business-loan.domain | jq '.organization.contexts[0].name'
+# Clean YAML model
+./parse-domain.sh examples/ecommerce/v2/orders.domain -f yaml > orders.yaml
+
+# Pretty-printed JSON (default format is json)
+./parse-domain.sh examples/ecommerce/v2/orders.domain --pretty
 ```
 
-Example output (truncated) for `examples/business-loan/business-loan.domain`:
+| Flag | Description |
+|------|-------------|
+| `-f, --format <fmt>` | `json` (default), `yaml`, or `markdown` |
+| `--pretty` | Pretty-print JSON output |
+| `--raw` | Emit the faithful Langium AST (with `$type` discriminators) instead of the clean domain model — `json`/`yaml` only |
+
+`json` and `yaml` share a **clean domain model**: Langium internals are stripped and definitions are grouped by kind (`entities`, `values`, `enums`, `commands`, `queries`, `events`, `services`, `policies`, …) under their owning context/module. `markdown` renders the same model as a documentation-style document (heading hierarchy, field tables, operation summaries). Pass `--raw` when you need the verbatim AST.
+
+Under the hood the wrapper calls the CLI directly, which you can also invoke from `src/langium/specy-domain/`:
+
+```bash
+node out/cli/index.js parse ../../../examples/ecommerce/v2/orders.domain -f markdown
+node out/cli/index.js parse ../../../examples/ecommerce/v2/orders.domain -f json | jq '.definitions.entities[].name'
+```
+
+Example JSON output (truncated) for `examples/ecommerce/v2/orders.domain`:
 
 ```json
 {
-  "organization": {
-    "name": "BusinessLoan",
-    "contexts": [
+  "modules": [
+    { "name": "Order", "dependencies": ["Shipping"] }
+  ],
+  "definitions": {
+    "enums": [
+      { "kind": "enum", "name": "OrderStatus", "values": ["draft", "confirmed", "shipped", "delivered", "cancelled"] }
+    ],
+    "entities": [
       {
-        "name": "LoanOrigination",
-        "modules": [
-          {
-            "name": "Application",
-            "entities": [
-              { "name": "LoanApplication", "identity": "applicationId", "states": { "...": "..." } }
-            ],
-            "commands": [ { "name": "SubmitApplication", "...": "..." } ],
-            "events":   [ { "name": "ApplicationSubmitted", "...": "..." } ]
-          }
+        "kind": "entity",
+        "name": "Customer",
+        "description": "A customer who places orders",
+        "identity": { "name": "id", "type": "UUID" },
+        "fields": [
+          { "name": "name", "type": "string", "constraints": ["minLength(1)", "maxLength(100)"] },
+          { "name": "email", "type": "EmailAddress", "constraints": ["unique"] }
         ]
       }
     ]
@@ -410,7 +433,7 @@ Parse errors are written to `stderr` with `line:column` locations, and the proce
 ### Validate a `.domain` file
 
 ```bash
-node out/cli/index.js validate ../../../examples/business-loan/business-loan.domain
+node out/cli/index.js validate ../../../examples/ecommerce/v2/orders.domain
 ```
 
 Emits one `path:line:col [severity] message` line per diagnostic. Exits `0` when there are no errors (warnings allowed), `1` otherwise — suitable for CI gates.
