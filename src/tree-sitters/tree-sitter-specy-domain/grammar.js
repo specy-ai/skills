@@ -530,6 +530,10 @@ module.exports = grammar({
 
     must_block: $ => seq('must', '{', $.expression, '}'),
 
+    // Opaque body for predicate blocks authored as freeform business prose
+    // (GAP-006). Excludes braces so it stops at the closing `}`.
+    text_predicate: $ => token(prec(-1, /[^{}]+/)),
+
     // =========================================================================
     // Fields & References
     // =========================================================================
@@ -562,7 +566,7 @@ module.exports = grammar({
     ),
 
     primitive_type: $ => choice(
-      'string', 'int', 'long', 'decimal', 'boolean', 'date', 'datetime', 'time', 'duration',
+      'string', 'int', 'integer', 'long', 'decimal', 'boolean', 'date', 'datetime', 'time', 'duration',
       'uuid', 'void', 'bytes', 'any',
     ),
 
@@ -1166,7 +1170,10 @@ module.exports = grammar({
       ),
     ),
 
-    predicate_block: $ => seq('predicate', '{', $.predicate_expr, '}'),
+    // Agreement/reconciliation predicates are authored as freeform business
+    // prose (GAP-006); parse the body as an opaque text_predicate and leave
+    // semantic validation to the LSP/checker rather than erroring.
+    predicate_block: $ => seq('predicate', '{', $.text_predicate, '}'),
 
     predicate_expr: $ => choice(
       $.forall_pred,

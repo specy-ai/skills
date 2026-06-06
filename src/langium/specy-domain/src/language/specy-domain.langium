@@ -406,7 +406,7 @@ KeywordAsIdent returns string:
     | 'true' | 'false'
     | 'reject' | 'warn' | 'alert' | 'suspend' | 'manual'
     | 'retry' | 'compensate' | 'shortname'
-    | 'void' | 'string' | 'int' | 'long' | 'decimal' | 'boolean'
+    | 'void' | 'string' | 'int' | 'integer' | 'long' | 'decimal' | 'boolean'
     | 'date' | 'datetime' | 'time' | 'duration' | 'uuid'
     | 'list' | 'set' | 'unique' | 'immutable' | 'ordered'
     | 'default' | 'min' | 'max' | 'range' | 'minLength' | 'maxLength' | 'pattern'
@@ -425,7 +425,7 @@ PrimitiveType:
     value=PrimitiveTypeKw;
 
 PrimitiveTypeKw returns string:
-    'string' | 'int' | 'long' | 'decimal' | 'boolean'
+    'string' | 'int' | 'integer' | 'long' | 'decimal' | 'boolean'
     | 'date' | 'datetime' | 'time' | 'duration' | 'uuid' | 'void';
 
 CollectionType:
@@ -1110,15 +1110,17 @@ ArrayIndex:
 // Value expressions
 // -----------------------------------------------------------------------------
 
+// Service calls are already produced by Expression (via DotPathOrCallExpr ->
+// ExprServiceCall), so a standalone ServiceCallExpr alternative here is redundant
+// and was ambiguous with Expression — both start with a DotPath, which is an
+// unresolvable LL conflict that made the Chevrotain parser hang on array-literal
+// elements such as `[someField]`. Letting Expression handle it removes the conflict.
 ValueExpr:
-    ServiceCallExpr | ArrayLiteral | Expression;
+    ArrayLiteral | Expression;
 
 // NOTE: Value constructors (TypeName { field = value, ... }) cannot be parsed
 // by an LL parser in expression position due to ambiguity with { } blocks.
 // The tree-sitter GLR parser handles these. This is a known limitation.
-
-ServiceCallExpr:
-    path=DotPath '(' args=ArgList? ')';
 
 ArrayLiteral:
     '[' first=ValueExpr (',' more+=ValueExpr)* ']';
