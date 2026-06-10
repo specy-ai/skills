@@ -25,6 +25,7 @@
   - [State machine](#state-machine)
   - [Entity](#entity)
   - [Aggregate](#aggregate)
+  - [Repository](#repository)
   - [Command](#command)
   - [Query](#query)
   - [Event](#event)
@@ -288,7 +289,7 @@ A domain concept with a fixed identity and a lifecycle. An entity changes throug
 
 **Duplicate detection**: An entity declares a duplicate detection predicate over candidate fields, evaluated through its repository.
 
-**Repository**: Each entity derives a repository with core operations (store, getById, remove, search) plus findByField operations deduced from use cases. If the entity belongs to an aggregate, only the aggregate root has a repository. An entity's repository can have only "read" operations and no side-effect operations because the entity used came from 
+**Repository**: Each entity derives a repository with core operations (store, getById, remove, search) plus findByField operations deduced from use cases. If the entity belongs to an aggregate, only the aggregate root has a repository. See [Repository](#repository) for the full definition.
 
 **Naming**: Entity types are named with a noun.
 
@@ -329,6 +330,28 @@ Relations (in addition to all entity relations):
 - 1..1 "has root" relation with entity (the root entity that controls all access)
 - 1..n "contains" relation with entities (the cluster of entities inside the aggregate boundary, including the root)
 - 0..n "constrained by" relation with invariants (aggregate-level invariants that span the whole cluster)
+
+## Repository
+
+A repository is the collection-like abstraction through which the domain retrieves and persists entities and aggregate roots. It presents persistence as if it were an in-memory collection of domain objects keyed by identity, hiding the underlying data store entirely. The domain layer depends only on the repository's interface — a port in the hexagonal architecture — while an adapter in the infrastructure layer provides the concrete implementation.
+
+A repository is **derived, not hand-authored**: it falls out of its owning entity or aggregate root together with the use cases that read its state. The modeler does not invent repositories — each entity that needs persistence implies one, and every criteria-based query implies a corresponding finder on it.
+
+**Derivation rule**: Each persisted entity derives exactly one repository. When an entity belongs to an aggregate, only the aggregate root derives a repository — non-root child entities are reached only by navigating from the root, never through a repository of their own. This keeps the aggregate the unit of both consistency and access.
+
+**Operations**: A repository provides a core set of operations — `store`, `getById`, `remove`, `search` — plus `findByField` operations deduced from the use cases that need them. Retrieval is always by identity (`getById`) or by criteria (`findByField`, `search`). A repository never exposes operations that mutate domain state; it only stores or removes whole domain objects. Mutation of an entity's state is the responsibility of the entity's own operations, after which the result is handed back to the repository to `store`.
+
+**Read surface**: A repository is the read surface that queries target. Whereas commands flow through entity operations, queries read current state directly from the repository.
+
+**Read-only repositories**: A repository derived from a read-only entity (master data) exposes read operations only — `getById`, `findByField`, `search` — and never `store` or `remove`, because the entity's state is owned by an upstream context or external system (see [Read-only Entity](#read-only-entity-master-data)).
+
+**Naming**: Repositories are named after the entity or aggregate root they serve, suffixed with `Repository`. Example: `OrderRepository`, `CustomerRepository`.
+
+Relations:
+- 1..1 "derived from" relation with entity or aggregate root (the domain object whose persistence it manages; absent for non-root child entities of an aggregate)
+- 1..n "provides" relation with operations (`store`, `getById`, `remove`, `search`, and deduced `findByField` operations)
+- 0..n "read by" relation with queries (a query reads current state through the repository's read surface)
+- 1..1 "belongs to" relation with the module of its owning entity or aggregate
 
 ## Command
 
