@@ -484,6 +484,14 @@ export const IsNotDefinedExpr = 'IsNotDefinedExpr';
 export function isIsNotDefinedExpr(item) {
     return reflection.isInstance(item, IsNotDefinedExpr);
 }
+export const IsNotNullExpr = 'IsNotNullExpr';
+export function isIsNotNullExpr(item) {
+    return reflection.isInstance(item, IsNotNullExpr);
+}
+export const IsNullExpr = 'IsNullExpr';
+export function isIsNullExpr(item) {
+    return reflection.isInstance(item, IsNullExpr);
+}
 export const MatchesExpr = 'MatchesExpr';
 export function isMatchesExpr(item) {
     return reflection.isInstance(item, MatchesExpr);
@@ -539,6 +547,10 @@ export function isNoFieldContainsExpr(item) {
 export const NotInExpr = 'NotInExpr';
 export function isNotInExpr(item) {
     return reflection.isInstance(item, NotInExpr);
+}
+export const NullLiteralExpr = 'NullLiteralExpr';
+export function isNullLiteralExpr(item) {
+    return reflection.isInstance(item, NullLiteralExpr);
 }
 export const NumberLiteral = 'NumberLiteral';
 export function isNumberLiteral(item) {
@@ -794,7 +806,7 @@ export function isForallPred(item) {
 }
 export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
     getAllTypes() {
-        return [AbsoluteTemporalEvent, AcceptsClause, AggregateBodyItem, AggregateContainsDecl, AggregateDef, AggregateEntitiesDecl, AggregateRootDecl, AgreementDef, AgreementItem, ApplicationServiceDef, ArgList, ArrayIndex, ArrayLiteral, AssignmentClause, BinaryExpr, BooleanLiteral, BooleanLiteralExpr, ClassicStateDef, ClassicTransitionDef, CollectionType, CommandDef, CommandTriggeredOp, CompensationClause, Constraint, ContainsExpr, ContextDef, ContextMapBlock, ContextRelation, CoordinationClause, CreatesClause, Definition, DependsBlock, Description, DetectionClause, DomainFile, DomainServiceDef, DotPath, DotPathExpr, DownstreamRelation, DuplicateDetection, DurationLiteral, EffectsClause, EmitsClause, EnforcementStrategy, EntityBodyItem, EntityDef, EntityTransition, EnumDef, EnumValue, ErrorEventDef, EscalationAction, EscalationActionClause, EscalationChainDef, EscalationCondition, EscalationMaxAttempts, EscalationStep, EscalationStepItem, EscalationThen, EscalationWhen, EventBodyItem, EventDef, EventGuard, EventInstant, EventSchedule, EventTriggeredOp, EventTypeClassifier, EveryExpr, ExistsPred, ExposesClause, ExprServiceCall, Expression, ExternalEventDef, FieldDecl, FieldType, FieldTypeOpt, FieldsBlock, FinalState, ForallPred, ForeachClause, FunctionCallExpr, GenericType, IdentityDecl, IfExpr, InExpr, InfrastructureServiceDef, InlineEnumBlock, InlineInvariant, InterfaceDef, InternalOp, InvariantDef, InvariantsBlock, IsDefinedExpr, IsNotDefinedExpr, LiteralValue, MatchPattern, MatchesExpr, MetadataBlock, MetadataEntry, ModuleBody, ModuleDef, MustBlock, NamedArg, NamedArgList, NamedOpItem, NamedOperationDef, NamedPostcondition, NamedPrecondition, NoFieldContainsExpr, NotInExpr, NumberLiteral, NumberLiteralExpr, OnClause, OperationClause, OperationDef, OperationsBlock, OrganizationDef, ParamDecl, ParamDeclOpt, ParamList, ParenExpr, ParticipantsClause, PathSegment, PoliciesBlock, PolicyCallClause, PolicyDef, PostconditionClause, PrdSourceDecl, PreconditionClause, PredicateBlock, PredicateExpr, PrimitiveType, QueryBodyItem, QueryDef, ReactionDef, ReactionItem, ReconciliationDef, ReconciliationItem, ReconciliationTrigger, ReconciliationTriggerClause, RecordBodyItem, RecurringTemporalEvent, ReferenceDecl, ReferencesBlock, RelativeTemporalEvent, RequirementsSourceDecl, ResolvesClause, ReturnsClause, ReturnsDecl, SatisfiesDecl, ScopedInvariantDef, ScopedPolicyDef, ServiceBodyItem, ServiceCallClause, ServiceDef, SetsClause, Shortname, SomeExpr, SourceDecl, StateDef, StateInvariantDef, StateMachineDef, StatemachineDef, StatemachineItem, StatemachineStart, StatesBlock, StringLiteral, StringLiteralExpr, SymmetricRelation, TemporalEventDef, TopLevelElement, TransitionInline, TransitionsBlock, TriggeredByClause, UnaryExpr, UpstreamRelation, UsesDecl, ValueBodyItem, ValueDef, ValueExpr, ValueList, ValueOpDef, ValueOperationsBlock];
+        return [AbsoluteTemporalEvent, AcceptsClause, AggregateBodyItem, AggregateContainsDecl, AggregateDef, AggregateEntitiesDecl, AggregateRootDecl, AgreementDef, AgreementItem, ApplicationServiceDef, ArgList, ArrayIndex, ArrayLiteral, AssignmentClause, BinaryExpr, BooleanLiteral, BooleanLiteralExpr, ClassicStateDef, ClassicTransitionDef, CollectionType, CommandDef, CommandTriggeredOp, CompensationClause, Constraint, ContainsExpr, ContextDef, ContextMapBlock, ContextRelation, CoordinationClause, CreatesClause, Definition, DependsBlock, Description, DetectionClause, DomainFile, DomainServiceDef, DotPath, DotPathExpr, DownstreamRelation, DuplicateDetection, DurationLiteral, EffectsClause, EmitsClause, EnforcementStrategy, EntityBodyItem, EntityDef, EntityTransition, EnumDef, EnumValue, ErrorEventDef, EscalationAction, EscalationActionClause, EscalationChainDef, EscalationCondition, EscalationMaxAttempts, EscalationStep, EscalationStepItem, EscalationThen, EscalationWhen, EventBodyItem, EventDef, EventGuard, EventInstant, EventSchedule, EventTriggeredOp, EventTypeClassifier, EveryExpr, ExistsPred, ExposesClause, ExprServiceCall, Expression, ExternalEventDef, FieldDecl, FieldType, FieldTypeOpt, FieldsBlock, FinalState, ForallPred, ForeachClause, FunctionCallExpr, GenericType, IdentityDecl, IfExpr, InExpr, InfrastructureServiceDef, InlineEnumBlock, InlineInvariant, InterfaceDef, InternalOp, InvariantDef, InvariantsBlock, IsDefinedExpr, IsNotDefinedExpr, IsNotNullExpr, IsNullExpr, LiteralValue, MatchPattern, MatchesExpr, MetadataBlock, MetadataEntry, ModuleBody, ModuleDef, MustBlock, NamedArg, NamedArgList, NamedOpItem, NamedOperationDef, NamedPostcondition, NamedPrecondition, NoFieldContainsExpr, NotInExpr, NullLiteralExpr, NumberLiteral, NumberLiteralExpr, OnClause, OperationClause, OperationDef, OperationsBlock, OrganizationDef, ParamDecl, ParamDeclOpt, ParamList, ParenExpr, ParticipantsClause, PathSegment, PoliciesBlock, PolicyCallClause, PolicyDef, PostconditionClause, PrdSourceDecl, PreconditionClause, PredicateBlock, PredicateExpr, PrimitiveType, QueryBodyItem, QueryDef, ReactionDef, ReactionItem, ReconciliationDef, ReconciliationItem, ReconciliationTrigger, ReconciliationTriggerClause, RecordBodyItem, RecurringTemporalEvent, ReferenceDecl, ReferencesBlock, RelativeTemporalEvent, RequirementsSourceDecl, ResolvesClause, ReturnsClause, ReturnsDecl, SatisfiesDecl, ScopedInvariantDef, ScopedPolicyDef, ServiceBodyItem, ServiceCallClause, ServiceDef, SetsClause, Shortname, SomeExpr, SourceDecl, StateDef, StateInvariantDef, StateMachineDef, StatemachineDef, StatemachineItem, StatemachineStart, StatesBlock, StringLiteral, StringLiteralExpr, SymmetricRelation, TemporalEventDef, TopLevelElement, TransitionInline, TransitionsBlock, TriggeredByClause, UnaryExpr, UpstreamRelation, UsesDecl, ValueBodyItem, ValueDef, ValueExpr, ValueList, ValueOpDef, ValueOperationsBlock];
     }
     computeIsSubtype(subtype, supertype) {
         switch (subtype) {
@@ -850,9 +862,12 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
             case InExpr:
             case IsDefinedExpr:
             case IsNotDefinedExpr:
+            case IsNotNullExpr:
+            case IsNullExpr:
             case MatchesExpr:
             case NoFieldContainsExpr:
             case NotInExpr:
+            case NullLiteralExpr:
             case NumberLiteralExpr:
             case ParenExpr:
             case SomeExpr:
@@ -1793,6 +1808,22 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     ]
                 };
             }
+            case IsNotNullExpr: {
+                return {
+                    name: IsNotNullExpr,
+                    properties: [
+                        { name: 'path' }
+                    ]
+                };
+            }
+            case IsNullExpr: {
+                return {
+                    name: IsNullExpr,
+                    properties: [
+                        { name: 'path' }
+                    ]
+                };
+            }
             case MatchesExpr: {
                 return {
                     name: MatchesExpr,
@@ -1916,6 +1947,14 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     properties: [
                         { name: 'path' },
                         { name: 'values' }
+                    ]
+                };
+            }
+            case NullLiteralExpr: {
+                return {
+                    name: NullLiteralExpr,
+                    properties: [
+                        { name: 'value' }
                     ]
                 };
             }

@@ -1043,6 +1043,8 @@ UnaryExpr infers Expression:
     | NoFieldContainsExpr
     | IsDefinedExpr
     | IsNotDefinedExpr
+    | IsNullExpr
+    | IsNotNullExpr
     | InExpr
     | NotInExpr
     | FunctionCallExpr
@@ -1076,6 +1078,12 @@ IsDefinedExpr:
 
 IsNotDefinedExpr:
     path=DotPath 'is' 'not' 'defined';
+
+IsNullExpr:
+    path=DotPath 'is' 'null';
+
+IsNotNullExpr:
+    path=DotPath 'is' 'not' 'null';
 
 InExpr:
     path=DotPath 'in' '{' values=ValueList '}';
@@ -1148,7 +1156,10 @@ LiteralValue:
 Literal infers Expression:
     {infer StringLiteralExpr} value=STRING
     | {infer NumberLiteralExpr} value=NUMBER
-    | {infer BooleanLiteralExpr} value=('true' | 'false');
+    | {infer BooleanLiteralExpr} value=('true' | 'false')
+    // `null` is a keyword (used by `is null` / `is not null`); as a literal it
+    // keeps comparisons like `field != null` parsing as a value, not an identifier.
+    | {infer NullLiteralExpr} value='null';
 
 StringLiteral:
     value=STRING;

@@ -16,11 +16,12 @@ program
     .version('1.0.0');
 program
     .command('parse')
-    .description('Parse a .domain file and output JSON, YAML, or Markdown')
+    .description('Parse a .domain file and output JSON, YAML, or Markdown (best-effort on parse errors; use --strict to fail instead)')
     .argument('<file>', 'Path to .domain file')
     .option('-f, --format <format>', 'Output format: json, yaml, or markdown', 'json')
     .option('--pretty', 'Pretty-print JSON output')
     .option('--raw', 'Emit the faithful Langium AST instead of the clean domain model (json/yaml only)')
+    .option('--strict', 'Exit with an error on parse errors instead of emitting best-effort output from the recovered AST')
     .action(async (file, options) => {
     const filePath = path.resolve(file);
     if (!fs.existsSync(filePath)) {
@@ -35,36 +36,48 @@ program
     const diagnostics = (document.diagnostics ?? []);
     const errors = diagnostics.filter(d => d.severity === 1);
     if (errors.length > 0) {
-        console.error(`Parse errors in ${file}:`);
+        const label = options.strict ? 'Parse errors' : 'Warning: parse errors';
+        console.error(`${label} in ${file} (${errors.length}):`);
         for (const diag of errors) {
             const line = diag.range.start.line + 1;
             const col = diag.range.start.character + 1;
             console.error(`  ${line}:${col} - ${diag.message}`);
         }
-        process.exit(1);
+        if (options.strict) {
+            process.exit(1);
+        }
+        console.error('Emitting best-effort output from the recovered partial AST; unparsed regions are omitted.');
     }
     const ast = document.parseResult.value;
     const format = options.format.toLowerCase();
-    if (format === 'markdown' || format === 'md') {
-        if (options.raw) {
-            console.error('--raw is only supported for json and yaml formats');
-            process.exit(1);
+    let output;
+    try {
+        if (format === 'markdown' || format === 'md') {
+            if (options.raw) {
+                console.error('--raw is only supported for json and yaml formats');
+                process.exit(1);
+            }
+            output = modelToMarkdown(normalizeDomain(ast));
         }
-        console.log(modelToMarkdown(normalizeDomain(ast)));
-    }
-    else if (format === 'json' || format === 'yaml' || format === 'yml') {
-        const data = options.raw ? astToJson(ast) : normalizeDomain(ast);
-        if (format === 'json') {
-            console.log(JSON.stringify(data, null, options.pretty ? 2 : undefined));
+        else if (format === 'json' || format === 'yaml' || format === 'yml') {
+            const data = options.raw ? astToJson(ast) : normalizeDomain(ast);
+            output =
+                format === 'json'
+                    ? JSON.stringify(data, null, options.pretty ? 2 : undefined)
+                    : yamlStringify(data);
         }
         else {
-            console.log(yamlStringify(data));
+            console.error(`Unknown format: ${options.format}`);
+            process.exit(1);
+            return;
         }
     }
-    else {
-        console.error(`Unknown format: ${options.format}`);
+    catch (err) {
+        console.error(`Failed to serialize ${file}: ${err?.message ?? String(err)}`);
         process.exit(1);
+        return;
     }
+    console.log(output);
 });
 program
     .command('validate')

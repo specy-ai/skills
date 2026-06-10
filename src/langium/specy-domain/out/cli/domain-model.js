@@ -60,6 +60,9 @@ function cleanNode(node) {
     return result;
 }
 function typeToString(ft) {
+    // The AST may be partial (error recovery), so a type node can be missing.
+    if (!ft)
+        return 'unknown';
     if (ast.isPrimitiveType(ft))
         return ft.value;
     if (ast.isCollectionType(ft)) {
@@ -77,7 +80,7 @@ function typeToString(ft) {
     return ft.typeName;
 }
 function dotPathToString(dp) {
-    return dp.segments
+    return (dp?.segments ?? [])
         .map(seg => {
         const s = seg;
         return (s.name ?? s.segment ?? '');
@@ -86,6 +89,8 @@ function dotPathToString(dp) {
         .join('.');
 }
 function nameOf(value) {
+    if (value === undefined || value === null)
+        return '';
     if (typeof value === 'string')
         return value;
     if (isReference(value))
@@ -438,8 +443,22 @@ function normalizeDefinition(def) {
 function groupDefinitions(defs) {
     const groups = {};
     for (const def of defs) {
-        const { group, construct } = normalizeDefinition(def);
-        (groups[group] ??= []).push(construct);
+        if (!def || typeof def.$type !== 'string')
+            continue;
+        // Isolate each definition: a malformed node from a partial/recovered AST
+        // degrades to a placeholder instead of aborting the whole serialization.
+        try {
+            const { group, construct } = normalizeDefinition(def);
+            (groups[group] ??= []).push(construct);
+        }
+        catch {
+            const d = def;
+            (groups.other ??= []).push({
+                kind: def.$type,
+                name: nameOf(d.name),
+                _unparsed: true,
+            });
+        }
     }
     return Object.keys(groups).length > 0 ? groups : undefined;
 }

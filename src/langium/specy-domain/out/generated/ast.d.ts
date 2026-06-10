@@ -16,7 +16,7 @@ export declare const SpecyDomainTerminals: {
     REGEX: RegExp;
 };
 export type SpecyDomainTerminalNames = keyof typeof SpecyDomainTerminals;
-export type SpecyDomainKeywordNames = "!=" | "(" | ")" | "*" | "+" | "," | "-" | "-->" | "->" | "." | "/" | ":" | "::" | "<" | "<=" | "=" | ">" | ">=" | "?" | "ACL" | "CS" | "Conformist" | "OHS" | "Partnership" | "PublishedLanguage" | "SeparateWays" | "SharedKernel" | "[" | "[*]" | "]" | "accepts" | "action" | "active" | "aggregate" | "agreement" | "alert" | "and" | "append" | "application" | "application-service" | "as" | "boolean" | "cancelled" | "choreography" | "command" | "compensate" | "compensation" | "condition" | "contain" | "contains" | "context" | "coordination" | "count" | "creates" | "date" | "datetime" | "days" | "decimal" | "default" | "defined" | "depends" | "detection" | "does" | "domain" | "domain-service" | "downstream" | "duplicate" | "duration" | "effect" | "effects" | "emits" | "enforcement" | "entities" | "entity" | "enum" | "error" | "escalation" | "event" | "event-sourced" | "every" | "exists" | "exposes" | "external" | "false" | "field" | "fields" | "final" | "forall" | "foreach" | "from" | "future" | "futureOrPresent" | "guard" | "hours" | "id" | "identifier" | "identity" | "if" | "immutable" | "in" | "infrastructure" | "infrastructure-service" | "instant" | "int" | "integer" | "interface" | "internal" | "invariant" | "invariants" | "is" | "isEmpty" | "isNotEmpty" | "list" | "long" | "machine" | "manual" | "manual-intervention" | "map" | "matches" | "max" | "max-attempts" | "maxLength" | "message" | "meta" | "min" | "minLength" | "minutes" | "module" | "months" | "must" | "name" | "no" | "not" | "now" | "number" | "offset" | "on" | "operation" | "operations" | "optional" | "or" | "orchestration" | "ordered" | "organization" | "participants" | "past" | "pastOrPresent" | "pattern" | "policies" | "policy" | "postcondition" | "prd-source" | "precondition" | "predicate" | "query" | "query-based" | "range" | "reaction" | "reconciliation" | "reference" | "references" | "reject" | "rejection" | "rejects" | "required" | "requirements-source" | "resolves" | "retry" | "returns" | "root" | "satisfies" | "schedule" | "searching" | "seconds" | "service" | "set" | "sets" | "shortname" | "size" | "some" | "start" | "state" | "statemachine" | "states" | "status" | "step" | "string" | "sum" | "suspend" | "symmetric" | "temporal" | "then" | "time" | "today" | "transition" | "transitions" | "trigger" | "triggered-by" | "triggers" | "true" | "type" | "unique" | "upstream" | "uses" | "uuid" | "value" | "violation" | "void" | "warn" | "weeks" | "when" | "where" | "years" | "{" | "}";
+export type SpecyDomainKeywordNames = "!=" | "(" | ")" | "*" | "+" | "," | "-" | "-->" | "->" | "." | "/" | ":" | "::" | "<" | "<=" | "=" | ">" | ">=" | "?" | "ACL" | "CS" | "Conformist" | "OHS" | "Partnership" | "PublishedLanguage" | "SeparateWays" | "SharedKernel" | "[" | "[*]" | "]" | "accepts" | "action" | "active" | "aggregate" | "agreement" | "alert" | "and" | "append" | "application" | "application-service" | "as" | "boolean" | "cancelled" | "choreography" | "command" | "compensate" | "compensation" | "condition" | "contain" | "contains" | "context" | "coordination" | "count" | "creates" | "date" | "datetime" | "days" | "decimal" | "default" | "defined" | "depends" | "detection" | "does" | "domain" | "domain-service" | "downstream" | "duplicate" | "duration" | "effect" | "effects" | "emits" | "enforcement" | "entities" | "entity" | "enum" | "error" | "escalation" | "event" | "event-sourced" | "every" | "exists" | "exposes" | "external" | "false" | "field" | "fields" | "final" | "forall" | "foreach" | "from" | "future" | "futureOrPresent" | "guard" | "hours" | "id" | "identifier" | "identity" | "if" | "immutable" | "in" | "infrastructure" | "infrastructure-service" | "instant" | "int" | "integer" | "interface" | "internal" | "invariant" | "invariants" | "is" | "isEmpty" | "isNotEmpty" | "list" | "long" | "machine" | "manual" | "manual-intervention" | "map" | "matches" | "max" | "max-attempts" | "maxLength" | "message" | "meta" | "min" | "minLength" | "minutes" | "module" | "months" | "must" | "name" | "no" | "not" | "now" | "null" | "number" | "offset" | "on" | "operation" | "operations" | "optional" | "or" | "orchestration" | "ordered" | "organization" | "participants" | "past" | "pastOrPresent" | "pattern" | "policies" | "policy" | "postcondition" | "prd-source" | "precondition" | "predicate" | "query" | "query-based" | "range" | "reaction" | "reconciliation" | "reference" | "references" | "reject" | "rejection" | "rejects" | "required" | "requirements-source" | "resolves" | "retry" | "returns" | "root" | "satisfies" | "schedule" | "searching" | "seconds" | "service" | "set" | "sets" | "shortname" | "size" | "some" | "start" | "state" | "statemachine" | "states" | "status" | "step" | "string" | "sum" | "suspend" | "symmetric" | "temporal" | "then" | "time" | "today" | "transition" | "transitions" | "trigger" | "triggered-by" | "triggers" | "true" | "type" | "unique" | "upstream" | "uses" | "uuid" | "value" | "violation" | "void" | "warn" | "weeks" | "when" | "where" | "years" | "{" | "}";
 export type SpecyDomainTokenNames = SpecyDomainTerminalNames | SpecyDomainKeywordNames;
 export type AggregateBodyItem = AggregateContainsDecl | AggregateEntitiesDecl | AggregateRootDecl | Description | DuplicateDetection | FieldDecl | FieldsBlock | IdentityDecl | InvariantsBlock | OperationsBlock | PoliciesBlock | ReferencesBlock | SatisfiesDecl | StatesBlock | TransitionsBlock;
 export declare const AggregateBodyItem = "AggregateBodyItem";
@@ -53,7 +53,7 @@ export declare function isEscalationStepItem(item: unknown): item is EscalationS
 export type EventBodyItem = Description | EventGuard | EventInstant | EventSchedule | EventTypeClassifier | FieldDecl | FieldsBlock | SatisfiesDecl;
 export declare const EventBodyItem = "EventBodyItem";
 export declare function isEventBodyItem(item: unknown): item is EventBodyItem;
-export type Expression = BinaryExpr | BooleanLiteralExpr | ContainsExpr | DotPathExpr | DurationLiteral | EveryExpr | ExprServiceCall | FunctionCallExpr | IfExpr | InExpr | IsDefinedExpr | IsNotDefinedExpr | MatchesExpr | NoFieldContainsExpr | NotInExpr | NumberLiteralExpr | ParenExpr | SomeExpr | StringLiteralExpr | UnaryExpr;
+export type Expression = BinaryExpr | BooleanLiteralExpr | ContainsExpr | DotPathExpr | DurationLiteral | EveryExpr | ExprServiceCall | FunctionCallExpr | IfExpr | InExpr | IsDefinedExpr | IsNotDefinedExpr | IsNotNullExpr | IsNullExpr | MatchesExpr | NoFieldContainsExpr | NotInExpr | NullLiteralExpr | NumberLiteralExpr | ParenExpr | SomeExpr | StringLiteralExpr | UnaryExpr;
 export declare const Expression = "Expression";
 export declare function isExpression(item: unknown): item is Expression;
 export type FieldName = KeywordAsIdent | string;
@@ -390,7 +390,7 @@ export interface DomainServiceDef extends langium.AstNode {
 export declare const DomainServiceDef = "DomainServiceDef";
 export declare function isDomainServiceDef(item: unknown): item is DomainServiceDef;
 export interface DotPath extends langium.AstNode {
-    readonly $container: AbsoluteTemporalEvent | ContainsExpr | DotPathExpr | EventInstant | EveryExpr | ExposesClause | ForeachClause | InExpr | IsDefinedExpr | IsNotDefinedExpr | NoFieldContainsExpr | NotInExpr | ResolvesClause | ServiceCallClause | SomeExpr;
+    readonly $container: AbsoluteTemporalEvent | ContainsExpr | DotPathExpr | EventInstant | EveryExpr | ExposesClause | ForeachClause | InExpr | IsDefinedExpr | IsNotDefinedExpr | IsNotNullExpr | IsNullExpr | NoFieldContainsExpr | NotInExpr | ResolvesClause | ServiceCallClause | SomeExpr;
     readonly $type: 'DotPath';
     segments: Array<PathSegment>;
 }
@@ -827,6 +827,20 @@ export interface IsNotDefinedExpr extends langium.AstNode {
 }
 export declare const IsNotDefinedExpr = "IsNotDefinedExpr";
 export declare function isIsNotDefinedExpr(item: unknown): item is IsNotDefinedExpr;
+export interface IsNotNullExpr extends langium.AstNode {
+    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PolicyCallClause | PolicyDef | PostconditionClause | PreconditionClause | PredicateExpr | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | ScopedPolicyDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
+    readonly $type: 'IsNotNullExpr';
+    path: DotPath;
+}
+export declare const IsNotNullExpr = "IsNotNullExpr";
+export declare function isIsNotNullExpr(item: unknown): item is IsNotNullExpr;
+export interface IsNullExpr extends langium.AstNode {
+    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PolicyCallClause | PolicyDef | PostconditionClause | PreconditionClause | PredicateExpr | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | ScopedPolicyDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
+    readonly $type: 'IsNullExpr';
+    path: DotPath;
+}
+export declare const IsNullExpr = "IsNullExpr";
+export declare function isIsNullExpr(item: unknown): item is IsNullExpr;
 export interface MatchesExpr extends langium.AstNode {
     readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PolicyCallClause | PolicyDef | PostconditionClause | PreconditionClause | PredicateExpr | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | ScopedPolicyDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
     readonly $type: 'MatchesExpr';
@@ -939,6 +953,13 @@ export interface NotInExpr extends langium.AstNode {
 }
 export declare const NotInExpr = "NotInExpr";
 export declare function isNotInExpr(item: unknown): item is NotInExpr;
+export interface NullLiteralExpr extends langium.AstNode {
+    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PolicyCallClause | PolicyDef | PostconditionClause | PreconditionClause | PredicateExpr | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | ScopedPolicyDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
+    readonly $type: 'NullLiteralExpr';
+    value: 'null';
+}
+export declare const NullLiteralExpr = "NullLiteralExpr";
+export declare function isNullLiteralExpr(item: unknown): item is NullLiteralExpr;
 export interface NumberLiteral extends langium.AstNode {
     readonly $container: Constraint | MetadataEntry;
     readonly $type: 'NumberLiteral';
@@ -1566,6 +1587,8 @@ export type SpecyDomainAstType = {
     InvariantsBlock: InvariantsBlock;
     IsDefinedExpr: IsDefinedExpr;
     IsNotDefinedExpr: IsNotDefinedExpr;
+    IsNotNullExpr: IsNotNullExpr;
+    IsNullExpr: IsNullExpr;
     LiteralValue: LiteralValue;
     MatchPattern: MatchPattern;
     MatchesExpr: MatchesExpr;
@@ -1582,6 +1605,7 @@ export type SpecyDomainAstType = {
     NamedPrecondition: NamedPrecondition;
     NoFieldContainsExpr: NoFieldContainsExpr;
     NotInExpr: NotInExpr;
+    NullLiteralExpr: NullLiteralExpr;
     NumberLiteral: NumberLiteral;
     NumberLiteralExpr: NumberLiteralExpr;
     OnClause: OnClause;
