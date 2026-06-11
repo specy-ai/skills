@@ -156,8 +156,6 @@ module.exports = grammar({
       $.application_service_def,
       $.infrastructure_service_def,
       $.service_def,
-      $.policy_def,
-      $.scoped_policy_def,
       $.invariant_def,
       $.agreement_def,
       $.reaction_def,
@@ -271,7 +269,7 @@ module.exports = grammar({
       $.operations_block,
       $.inline_invariant,
       $.invariants_block,
-      $.policies_block,
+      $.reactions_block,
       $.states_block,
       $.transitions_block,
       $.references_block,
@@ -319,7 +317,7 @@ module.exports = grammar({
       $.fields_block,
       $.references_block,
       $.invariants_block,
-      $.policies_block,
+      $.reactions_block,
       $.operations_block,
       $.states_block,
       $.transitions_block,
@@ -410,15 +408,22 @@ module.exports = grammar({
       'reaction',
       // url-shortener uses string-literal names; ride-now uses identifier names
       field('name', choice($.identifier, $.type_name, $.string_literal)),
+      // scoped-guard form (formerly `policy name(params) { expr }`) carries typed params
+      optional(seq('(', optional($.param_list), ')')),
       optional($.description),
       optional($.metadata_block),
       '{',
-      repeat($._reaction_item),
+      optional($.satisfies_decl),
+      // Either clause items (triggered-by/trigger/effects/effect/guard) or a single
+      // bare guard expression (the scoped-reaction form, formerly `policy name { expr }`).
+      choice(
+        repeat($._reaction_item),
+        $.expression,
+      ),
       '}',
     ),
 
     _reaction_item: $ => choice(
-      $.satisfies_decl,
       $.description,
       $.triggered_by_clause,
       $.trigger_clause,
@@ -674,8 +679,8 @@ module.exports = grammar({
       $.precondition_clause,
       $.postcondition_clause,
       $.resolves_clause,
-      $.policy_call_clause,
-      $.scoped_policy_def,
+      $.reaction_call_clause,
+      $.reaction_def,
       $.creates_clause,
       $.sets_clause,
       $.emits_clause,
@@ -715,15 +720,14 @@ module.exports = grammar({
 
     resolves_clause: $ => seq('resolves', $.type_name, 'from', $.dot_path),
 
-    policy_call_clause: $ => seq(
-      'policy',
+    reaction_call_clause: $ => seq(
+      'reaction',
       field('name', $.identifier),
       '(',
       optional($.arg_list),
       ')',
       optional($.description),
       optional($.metadata_block),
-      optional(seq('{', $.expression, '}')),
     ),
 
     creates_clause: $ => seq(
@@ -769,7 +773,7 @@ module.exports = grammar({
         $.sets_clause,
         $.emits_clause,
         $.service_call_clause,
-        $.policy_call_clause,
+        $.reaction_call_clause,
       )),
       '}',
     ),
@@ -1033,7 +1037,7 @@ module.exports = grammar({
       $.operations_block,
       $.interface_def,
       $.invariants_block,
-      $.policies_block,
+      $.reactions_block,
     ),
 
     service_op_def: $ => seq(
@@ -1057,32 +1061,8 @@ module.exports = grammar({
     ),
 
     // =========================================================================
-    // Policy
-    // =========================================================================
-
-    policy_def: $ => seq(
-      'policy',
-      field('name', $.type_name),
-      optional($.description),
-      optional($.metadata_block),
-      '{',
-      optional($.satisfies_decl),
-      'trigger', $.type_name, repeat(seq(',', $.type_name)),
-      optional(seq('guard', '{', $.expression, '}')),
-      'effect', $.type_name,
-      '}',
-    ),
-
-    scoped_policy_def: $ => seq(
-      'policy',
-      field('name', $.identifier),
-      optional($.description),
-      optional($.metadata_block),
-      '{',
-      optional($.satisfies_decl),
-      $.expression,
-      '}',
-    ),
+    // Reaction (reactive rules) are defined by `reaction_def` above; the legacy
+    // `policy` and scoped-`policy` forms were folded into it.
 
     // =========================================================================
     // Invariant (top-level)
@@ -1112,7 +1092,7 @@ module.exports = grammar({
 
     invariants_block: $ => seq('invariants', '{', repeat($.scoped_invariant_def), '}'),
 
-    policies_block: $ => seq('policies', '{', repeat($.scoped_invariant_def), '}'),
+    reactions_block: $ => seq('reactions', '{', repeat($.scoped_invariant_def), '}'),
 
     // =========================================================================
     // Transitions (entity-level shorthand)
@@ -1131,6 +1111,7 @@ module.exports = grammar({
 
     scoped_invariant_def: $ => seq(
       field('name', $.identifier),
+      optional(seq('(', optional($.param_list), ')')),
       optional($.description),
       optional(seq('enforcement', choice('reject', 'warn', 'rejection', 'compensation', 'alert'))),
       optional($.metadata_block),

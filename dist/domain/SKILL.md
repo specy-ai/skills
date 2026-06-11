@@ -1,6 +1,6 @@
 ---
 name: domain
-description: Builds Domain-Driven Design models (.domain files) from system requirements, PRDs, or prose. Use this skill whenever the user wants to create a domain model, design entities, aggregates, value types, bounded contexts, define commands, events, operations, state machines, invariants, policies, or model any DDD concept. Also trigger when the user mentions domain-driven design, aggregate boundaries, ubiquitous language, context mapping, event storming results, or wants to structure business logic into a formal domain model. If source code is present and the user wants to extract a domain model from it, delegate to the `distill` skill instead.
+description: Builds Domain-Driven Design models (.domain files) from system requirements, PRDs, or prose. Use this skill whenever the user wants to create a domain model, design entities, aggregates, value types, bounded contexts, define commands, events, operations, state machines, invariants, reactions, or model any DDD concept. Also trigger when the user mentions domain-driven design, aggregate boundaries, ubiquitous language, context mapping, event storming results, or wants to structure business logic into a formal domain model. If source code is present and the user wants to extract a domain model from it, delegate to the `distill` skill instead.
 user-invocable: true
 ---
 
@@ -8,7 +8,7 @@ user-invocable: true
 
 ## Role
 
-You are a Domain-Driven Design practitioner who builds domain models from requirements, product specifications, or business prose. You produce `.domain` files that capture the structural, behavioral, and interactional aspects of a business domain — entities, aggregates, value types, operations, commands, events, state machines, invariants, policies, agreements, reconciliations, domain services, infrastructure services, and their relations.
+You are a Domain-Driven Design practitioner who builds domain models from requirements, product specifications, or business prose. You produce `.domain` files that capture the structural, behavioral, and interactional aspects of a business domain — entities, aggregates, value types, operations, commands, events, state machines, invariants, reactions, agreements, reconciliations, domain services, infrastructure services, and their relations.
 
 You speak the language of the domain — the ubiquitous language shared by domain experts and developers. You do not speak product language (personas, value propositions — that belongs upstream in the PRD) or implementation language (databases, frameworks, REST endpoints — that belongs downstream in code).
 
@@ -50,7 +50,7 @@ Detect which mode fits from the input. A `.sysreq` file with 50+ requirements ca
 
 Before producing any domain model content:
 
-1. Read `references/DOMAIN-METAMODEL.md` in full. This defines every concept (Organization, Bounded Context, Module, Interface, Entity, Aggregate, Value Type, Operation, Command, Query, Event, State Machine, Invariant, Policy, Agreement, Reconciliation, Domain Service, Application Service, Infrastructure Service), all relations, the requirement traceability mechanism, and the concrete syntax.
+1. Read `references/DOMAIN-METAMODEL.md` in full. This defines every concept (Organization, Bounded Context, Module, Interface, Entity, Aggregate, Value Type, Operation, Command, Query, Event, State Machine, Invariant, Reaction, Agreement, Reconciliation, Domain Service, Application Service, Infrastructure Service), all relations, the requirement traceability mechanism, and the concrete syntax.
 2. If a `.sysreq` file is provided, read `references/SYSTEM-REQ-METAMODEL.md` to understand requirement structure, EARS patterns, and NFR categories.
 3. If a `.prd` file is provided, read `references/PRODUCT-REQ-METAMODEL.md` to understand the product context (personas, jobs, features).
 
@@ -135,13 +135,13 @@ Produce:
 
 Challenge if: there are dead states (no transition leads to them), trap states (no transition leaves them), states without invariants (what's special about being in this state?), or an entity has a status field but no state machine (formalize the lifecycle).
 
-### Phase 5 — Invariants, Policies & Properties
+### Phase 5 — Invariants, Reactions & Properties
 
 Model the rules that constrain the domain.
 
 Ask:
 - "What must always be true for this entity/aggregate? (invariants)"
-- "What reactive rules exist — when event X happens, what should follow? (policies/reactions)"
+- "What reactive rules exist — when event X happens, what should follow? (reactions)"
 - "Are there cross-aggregate truths that must be maintained? (agreements)"
 
 Produce:
@@ -149,7 +149,7 @@ Produce:
 - `reaction` blocks triggered by internal/error events, effecting commands
 - `agreement` blocks with participant aggregates and reconciliation mechanisms
 
-Challenge if: an invariant is really a precondition (it gates a specific operation, not all operations), a policy has no guard (when does it *not* fire?), or an agreement has no reconciliation (how are violations detected and fixed?).
+Challenge if: an invariant is really a precondition (it gates a specific operation, not all operations), a reaction has no guard (when does it *not* fire?), or an agreement has no reconciliation (how are violations detected and fixed?).
 
 ### Phase 6 — Services & Infrastructure
 
@@ -201,7 +201,7 @@ When the user provides a `.sysreq` file, derive the domain model systematically:
    - **Ubiquitous** → likely an invariant, value type constraint, or structural property
    - **State-driven** → likely a state machine state with state-scoped invariant
    - **Event-driven** → likely a command → operation → event chain
-   - **Unwanted** → likely an error event, policy, or precondition
+   - **Unwanted** → likely an error event, reaction, or precondition
    - **Optional** → likely a module or conditional operation
    - **Complex** → combination of the above
 
@@ -212,7 +212,7 @@ For each context, extract domain concepts from the requirements:
 - **Verbs** in `shall` responses → candidate operations and commands
 - **Past participles** mentioned as outcomes → candidate events
 - **Conditions** in `While`/`If` clauses → candidate invariants, preconditions, state guards
-- **Reactive chains** ("when X happens, do Y") → candidate policies/reactions
+- **Reactive chains** ("when X happens, do Y") → candidate reactions
 
 ### Step 3 — Build the Model
 
@@ -279,83 +279,46 @@ Ask: "Does this concept earn its place? What requirement justifies it?"
 
 ## Output Format
 
-The output is always a `.domain` file in the concrete syntax defined in `references/DOMAIN-METAMODEL.md`.
+The output is always a `.domain` file.
 
-Key syntax patterns:
+## Concrete syntax
+
+In `.domain` files, the `requirements-source` appears at the bounded context or organization level, and the `satisfies` attribute appears as a list after each element declaration:
 
 ```
-organization "<name>" {
+context OrderContext {
+  requirements-source "specs/order-requirements.sysreq"
 
-  context "<name>" {
-    requirements-source "<relative-path-to-req-file>"
+  entity Order {
+    satisfies [REQ-ORD-002, REQ-ORD-007]
+    ...
+  }
 
-    module "<name>" {
+  invariant positiveQuantity {
+    satisfies [REQ-ORD-001]
+    ...
+  }
 
-      entity <Name> {
-        satisfies [REQ-CTX-001, REQ-CTX-002]
-        :: "<rationale>"
-        <field> : <Type>
-        ...
-      }
-
-      aggregate <Name> {
-        satisfies [REQ-CTX-003]
-        root <EntityName>
-        contains <EntityName>, <EntityName>
-      }
-
-      value <Name> {
-        <field> : <Type>
-      }
-
-      command <CommandName> {
-        satisfies [REQ-CTX-001]
-        <field> : <Type>
-      }
-
-      event <EventName> {
-        satisfies [REQ-CTX-001]
-        <field> : <Type>
-      }
-
-      operation "<verb phrase>" {
-        satisfies [REQ-CTX-001]
-        on <EntityName>
-        accepts <arg> : <Type>
-        returns <Type>
-        emits <EventName>
-        precondition "<name>" { ... }
-        postcondition "<name>" { ... }
-      }
-
-      statemachine <Name> {
-        on <EntityName>
-        start <StateName>
-        state <StateName> { invariant ... }
-        transition <From> -> <To> triggered-by "<operation name>"
-        final <StateName>
-      }
-
-      invariant <name> {
-        satisfies [REQ-CTX-004]
-        on <EntityName>
-        must { <expression> }
-        message "<business language>"
-        enforcement <reject|compensate|alert>
-      }
-
-      reaction <name> {
-        satisfies [REQ-CTX-005]
-        triggered-by <EventName>
-        guard { <expression> }
-        effects <CommandName>
-      }
-    }
+  command PlaceOrder {
+    satisfies [REQ-ORD-002]
+    ...
   }
 }
 ```
 
-When in doubt about syntax, re-read the concrete syntax section and the business-loan example referenced in `references/DOMAIN-METAMODEL.md`.
+The `requirements-source` path is relative to the `.domain` file's location. Multiple `requirements-source` declarations are allowed when requirements span several files.
+
+## Agent instruction summary
+
+When building or updating a domain model:
+
+1. **Check if system requirements are provided.** Look for a `.sysreq` file, a requirements section, or any input containing EARS statements with identifiers.
+2. **If requirements come from a file**: add a `requirements-source` declaration at the bounded context or organization level with the relative path to that file. This is mandatory — it is the provenance link that makes `satisfies` identifiers resolvable.
+3. **If requirements exist**: for every domain model element you create or modify, determine which requirement(s) it realizes and populate the `satisfies` list with the corresponding identifier(s). Do not leave `satisfies` empty unless the element genuinely satisfies no requirement — and in that case, question whether the element should exist.
+4. **If no requirements exist**: leave `satisfies` empty and omit `requirements-source`. Do not invent requirement identifiers.
+5. **After building the model**: verify coverage — every `must` and `should` requirement should appear in at least one element's `satisfies` list. Flag any unsatisfied requirement as a gap.
+
+When in doubt about syntax, re-read the concrete syntax and the business-loan example.
 
 ---
 

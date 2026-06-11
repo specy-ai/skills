@@ -62,7 +62,7 @@ conceptType      = "entity"
                  | "error event"
                  | "temporal event"
                  | "operation"
-                 | "policy"
+                 | "reaction"
                  | "invariant"
                  | "domain service"
                  | "application service"
@@ -131,7 +131,7 @@ definition       = entityDef
                  | domainServiceDef
                  | applicationServiceDef
                  | infrastructureServiceDef
-                 | policyDef
+                 | reactionDef
                  | invariantDef
                  | agreementDef ;
 
@@ -149,7 +149,7 @@ definitionKind   = "entity"
                  | "domain service"
                  | "application service"
                  | "infrastructure service"
-                 | "policy"
+                 | "reaction"
                  | "invariant"
                  | "agreement"
                  | "state machine"

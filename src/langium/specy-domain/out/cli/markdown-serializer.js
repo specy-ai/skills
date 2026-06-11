@@ -66,7 +66,6 @@ const GROUP_TITLES = {
     queries: 'Queries',
     events: 'Events',
     services: 'Services',
-    policies: 'Policies',
     reactions: 'Reactions',
     invariants: 'Invariants',
     agreements: 'Agreements',
@@ -132,14 +131,14 @@ function renderConstruct(w, c, level) {
         }
         w.blank();
     }
-    // Policy / reaction wiring
+    // Reaction wiring
     if (Array.isArray(c.triggers))
         w.line(`**Triggered by:** ${c.triggers.join(', ')}`);
-    if (c.effect)
-        w.line(`**Effect:** ${c.effect}`);
     if (Array.isArray(c.effects))
         w.line(`**Effects:** ${c.effects.join(', ')}`);
-    if (c.triggers || c.effect || c.effects)
+    if (c.guard !== undefined)
+        w.line(`**Guard:** \`${typeof c.guard === 'string' ? c.guard : JSON.stringify(c.guard)}\``);
+    if (c.triggers || c.effects || c.guard !== undefined)
         w.blank();
     // Operations
     if (Array.isArray(c.operations) && c.operations.length) {

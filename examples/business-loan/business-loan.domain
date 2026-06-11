@@ -189,7 +189,7 @@ entity ProductConfiguration :: "Defines a loan product type with all its paramet
     operations {
         "Activate product" on ActivateProductConfiguration {
             satisfies [REQ-CFG-001]
-            policy productConfigurationMustBeValid(ProductConfiguration)
+            reaction productConfigurationMustBeValid(ProductConfiguration)
 
             sets ProductConfiguration {
                 active = true
@@ -297,7 +297,7 @@ entity CreditAnalysis :: "Encapsulates scoring, financial ratio computation, and
 
         "Override financial ratio" on OverrideFinancialRatio {
             satisfies [REQ-SCO-003]
-            policy overrideMustHaveJustification(CreditAnalysis)
+            reaction overrideMustHaveJustification(CreditAnalysis)
 
             sets CreditAnalysis {
                 financialRatios = updatedRatios
@@ -331,7 +331,7 @@ entity CreditAnalysis :: "Encapsulates scoring, financial ratio computation, and
         "Override delegation routing" on OverrideDelegationRouting {
             satisfies [REQ-SCO-005]
 
-            policy routingOverrideRequiresHigherAuthority :: "Override requires approval from authority one level above target" {
+            reaction routingOverrideRequiresHigherAuthority :: "Override requires approval from authority one level above target" {
                 satisfies [REQ-SCO-005]
                 overrideDelegationRouting.approverLevel > overrideDelegationRouting.targetLevel
             }
@@ -352,7 +352,7 @@ entity CreditAnalysis :: "Encapsulates scoring, financial ratio computation, and
 
         "Record scoring override" when ScoringOverrideDetected then RecordScoringOverride {
             satisfies [REQ-SCO-007]
-            policy scoringOverrideMustHaveRationale(CreditAnalysis)
+            reaction scoringOverrideMustHaveRationale(CreditAnalysis)
 
             emits ScoringOverrideRecorded {
                 analysisId = CreditAnalysis.id
@@ -402,7 +402,7 @@ entity LoanApplication :: "The core aggregate for loan origination — tracks an
         }
     }
 
-    policies {
+    reactions {
         fieldValidationRules :: "Validate fields in real time as they are entered" {
             satisfies [REQ-ORI-005]
             true
@@ -462,12 +462,12 @@ entity LoanApplication :: "The core aggregate for loan origination — tracks an
 
         "Validate field" on ValidateField {
             satisfies [REQ-ORI-005]
-            policy fieldValidationRules(LoanApplication)
+            reaction fieldValidationRules(LoanApplication)
         }
 
         "Submit application" on SubmitLoanApplication {
             satisfies [REQ-ORI-006]
-            policy applicationMustBeComplete(LoanApplication)
+            reaction applicationMustBeComplete(LoanApplication)
 
             sets LoanApplication {
                 status = SUBMITTED
@@ -521,8 +521,8 @@ entity LoanApplication :: "The core aggregate for loan origination — tracks an
 
         "Auto-approve" on AutoApproveLoanApplication {
             satisfies [REQ-AUT-001]
-            policy autoApprovalEligibilityCriteria(LoanApplication)
-            policy noAutoRejection :: "Auto-approval can only approve, never reject" {
+            reaction autoApprovalEligibilityCriteria(LoanApplication)
+            reaction noAutoRejection :: "Auto-approval can only approve, never reject" {
                 true
             }
 
@@ -1221,7 +1221,7 @@ entity Loan :: "The core aggregate for the servicing lifecycle — tracks a loan
         }
     }
 
-    policies {
+    reactions {
         waiverRequiresManagerApproval :: "Condition waivers require manager sign-off" {
             satisfies [REQ-DIS-002]
             true
@@ -1231,7 +1231,7 @@ entity Loan :: "The core aggregate for the servicing lifecycle — tracks a loan
     operations {
         "Disburse loan" on DisburseLoan {
             satisfies [REQ-DIS-003]
-            policy disbursementPreConditionsMustBeMet(Loan)
+            reaction disbursementPreConditionsMustBeMet(Loan)
 
             creates Loan {
                 applicationId = disburseLoan.applicationId
@@ -1277,7 +1277,7 @@ entity Loan :: "The core aggregate for the servicing lifecycle — tracks a loan
 
         "Waive pre-condition" on WaivePreCondition {
             satisfies [REQ-DIS-002]
-            policy waiverRequiresManagerApproval(Loan)
+            reaction waiverRequiresManagerApproval(Loan)
 
             emits PreConditionWaived {
                 loanId = Loan.id
@@ -1290,7 +1290,7 @@ entity Loan :: "The core aggregate for the servicing lifecycle — tracks a loan
 
         "Process early repayment" on ProcessEarlyRepayment {
             satisfies [REQ-PAY-004]
-            policy iraCappedAtLegalMaximum(Loan)
+            reaction iraCappedAtLegalMaximum(Loan)
 
             sets Loan {
                 outstandingBalance = outstandingBalance - processEarlyRepayment.amount
@@ -1342,7 +1342,7 @@ entity Loan :: "The core aggregate for the servicing lifecycle — tracks a loan
 
         "Detect missed payments" on DetectMissedPayments {
             satisfies [REQ-DEL-001, REQ-NFR-004]
-            policy latePenaltyCappedAtLegalMaximum(Loan)
+            reaction latePenaltyCappedAtLegalMaximum(Loan)
 
             sets Loan {
                 daysPastDue = computedDaysPastDue
@@ -1362,7 +1362,7 @@ entity Loan :: "The core aggregate for the servicing lifecycle — tracks a loan
 
         "Declare default" on DeclareDefault {
             satisfies [REQ-DEL-003]
-            policy defaultThresholdRule(Loan)
+            reaction defaultThresholdRule(Loan)
 
             sets Loan {
                 status = DEFAULT
@@ -1378,7 +1378,7 @@ entity Loan :: "The core aggregate for the servicing lifecycle — tracks a loan
 
         "Cure default" on CureDefault {
             satisfies [REQ-DEL-004]
-            policy cureConditions(Loan)
+            reaction cureConditions(Loan)
 
             sets Loan {
                 status = PERFORMING
@@ -1882,7 +1882,7 @@ entity Collateral :: "A collateral item securing one or more loans" {
 
         "Release collateral" on ReleaseCollateral {
             satisfies [REQ-COL-005]
-            policy sharedCollateralReleaseGuard(Collateral)
+            reaction sharedCollateralReleaseGuard(Collateral)
 
             sets Collateral {
                 released = true
@@ -2083,7 +2083,7 @@ service RegulatoryReportingService :: "Generates regulatory reports from the eve
         "Generate AnaCredit" on GenerateAnaCredit {
             satisfies [REQ-BAS-003]
 
-            policy anaCreDataQualityChecks :: "Data quality validation before AnaCredit submission" {
+            reaction anaCreDataQualityChecks :: "Data quality validation before AnaCredit submission" {
                 satisfies [REQ-BAS-003]
                 true
             }
@@ -2528,14 +2528,14 @@ event SlaBreachAlert :: "Emitted when an operation exceeds its SLA or error rate
 // REQ-NFR-012 "Recovery time objective"   — satisfied-by-infrastructure (failover, orchestration)
 // REQ-NFR-020 "Data encryption at rest"   — satisfied-by-infrastructure (AES-256 at storage layer)
 // REQ-NFR-021 "Data encryption in transit" — satisfied-by-infrastructure (TLS 1.3)
-// REQ-NFR-022 "RBAC access control"       — satisfied-by-infrastructure (RBAC + domain policy rbacPolicy)
+// REQ-NFR-022 "RBAC access control"       — satisfied-by-infrastructure (RBAC + domain reaction rbacPolicy)
 // REQ-NFR-023 "Inter-module mTLS"         — satisfied-by-infrastructure (mTLS configuration)
 // REQ-NFR-030 "Structured logging"        — satisfied-by-infrastructure (JSON logs, correlation IDs)
 // REQ-NFR-031 "RED metrics"               — satisfied-by-infrastructure (metrics exporter)
 // REQ-NFR-032 "Distributed tracing"       — satisfied-by-infrastructure (OpenTelemetry)
 // REQ-NFR-033 "SLA breach alerting"       — detected-by SlaBreachAlert event (above) + infrastructure alerting
 
-policy rbacPolicy :: "Role-based access control enforced at operation level" {
+reaction rbacPolicy :: "Role-based access control enforced at operation level" {
     satisfies [REQ-NFR-022]
     true
 }

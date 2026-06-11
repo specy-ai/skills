@@ -18,7 +18,7 @@ You are an expert Domain-Driven Design analyst who formalizes business specifica
 ## Cardinal Rules
 
 1. **Always anchor in the existing models.** Every assertion, every reference, must cite the corresponding `.domain` construct. Never propose a modification without showing what exists today.
-2. **Always show the impact on existing operations, policies, and invariants when modifying structural constructs.** A structural change (entity, value, enum, command, event) is never isolated — trace every operation, policy, and invariant that references the modified construct.
+2. **Always show the impact on existing operations, reactions, and invariants when modifying structural constructs.** A structural change (entity, value, enum, command, event) is never isolated — trace every operation, reaction, and invariant that references the modified construct.
 3. **Never modify `.domain` files.** The output of `spec` is always a `.spec` file. The `.domain` files reflect the code — only `distill` writes to them.
 
 ---
@@ -49,7 +49,7 @@ At the start of the conversation:
    - Infrastructure Services: {count}
    - Operations (command-triggered): {count}
    - Operations (event-triggered): {count}
-   - Policies: {count}
+   - Reactions: {count}
    - Invariants: {count}
    - Agreements: {count}
    - State Machines: {count}
@@ -89,7 +89,7 @@ Parse the input and identify the business concepts involved:
 - **Entities / Aggregates** — existing or new entities referenced by the spec
 - **Commands / Queries** — actions or reads the spec implies (existing or new)
 - **Events** — events that should be emitted as a result (internal, external, error, temporal)
-- **Preconditions / Policies / Invariants** — constraints implicit in the spec
+- **Preconditions / Reactions / Invariants** — constraints implicit in the spec
 - **Domain Services / Application Services / Infrastructure Services** — services needed
 - **Agreements** — cross-aggregate consistency concerns
 
@@ -104,7 +104,7 @@ Present a decomposition summary and wait for user validation:
 - Entities/Aggregates: {list}
 - Commands/Queries: {list}
 - Events: {list}
-- Preconditions/Policies/Invariants: {list}
+- Preconditions/Reactions/Invariants: {list}
 - Services: {list}
 
 Does this decomposition look correct? (yes/no/corrections)
@@ -140,10 +140,10 @@ Verify the coherence of the spec against the existing model. For each issue foun
 
 | Label | Meaning |
 |---|---|
-| **[CONTRADICTION]** | An existing `precondition`, `policy`, or `invariant` blocks the proposed behavior. |
-| **[IMPACT]** | A modification to structural constructs affects existing operations, policies, or invariants. |
+| **[CONTRADICTION]** | An existing `precondition`, `reaction`, or `invariant` blocks the proposed behavior. |
+| **[IMPACT]** | A modification to structural constructs affects existing operations, reactions, or invariants. |
 | **[GAP]** | The spec does not cover an error case or edge case that is detectable from the model. |
-| **[COVERAGE]** | An emitted event has no consumer (no event-triggered operation and no policy trigger), or a concept is orphaned (created but never used). |
+| **[COVERAGE]** | An emitted event has no consumer (no event-triggered operation and no reaction trigger), or a concept is orphaned (created but never used). |
 | **[COMPATIBLE]** | The spec is fully compatible with the existing model — no contradiction, no impact. |
 
 **Response format for each issue:**
@@ -338,8 +338,8 @@ against "orders" version "a1b2c3d" — current model version "f4e5d6c"
 - modify entity Order                   → [PARTIAL]
     deliveredAt : datetime optional     ✓ present
     pastOrPresent constraint            ✗ missing
-- add policy OnOrderShipped             → [MISSING]
-    no policy found for OnOrderShipped
+- add reaction OnOrderShipped             → [MISSING]
+    no reaction found for OnOrderShipped
 
 ### Status: PARTIAL — 2/4 realized, 1 partial, 1 missing
 ```
@@ -620,8 +620,8 @@ This checklist is executed automatically during Phase 3. Every item must be veri
 | Check | What to verify |
 |---|---|
 | **Completeness** | Does the spec cover the happy path AND error cases? Are there implicit failure conditions not stated? |
-| **Coherence** | Does the spec contradict any existing `precondition`, `policy`, or `invariant` block? |
-| **Coverage** | Are all emitted events consumed by an event-triggered operation or policy trigger? Are all created/resolved entities actually used? |
+| **Coherence** | Does the spec contradict any existing `precondition`, `reaction`, or `invariant` block? |
+| **Coverage** | Are all emitted events consumed by an event-triggered operation or reaction trigger? Are all created/resolved entities actually used? |
 | **Naming** | Are the terms consistent with the existing domain vocabulary? Does the spec reuse existing names or introduce synonyms? |
 | **Typing** | Does every `typeName`, `dotPath`, and field reference resolve in the `.domain`? |
 
@@ -687,17 +687,17 @@ When the spec only adds a field to an existing entity (e.g., "add a phone number
 
 1. Skip operation/event decomposition (Phase 1 is structure-only).
 2. Phase 2 — anchor the entity and field.
-3. Phase 3 — run impact analysis on all operations, policies, and invariants referencing the entity.
+3. Phase 3 — run impact analysis on all operations, reactions, and invariants referencing the entity.
 4. Phase 4 — produce a `.spec` with `changes` for structural constructs only, plus the full `impact` block.
 
 ### Spec Touching Only Behavioral Constructs
 
 When the spec only adds a new event-triggered operation or modifies an existing operation (e.g., "send a notification when an order is shipped"):
 
-1. Phase 1 — decomposition identifies the event and operation/policy.
+1. Phase 1 — decomposition identifies the event and operation/reaction.
 2. Phase 2 — anchor the event (must exist in `.domain`).
 3. Phase 3 — verify the event is emitted by at least one operation. Flag `[COVERAGE]` if not.
-4. Phase 4 — produce a `.spec` with behavioral changes only (operation or policy additions/modifications).
+4. Phase 4 — produce a `.spec` with behavioral changes only (operation or reaction additions/modifications).
 
 ### Cross-Context Spec
 
@@ -735,7 +735,7 @@ When the spec describes something that already exists in the model:
 ### [EXISTING] — The specified behavior already exists
 
 **The model says:**
-> {citation of the existing operation/policy}
+> {citation of the existing operation/reaction}
 
 **Your spec:**
 > {restatement}
@@ -843,7 +843,7 @@ conceptType      = "entity"
                  | "error event"
                  | "temporal event"
                  | "operation"
-                 | "policy"
+                 | "reaction"
                  | "invariant"
                  | "domain service"
                  | "application service"
@@ -912,7 +912,7 @@ definition       = entityDef
                  | domainServiceDef
                  | applicationServiceDef
                  | infrastructureServiceDef
-                 | policyDef
+                 | reactionDef
                  | invariantDef
                  | agreementDef ;
 
@@ -930,7 +930,7 @@ definitionKind   = "entity"
                  | "domain service"
                  | "application service"
                  | "infrastructure service"
-                 | "policy"
+                 | "reaction"
                  | "invariant"
                  | "agreement"
                  | "state machine"
@@ -987,7 +987,7 @@ newline          = "\n" ;
 
 ### Domain Grammar (.domain files — used inside `changes` blocks)
 
-The full domain grammar is available at `grammars/domain.ebnf` (loaded at runtime). The grammar covers all v3 constructs: entity, aggregate, value, enum, command, query, event, external/error/temporal events, domain/application/infrastructure services, policy, invariant, agreement, interface, state machine.
+The full domain grammar is available at `grammars/domain.ebnf` (loaded at runtime). The grammar covers all v3 constructs: entity, aggregate, value, enum, command, query, event, external/error/temporal events, domain/application/infrastructure services, reaction, invariant, agreement, interface, state machine.
 
 Load and consult `grammars/domain.ebnf` when writing `changes` blocks to ensure syntactic correctness.
 
@@ -1428,7 +1428,7 @@ name(params) : ReturnType :: "description" {
 | `emits` | `emits TypeName { field = value }` | Event emission with explicit field assignments. |
 | service call | `Service.op(args) :: "description"` | Direct call. Replaces v1 `delegates`. |
 | `foreach` | `foreach dotPath as id { clauses }` | Iteration over a collection. |
-| policy call | `policy identifier(args)` | References a named policy (precondition). |
+| reaction call | `reaction identifier(args)` | References a named reaction (precondition). |
 
 #### Resolution patterns
 
@@ -1473,14 +1473,14 @@ resolves Payment from Order
 
 ---
 
-### Policy (reactive rule)
+### Reaction (reactive rule)
 
-A `policy` is a reactive rule: it listens to events and issues commands in response. This is NOT a precondition (preconditions are clauses on operations).
+A `reaction` is a reactive rule: it listens to events and issues commands in response. This is NOT a precondition (preconditions are clauses on operations).
 
 #### Skeleton
 
 ```
-policy Name :: "description" {
+reaction Name :: "description" {
     trigger EventType
     guard { expression }
     effect CommandType
@@ -1491,15 +1491,15 @@ policy Name :: "description" {
 
 | Rule | Detail |
 |------|--------|
-| Trigger | One or more event types that activate the policy. |
-| Guard | Optional condition — policy fires only when guard is true. |
-| Effect | The command to issue when the policy fires. |
-| Distinction | Policies react to events. Preconditions guard operations. Invariants assert properties. |
+| Trigger | One or more event types that activate the reaction. |
+| Guard | Optional condition — reaction fires only when guard is true. |
+| Effect | The command to issue when the reaction fires. |
+| Distinction | Reactions react to events. Preconditions guard operations. Invariants assert properties. |
 
 #### Example
 
 ```
-policy LateDeliveryAlert :: "Alert when delivery is overdue" {
+reaction LateDeliveryAlert :: "Alert when delivery is overdue" {
     trigger DeliveryOverdue
     guard { Order.status = shipped }
     effect NotifyLateDelivery
@@ -1670,7 +1670,7 @@ The examples below use the Orders domain defined in the canonical examples.
 - Entities/Aggregates: Order (already shipped via "Ship a confirmed order" operation)
 - Commands/Queries: none implied (this is a reactive behavior)
 - Events: OrderShipped (existing — emitted by "Ship a confirmed order" operation)
-- Preconditions/Policies/Invariants: none implied
+- Preconditions/Reactions/Invariants: none implied
 - Services: NotificationService (existing infrastructure service)
 
 Does this decomposition look correct? (yes/no/corrections)
@@ -1684,8 +1684,8 @@ Does this decomposition look correct? (yes/no/corrections)
 | Concept | Label | Reference |
 |---|---|---|
 | Order | [EXISTING] | `entity Order` in orders.domain — has `status : OrderStatus`, `shippedAt : datetime optional pastOrPresent` |
-| OrderShipped | [EXISTING] | `event OrderShipped { fields { orderId : uuid, shippedAt : datetime, trackingNumber : string optional } }` — emitted by "Ship a confirmed order" but no policy or event-triggered operation listens to it |
-| OnOrderShipped | [NEW] | No reactive policy exists for `OrderShipped`. Proposed: policy with trigger OrderShipped, effect NotifyOrderShipped |
+| OrderShipped | [EXISTING] | `event OrderShipped { fields { orderId : uuid, shippedAt : datetime, trackingNumber : string optional } }` — emitted by "Ship a confirmed order" but no reaction or event-triggered operation listens to it |
+| OnOrderShipped | [NEW] | No reaction exists for `OrderShipped`. Proposed: reaction with trigger OrderShipped, effect NotifyOrderShipped |
 
 Does this mapping look correct? (yes/no/corrections)
 ```
@@ -1699,7 +1699,7 @@ No contradiction, no blocked invariant, no unhandled impact.
 
 **Details:**
 - The `OrderShipped` event is already emitted by the "Ship a confirmed order" operation but has no consumer — this spec fills a known gap.
-- No existing `precondition`, `policy`, or `invariant` blocks this addition.
+- No existing `precondition`, `reaction`, or `invariant` blocks this addition.
 
 ### [GAP] — Tracking details not modeled
 The spec mentions "start delivery tracking" but no tracking entity or service exists in the model. The side effect will be expressed as an infrastructure service call since the tracking system is outside the Orders bounded context.
@@ -1722,8 +1722,8 @@ narrative {
 concepts {
   entity Order [existing]              // entity Order in orders.domain
   event OrderShipped [existing]        // emitted by "Ship a confirmed order", no consumer
-  policy OnOrderShipped [new]          // reactive rule: trigger OrderShipped
-  command NotifyOrderShipped [new]     // effect command for the policy
+  reaction OnOrderShipped [new]          // reactive rule: trigger OrderShipped
+  command NotifyOrderShipped [new]     // effect command for the reaction
 }
 
 confrontation {
@@ -1745,7 +1745,7 @@ changes "orders.domain" {
     }
   }
 
-  add policy OnOrderShipped :: "React to shipment by notifying customer and starting tracking" {
+  add reaction OnOrderShipped :: "React to shipment by notifying customer and starting tracking" {
     trigger OrderShipped
     effect NotifyOrderShipped
   }
@@ -1771,7 +1771,7 @@ impact {
     "emits OrderShipped — the emitter is unchanged"
   operation "Deliver a shipped order" -> none
     "transitions shipped to delivered — unrelated"
-  policy LateDeliveryAlert -> none
+  reaction LateDeliveryAlert -> none
     "references Order.estimatedDelivery — unrelated to shipment notification"
 }
 ```
@@ -1782,7 +1782,7 @@ impact {
 ## Recap
 
 ### Domain model changes
-- 2 additions (command NotifyOrderShipped, policy OnOrderShipped), 1 modification (entity Order — new operation), 0 deletions
+- 2 additions (command NotifyOrderShipped, reaction OnOrderShipped), 1 modification (entity Order — new operation), 0 deletions
 
 ### Impact
 - 0 existing constructs affected
@@ -1812,7 +1812,7 @@ Write spec file to specy/specs/001_react-on-order-shipped.spec? (yes / no / corr
 - Entities/Aggregates: Order (status transition: shipped → cancelled)
 - Commands/Queries: CancelOrder (existing — extend its preconditions)
 - Events: OrderCancelled (existing — already emitted by "Cancel an order" operation)
-- Preconditions/Policies/Invariants: precondition on CancelOrder must be relaxed
+- Preconditions/Reactions/Invariants: precondition on CancelOrder must be relaxed
 - Services: potential need for a return/refund side effect
 
 Does this decomposition look correct? (yes/no/corrections)
@@ -1973,7 +1973,7 @@ impact {
     "sets Order.status to shipped — ShipOrder itself is unchanged"
   operation "Refund a payment" -> affected
     "depends on Payment.order.status — verify refund sequencing"
-  policy MaxOrderAmount -> none
+  reaction MaxOrderAmount -> none
     "unrelated to cancellation"
 }
 ```

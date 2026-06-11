@@ -79,7 +79,7 @@ export function isIdent(item) {
     return isKeywordAsIdent(item) || (typeof item === 'string' && (/[a-zA-Z_][a-zA-Z0-9_]*/.test(item)));
 }
 export function isKeywordAsIdent(item) {
-    return item === 'required' || item === 'optional' || item === 'value' || item === 'type' || item === 'status' || item === 'id' || item === 'message' || item === 'name' || item === 'identifier' || item === 'trigger' || item === 'effect' || item === 'start' || item === 'action' || item === 'state' || item === 'event' || item === 'command' || item === 'query' || item === 'schedule' || item === 'reference' || item === 'offset' || item === 'instant' || item === 'guard' || item === 'from' || item === 'on' || item === 'when' || item === 'then' || item === 'as' || item === 'root' || item === 'final' || item === 'fields' || item === 'entities' || item === 'contains' || item === 'exposes' || item === 'accepts' || item === 'returns' || item === 'emits' || item === 'creates' || item === 'sets' || item === 'resolves' || item === 'policy' || item === 'precondition' || item === 'postcondition' || item === 'foreach' || item === 'invariant' || item === 'agreement' || item === 'predicate' || item === 'participants' || item === 'reconciliation' || item === 'detection' || item === 'compensation' || item === 'coordination' || item === 'escalation' || item === 'step' || item === 'condition' || item === 'must' || item === 'enforcement' || item === 'violation' || item === 'module' || item === 'context' || item === 'organization' || item === 'interface' || item === 'entity' || item === 'aggregate' || item === 'service' || item === 'enum' || item === 'statemachine' || item === 'transition' || item === 'machine' || item === 'reaction' || item === 'operation' || item === 'satisfies' || item === 'depends' || item === 'uses' || item === 'map' || item === 'upstream' || item === 'downstream' || item === 'symmetric' || item === 'external' || item === 'error' || item === 'temporal' || item === 'domain' || item === 'application' || item === 'infrastructure' || item === 'internal' || item === 'not' || item === 'and' || item === 'or' || item === 'in' || item === 'is' || item === 'if' || item === 'every' || item === 'no' || item === 'field' || item === 'count' || item === 'sum' || item === 'now' || item === 'today' || item === 'size' || item === 'isEmpty' || item === 'isNotEmpty' || item === 'append' || item === 'true' || item === 'false' || item === 'reject' || item === 'warn' || item === 'alert' || item === 'suspend' || item === 'manual' || item === 'retry' || item === 'compensate' || item === 'shortname' || item === 'void' || item === 'string' || item === 'int' || item === 'integer' || item === 'long' || item === 'decimal' || item === 'boolean' || item === 'date' || item === 'datetime' || item === 'time' || item === 'duration' || item === 'uuid' || item === 'list' || item === 'set' || item === 'unique' || item === 'immutable' || item === 'ordered' || item === 'default' || item === 'min' || item === 'max' || item === 'range' || item === 'minLength' || item === 'maxLength' || item === 'pattern' || item === 'past' || item === 'future' || item === 'pastOrPresent' || item === 'futureOrPresent' || item === 'months' || item === 'days' || item === 'years' || item === 'hours' || item === 'minutes' || item === 'seconds' || item === 'weeks' || item === 'some' || item === 'forall' || item === 'exists' || item === 'where' || item === 'number' || item === 'active' || item === 'searching' || item === 'cancelled';
+    return item === 'required' || item === 'optional' || item === 'value' || item === 'type' || item === 'status' || item === 'id' || item === 'message' || item === 'name' || item === 'identifier' || item === 'trigger' || item === 'effect' || item === 'start' || item === 'action' || item === 'state' || item === 'event' || item === 'command' || item === 'query' || item === 'schedule' || item === 'reference' || item === 'offset' || item === 'instant' || item === 'guard' || item === 'from' || item === 'on' || item === 'when' || item === 'then' || item === 'as' || item === 'root' || item === 'final' || item === 'fields' || item === 'entities' || item === 'contains' || item === 'exposes' || item === 'accepts' || item === 'returns' || item === 'emits' || item === 'creates' || item === 'sets' || item === 'resolves' || item === 'precondition' || item === 'postcondition' || item === 'foreach' || item === 'invariant' || item === 'agreement' || item === 'predicate' || item === 'participants' || item === 'reconciliation' || item === 'detection' || item === 'compensation' || item === 'coordination' || item === 'escalation' || item === 'step' || item === 'condition' || item === 'must' || item === 'enforcement' || item === 'violation' || item === 'module' || item === 'context' || item === 'organization' || item === 'interface' || item === 'entity' || item === 'aggregate' || item === 'service' || item === 'enum' || item === 'statemachine' || item === 'transition' || item === 'machine' || item === 'reaction' || item === 'operation' || item === 'satisfies' || item === 'depends' || item === 'uses' || item === 'map' || item === 'upstream' || item === 'downstream' || item === 'symmetric' || item === 'external' || item === 'error' || item === 'temporal' || item === 'domain' || item === 'application' || item === 'infrastructure' || item === 'internal' || item === 'not' || item === 'and' || item === 'or' || item === 'in' || item === 'is' || item === 'if' || item === 'every' || item === 'no' || item === 'field' || item === 'count' || item === 'sum' || item === 'now' || item === 'today' || item === 'size' || item === 'isEmpty' || item === 'isNotEmpty' || item === 'append' || item === 'true' || item === 'false' || item === 'reject' || item === 'warn' || item === 'alert' || item === 'suspend' || item === 'manual' || item === 'retry' || item === 'compensate' || item === 'shortname' || item === 'void' || item === 'string' || item === 'int' || item === 'integer' || item === 'long' || item === 'decimal' || item === 'boolean' || item === 'date' || item === 'datetime' || item === 'time' || item === 'duration' || item === 'uuid' || item === 'list' || item === 'set' || item === 'unique' || item === 'immutable' || item === 'ordered' || item === 'default' || item === 'min' || item === 'max' || item === 'range' || item === 'minLength' || item === 'maxLength' || item === 'pattern' || item === 'past' || item === 'future' || item === 'pastOrPresent' || item === 'futureOrPresent' || item === 'months' || item === 'days' || item === 'years' || item === 'hours' || item === 'minutes' || item === 'seconds' || item === 'weeks' || item === 'some' || item === 'forall' || item === 'exists' || item === 'where' || item === 'number' || item === 'active' || item === 'searching' || item === 'cancelled';
 }
 export const LiteralValue = 'LiteralValue';
 export function isLiteralValue(item) {
@@ -300,6 +300,10 @@ export const DurationLiteral = 'DurationLiteral';
 export function isDurationLiteral(item) {
     return reflection.isInstance(item, DurationLiteral);
 }
+export const EffectClause = 'EffectClause';
+export function isEffectClause(item) {
+    return reflection.isInstance(item, EffectClause);
+}
 export const EffectsClause = 'EffectsClause';
 export function isEffectsClause(item) {
     return reflection.isInstance(item, EffectsClause);
@@ -435,6 +439,10 @@ export function isForeachClause(item) {
 export const FunctionCallExpr = 'FunctionCallExpr';
 export function isFunctionCallExpr(item) {
     return reflection.isInstance(item, FunctionCallExpr);
+}
+export const GuardClause = 'GuardClause';
+export function isGuardClause(item) {
+    return reflection.isInstance(item, GuardClause);
 }
 export const IdentityDecl = 'IdentityDecl';
 export function isIdentityDecl(item) {
@@ -596,18 +604,6 @@ export const PathSegment = 'PathSegment';
 export function isPathSegment(item) {
     return reflection.isInstance(item, PathSegment);
 }
-export const PoliciesBlock = 'PoliciesBlock';
-export function isPoliciesBlock(item) {
-    return reflection.isInstance(item, PoliciesBlock);
-}
-export const PolicyCallClause = 'PolicyCallClause';
-export function isPolicyCallClause(item) {
-    return reflection.isInstance(item, PolicyCallClause);
-}
-export const PolicyDef = 'PolicyDef';
-export function isPolicyDef(item) {
-    return reflection.isInstance(item, PolicyDef);
-}
 export const PostconditionClause = 'PostconditionClause';
 export function isPostconditionClause(item) {
     return reflection.isInstance(item, PostconditionClause);
@@ -632,9 +628,17 @@ export const QueryDef = 'QueryDef';
 export function isQueryDef(item) {
     return reflection.isInstance(item, QueryDef);
 }
+export const ReactionCallClause = 'ReactionCallClause';
+export function isReactionCallClause(item) {
+    return reflection.isInstance(item, ReactionCallClause);
+}
 export const ReactionDef = 'ReactionDef';
 export function isReactionDef(item) {
     return reflection.isInstance(item, ReactionDef);
+}
+export const ReactionsBlock = 'ReactionsBlock';
+export function isReactionsBlock(item) {
+    return reflection.isInstance(item, ReactionsBlock);
 }
 export const ReconciliationDef = 'ReconciliationDef';
 export function isReconciliationDef(item) {
@@ -687,10 +691,6 @@ export function isSatisfiesDecl(item) {
 export const ScopedInvariantDef = 'ScopedInvariantDef';
 export function isScopedInvariantDef(item) {
     return reflection.isInstance(item, ScopedInvariantDef);
-}
-export const ScopedPolicyDef = 'ScopedPolicyDef';
-export function isScopedPolicyDef(item) {
-    return reflection.isInstance(item, ScopedPolicyDef);
 }
 export const ServiceCallClause = 'ServiceCallClause';
 export function isServiceCallClause(item) {
@@ -756,6 +756,10 @@ export const TransitionsBlock = 'TransitionsBlock';
 export function isTransitionsBlock(item) {
     return reflection.isInstance(item, TransitionsBlock);
 }
+export const TriggerClause = 'TriggerClause';
+export function isTriggerClause(item) {
+    return reflection.isInstance(item, TriggerClause);
+}
 export const TriggeredByClause = 'TriggeredByClause';
 export function isTriggeredByClause(item) {
     return reflection.isInstance(item, TriggeredByClause);
@@ -806,7 +810,7 @@ export function isForallPred(item) {
 }
 export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
     getAllTypes() {
-        return [AbsoluteTemporalEvent, AcceptsClause, AggregateBodyItem, AggregateContainsDecl, AggregateDef, AggregateEntitiesDecl, AggregateRootDecl, AgreementDef, AgreementItem, ApplicationServiceDef, ArgList, ArrayIndex, ArrayLiteral, AssignmentClause, BinaryExpr, BooleanLiteral, BooleanLiteralExpr, ClassicStateDef, ClassicTransitionDef, CollectionType, CommandDef, CommandTriggeredOp, CompensationClause, Constraint, ContainsExpr, ContextDef, ContextMapBlock, ContextRelation, CoordinationClause, CreatesClause, Definition, DependsBlock, Description, DetectionClause, DomainFile, DomainServiceDef, DotPath, DotPathExpr, DownstreamRelation, DuplicateDetection, DurationLiteral, EffectsClause, EmitsClause, EnforcementStrategy, EntityBodyItem, EntityDef, EntityTransition, EnumDef, EnumValue, ErrorEventDef, EscalationAction, EscalationActionClause, EscalationChainDef, EscalationCondition, EscalationMaxAttempts, EscalationStep, EscalationStepItem, EscalationThen, EscalationWhen, EventBodyItem, EventDef, EventGuard, EventInstant, EventSchedule, EventTriggeredOp, EventTypeClassifier, EveryExpr, ExistsPred, ExposesClause, ExprServiceCall, Expression, ExternalEventDef, FieldDecl, FieldType, FieldTypeOpt, FieldsBlock, FinalState, ForallPred, ForeachClause, FunctionCallExpr, GenericType, IdentityDecl, IfExpr, InExpr, InfrastructureServiceDef, InlineEnumBlock, InlineInvariant, InterfaceDef, InternalOp, InvariantDef, InvariantsBlock, IsDefinedExpr, IsNotDefinedExpr, IsNotNullExpr, IsNullExpr, LiteralValue, MatchPattern, MatchesExpr, MetadataBlock, MetadataEntry, ModuleBody, ModuleDef, MustBlock, NamedArg, NamedArgList, NamedOpItem, NamedOperationDef, NamedPostcondition, NamedPrecondition, NoFieldContainsExpr, NotInExpr, NullLiteralExpr, NumberLiteral, NumberLiteralExpr, OnClause, OperationClause, OperationDef, OperationsBlock, OrganizationDef, ParamDecl, ParamDeclOpt, ParamList, ParenExpr, ParticipantsClause, PathSegment, PoliciesBlock, PolicyCallClause, PolicyDef, PostconditionClause, PrdSourceDecl, PreconditionClause, PredicateBlock, PredicateExpr, PrimitiveType, QueryBodyItem, QueryDef, ReactionDef, ReactionItem, ReconciliationDef, ReconciliationItem, ReconciliationTrigger, ReconciliationTriggerClause, RecordBodyItem, RecurringTemporalEvent, ReferenceDecl, ReferencesBlock, RelativeTemporalEvent, RequirementsSourceDecl, ResolvesClause, ReturnsClause, ReturnsDecl, SatisfiesDecl, ScopedInvariantDef, ScopedPolicyDef, ServiceBodyItem, ServiceCallClause, ServiceDef, SetsClause, Shortname, SomeExpr, SourceDecl, StateDef, StateInvariantDef, StateMachineDef, StatemachineDef, StatemachineItem, StatemachineStart, StatesBlock, StringLiteral, StringLiteralExpr, SymmetricRelation, TemporalEventDef, TopLevelElement, TransitionInline, TransitionsBlock, TriggeredByClause, UnaryExpr, UpstreamRelation, UsesDecl, ValueBodyItem, ValueDef, ValueExpr, ValueList, ValueOpDef, ValueOperationsBlock];
+        return [AbsoluteTemporalEvent, AcceptsClause, AggregateBodyItem, AggregateContainsDecl, AggregateDef, AggregateEntitiesDecl, AggregateRootDecl, AgreementDef, AgreementItem, ApplicationServiceDef, ArgList, ArrayIndex, ArrayLiteral, AssignmentClause, BinaryExpr, BooleanLiteral, BooleanLiteralExpr, ClassicStateDef, ClassicTransitionDef, CollectionType, CommandDef, CommandTriggeredOp, CompensationClause, Constraint, ContainsExpr, ContextDef, ContextMapBlock, ContextRelation, CoordinationClause, CreatesClause, Definition, DependsBlock, Description, DetectionClause, DomainFile, DomainServiceDef, DotPath, DotPathExpr, DownstreamRelation, DuplicateDetection, DurationLiteral, EffectClause, EffectsClause, EmitsClause, EnforcementStrategy, EntityBodyItem, EntityDef, EntityTransition, EnumDef, EnumValue, ErrorEventDef, EscalationAction, EscalationActionClause, EscalationChainDef, EscalationCondition, EscalationMaxAttempts, EscalationStep, EscalationStepItem, EscalationThen, EscalationWhen, EventBodyItem, EventDef, EventGuard, EventInstant, EventSchedule, EventTriggeredOp, EventTypeClassifier, EveryExpr, ExistsPred, ExposesClause, ExprServiceCall, Expression, ExternalEventDef, FieldDecl, FieldType, FieldTypeOpt, FieldsBlock, FinalState, ForallPred, ForeachClause, FunctionCallExpr, GenericType, GuardClause, IdentityDecl, IfExpr, InExpr, InfrastructureServiceDef, InlineEnumBlock, InlineInvariant, InterfaceDef, InternalOp, InvariantDef, InvariantsBlock, IsDefinedExpr, IsNotDefinedExpr, IsNotNullExpr, IsNullExpr, LiteralValue, MatchPattern, MatchesExpr, MetadataBlock, MetadataEntry, ModuleBody, ModuleDef, MustBlock, NamedArg, NamedArgList, NamedOpItem, NamedOperationDef, NamedPostcondition, NamedPrecondition, NoFieldContainsExpr, NotInExpr, NullLiteralExpr, NumberLiteral, NumberLiteralExpr, OnClause, OperationClause, OperationDef, OperationsBlock, OrganizationDef, ParamDecl, ParamDeclOpt, ParamList, ParenExpr, ParticipantsClause, PathSegment, PostconditionClause, PrdSourceDecl, PreconditionClause, PredicateBlock, PredicateExpr, PrimitiveType, QueryBodyItem, QueryDef, ReactionCallClause, ReactionDef, ReactionItem, ReactionsBlock, ReconciliationDef, ReconciliationItem, ReconciliationTrigger, ReconciliationTriggerClause, RecordBodyItem, RecurringTemporalEvent, ReferenceDecl, ReferencesBlock, RelativeTemporalEvent, RequirementsSourceDecl, ResolvesClause, ReturnsClause, ReturnsDecl, SatisfiesDecl, ScopedInvariantDef, ServiceBodyItem, ServiceCallClause, ServiceDef, SetsClause, Shortname, SomeExpr, SourceDecl, StateDef, StateInvariantDef, StateMachineDef, StatemachineDef, StatemachineItem, StatemachineStart, StatesBlock, StringLiteral, StringLiteralExpr, SymmetricRelation, TemporalEventDef, TopLevelElement, TransitionInline, TransitionsBlock, TriggerClause, TriggeredByClause, UnaryExpr, UpstreamRelation, UsesDecl, ValueBodyItem, ValueDef, ValueExpr, ValueList, ValueOpDef, ValueOperationsBlock];
     }
     computeIsSubtype(subtype, supertype) {
         switch (subtype) {
@@ -837,7 +841,6 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
             case ExternalEventDef:
             case InfrastructureServiceDef:
             case InvariantDef:
-            case PolicyDef:
             case QueryDef:
             case ReactionDef:
             case ServiceDef:
@@ -905,17 +908,16 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
             }
             case CreatesClause:
             case ForeachClause:
-            case PolicyCallClause:
             case PostconditionClause:
             case PreconditionClause:
+            case ReactionCallClause:
             case ResolvesClause:
             case ReturnsClause:
             case ServiceCallClause:
             case SetsClause: {
                 return this.isSubtype(OperationClause, supertype);
             }
-            case Description:
-            case SatisfiesDecl: {
+            case Description: {
                 return this.isSubtype(AggregateBodyItem, supertype) || this.isSubtype(AgreementItem, supertype) || this.isSubtype(EntityBodyItem, supertype) || this.isSubtype(EventBodyItem, supertype) || this.isSubtype(NamedOpItem, supertype) || this.isSubtype(QueryBodyItem, supertype) || this.isSubtype(ReactionItem, supertype) || this.isSubtype(RecordBodyItem, supertype) || this.isSubtype(ServiceBodyItem, supertype) || this.isSubtype(ValueBodyItem, supertype);
             }
             case DownstreamRelation:
@@ -930,7 +932,10 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
             case TransitionsBlock: {
                 return this.isSubtype(AggregateBodyItem, supertype) || this.isSubtype(EntityBodyItem, supertype);
             }
+            case EffectClause:
             case EffectsClause:
+            case GuardClause:
+            case TriggerClause:
             case TriggeredByClause: {
                 return this.isSubtype(ReactionItem, supertype);
             }
@@ -983,7 +988,7 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                 return this.isSubtype(NamedOpItem, supertype) || this.isSubtype(StatemachineItem, supertype);
             }
             case OperationsBlock:
-            case PoliciesBlock: {
+            case ReactionsBlock: {
                 return this.isSubtype(AggregateBodyItem, supertype) || this.isSubtype(EntityBodyItem, supertype) || this.isSubtype(ServiceBodyItem, supertype);
             }
             case ParticipantsClause:
@@ -998,8 +1003,8 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
             case ReturnsDecl: {
                 return this.isSubtype(NamedOpItem, supertype) || this.isSubtype(QueryBodyItem, supertype);
             }
-            case ScopedPolicyDef: {
-                return this.isSubtype(Definition, supertype) || this.isSubtype(OperationClause, supertype);
+            case SatisfiesDecl: {
+                return this.isSubtype(AggregateBodyItem, supertype) || this.isSubtype(AgreementItem, supertype) || this.isSubtype(EntityBodyItem, supertype) || this.isSubtype(EventBodyItem, supertype) || this.isSubtype(NamedOpItem, supertype) || this.isSubtype(QueryBodyItem, supertype) || this.isSubtype(RecordBodyItem, supertype) || this.isSubtype(ServiceBodyItem, supertype) || this.isSubtype(ValueBodyItem, supertype);
             }
             default: {
                 return false;
@@ -1360,6 +1365,14 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     ]
                 };
             }
+            case EffectClause: {
+                return {
+                    name: EffectClause,
+                    properties: [
+                        { name: 'command' }
+                    ]
+                };
+            }
             case EffectsClause: {
                 return {
                     name: EffectsClause,
@@ -1678,6 +1691,14 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     properties: [
                         { name: 'args' },
                         { name: 'name' }
+                    ]
+                };
+            }
+            case GuardClause: {
+                return {
+                    name: GuardClause,
+                    properties: [
+                        { name: 'expr' }
                     ]
                 };
             }
@@ -2055,40 +2076,6 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     ]
                 };
             }
-            case PoliciesBlock: {
-                return {
-                    name: PoliciesBlock,
-                    properties: [
-                        { name: 'policies', defaultValue: [] }
-                    ]
-                };
-            }
-            case PolicyCallClause: {
-                return {
-                    name: PolicyCallClause,
-                    properties: [
-                        { name: 'args' },
-                        { name: 'description' },
-                        { name: 'expr' },
-                        { name: 'metadata' },
-                        { name: 'name' }
-                    ]
-                };
-            }
-            case PolicyDef: {
-                return {
-                    name: PolicyDef,
-                    properties: [
-                        { name: 'description' },
-                        { name: 'effect' },
-                        { name: 'guard' },
-                        { name: 'metadata' },
-                        { name: 'name' },
-                        { name: 'satisfies' },
-                        { name: 'triggers', defaultValue: [] }
-                    ]
-                };
-            }
             case PostconditionClause: {
                 return {
                     name: PostconditionClause,
@@ -2147,12 +2134,37 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     ]
                 };
             }
+            case ReactionCallClause: {
+                return {
+                    name: ReactionCallClause,
+                    properties: [
+                        { name: 'args' },
+                        { name: 'description' },
+                        { name: 'expr' },
+                        { name: 'metadata' },
+                        { name: 'name' }
+                    ]
+                };
+            }
             case ReactionDef: {
                 return {
                     name: ReactionDef,
                     properties: [
+                        { name: 'description' },
+                        { name: 'guard' },
                         { name: 'items', defaultValue: [] },
-                        { name: 'name' }
+                        { name: 'metadata' },
+                        { name: 'name' },
+                        { name: 'params' },
+                        { name: 'satisfies' }
+                    ]
+                };
+            }
+            case ReactionsBlock: {
+                return {
+                    name: ReactionsBlock,
+                    properties: [
+                        { name: 'reactions', defaultValue: [] }
                     ]
                 };
             }
@@ -2277,19 +2289,6 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
             case ScopedInvariantDef: {
                 return {
                     name: ScopedInvariantDef,
-                    properties: [
-                        { name: 'description' },
-                        { name: 'expr' },
-                        { name: 'metadata' },
-                        { name: 'name' },
-                        { name: 'params' },
-                        { name: 'satisfies' }
-                    ]
-                };
-            }
-            case ScopedPolicyDef: {
-                return {
-                    name: ScopedPolicyDef,
                     properties: [
                         { name: 'description' },
                         { name: 'expr' },
@@ -2444,6 +2443,15 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     name: TransitionsBlock,
                     properties: [
                         { name: 'transitions', defaultValue: [] }
+                    ]
+                };
+            }
+            case TriggerClause: {
+                return {
+                    name: TriggerClause,
+                    properties: [
+                        { name: 'event' },
+                        { name: 'more', defaultValue: [] }
                     ]
                 };
             }

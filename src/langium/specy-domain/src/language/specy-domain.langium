@@ -137,7 +137,6 @@ Definition:
     | CommandDef | QueryDef
     | EventDef | ExternalEventDef | ErrorEventDef | TemporalEventDef
     | DomainServiceDef | ApplicationServiceDef | InfrastructureServiceDef | ServiceDef
-    | PolicyDef | ScopedPolicyDef
     | InvariantDef
     | AgreementDef
     | ReactionDef;
@@ -216,7 +215,7 @@ EntityBodyItem:
     | IdentityDecl | DuplicateDetection
     | NamedOperationDef | OperationsBlock
     | InlineInvariant | InvariantsBlock
-    | PoliciesBlock | StatesBlock | TransitionsBlock | ReferencesBlock;
+    | ReactionsBlock | StatesBlock | TransitionsBlock | ReferencesBlock;
 
 IdentityDecl:
     ('identity' | 'identifier') name=Ident ':' type=FieldType;
@@ -241,7 +240,7 @@ AggregateBodyItem:
     | AggregateRootDecl | AggregateEntitiesDecl | AggregateContainsDecl
     | IdentityDecl | DuplicateDetection
     | FieldDecl | FieldsBlock | ReferencesBlock
-    | InvariantsBlock | PoliciesBlock
+    | InvariantsBlock | ReactionsBlock
     | OperationsBlock | StatesBlock | TransitionsBlock;
 
 AggregateRootDecl:
@@ -287,19 +286,37 @@ FinalState:
 // -----------------------------------------------------------------------------
 
 ReactionDef:
-    'reaction' name=STRING
+    'reaction' name=(Ident | TypeName | STRING)
+    ('(' params=ParamList ')')?
+    description=Description?
+    metadata=MetadataBlock?
     '{'
+        satisfies=SatisfiesDecl?
+        // Either clause items (triggered-by/trigger/effects/effect/guard) or a single
+        // bare guard expression (the scoped-reaction form, formerly `policy name { expr }`).
+        // Item keywords and expression starts are disjoint, so the loop exit is LL-decidable;
+        // the guard expression is parsed once (never repeated) to avoid expression ambiguity.
         (items+=ReactionItem)*
+        (guard=Expression)?
     '}';
 
 ReactionItem:
-    SatisfiesDecl | Description | TriggeredByClause | EffectsClause;
+    Description | TriggeredByClause | EffectsClause | TriggerClause | GuardClause | EffectClause;
 
 TriggeredByClause:
     'triggered-by' event=TypeName;
 
 EffectsClause:
     'effects' command=TypeName;
+
+TriggerClause:
+    'trigger' event=TypeName (',' more+=TypeName)*;
+
+GuardClause:
+    'guard' '{' expr=Expression '}';
+
+EffectClause:
+    'effect' command=TypeName;
 
 // -----------------------------------------------------------------------------
 // Named Operation (inline in entity/service/interface)
@@ -390,7 +407,7 @@ KeywordAsIdent returns string:
     | 'reference' | 'offset' | 'instant' | 'guard'
     | 'from' | 'on' | 'when' | 'then' | 'as' | 'root' | 'final'
     | 'fields' | 'entities' | 'contains' | 'exposes' | 'accepts' | 'returns'
-    | 'emits' | 'creates' | 'sets' | 'resolves' | 'policy' | 'precondition'
+    | 'emits' | 'creates' | 'sets' | 'resolves' | 'precondition'
     | 'postcondition' | 'foreach' | 'invariant' | 'agreement' | 'predicate'
     | 'participants' | 'reconciliation' | 'detection' | 'compensation'
     | 'coordination' | 'escalation' | 'step' | 'condition'
@@ -503,7 +520,7 @@ InternalOp:
 
 OperationClause:
     PreconditionClause | PostconditionClause
-    | ResolvesClause | PolicyCallClause | ScopedPolicyDef
+    | ResolvesClause | ReactionCallClause
     | CreatesClause | SetsClause | EmitsClause
     | ServiceCallClause | ForeachClause | ReturnsClause;
 
@@ -531,8 +548,8 @@ PostconditionClause:
 ResolvesClause:
     'resolves' type=TypeName 'from' source=DotPath;
 
-PolicyCallClause:
-    'policy' name=Ident
+ReactionCallClause:
+    'reaction' name=Ident
     '(' args=ArgList? ')'
     description=Description?
     metadata=MetadataBlock?
@@ -566,7 +583,7 @@ ServiceCallClause:
 ForeachClause:
     'foreach' collection=DotPath 'as' variable=Ident '{'
         (body+=(ResolvesClause | SetsClause | EmitsClause
-            | ServiceCallClause | PolicyCallClause))*
+            | ServiceCallClause | ReactionCallClause))*
     '}';
 
 // -----------------------------------------------------------------------------
@@ -783,32 +800,10 @@ ServiceDef:
 ServiceBodyItem:
     SatisfiesDecl | Description
     | NamedOperationDef | OperationsBlock
-    | InterfaceDef | InvariantsBlock | PoliciesBlock;
+    | InterfaceDef | InvariantsBlock | ReactionsBlock;
 
-// -----------------------------------------------------------------------------
-// Policy
-// -----------------------------------------------------------------------------
-
-PolicyDef:
-    'policy' name=TypeName
-    description=Description?
-    metadata=MetadataBlock?
-    '{'
-        satisfies=SatisfiesDecl?
-        'trigger' triggers+=TypeName (',' triggers+=TypeName)*
-        ('guard' '{' guard=Expression '}')?
-        'effect' effect=TypeName
-    '}';
-
-ScopedPolicyDef:
-    'policy' name=Ident
-    ('(' params=ParamList ')')?
-    description=Description?
-    metadata=MetadataBlock?
-    '{'
-        satisfies=SatisfiesDecl?
-        expr=Expression?
-    '}';
+// (Reactive rules are defined by `ReactionDef` above; the legacy `PolicyDef`
+// and `ScopedPolicyDef` forms were folded into it.)
 
 // -----------------------------------------------------------------------------
 // Invariant (top-level)
@@ -836,8 +831,8 @@ EnforcementStrategy:
 InvariantsBlock:
     'invariants' '{' (invariants+=ScopedInvariantDef)* '}';
 
-PoliciesBlock:
-    'policies' '{' (policies+=ScopedInvariantDef)* '}';
+ReactionsBlock:
+    'reactions' '{' (reactions+=ScopedInvariantDef)* '}';
 
 ScopedInvariantDef:
     name=Ident

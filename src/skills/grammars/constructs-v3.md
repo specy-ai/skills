@@ -433,7 +433,7 @@ name(params) : ReturnType :: "description" {
 | `emits` | `emits TypeName { field = value }` | Event emission with explicit field assignments. |
 | service call | `Service.op(args) :: "description"` | Direct call. Replaces v1 `delegates`. |
 | `foreach` | `foreach dotPath as id { clauses }` | Iteration over a collection. |
-| policy call | `policy identifier(args)` | References a named policy (precondition). |
+| reaction call | `reaction identifier(args)` | References a named reaction (precondition). |
 
 #### Resolution patterns
 
@@ -478,14 +478,14 @@ resolves Payment from Order
 
 ---
 
-### Policy (reactive rule)
+### Reaction (reactive rule)
 
-A `policy` is a reactive rule: it listens to events and issues commands in response. This is NOT a precondition (preconditions are clauses on operations).
+A `reaction` is a reactive rule: it listens to events and issues commands in response. This is NOT a precondition (preconditions are clauses on operations).
 
 #### Skeleton
 
 ```
-policy Name :: "description" {
+reaction Name :: "description" {
     trigger EventType
     guard { expression }
     effect CommandType
@@ -496,15 +496,15 @@ policy Name :: "description" {
 
 | Rule | Detail |
 |------|--------|
-| Trigger | One or more event types that activate the policy. |
-| Guard | Optional condition — policy fires only when guard is true. |
-| Effect | The command to issue when the policy fires. |
-| Distinction | Policies react to events. Preconditions guard operations. Invariants assert properties. |
+| Trigger | One or more event types that activate the reaction. |
+| Guard | Optional condition — reaction fires only when guard is true. |
+| Effect | The command to issue when the reaction fires. |
+| Distinction | Reactions react to events. Preconditions guard operations. Invariants assert properties. |
 
 #### Example
 
 ```
-policy LateDeliveryAlert :: "Alert when delivery is overdue" {
+reaction LateDeliveryAlert :: "Alert when delivery is overdue" {
     trigger DeliveryOverdue
     guard { Order.status = shipped }
     effect NotifyLateDelivery

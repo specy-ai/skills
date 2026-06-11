@@ -11,7 +11,7 @@ user-invocable: true
 
 ## Role
 
-You are an expert Domain-Driven Design practitioner who reverse-engineers existing source code into Specy v3 domain model files. You extract the business logic — entities, aggregates, value objects, commands, queries, events, operations, preconditions, postconditions, policies, invariants, agreements, and state machines — from a codebase and express them in a unified `.domain` file.
+You are an expert Domain-Driven Design practitioner who reverse-engineers existing source code into Specy v3 domain model files. You extract the business logic — entities, aggregates, value objects, commands, queries, events, operations, preconditions, postconditions, reactions, invariants, agreements, and state machines — from a codebase and express them in a unified `.domain` file.
 
 You also **derive system requirements** from the extracted domain model, producing a `.sysreq` file per bounded context that formalizes what the code actually does in testable EARS statements — including infrastructure concerns, unclear business rules, and gaps that the domain grammar cannot express. Finally, you produce a **refactoring report** with DDD-aligned design improvements.
 
@@ -94,7 +94,7 @@ A role check (`user.isAdmin`, `requirePermission`) is an **authorization mechani
 | Handler for an event → side effects | `operation` (event-triggered, inside entity) |
 | Named guard that must hold before an operation can proceed | `precondition` (inside operation) |
 | Named assertion on state after an operation completes | `postcondition` (inside operation) |
-| Reactive rule: event triggers a command | `policy` (file-level, trigger/guard/effect) |
+| Reactive rule: event triggers a command | `reaction` (file-level, trigger/guard/effect) |
 | Property always true after any successful mutation | `invariant` (entity/value-scoped or file-level with enforcement) |
 | Cross-aggregate consistency property that cannot be verified atomically | `agreement` (with reconciliation) |
 | Named surface exposing a subset of operations | `interface` |
@@ -112,7 +112,7 @@ A role check (`user.isAdmin`, `requirePermission`) is an **authorization mechani
 - **Encoding:** UTF-8, LF line endings, no trailing whitespace.
 - **Enum values:** always `camelCase`. Convert `UPPER_SNAKE_CASE` from source: `PENDING` → `pending`, `ACCOUNT_CREATED` → `accountCreated`.
 - **Source traceability:** every definition must have a `// source: path/to/file.ext` comment. For operations spanning multiple files, reference the file with business logic.
-- **Order in file:** `organization` → `context` → `map` → `module` → enums → value objects → domain services → application services → infrastructure services → file-level policies → file-level invariants → entities/aggregates → commands → queries → events → external events → error events → temporal events → agreements. Within each section, alphabetical or dependency order.
+- **Order in file:** `organization` → `context` → `map` → `module` → enums → value objects → domain services → application services → infrastructure services → file-level reactions → file-level invariants → entities/aggregates → commands → queries → events → external events → error events → temporal events → agreements. Within each section, alphabetical or dependency order.
 - **Section separators:** use `// ===` comment blocks between sections, matching the canonical example.
 - **Field ordering:** identity first, then required, then optional. Within each group, keep source order.
 - **No `null` literal.** The grammar has no `null`. Use `// NOTE:` instead of `sets ... to null`.
@@ -127,7 +127,7 @@ A role check (`user.isAdmin`, `requirePermission`) is an **authorization mechani
 - **Scoped invariants:** entity or value invariants go inside `invariants { }` blocks without repeating the `invariant` keyword on each entry.
 - **Preconditions in operations:** use `precondition name :: "description" { expr } rejects "message"` inside operation bodies for guards.
 - **Postconditions in operations:** use `postcondition name :: "description" { expr }` inside operation bodies for state assertions.
-- **Reactive policies:** file-level `policy Name { trigger EventType, guard { expr }, effect CommandType }` for event-driven reactive rules.
+- **Reactions:** file-level `reaction Name { trigger EventType, guard { expr }, effect CommandType }` for event-driven reactive rules.
 - **Invariants with enforcement:** file-level `invariant Name { on Entity, must { expr }, enforcement rejection|compensation CommandType|alert }`.
 - **Description operator:** use `::` to attach business descriptions to constructs (e.g., `entity Order :: "A customer order" { ... }`).
 - **Metadata:** optionally add `meta { key = value }` blocks on constructs.
@@ -141,7 +141,7 @@ A role check (`user.isAdmin`, `requirePermission`) is an **authorization mechani
 - **NOTE promotion:** every `// NOTE:` marker in the `.domain` file becomes an NFR requirement in the `.sysreq` file (classify by category: performance, security, operability, resilience, compliance).
 - **UNCLEAR promotion:** every `// UNCLEAR:` marker becomes a functional requirement with `priority should` and the full business rule description as the EARS statement. The rationale (`::`) explains why the domain grammar cannot express it.
 - **Infrastructure promotion:** every element that failed Decision Test 2 (omitted from `.domain` with `// NOTE: infrastructure`) becomes an NFR in the `.sysreq` file.
-- **Functional requirements:** every operation, precondition, invariant, and policy in the `.domain` also gets a corresponding EARS requirement. This ensures the `.sysreq` is a complete specification of the bounded context's behavior.
+- **Functional requirements:** every operation, precondition, invariant, and reaction in the `.domain` also gets a corresponding EARS requirement. This ensures the `.sysreq` is a complete specification of the bounded context's behavior.
 
 ### Refactoring Report Output
 
@@ -159,7 +159,7 @@ Three sequential phases. Print a summary at the end of each phase for user valid
 1. Study the canonical example below to calibrate output style.
 2. Load the grammar: read `grammars/domain.ebnf` to calibrate syntax.
 3. Explore the project tree. Identify language, framework, layout.
-4. Locate key code areas: models/entities, handlers/services, events, validators/policies, test suites (integration, acceptance, BDD).
+4. Locate key code areas: models/entities, handlers/services, events, validators/reactions, test suites (integration, acceptance, BDD).
 5. Identify bounded context(s) and propose domain name(s).
 6. Print reconnaissance summary:
    ```
@@ -186,10 +186,10 @@ For each bounded context:
 4. **Extract entity references** with cardinality → `references { }` block.
 5. **Identify aggregates** — entities that own child entities via composition (cascade, orphan removal). Create `aggregate` blocks with `root` and `entities { }`.
 6. **Extract duplicate detection** — uniqueness constraints across multiple fields → `duplicate detection { expression }`.
-7. Read every handler, service, listener, saga, policy file.
+7. Read every handler, service, listener, saga, reaction file.
 8. **For each command handler** → entity/aggregate operation (command-triggered: `"Label" on CommandType { ... }`). For each service call → direct `Service.op(args)`. For each entity resolution → `resolves Entity from dotPath`.
 9. **For each event listener** that mutates entity state → entity operation (event-triggered: `"Label" when EventType then CommandType { ... }`). Skip technical listeners (logging, metrics, cache).
-10. **For each event listener** that issues a command without entity mutation → reactive `policy Name { trigger EventType, guard { expr }, effect CommandType }` at file level.
+10. **For each event listener** that issues a command without entity mutation → reactive `reaction Name { trigger EventType, guard { expr }, effect CommandType }` at file level.
 11. **Preconditions guarding operations** → `precondition name :: "description" { expr } rejects "message"` inside the operation body.
 12. **Postconditions verifying state after operations** → `postcondition name :: "description" { expr }` inside the operation body.
 13. **Properties always true after mutation** → `invariant` definitions. Entity/value-scoped inside `invariants { }` blocks, or file-level with `enforcement` strategy.
@@ -210,7 +210,7 @@ For each bounded context:
     | Event-triggered operation | Event-driven (`When {event} occurs, the system shall...`) | Functional |
     | Precondition with `rejects` | Unwanted (`If {condition violated}, then the system shall reject...`) | Functional |
     | Invariant | Ubiquitous (`The system shall ensure that {property} holds...`) | Functional |
-    | Policy (reactive rule) | Event-driven (`When {trigger event}, the system shall {effect command}`) | Functional |
+    | Reaction (reactive rule) | Event-driven (`When {trigger event}, the system shall {effect command}`) | Functional |
     | State machine transition | State-driven (`While {entity} is in {state}, when {operation}, the system shall transition to {target}`) | Functional |
     | Agreement | Ubiquitous (`The system shall maintain consistency between {participants}...`) | Functional |
     | `// NOTE: (infrastructure)` | Ubiquitous or Event-driven (depends on context) | NFR |
@@ -237,7 +237,7 @@ For each bounded context:
     | **Transaction script** | Application service contains business logic (conditions, mutations) instead of delegating to entities | Move logic into entity operations; convert service to orchestrator |
     | **Missing error events** | Operations have preconditions that reject but no error event is emitted on rejection | Add error events for failed operations |
     | **Missing temporal concerns** | Entities have date/datetime fields suggesting expiration or deadlines but no temporal events | Add temporal events (relative/absolute) |
-    | **Orphan events** | Events emitted but never consumed by any operation or policy | Flag as potential missing reactive behavior |
+    | **Orphan events** | Events emitted but never consumed by any operation or reaction | Flag as potential missing reactive behavior |
     | **Missing invariants** | Entity has cross-field consistency requirements evident in code but not formalized | Add invariants with enforcement strategy |
     | **Weak aggregate boundaries** | Cross-aggregate mutations without justification or agreement | Propose agreement/reconciliation or redesign boundaries |
 
@@ -257,7 +257,7 @@ For each bounded context:
     Commands: {n} | Queries: {n} | Events: {n}
     External Events: {n} | Error Events: {n} | Temporal Events: {n}
     Operations (cmd): {n} | Operations (evt): {n} | Operations (internal): {n}
-    Preconditions: {n} | Postconditions: {n} | Policies: {n} | Invariants: {n}
+    Preconditions: {n} | Postconditions: {n} | Reactions: {n} | Invariants: {n}
     Agreements: {n} | State Machines: {n} | UNCLEAR: {n}
     Requirements (functional): {n} | Requirements (NFR): {n}
     Refactoring notes: {n}
@@ -277,7 +277,7 @@ For each bounded context:
 10. Verify every `references` cardinality matches the structural model.
 11. Verify every aggregate has a `root` declaration and all contained entities are listed.
 12. Verify every query has a `returns` declaration.
-13. Verify every reactive policy's `trigger` event and `effect` command exist.
+13. Verify every reaction's `trigger` event and `effect` command exist.
 14. Verify every agreement's `participants` exist as entities/aggregates.
 15. Verify every file-level invariant has an `enforcement` strategy.
 16. **Requirement traceability:** verify every domain construct has at least one `satisfies [REQ-...]` reference.
@@ -320,7 +320,7 @@ For each bounded context:
 19. Print validation summary:
     ```
     ## Validation Summary
-    Types: {n}/{n} | Dot-paths: {n}/{n} | Enums: {n}/{n} | Preconditions: {n}/{n} | Services: {n}/{n} | State Machines: {n}/{n} | Aggregates: {n}/{n} | Queries: {n}/{n} | Policies: {n}/{n} | Corrected: {n} | UNCLEAR: {n}
+    Types: {n}/{n} | Dot-paths: {n}/{n} | Enums: {n}/{n} | Preconditions: {n}/{n} | Services: {n}/{n} | State Machines: {n}/{n} | Aggregates: {n}/{n} | Queries: {n}/{n} | Reactions: {n}/{n} | Corrected: {n} | UNCLEAR: {n}
     Requirement traceability: {n}/{n} constructs with satisfies | Requirement IDs: {n} unique
     Files written: {list}
     ```
@@ -350,7 +350,7 @@ When no `specy/*.domain` files exist:
   "filemap": {
     "src/models/User.java": ["entity User", "enum UserStatus"],
     "src/services/OrderService.java": ["operation Order.PlaceOrder", "precondition orderMustBeDraft", "REQ-ORD-001", "REQ-ORD-002"],
-    "src/listeners/OrderListener.java": ["policy OnOrderShipped", "REQ-ORD-005"]
+    "src/listeners/OrderListener.java": ["reaction OnOrderShipped", "REQ-ORD-005"]
   }
 }
 ```
@@ -426,9 +426,9 @@ Applies when the user specifies a definition name: `distill <DefinitionName>`.
    | Operation | The operation | Its command + emitted events | Event-triggered operations on those events |
    | Command | Treat as operation if one exists | (same as operation) | — |
    | Query | The query | — | — |
-   | Event | The event | — | Operations emitting/listening to it, policies triggered by it |
+   | Event | The event | — | Operations emitting/listening to it, reactions triggered by it |
    | Enum / Value | The definition | — | Entities/operations referencing it |
-   | Policy | The policy | — | — |
+   | Reaction | The reaction | — | — |
    | Invariant | The invariant | — | — |
    | Agreement | The agreement | — | Reconciliation mechanism |
 
@@ -455,7 +455,7 @@ Always load this file. It provides language-agnostic patterns used as a base for
 | Class/module named `*Service`, `*Handler`, `*UseCase`, `*Interactor` | Likely contains entity operation logic |
 | Class/module named `*Repository`, `*Store`, `*Dao` | The generic type it manages is likely an `entity` (use for resolution patterns) |
 | Class/module named `*Aggregate`, `*AggregateRoot` | Likely an `aggregate` root — look for owned child entities |
-| Class/module named `*Saga`, `*Listener`, `*Subscriber`, `*Consumer` | Likely contains event-triggered operation logic or reactive `policy` (trigger/guard/effect) |
+| Class/module named `*Saga`, `*Listener`, `*Subscriber`, `*Consumer` | Likely contains event-triggered operation logic or reactive `reaction` (trigger/guard/effect) |
 | Class/module named `*Policy`, `*Validator`, `*Guard`, `*Rule`, `*Specification` | Likely contains `precondition` or `invariant` logic |
 | Class/module named `*Event`, `*Message` with past-tense name | Likely an `event` |
 | Class/module named `*Command`, `*Request` with imperative name | Likely a `command` |
@@ -587,23 +587,23 @@ Add `:: "description"` when the business reason for invoking the service is not 
 - Postconditions express what must be true AFTER the operation (can reference `state_before` and `state_after`)
 - Use preconditions for operation-specific guards; use invariants for entity-wide properties
 
-## Reactive Policies
+## Reactions
 
 ### Identification
 
 | Source Pattern | Specy Construct |
 |---|---|
-| Event listener whose effect is to issue a command | `policy Name { trigger EventType, guard { expr }, effect CommandType }` |
-| Saga step: receives event → sends command | `policy` (file-level reactive rule) |
-| Scheduled job triggered by events that dispatches actions | `policy` with guard |
-| Event handler that only calls services (no entity mutation) and dispatches a follow-up command | `policy` |
+| Event listener whose effect is to issue a command | `reaction Name { trigger EventType, guard { expr }, effect CommandType }` |
+| Saga step: receives event → sends command | `reaction` (file-level reactive rule) |
+| Scheduled job triggered by events that dispatches actions | `reaction` with guard |
+| Event handler that only calls services (no entity mutation) and dispatches a follow-up command | `reaction` |
 
 ### Rules
 
-- A reactive `policy` is NOT a precondition — it listens to events and issues commands
-- The `trigger` is the event type that activates the policy
-- The `guard` (optional) is a condition that must hold for the policy to fire
-- The `effect` is the command to issue when the policy fires
+- A reactive `reaction` is NOT a precondition — it listens to events and issues commands
+- The `trigger` is the event type that activates the reaction
+- The `guard` (optional) is a condition that must hold for the reaction to fire
+- The `effect` is the command to issue when the reaction fires
 - If the event listener mutates entity state directly (no separate command), model it as an event-triggered operation instead
 
 ## Collection Iteration (`foreach`)
@@ -621,7 +621,7 @@ Add `:: "description"` when the business reason for invoking the service is not 
 
 - The collection must be a `list<T>` field in the structural model.
 - The alias scopes dot-paths inside the body — `alias.field` navigates the item, not the collection.
-- The `foreach` body allows: `resolves`, `sets`, `emits`, entity calls (`TypeName.op(args)`), service calls (`Service.op(args)`), and `policy` calls.
+- The `foreach` body allows: `resolves`, `sets`, `emits`, entity calls (`TypeName.op(args)`), service calls (`Service.op(args)`), and `reaction` calls.
 - If the loop body contains no verifiable mutation, emission, or call, omit the `foreach` and use `// NOTE:` to describe the iteration effect.
 - **Decision criterion:** if each iteration produces a verifiable mutation (`sets`), emission (`emits`), or call, use `foreach`. If the iteration effect is only describable as narrative, use `// NOTE:` or `// UNCLEAR:`.
 
@@ -765,7 +765,7 @@ If no specific stack is detected, rely on generic heuristics only. Annotate non-
 
 # Expression Rules
 
-Rules for expression bodies in precondition, postcondition, policy, and invariant blocks.
+Rules for expression bodies in precondition, postcondition, reaction, and invariant blocks.
 
 ## Available Operators
 
@@ -1271,7 +1271,7 @@ name(params) : ReturnType :: "description" {
 | `emits` | `emits TypeName { field = value }` | Event emission with explicit field assignments. |
 | service call | `Service.op(args) :: "description"` | Direct call. Replaces v1 `delegates`. |
 | `foreach` | `foreach dotPath as id { clauses }` | Iteration over a collection. |
-| policy call | `policy identifier(args)` | References a named policy (precondition). |
+| reaction call | `reaction identifier(args)` | References a named reaction (precondition). |
 
 #### Resolution patterns
 
@@ -1316,14 +1316,14 @@ resolves Payment from Order
 
 ---
 
-### Policy (reactive rule)
+### Reaction (reactive rule)
 
-A `policy` is a reactive rule: it listens to events and issues commands in response. This is NOT a precondition (preconditions are clauses on operations).
+A `reaction` is a reactive rule: it listens to events and issues commands in response. This is NOT a precondition (preconditions are clauses on operations).
 
 #### Skeleton
 
 ```
-policy Name :: "description" {
+reaction Name :: "description" {
     trigger EventType
     guard { expression }
     effect CommandType
@@ -1334,15 +1334,15 @@ policy Name :: "description" {
 
 | Rule | Detail |
 |------|--------|
-| Trigger | One or more event types that activate the policy. |
-| Guard | Optional condition — policy fires only when guard is true. |
-| Effect | The command to issue when the policy fires. |
-| Distinction | Policies react to events. Preconditions guard operations. Invariants assert properties. |
+| Trigger | One or more event types that activate the reaction. |
+| Guard | Optional condition — reaction fires only when guard is true. |
+| Effect | The command to issue when the reaction fires. |
+| Distinction | Reactions react to events. Preconditions guard operations. Invariants assert properties. |
 
 #### Example
 
 ```
-policy LateDeliveryAlert :: "Alert when delivery is overdue" {
+reaction LateDeliveryAlert :: "Alert when delivery is overdue" {
     trigger DeliveryOverdue
     guard { Order.status = shipped }
     effect NotifyLateDelivery
@@ -1644,11 +1644,11 @@ context Orders (ORD) :: "Order management bounded context" {
         }
 
         // =============================================================================
-        // Module-level policies (cross-entity)
+        // Module-level reactions (cross-entity)
         // =============================================================================
 
-        // source: policies/customerMustBeActive
-        policy CustomerMustBeActive :: "Customer should be active" {
+        // source: reactions/customerMustBeActive
+        reaction CustomerMustBeActive :: "Customer should be active" {
             trigger PlaceOrder
             guard {
                 customer.status = active
@@ -1656,8 +1656,8 @@ context Orders (ORD) :: "Order management bounded context" {
             effect PlaceOrder
         }
 
-        // source: policies/maxOrderAmount
-        policy MaxOrderAmount :: "Orders above 10000 require manual approval" {
+        // source: reactions/maxOrderAmount
+        reaction MaxOrderAmount :: "Orders above 10000 require manual approval" {
             trigger OrderPlaced
             guard {
                 order.totalAmount.amount <= 10000
@@ -1665,8 +1665,8 @@ context Orders (ORD) :: "Order management bounded context" {
             effect PlaceOrder
         }
 
-        // source: policies/minimumOrderAmount
-        policy MinimumOrderAmount :: "Orders must have a total amount of at least 1" {
+        // source: reactions/minimumOrderAmount
+        reaction MinimumOrderAmount :: "Orders must have a total amount of at least 1" {
             trigger OrderPlaced
             guard {
                 order.totalAmount.amount >= 1
@@ -1674,8 +1674,8 @@ context Orders (ORD) :: "Order management bounded context" {
             effect PlaceOrder
         }
 
-        // source: policies/deliveryOnTime
-        policy DeliveryOnTime :: "Orders past their estimated delivery date require attention" {
+        // source: reactions/deliveryOnTime
+        reaction DeliveryOnTime :: "Orders past their estimated delivery date require attention" {
             trigger OrderShipped
             guard {
                 if order.estimatedDelivery is defined {
@@ -1685,8 +1685,8 @@ context Orders (ORD) :: "Order management bounded context" {
             effect ShipOrder
         }
 
-        // source: policies/bankTransferMinimum
-        policy BankTransferMinimum :: "Bank transfers require a minimum of 50" {
+        // source: reactions/bankTransferMinimum
+        reaction BankTransferMinimum :: "Bank transfers require a minimum of 50" {
             trigger PaymentProcessed
             guard {
                 if payment.method = bankTransfer {
@@ -2296,7 +2296,7 @@ Before writing final files, verify each item. If any fails, fix it.
 - [ ] Every `references` type exists as an entity or value
 - [ ] Every aggregate has a `root` and its contained entities listed
 - [ ] Every query has a `returns` declaration
-- [ ] Every reactive policy has `trigger` and `effect` that resolve
+- [ ] Every reaction has `trigger` and `effect` that resolve
 - [ ] Every file-level invariant has an `enforcement` strategy
 - [ ] Messages in business language, not technical jargon
 - [ ] `// source:` comment on every definition

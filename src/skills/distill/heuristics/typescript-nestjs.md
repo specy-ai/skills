@@ -37,7 +37,7 @@
 | `this.repository.save(new Entity(...))` | `creates Entity` |
 | `throw new BadRequestException(msg)` / guard condition | `precondition name :: "description" { condition } rejects "message"` |
 | `this.eventEmitter.emit(...)` / `this.eventBus.publish(...)` | `emits Event` |
-| `@OnEvent("EventName")` / `@EventPattern(...)` handler that issues a command in response to an event | `policy Name { trigger EventName, guard { expression }, effect CommandName }` |
+| `@OnEvent("EventName")` / `@EventPattern(...)` handler that issues a command in response to an event | `reaction Name { trigger EventName, guard { expression }, effect CommandName }` |
 | `for (const item of entity.items)` / `entity.items.forEach(item => ...)` | `foreach Entity.items as item { ... }` |
 | `entity.items.map(item => ...)` with mutation side effects | `foreach Entity.items as item { ... }` |
 | Inside loop: `item.related.field = value` | `sets RelatedType { field = value }` (cross-aggregate, inside `foreach`) |

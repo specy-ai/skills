@@ -208,7 +208,7 @@ These analyses are defined and executed from the domain model side (see DOMAIN-M
 
 Additionally, at the requirement level:
 
-- **Conflict detection** — Requirements linked by `conflicts-with` that cannot both be fully satisfied create an unresolved tension. The resolution strategy must be documented (typically through priority, a mediating policy, or an agreement).
+- **Conflict detection** — Requirements linked by `conflicts-with` that cannot both be fully satisfied create an unresolved tension. The resolution strategy must be documented (typically through priority, a mediating reaction, or an agreement).
 
 
 ## Integration with verification loops
@@ -243,7 +243,7 @@ Not all NFRs are equal. Some trace directly to domain model elements; others are
 | **Operability** | How the system is monitored, deployed, debugged, and maintained | Operation (observability), Event (audit trail), Infrastructure Service (logging, alerting) | Bounded Context or Organization |
 | **Scalability** | How the system handles growing load without degradation | Operation (throughput ceiling), Entity (partitioning), Infrastructure Service (elastic capacity) | Organization |
 | **Compliance** | How the system meets regulatory, legal, or contractual obligations | Entity (data retention, deletion), Operation (audit), Value Type (PII classification) | Organization |
-| **Resilience** | How the system behaves when parts fail — degraded modes, circuit breaking, bulkheading | Operation (fallback behavior), Infrastructure Service (circuit breaker), Policy (compensating action) | Bounded Context |
+| **Resilience** | How the system behaves when parts fail — degraded modes, circuit breaking, bulkheading | Operation (fallback behavior), Infrastructure Service (circuit breaker), Reaction (compensating action) | Bounded Context |
 
 ### NFR discovery heuristic
 

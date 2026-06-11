@@ -44,7 +44,7 @@
 | `if (condition) throw new ...Exception(msg)` | `precondition name :: "description" { condition } rejects "message"` |
 | `entity.setField(value)` / `entity.field = value` | `sets Entity { field = value }` |
 | `publisher.publishEvent(new Event(...))` / `eventBus.publish(...)` | `emits Event` |
-| `@EventListener` / `@TransactionalEventListener` method that issues a command in response to an event | `policy Name { trigger EventName, guard { expression }, effect CommandName }` |
+| `@EventListener` / `@TransactionalEventListener` method that issues a command in response to an event | `reaction Name { trigger EventName, guard { expression }, effect CommandName }` |
 | `for (Item item : entity.getItems())` / `entity.getItems().forEach(item -> ...)` | `foreach Entity.items as item { ... }` |
 | `entity.getItems().stream().forEach(...)` / `.map(...)` with side effects | `foreach Entity.items as item { ... }` |
 | Inside loop: `item.getRelated().setField(value)` | `sets RelatedType { field = value }` (cross-aggregate, inside `foreach`) |

@@ -133,7 +133,7 @@
           "named": true
         },
         {
-          "type": "policies_block",
+          "type": "reactions_block",
           "named": true
         },
         {
@@ -295,7 +295,7 @@
           "named": true
         },
         {
-          "type": "policies_block",
+          "type": "reactions_block",
           "named": true
         },
         {
@@ -523,15 +523,19 @@
           "named": true
         },
         {
-          "type": "policy_call_clause",
-          "named": true
-        },
-        {
           "type": "postcondition_clause",
           "named": true
         },
         {
           "type": "precondition_clause",
+          "named": true
+        },
+        {
+          "type": "reaction_call_clause",
+          "named": true
+        },
+        {
+          "type": "reaction_def",
           "named": true
         },
         {
@@ -544,10 +548,6 @@
         },
         {
           "type": "satisfies_decl",
-          "named": true
-        },
-        {
-          "type": "scoped_policy_def",
           "named": true
         },
         {
@@ -720,10 +720,6 @@
           "named": true
         },
         {
-          "type": "policy_def",
-          "named": true
-        },
-        {
           "type": "prd_source_decl",
           "named": true
         },
@@ -737,10 +733,6 @@
         },
         {
           "type": "requirements_source_decl",
-          "named": true
-        },
-        {
-          "type": "scoped_policy_def",
           "named": true
         },
         {
@@ -921,7 +913,7 @@
           "named": true
         },
         {
-          "type": "policies_block",
+          "type": "reactions_block",
           "named": true
         },
         {
@@ -1148,7 +1140,7 @@
           "named": true
         },
         {
-          "type": "policies_block",
+          "type": "reactions_block",
           "named": true
         },
         {
@@ -1540,15 +1532,19 @@
           "named": true
         },
         {
-          "type": "policy_call_clause",
-          "named": true
-        },
-        {
           "type": "postcondition_clause",
           "named": true
         },
         {
           "type": "precondition_clause",
+          "named": true
+        },
+        {
+          "type": "reaction_call_clause",
+          "named": true
+        },
+        {
+          "type": "reaction_def",
           "named": true
         },
         {
@@ -1561,10 +1557,6 @@
         },
         {
           "type": "satisfies_decl",
-          "named": true
-        },
-        {
-          "type": "scoped_policy_def",
           "named": true
         },
         {
@@ -1835,7 +1827,7 @@
           "named": true
         },
         {
-          "type": "policy_call_clause",
+          "type": "reaction_call_clause",
           "named": true
         },
         {
@@ -2067,7 +2059,7 @@
           "named": true
         },
         {
-          "type": "policies_block",
+          "type": "reactions_block",
           "named": true
         },
         {
@@ -2258,15 +2250,19 @@
           "named": true
         },
         {
-          "type": "policy_call_clause",
-          "named": true
-        },
-        {
           "type": "postcondition_clause",
           "named": true
         },
         {
           "type": "precondition_clause",
+          "named": true
+        },
+        {
+          "type": "reaction_call_clause",
+          "named": true
+        },
+        {
+          "type": "reaction_def",
           "named": true
         },
         {
@@ -2279,10 +2275,6 @@
         },
         {
           "type": "satisfies_decl",
-          "named": true
-        },
-        {
-          "type": "scoped_policy_def",
           "named": true
         },
         {
@@ -2570,19 +2562,11 @@
           "named": true
         },
         {
-          "type": "policy_def",
-          "named": true
-        },
-        {
           "type": "query_def",
           "named": true
         },
         {
           "type": "reaction_def",
-          "named": true
-        },
-        {
-          "type": "scoped_policy_def",
           "named": true
         },
         {
@@ -3098,101 +3082,6 @@
     }
   },
   {
-    "type": "policies_block",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": false,
-      "types": [
-        {
-          "type": "scoped_invariant_def",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
-    "type": "policy_call_clause",
-    "named": true,
-    "fields": {
-      "name": {
-        "multiple": false,
-        "required": true,
-        "types": [
-          {
-            "type": "identifier",
-            "named": true
-          }
-        ]
-      }
-    },
-    "children": {
-      "multiple": true,
-      "required": false,
-      "types": [
-        {
-          "type": "arg_list",
-          "named": true
-        },
-        {
-          "type": "description",
-          "named": true
-        },
-        {
-          "type": "expression",
-          "named": true
-        },
-        {
-          "type": "metadata_block",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
-    "type": "policy_def",
-    "named": true,
-    "fields": {
-      "name": {
-        "multiple": false,
-        "required": true,
-        "types": [
-          {
-            "type": "type_name",
-            "named": true
-          }
-        ]
-      }
-    },
-    "children": {
-      "multiple": true,
-      "required": true,
-      "types": [
-        {
-          "type": "description",
-          "named": true
-        },
-        {
-          "type": "expression",
-          "named": true
-        },
-        {
-          "type": "metadata_block",
-          "named": true
-        },
-        {
-          "type": "satisfies_decl",
-          "named": true
-        },
-        {
-          "type": "type_name",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
     "type": "postcondition_clause",
     "named": true,
     "fields": {
@@ -3382,6 +3271,40 @@
     }
   },
   {
+    "type": "reaction_call_clause",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "arg_list",
+          "named": true
+        },
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "reaction_def",
     "named": true,
     "fields": {
@@ -3421,11 +3344,19 @@
           "named": true
         },
         {
+          "type": "expression",
+          "named": true
+        },
+        {
           "type": "guard_clause",
           "named": true
         },
         {
           "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "param_list",
           "named": true
         },
         {
@@ -3438,6 +3369,21 @@
         },
         {
           "type": "triggered_by_clause",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "reactions_block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "scoped_invariant_def",
           "named": true
         }
       ]
@@ -3753,41 +3699,7 @@
           "named": true
         },
         {
-          "type": "satisfies_decl",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
-    "type": "scoped_policy_def",
-    "named": true,
-    "fields": {
-      "name": {
-        "multiple": false,
-        "required": true,
-        "types": [
-          {
-            "type": "identifier",
-            "named": true
-          }
-        ]
-      }
-    },
-    "children": {
-      "multiple": true,
-      "required": true,
-      "types": [
-        {
-          "type": "description",
-          "named": true
-        },
-        {
-          "type": "expression",
-          "named": true
-        },
-        {
-          "type": "metadata_block",
+          "type": "param_list",
           "named": true
         },
         {
@@ -3899,7 +3811,7 @@
           "named": true
         },
         {
-          "type": "policies_block",
+          "type": "reactions_block",
           "named": true
         },
         {
@@ -4013,19 +3925,11 @@
           "named": true
         },
         {
-          "type": "policy_def",
-          "named": true
-        },
-        {
           "type": "query_def",
           "named": true
         },
         {
           "type": "reaction_def",
-          "named": true
-        },
-        {
-          "type": "scoped_policy_def",
           "named": true
         },
         {
@@ -5380,14 +5284,6 @@
     "named": false
   },
   {
-    "type": "policies",
-    "named": false
-  },
-  {
-    "type": "policy",
-    "named": false
-  },
-  {
     "type": "postcondition",
     "named": false
   },
@@ -5421,6 +5317,10 @@
   },
   {
     "type": "reaction",
+    "named": false
+  },
+  {
+    "type": "reactions",
     "named": false
   },
   {

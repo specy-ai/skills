@@ -313,7 +313,7 @@ interface BodyBuckets {
     references?: { name: string; target: string; cardinality: string }[];
     operations?: OperationModel[];
     invariants?: unknown[];
-    policies?: unknown[];
+    reactions?: unknown[];
     stateMachines?: unknown[];
     transitions?: unknown[];
     interfaces?: ConstructModel[];
@@ -332,7 +332,7 @@ function walkBody(items: AstNode[]): BodyBuckets {
     const references: { name: string; target: string; cardinality: string }[] = [];
     const operations: OperationModel[] = [];
     const invariants: unknown[] = [];
-    const policies: unknown[] = [];
+    const reactions: unknown[] = [];
     const stateMachines: unknown[] = [];
     const transitions: unknown[] = [];
     const interfaces: ConstructModel[] = [];
@@ -360,8 +360,8 @@ function walkBody(items: AstNode[]): BodyBuckets {
             for (const inv of item.invariants) invariants.push(cleanNode(inv));
         } else if (ast.isInlineInvariant(item)) {
             invariants.push(cleanNode(item));
-        } else if (ast.isPoliciesBlock(item)) {
-            for (const p of item.policies) policies.push(cleanNode(p));
+        } else if (ast.isReactionsBlock(item)) {
+            for (const p of item.reactions) reactions.push(cleanNode(p));
         } else if (ast.isStatesBlock(item)) {
             for (const m of item.machines) stateMachines.push(cleanNode(m));
         } else if (ast.isTransitionsBlock(item)) {
@@ -390,7 +390,7 @@ function walkBody(items: AstNode[]): BodyBuckets {
     if (references.length) b.references = references;
     if (operations.length) b.operations = operations;
     if (invariants.length) b.invariants = invariants;
-    if (policies.length) b.policies = policies;
+    if (reactions.length) b.reactions = reactions;
     if (stateMachines.length) b.stateMachines = stateMachines;
     if (transitions.length) b.transitions = transitions;
     if (interfaces.length) b.interfaces = interfaces;
@@ -440,8 +440,6 @@ const KIND_BY_TYPE: Record<string, KindSpec> = {
     ApplicationServiceDef: { kind: 'application-service', group: 'services' },
     InfrastructureServiceDef: { kind: 'infrastructure-service', group: 'services' },
     ServiceDef: { kind: 'service', group: 'services' },
-    PolicyDef: { kind: 'policy', group: 'policies' },
-    ScopedPolicyDef: { kind: 'policy', group: 'policies' },
     ReactionDef: { kind: 'reaction', group: 'reactions' },
     InvariantDef: { kind: 'invariant', group: 'invariants' },
     AgreementDef: { kind: 'agreement', group: 'agreements' },
@@ -458,7 +456,7 @@ function normalizeDefinition(def: AstNode): { group: string; construct: Construc
         description: descOf(d.description as ast.Description | undefined),
         metadata: metaOf(d.metadata as ast.MetadataBlock | undefined),
     };
-    // satisfies as a direct property (enum/policy/external-event/invariant/...)
+    // satisfies as a direct property (enum/reaction/external-event/invariant/...)
     if (d.satisfies && ast.isSatisfiesDecl(d.satisfies as AstNode)) {
         base.satisfies = (d.satisfies as ast.SatisfiesDecl).ids;
     }
@@ -482,10 +480,6 @@ function normalizeDefinition(def: AstNode): { group: string; construct: Construc
             else if (ast.isAggregateEntitiesDecl(it)) base.entities = it.entities.map(nameOf);
             else if (ast.isAggregateContainsDecl(it)) base.contains = [nameOf(it.first), ...it.more.map(nameOf)];
         }
-    } else if (ast.isPolicyDef(def)) {
-        base.triggers = def.triggers.map(nameOf);
-        base.effect = nameOf(def.effect);
-        base.guard = def.guard ? cleanValue(def.guard) : undefined;
     } else if (ast.isExternalEventDef(def)) {
         base.eventKind = 'external';
         base.from = nameOf(def.from);
@@ -502,12 +496,18 @@ function normalizeDefinition(def: AstNode): { group: string; construct: Construc
     } else if (ast.isReactionDef(def)) {
         const triggers: string[] = [];
         const effects: string[] = [];
+        let guard: unknown;
         for (const it of def.items) {
             if (ast.isTriggeredByClause(it)) triggers.push(nameOf(it.event));
+            else if (ast.isTriggerClause(it)) triggers.push(nameOf(it.event), ...it.more.map(nameOf));
             else if (ast.isEffectsClause(it)) effects.push(nameOf(it.command));
+            else if (ast.isEffectClause(it)) effects.push(nameOf(it.command));
+            else if (ast.isGuardClause(it)) guard = cleanValue(it.expr);
         }
+        if (def.guard) guard = cleanValue(def.guard);
         if (triggers.length) base.triggers = triggers;
         if (effects.length) base.effects = effects;
+        if (guard !== undefined) base.guard = guard;
         delete (base as Record<string, unknown>).other;
     }
 

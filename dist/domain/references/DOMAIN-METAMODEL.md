@@ -25,6 +25,7 @@
   - [State machine](#state-machine)
   - [Entity](#entity)
   - [Aggregate](#aggregate)
+  - [Repository](#repository)
   - [Command](#command)
   - [Query](#query)
   - [Event](#event)
@@ -42,7 +43,7 @@
   - [Domain Service](#domain-service)
   - [Application Service](#application-service)
   - [Infrastructure Service](#infrastructure-service)
-  - [Properties - Policy and Invariant](#properties---policy-and-invariant)
+  - [Properties - Reaction and Invariant](#properties---reaction-and-invariant)
     - [Invariant](#invariant)
     - [Reaction](#reaction)
       - [Differentiators with other property types](#differentiators-with-other-property-types)
@@ -55,8 +56,6 @@
     - [How traceability works](#how-traceability-works)
     - [Traceability by concept type](#traceability-by-concept-type)
     - [Bidirectional traceability](#bidirectional-traceability)
-    - [Concrete syntax](#concrete-syntax)
-    - [Agent instruction summary](#agent-instruction-summary)
   - [Software System's Interface](#software-systems-interface)
     - [Inbound communication (System is Driven)](#inbound-communication-system-is-driven)
     - [Outbound Communication (System is Driving)](#outbound-communication-system-is-driving)
@@ -74,11 +73,11 @@ This file defines a Domain-Driven Design metamodel for creating domain models.
 
 Every concept in this metamodel carries a name, a description, a metadata map (a set of arbitrary key/value pairs), and a **satisfies** list (zero or more system requirement identifiers). These attributes are implicit and not repeated in each definition below.
 
-The `satisfies` list is the traceability bridge from the domain model back to the system requirement layer (see SYSTEM-REQ-METAMODEL.md). When system requirements are provided as input and each requirement carries an identifier (e.g. `REQ-ORD-001`), **every domain model element that realizes a requirement MUST include the corresponding requirement identifier(s) in its `satisfies` list**. This applies to all concepts defined in this metamodel: entities, aggregates, value types, operations, commands, queries, events (all subtypes), state machines, invariants, policies, agreements, reconciliations, domain services, application services, infrastructure services, interfaces, and modules.
+The `satisfies` list is the traceability bridge from the domain model back to the system requirement layer (see SYSTEM-REQ-METAMODEL.md). When system requirements are provided as input and each requirement carries an identifier (e.g. `REQ-ORD-001`), **every domain model element that realizes a requirement MUST include the corresponding requirement identifier(s) in its `satisfies` list**. This applies to all concepts defined in this metamodel: entities, aggregates, value types, operations, commands, queries, events (all subtypes), state machines, invariants, reactions, agreements, reconciliations, domain services, application services, infrastructure services, interfaces, and modules.
 
 If no system requirements are provided as input, the `satisfies` list is left empty — it is always optional in the schema but mandatory in practice when requirements exist.
 
-When the system requirements are loaded from a file, the domain model MUST declare a **requirements-source** attribute at the top level (on the organization or bounded context) containing the relative path to that file (e.g. `requirements-source "specs/order-requirements.sysreq"`). This makes the provenance of requirement identifiers explicit and machine-resolvable — any agent or tool can follow the path to read the full requirement text, check coverage, or detect drift.
+When the system requirements are loaded from a file, the domain model MUST declare a **requirements-source** attribute at the top level (on the organization or bounded context) containing the relative path to that file. This makes the provenance of requirement identifiers explicit and machine-resolvable — any agent or tool can follow the path to read the full requirement text, check coverage, or detect drift.
 
 ## Organization
 
@@ -290,7 +289,7 @@ A domain concept with a fixed identity and a lifecycle. An entity changes throug
 
 **Duplicate detection**: An entity declares a duplicate detection predicate over candidate fields, evaluated through its repository.
 
-**Repository**: Each entity derives a repository with core operations (store, getById, remove, search) plus findByField operations deduced from use cases. If the entity belongs to an aggregate, only the aggregate root has a repository.
+**Repository**: Each entity derives a repository with core operations (store, getById, remove, search) plus findByField operations deduced from use cases. If the entity belongs to an aggregate, only the aggregate root has a repository. See [Repository](#repository) for the full definition.
 
 **Naming**: Entity types are named with a noun.
 
@@ -302,6 +301,26 @@ Relations:
 - 0..n "relates to" relation with other entities
 - 0..n "constrained by" relation with invariants
 
+### Read-only Entity (Master Data)
+
+
+A read-only entity is an entity whose state is owned by another bounded context or an external system. Within this bounded context it is observable but not mutable — operations that change its state do not exist locally, and its repository exposes only read operations.
+
+Common examples are the master-data archetypes: `Customer`, `Supplier`, `Product`. They are referenced by higher-level operations of this context (e.g. an `Order` references a `Product`) but their lifecycle is governed elsewhere.
+
+A read-only entity is kept in sync with its source through one of two patterns:
+
+- **Synchronous lookup**: this context issues a query to the upstream context every time it needs the entity's current state. No local copy.
+- **Asynchronous projection**: this context subscribes to the upstream context's events and maintains a local read-model that is updated each time a relevant event arrives.
+
+The entity declares its sync pattern explicitly. Its repository derives only read operations (`getById`, `findByField`, `search`) — no `store`, no `delete`, no `update`. Domain operations defined locally on a read-only entity are forbidden; the entity is structural, not behavioural.
+
+Relations:
+- ◁ "is-a" relation with entity (inheritance — all entity rules apply except it owns no operations)
+- 1..1 "sourced from" relation with an upstream bounded context or external system
+- 0..1 "synced via" relation with a sync pattern (`synchronous-query` or `asynchronous-projection`)
+
+
 ## Aggregate
 
 A group of entities with a designated root that enforces the integrity of the whole. All state changes pass through the root; every operation evaluates the aggregate's invariants. An aggregate is itself an entity — all entity rules apply.
@@ -311,6 +330,28 @@ Relations (in addition to all entity relations):
 - 1..1 "has root" relation with entity (the root entity that controls all access)
 - 1..n "contains" relation with entities (the cluster of entities inside the aggregate boundary, including the root)
 - 0..n "constrained by" relation with invariants (aggregate-level invariants that span the whole cluster)
+
+## Repository
+
+A repository is the collection-like abstraction through which the domain retrieves and persists entities and aggregate roots. It presents persistence as if it were an in-memory collection of domain objects keyed by identity, hiding the underlying data store entirely. The domain layer depends only on the repository's interface — a port in the hexagonal architecture — while an adapter in the infrastructure layer provides the concrete implementation.
+
+A repository is **derived, not hand-authored**: it falls out of its owning entity or aggregate root together with the use cases that read its state. The modeler does not invent repositories — each entity that needs persistence implies one, and every criteria-based query implies a corresponding finder on it.
+
+**Derivation rule**: Each persisted entity derives exactly one repository. When an entity belongs to an aggregate, only the aggregate root derives a repository — non-root child entities are reached only by navigating from the root, never through a repository of their own. This keeps the aggregate the unit of both consistency and access.
+
+**Operations**: A repository provides a core set of operations — `store`, `getById`, `remove`, `search` — plus `findByField` operations deduced from the use cases that need them. Retrieval is always by identity (`getById`) or by criteria (`findByField`, `search`). A repository never exposes operations that mutate domain state; it only stores or removes whole domain objects. Mutation of an entity's state is the responsibility of the entity's own operations, after which the result is handed back to the repository to `store`.
+
+**Read surface**: A repository is the read surface that queries target. Whereas commands flow through entity operations, queries read current state directly from the repository.
+
+**Read-only repositories**: A repository derived from a read-only entity (master data) exposes read operations only — `getById`, `findByField`, `search` — and never `store` or `remove`, because the entity's state is owned by an upstream context or external system (see [Read-only Entity](#read-only-entity-master-data)).
+
+**Naming**: Repositories are named after the entity or aggregate root they serve, suffixed with `Repository`. Example: `OrderRepository`, `CustomerRepository`.
+
+Relations:
+- 1..1 "derived from" relation with entity or aggregate root (the domain object whose persistence it manages; absent for non-root child entities of an aggregate)
+- 1..n "provides" relation with operations (`store`, `getById`, `remove`, `search`, and deduced `findByField` operations)
+- 0..n "read by" relation with queries (a query reads current state through the repository's read surface)
+- 1..1 "belongs to" relation with the module of its owning entity or aggregate
 
 ## Command
 
@@ -350,10 +391,10 @@ Relations:
 
 ### Internal Event
 
-An event raised within the bounded context from an entity state transition. Internal events can trigger policies.
+An event raised within the bounded context from an entity state transition. Internal events can trigger reactions.
 
 Relations:
-- 0..n "triggers" relation with policies
+- 0..n "triggers" relation with reactions
 
 ### External Event
 
@@ -364,16 +405,16 @@ Relations:
 
 ### Error Event
 
-An error raised by an operation is a special case of event. Error events can be referenced by policies.
+An error raised by an operation is a special case of event. Error events can be referenced by reactions.
 
 Relations:
-- 0..n "triggers" relation with policies
+- 0..n "triggers" relation with reactions
 
 ### Temporal Event
 
 A temporal event is a domain fact caused by the passage of time. Unlike internal events (caused by an operation that emit it) or external events (caused by an upstream BC), a temporal event fires because a time condition — anchored to an domain reference as an instant field — has been met.
 
-A temporal event is an event. It inherits all event properties: it is a recorded fact, it is append-only, it can trigger policies, and it maintains the causality chain. Every temporal event has a domain-rooted cause — time alone is never the cause; the cause is the domain event, entity field (of type Instant), or schedule that establishes the temporal reference.
+A temporal event is an event. It inherits all event properties: it is a recorded fact, it is append-only, it can trigger reactions, and it maintains the causality chain. Every temporal event has a domain-rooted cause — time alone is never the cause; the cause is the domain event, entity field (of type Instant), or schedule that establishes the temporal reference.
 
 A temporal event has three flavors, determined by its trigger type:
 
@@ -410,17 +451,17 @@ Example: "Weekly payout cycle due" — fires every Monday at 00:00 UTC, guarded 
 
 #### Guard expression
 
-The guard is the mechanism that absorbs both cancellation and conditional firing. At firing time, the system evaluates the guard predicate against current entity state. If the guard evaluates to false, the temporal event is silently suppressed — no event is recorded, no policy triggers.
+The guard is the mechanism that absorbs both cancellation and conditional firing. At firing time, the system evaluates the guard predicate against current entity state. If the guard evaluates to false, the temporal event is silently suppressed — no event is recorded, no reaction triggers.
 
 The guard expression has access to the entity state referenced by the temporal event's context. A temporal event with no guard (or `guard: true`) fires unconditionally when its time condition is met.
 
 #### Recomputation heuristic
 
-When the reference instant can change after the temporal event is armed (e.g., a route recalculation updates the ETA), the modeler should define an explicit **recomputation policy** that:
+When the reference instant can change after the temporal event is armed (e.g., a route recalculation updates the ETA), the modeler should define an explicit **recomputation reaction** that:
 1. Listens to the event that changes the reference value.
 2. Cancels or re-arms the temporal event with the updated firing time.
 
-The recomputation policy is a regular policy — no special metamodel construct is needed. The metamodel documents this as a modeling heuristic: *whenever a temporal event's offset or instant depends on a mutable value, the modeler must identify which events can change that value and define a policy that re-arms the deadline accordingly.* Failure to do so is a modeling gap detectable by audit.
+The recomputation reaction is a regular reaction — no special metamodel construct is needed. The metamodel documents this as a modeling heuristic: *whenever a temporal event's offset or instant depends on a mutable value, the modeler must identify which events can change that value and define a reaction that re-arms the deadline accordingly.* Failure to do so is a modeling gap detectable by audit.
 
 #### Differentiators with other event types
 
@@ -429,13 +470,13 @@ The recomputation policy is a regular policy — no special metamodel construct 
 | **Cause** | An operation within the BC | An upstream BC | An operation failure | Time, anchored to a domain reference |
 | **Firing** | Synchronous with operation | Asynchronous from upstream | Synchronous with operation | Asynchronous from clock |
 | **Suppression** | Cannot be suppressed | Cannot be suppressed | Cannot be suppressed | Guard can suppress at firing time |
-| **Triggers** | Policies | Commands | Policies | Policies (same as internal) |
+| **Triggers** | Reactions | Commands | Reactions | Reactions (same as internal) |
 
 Relations:
 - 1..1 "references" relation with event (for relative), entity field (for absolute), or schedule expression (for recurring) — the temporal anchor that roots the causality chain
 - 0..1 "offset by" duration expression (for relative temporal events only)
 - 0..1 "guarded by" predicate expression over entity state (evaluated at firing time)
-- 0..n "triggers" relation with policies (inherited from event)
+- 0..n "triggers" relation with reactions (inherited from event)
 
 
 ## Value Type
@@ -453,6 +494,26 @@ Relations:
 - 0..n "embedded in" relation with entities (the entities that use this value type as a field type)
 - 0..n "has" relation with operations (behavior on the value; operations return new values)
 
+## Enums (Referential)
+
+An enum is a closed, named set of values used to constrain a field to a known finite range. The values may be primitive (a string or a number) or instances of an existing value type. Enums have no identity and no lifecycle of their own — they are purely referential.
+
+When an enum's values are instances of a value type, the value type must declare a **code field** (typically named `id`, `code`, or `symbol`) that serves as the unambiguous reference to each value. The code is what other parts of the system use to refer to the value.
+
+**Example.** The `Currency` value type carries:
+- a code — the ISO 4217 alphabetic code (`USD`, `EUR`, `GBP`, …)
+- a precision — the default number of fraction digits
+- a display name (e.g. "US Dollar")
+- a symbol (e.g. "$")
+
+The `Currencies` enum holds every defined `Currency` value. Other parts of the system reference a currency by its code alone (e.g. an `Amount` field of type `currency: Currency` can be set with `Currencies.USD`), making the reference unambiguous and stable as the value type's other fields evolve.
+
+**Naming**: enums are named with a noun, typically pluralized when they hold value-type instances (`Currencies`, `Roles`) and singular when they hold a closed set of primitive labels (`Severity`, `PaymentMethodType`).
+
+Relations:
+- 1..1 "references" relation with the value type whose instances populate the enum (omitted when the enum holds primitive values)
+- 1..n "holds" relation with values (the closed set of enum members)
+- 0..n "constrains" relation with fields (a field of enum-typed type is restricted to one of the enum's values)
 
 ## Domain Service
 
@@ -487,10 +548,10 @@ Relations:
 - 1..1 "belongs to" relation with a module
 
 
-## Properties - Policy and Invariant
+## Properties - Reaction and Invariant
 
 Properties constrain system behavior.
-A property has a name (anchored in the domain's ubiquitous language), a scope (the entity, domain service, or value type that guarantees the property holds). A property separates what must hold (a predicate for invariant, a reactive rule for policy) from the enforcement mechanism (what happens when an invariant is violated or a policy fires).
+A property has a name (anchored in the domain's ubiquitous language), a scope (the entity, domain service, or value type that guarantees the property holds). A property separates what must hold (a predicate for invariant, a reactive rule for reaction) from the enforcement mechanism (what happens when an invariant is violated or a reaction fires).
 
 ### Invariant
 
@@ -509,17 +570,17 @@ Relations:
 
 A reaction listens to internal events and issues commands in response.
 A reaction is triggered by an internal event, so it listens to one or more internal events.
-It has a name (anchored in the ubiquitous language), a trigger (one or more event references), a guard (a condition that must hold for the policy to fire), and an effect (a command reference)
+It has a name (anchored in the ubiquitous language), a trigger (one or more event references), a guard (a condition that must hold for the reaction to fire), and an effect (a command reference)
 
 Relations:
 - 1..n "triggered by" relation with internal events (or error events)
-- 1..1 "effects" relation with command (the command issued when the policy fires)
+- 1..1 "effects" relation with command (the command issued when the reaction fires)
 
 #### Differentiators with other property types
 
-- From invariant: an invariant is a predicate over state, checked synchronously within one aggregate. A policy is a reactive rule, triggered asynchronously across aggregates.
-- From precondition: a precondition gates the operation it belongs to. A policy reacts to the outcome of an operation it doesn't own.
-- From agreement: an agreement is a cross-aggregate predicate maintained by a reconciliation mechanism. A policy is a standalone reactive rule — it may participate in a reconciliation, but it has independent domain meaning.
+- From invariant: an invariant is a predicate over state, checked synchronously within one aggregate. A reaction is a reactive rule, triggered asynchronously across aggregates.
+- From precondition: a precondition gates the operation it belongs to. A reaction reacts to the outcome of an operation it doesn't own.
+- From agreement: an agreement is a cross-aggregate predicate maintained by a reconciliation mechanism. A reaction is a standalone reactive rule — it may participate in a reconciliation, but it has independent domain meaning.
 
 ### Agreement and Reconciliation
 
@@ -548,7 +609,7 @@ detection: how the violation is discovered. Either by evaluating the agreement's
 compensation: one or more commands issued to restore the agreement when a violation is detected. Compensation may target any participant. If compensation itself can fail, the reconciliation must define a fallback or escalation (e.g. alert, manual intervention, retry with backoff).
 
 A reconciliation may be choreographed (each participant reacts to events from the others in a chain, with no central coordinator) or orchestrated (a dedicated process — often called a saga — coordinates the sequence of commands and compensations across participants). The choice between choreography and orchestration is a design decision driven by the number of participants and the complexity of the compensation logic: bilateral agreements often work well with choreography; multilateral agreements typically need orchestration.
-A reconciliation that is triggered by events and uses choreography is structurally close to a set of cooperating policies. The distinction is intent: policies express independent reactive domain rules; a reconciliation is a coordinated mechanism serving a single agreement. When documenting the model, if several policies exist solely to maintain one cross-aggregate truth, consider naming the agreement and reconciliation explicitly rather than leaving the coordination implicit in scattered policy definitions.
+A reconciliation that is triggered by events and uses choreography is structurally close to a set of cooperating reactions. The distinction is intent: reactions express independent reactive domain rules; a reconciliation is a coordinated mechanism serving a single agreement. When documenting the model, if several reactions exist solely to maintain one cross-aggregate truth, consider naming the agreement and reconciliation explicitly rather than leaving the coordination implicit in scattered reaction definitions.
 Reconciliation has relations with:
 
 1..1 "maintains" relation with an agreement
@@ -599,7 +660,7 @@ The table below maps each domain model concept to the typical satisfaction roles
 | Entity, Aggregate, Value Type, field | `structured-by` | Entity `Order` satisfies REQ-ORD-002 (order structure) |
 | Invariant, Precondition | `enforced-by` | Invariant `positiveQuantity` satisfies REQ-ORD-001 |
 | Operation, Command, Event, Domain Service | `implemented-by` | Command `PlaceOrder` satisfies REQ-ORD-002 |
-| Policy (compensating) | `enforced-by` or `detected-by` | Policy `notifyOnStockout` satisfies REQ-ORD-004 |
+| Reaction (compensating) | `enforced-by` or `detected-by` | Reaction `notifyOnStockout` satisfies REQ-ORD-004 |
 | Error Event | `detected-by` | Error event `OrderRejected` satisfies REQ-ORD-004 |
 | Agreement, Reconciliation, Escalation Chain | `reconciled-by` | Agreement `CustomerCreditAgreement` satisfies REQ-ORD-005 |
 | Infrastructure Service | `quality-constrained-by` or `satisfied-by-infrastructure` | Infra service `PaymentGateway` satisfies REQ-NFR-001 |
@@ -614,44 +675,6 @@ Traceability is bidirectional:
 A domain element with an empty `satisfies` list when requirements are available is an **orphan** — it exists but no requirement justifies it. An orphan is either over-engineering or a signal that a requirement is missing.
 
 A requirement whose identifier appears in no domain element's `satisfies` list is **unsatisfied** — a gap in the domain model.
-
-### Concrete syntax
-
-In `.domain` files, the `requirements-source` appears at the bounded context or organization level, and the `satisfies` attribute appears as a list after each element declaration:
-
-```
-context OrderContext {
-  requirements-source "specs/order-requirements.sysreq"
-
-  entity Order {
-    satisfies [REQ-ORD-002, REQ-ORD-007]
-    ...
-  }
-
-  invariant positiveQuantity {
-    satisfies [REQ-ORD-001]
-    ...
-  }
-
-  command PlaceOrder {
-    satisfies [REQ-ORD-002]
-    ...
-  }
-}
-```
-
-The `requirements-source` path is relative to the `.domain` file's location. Multiple `requirements-source` declarations are allowed when requirements span several files.
-
-### Agent instruction summary
-
-When building or updating a domain model:
-
-1. **Check if system requirements are provided.** Look for a `.sysreq` file, a requirements section, or any input containing EARS statements with identifiers.
-2. **If requirements come from a file**: add a `requirements-source` declaration at the bounded context or organization level with the relative path to that file. This is mandatory — it is the provenance link that makes `satisfies` identifiers resolvable.
-3. **If requirements exist**: for every domain model element you create or modify, determine which requirement(s) it realizes and populate the `satisfies` list with the corresponding identifier(s). Do not leave `satisfies` empty unless the element genuinely satisfies no requirement — and in that case, question whether the element should exist.
-4. **If no requirements exist**: leave `satisfies` empty and omit `requirements-source`. Do not invent requirement identifiers.
-5. **After building the model**: verify coverage — every `must` and `should` requirement should appear in at least one element's `satisfies` list. Flag any unsatisfied requirement as a gap.
-
 
 ## Software System's Interface
 

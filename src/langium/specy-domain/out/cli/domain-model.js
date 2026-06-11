@@ -225,7 +225,7 @@ function walkBody(items) {
     const references = [];
     const operations = [];
     const invariants = [];
-    const policies = [];
+    const reactions = [];
     const stateMachines = [];
     const transitions = [];
     const interfaces = [];
@@ -264,9 +264,9 @@ function walkBody(items) {
         else if (ast.isInlineInvariant(item)) {
             invariants.push(cleanNode(item));
         }
-        else if (ast.isPoliciesBlock(item)) {
-            for (const p of item.policies)
-                policies.push(cleanNode(p));
+        else if (ast.isReactionsBlock(item)) {
+            for (const p of item.reactions)
+                reactions.push(cleanNode(p));
         }
         else if (ast.isStatesBlock(item)) {
             for (const m of item.machines)
@@ -311,8 +311,8 @@ function walkBody(items) {
         b.operations = operations;
     if (invariants.length)
         b.invariants = invariants;
-    if (policies.length)
-        b.policies = policies;
+    if (reactions.length)
+        b.reactions = reactions;
     if (stateMachines.length)
         b.stateMachines = stateMachines;
     if (transitions.length)
@@ -358,8 +358,6 @@ const KIND_BY_TYPE = {
     ApplicationServiceDef: { kind: 'application-service', group: 'services' },
     InfrastructureServiceDef: { kind: 'infrastructure-service', group: 'services' },
     ServiceDef: { kind: 'service', group: 'services' },
-    PolicyDef: { kind: 'policy', group: 'policies' },
-    ScopedPolicyDef: { kind: 'policy', group: 'policies' },
     ReactionDef: { kind: 'reaction', group: 'reactions' },
     InvariantDef: { kind: 'invariant', group: 'invariants' },
     AgreementDef: { kind: 'agreement', group: 'agreements' },
@@ -374,7 +372,7 @@ function normalizeDefinition(def) {
         description: descOf(d.description),
         metadata: metaOf(d.metadata),
     };
-    // satisfies as a direct property (enum/policy/external-event/invariant/...)
+    // satisfies as a direct property (enum/reaction/external-event/invariant/...)
     if (d.satisfies && ast.isSatisfiesDecl(d.satisfies)) {
         base.satisfies = d.satisfies.ids;
     }
@@ -401,11 +399,6 @@ function normalizeDefinition(def) {
                 base.contains = [nameOf(it.first), ...it.more.map(nameOf)];
         }
     }
-    else if (ast.isPolicyDef(def)) {
-        base.triggers = def.triggers.map(nameOf);
-        base.effect = nameOf(def.effect);
-        base.guard = def.guard ? cleanValue(def.guard) : undefined;
-    }
     else if (ast.isExternalEventDef(def)) {
         base.eventKind = 'external';
         base.from = nameOf(def.from);
@@ -426,16 +419,27 @@ function normalizeDefinition(def) {
     else if (ast.isReactionDef(def)) {
         const triggers = [];
         const effects = [];
+        let guard;
         for (const it of def.items) {
             if (ast.isTriggeredByClause(it))
                 triggers.push(nameOf(it.event));
+            else if (ast.isTriggerClause(it))
+                triggers.push(nameOf(it.event), ...it.more.map(nameOf));
             else if (ast.isEffectsClause(it))
                 effects.push(nameOf(it.command));
+            else if (ast.isEffectClause(it))
+                effects.push(nameOf(it.command));
+            else if (ast.isGuardClause(it))
+                guard = cleanValue(it.expr);
         }
+        if (def.guard)
+            guard = cleanValue(def.guard);
         if (triggers.length)
             base.triggers = triggers;
         if (effects.length)
             base.effects = effects;
+        if (guard !== undefined)
+            base.guard = guard;
         delete base.other;
     }
     return { group: spec.group, construct: compact(base) };

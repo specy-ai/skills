@@ -59,7 +59,7 @@ SYSTEM-REQ-METAMODEL.md
   EARS Requirement → Satisfaction Link
       ↓  satisfied-by
 DOMAIN-METAMODEL.md
-  Entity, Operation, Invariant, Policy, Event
+  Entity, Operation, Invariant, Reaction, Event
       ↓  realized in
   Code
 ```

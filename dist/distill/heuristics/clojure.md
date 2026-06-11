@@ -28,7 +28,7 @@
 | `(when (not ...) (throw ...))` | `precondition name :: "description" { condition } rejects "message"` |
 | `(emit! ...)` / `(publish! ...)` | `emits Event` |
 | `(assoc entity :field value)` | `sets Entity { field = value }` |
-| `defmulti` / `defmethod` dispatching on event type that issues a command in response | `policy Name { trigger EventName, guard { expression }, effect CommandName }` |
+| `defmulti` / `defmethod` dispatching on event type that issues a command in response | `reaction Name { trigger EventName, guard { expression }, effect CommandName }` |
 | `(doseq [item (:items entity)] ...)` / `(run! ... (:items entity))` | `foreach Entity.items as item { ... }` |
 | `(mapv #(assoc-in % [:related :field] value) (:items entity))` | `foreach Entity.items as item { sets RelatedType { field = value } }` |
 | `(assoc other-entity :field value)` where other-entity ≠ primary aggregate | `sets OtherEntity { field = value }` (cross-aggregate, add `::`) |

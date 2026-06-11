@@ -92,7 +92,7 @@ definition       = enumDef
                  | domainServiceDef
                  | applicationServiceDef
                  | infrastructureServiceDef
-                 | policyDef
+                 | reactionDef
                  | invariantDef
                  | agreementDef ;
 
@@ -227,7 +227,7 @@ internalOp         = identifier , "(" , [ paramList ] , ")" , [ ":" , fieldType 
 operationClause  = preconditionClause
                  | postconditionClause
                  | resolvesClause
-                 | policyCallClause
+                 | reactionCallClause
                  | createsClause
                  | setsClause
                  | emitsClause
@@ -256,7 +256,7 @@ postconditionExpr   = expression ;
 
 resolvesClause   = "resolves" , typeName , "from" , dotPath ;
 
-policyCallClause = "policy" , identifier , "(" , [ argList ] , ")" ;
+reactionCallClause = "reaction" , identifier , "(" , [ argList ] , ")" ;
 
 createsClause    = "creates" , typeName , "{" , { assignmentClause } , "}" ;
 
@@ -270,7 +270,7 @@ serviceCallClause = dotPath , "(" , [ argList ] , ")" , [ description ] ;
 
 foreachClause    = "foreach" , dotPath , "as" , identifier , "{"
                  , { resolvesClause | setsClause | emitsClause
-                   | serviceCallClause | policyCallClause }
+                   | serviceCallClause | reactionCallClause }
                  , "}" ;
 
 // -----------------------------------------------------------------------------
@@ -387,17 +387,17 @@ infrastructureServiceDef = "infrastructure" , "service" , typeName , [ descripti
                          , "}" ;
 
 // -----------------------------------------------------------------------------
-// Policy — reactive rule triggered by an internal event
+// Reaction — reactive rule triggered by an internal event
 // -----------------------------------------------------------------------------
 
-policyDef        = "policy" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
+reactionDef        = "reaction" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
                  ,   "trigger" , typeName , { "," , typeName }
                  , [ "guard" , "{" , expression , "}" ]
                  ,   "effect" , typeName
                  , "}" ;
 
-// Scoped policy inside an entity/aggregate policies { } block
-scopedPolicyDef  = identifier , [ description ] , [ metadataBlock ] , "{"
+// Scoped reaction inside an entity/aggregate reactions { } block
+scopedReactionDef  = identifier , [ description ] , [ metadataBlock ] , "{"
                  ,   "trigger" , typeName , { "," , typeName }
                  , [ "guard" , "{" , expression , "}" ]
                  ,   "effect" , typeName
@@ -581,7 +581,7 @@ unaryExpr        = ifExpr
                  | "(" , expression , ")" ;
 
 // if — logical implication (if A then B ≡ not A or B)
-// Used in policies/invariants for conditional validation.
+// Used in reactions/invariants for conditional validation.
 ifExpr           = "if" , expression , "{" , expression , "}" ;
 
 // every — universal quantifier over a collection

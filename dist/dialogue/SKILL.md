@@ -33,7 +33,7 @@ At the start of the conversation:
    - `context Name (shortname) {` declarations
    - `module Name {` declarations
    - `map { }` context map relations
-   - Block opening lines: `entity Name {`, `aggregate Name {`, `value Name {`, `enum Name {`, `command Name {`, `query Name {`, `event Name {`, `external event Name {`, `error event Name {`, `temporal event Name {`, `domain service Name {`, `application service Name {`, `infrastructure service Name {`, `interface Name {`, `policy Name {`, `invariant Name {`, `agreement Name {`
+   - Block opening lines: `entity Name {`, `aggregate Name {`, `value Name {`, `enum Name {`, `command Name {`, `query Name {`, `event Name {`, `external event Name {`, `error event Name {`, `temporal event Name {`, `domain service Name {`, `application service Name {`, `infrastructure service Name {`, `interface Name {`, `reaction Name {`, `invariant Name {`, `agreement Name {`
    - Operation labels inside entities: `"Label" on CommandType`, `"Label" when EventType then CommandType`
    - `// UNCLEAR` and `// NOTE` markers
    - Skip field lists, clause bodies, and expression contents.
@@ -46,7 +46,7 @@ At the start of the conversation:
    ### {context name} ({shortname})
    {1-sentence summary of what this context handles}
    {count} operations: {operation labels listed in natural language}
-   {count} rules ({count} preconditions, {count} policies, {count} invariants, {count} agreements) · {count} UNCLEAR · {count} NOTE
+   {count} rules ({count} preconditions, {count} reactions, {count} invariants, {count} agreements) · {count} UNCLEAR · {count} NOTE
    Context map: {upstream/downstream/symmetric relations}
 
    {repeat for each bounded context}
@@ -99,7 +99,7 @@ Organization ── Context ──┬── Module ──┬── Entity/Aggreg
 | **Context** | → Module | Module decomposition and interfaces |
 | | → Context Map | Upstream/downstream/symmetric relations |
 | | → Entity/Aggregate | Behaviors grouped around this entity |
-| | → Rules | Preconditions, policies, invariants, and agreements |
+| | → Rules | Preconditions, reactions, invariants, and agreements |
 | | → Cross-context | Dependencies with other contexts |
 | **Entity/Aggregate** | → Operation | Detail of a specific behavior |
 | | → State Machine | Named lifecycle with states and transitions |
@@ -151,7 +151,7 @@ Run these 4 tests **in sequence** on every turn before responding.
 - **In the model** → assert it. At breadth, everything is implicitly [IN MODEL]. At detail, lead with **[IN MODEL]**.
 - **Not in the model** → say so with **[OUT OF MODEL]**. Explain what the model *does* cover nearby. Never fill gaps with assumptions.
 - **Touches a `// UNCLEAR` or `// NOTE` marker** → surface it with **[UNCERTAIN]** and quote the marker text. This label is reserved for annotated zones only. Model inconsistencies (e.g. a command field with no `sets`) are [OUT OF MODEL], not [UNCERTAIN].
-- **Invariant vs policy vs precondition** → distinguish them. Invariants are safety properties that must always hold (with enforcement: rejection, compensation, or alert). Policies are reactive rules (trigger → guard → effect). Preconditions are named guards on specific operations. Never present one as another.
+- **Invariant vs reaction vs precondition** → distinguish them. Invariants are safety properties that must always hold (with enforcement: rejection, compensation, or alert). Reactions are reactive rules (trigger → guard → effect). Preconditions are named guards on specific operations. Never present one as another.
 - **Agreements vs invariants** → agreements span multiple aggregates and cannot be verified atomically. They have reconciliation mechanisms. Invariants are within a single entity/aggregate boundary.
 - **No implementation assumptions** → the models describe *what*, not *how*. No databases, APIs, frameworks.
 
@@ -164,7 +164,7 @@ End every response with **2-3 specific offers**. Choose by priority:
 1. **UNCLEAR zones** in scope — the dialogue has most value where the model is uncertain
 2. **State machine** — if the entity has a `states { machine ... }` block, offer to trace the lifecycle
 3. **Cross-context dependency** — if the answer crossed or approached a context boundary (context map, external events)
-4. **Related operation** — cascade effects (policy triggers), adjacent behaviors
+4. **Related operation** — cascade effects (reaction triggers), adjacent behaviors
 5. **Agreements** — if multiple aggregates are involved, offer to explore consistency guarantees
 6. **Temporal events** — if time-dependent behavior exists nearby
 7. **Structure** — fields and types, offered last (available on demand, rarely the most interesting)
@@ -204,7 +204,7 @@ When Test 2 detects an audit request ("What's missing?"), run this checklist. **
 | Check | What to look for |
 |---|---|
 | Commands without operation | Commands defined but no entity operation declares `on` this command |
-| Events without consumer | Events emitted but no event-triggered operation and no policy trigger references them |
+| Events without consumer | Events emitted but no event-triggered operation and no reaction trigger references them |
 | Entities without operation | Entities that appear in no `resolves`, `creates`, or `sets` clause |
 | Operations without precondition | Operations that have no failure path (no `precondition` clause) |
 | Operations without `emits` | Operations that produce no event |
@@ -213,7 +213,7 @@ When Test 2 detects an audit request ("What's missing?"), run this checklist. **
 | State machine anomalies | Dead states (no transition in), trap states (no transition out), missing final states, orphan transitions |
 | State-scoped invariants missing | States that should have specific invariants but don't |
 | Invariants without enforcement | File-level invariants missing `enforcement` strategy (rejection/compensation/alert) |
-| Policies without guard | Reactive policies missing a `guard` condition |
+| Reactions without guard | Reactions missing a `guard` condition |
 | Agreements without reconciliation | Agreements declared but no reconciliation mechanism defined |
 | Reconciliation without escalation | Reconciliation that has no escalation chain for failure cases |
 | Queries without return type | Queries missing `returns` declaration |
@@ -303,7 +303,7 @@ The following shows how the 4 tests produce different responses to a sequence of
 >
 > **Analysis:** Today, cancellation is restricted to draft and confirmed orders. Extending to shipped raises three questions: stock was already dispatched (the operation calls `StockService.restock`), a refund would need sequencing with the payment operation, and [OUT OF MODEL] no return flow exists for shipped goods. The `OrderLifecycle` state machine has no `shipped → cancelled` transition.
 >
-> Additionally, if a `LateDeliveryAlert` policy triggers on `DeliveryOverdue` events for shipped orders, cancellation could conflict with that reactive flow.
+> Additionally, if a `LateDeliveryAlert` reaction triggers on `DeliveryOverdue` events for shipped orders, cancellation could conflict with that reactive flow.
 >
 > **To go further:** Use the `spec` skill to formalize this change and see its full impact.
 
@@ -788,7 +788,7 @@ name(params) : ReturnType :: "description" {
 | `emits` | `emits TypeName { field = value }` | Event emission with explicit field assignments. |
 | service call | `Service.op(args) :: "description"` | Direct call. Replaces v1 `delegates`. |
 | `foreach` | `foreach dotPath as id { clauses }` | Iteration over a collection. |
-| policy call | `policy identifier(args)` | References a named policy (precondition). |
+| reaction call | `reaction identifier(args)` | References a named reaction (precondition). |
 
 #### Resolution patterns
 
@@ -833,14 +833,14 @@ resolves Payment from Order
 
 ---
 
-### Policy (reactive rule)
+### Reaction (reactive rule)
 
-A `policy` is a reactive rule: it listens to events and issues commands in response. This is NOT a precondition (preconditions are clauses on operations).
+A `reaction` is a reactive rule: it listens to events and issues commands in response. This is NOT a precondition (preconditions are clauses on operations).
 
 #### Skeleton
 
 ```
-policy Name :: "description" {
+reaction Name :: "description" {
     trigger EventType
     guard { expression }
     effect CommandType
@@ -851,15 +851,15 @@ policy Name :: "description" {
 
 | Rule | Detail |
 |------|--------|
-| Trigger | One or more event types that activate the policy. |
-| Guard | Optional condition — policy fires only when guard is true. |
-| Effect | The command to issue when the policy fires. |
-| Distinction | Policies react to events. Preconditions guard operations. Invariants assert properties. |
+| Trigger | One or more event types that activate the reaction. |
+| Guard | Optional condition — reaction fires only when guard is true. |
+| Effect | The command to issue when the reaction fires. |
+| Distinction | Reactions react to events. Preconditions guard operations. Invariants assert properties. |
 
 #### Example
 
 ```
-policy LateDeliveryAlert :: "Alert when delivery is overdue" {
+reaction LateDeliveryAlert :: "Alert when delivery is overdue" {
     trigger DeliveryOverdue
     guard { Order.status = shipped }
     effect NotifyLateDelivery

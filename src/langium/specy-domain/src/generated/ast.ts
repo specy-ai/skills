@@ -171,8 +171,6 @@ export type SpecyDomainKeywordNames =
     | "past"
     | "pastOrPresent"
     | "pattern"
-    | "policies"
-    | "policy"
     | "postcondition"
     | "prd-source"
     | "precondition"
@@ -181,6 +179,7 @@ export type SpecyDomainKeywordNames =
     | "query-based"
     | "range"
     | "reaction"
+    | "reactions"
     | "reconciliation"
     | "reference"
     | "references"
@@ -241,7 +240,7 @@ export type SpecyDomainKeywordNames =
 
 export type SpecyDomainTokenNames = SpecyDomainTerminalNames | SpecyDomainKeywordNames;
 
-export type AggregateBodyItem = AggregateContainsDecl | AggregateEntitiesDecl | AggregateRootDecl | Description | DuplicateDetection | FieldDecl | FieldsBlock | IdentityDecl | InvariantsBlock | OperationsBlock | PoliciesBlock | ReferencesBlock | SatisfiesDecl | StatesBlock | TransitionsBlock;
+export type AggregateBodyItem = AggregateContainsDecl | AggregateEntitiesDecl | AggregateRootDecl | Description | DuplicateDetection | FieldDecl | FieldsBlock | IdentityDecl | InvariantsBlock | OperationsBlock | ReactionsBlock | ReferencesBlock | SatisfiesDecl | StatesBlock | TransitionsBlock;
 
 export const AggregateBodyItem = 'AggregateBodyItem';
 
@@ -283,7 +282,7 @@ export function isCoordinationStyle(item: unknown): item is CoordinationStyle {
     return item === 'choreography' || item === 'orchestration';
 }
 
-export type Definition = AggregateDef | AgreementDef | ApplicationServiceDef | CommandDef | DomainServiceDef | EntityDef | EnumDef | ErrorEventDef | EventDef | ExternalEventDef | InfrastructureServiceDef | InvariantDef | PolicyDef | QueryDef | ReactionDef | ScopedPolicyDef | ServiceDef | StatemachineDef | TemporalEventDef | ValueDef;
+export type Definition = AggregateDef | AgreementDef | ApplicationServiceDef | CommandDef | DomainServiceDef | EntityDef | EnumDef | ErrorEventDef | EventDef | ExternalEventDef | InfrastructureServiceDef | InvariantDef | QueryDef | ReactionDef | ServiceDef | StatemachineDef | TemporalEventDef | ValueDef;
 
 export const Definition = 'Definition';
 
@@ -315,7 +314,7 @@ export function isEnforcementValue(item: unknown): item is EnforcementValue {
     return item === 'reject' || item === 'warn' || item === 'rejection' || item === 'compensation' || item === 'alert';
 }
 
-export type EntityBodyItem = Description | DuplicateDetection | FieldDecl | FieldsBlock | IdentityDecl | InlineInvariant | InvariantsBlock | NamedOperationDef | OperationsBlock | PoliciesBlock | ReferencesBlock | SatisfiesDecl | StatesBlock | TransitionsBlock;
+export type EntityBodyItem = Description | DuplicateDetection | FieldDecl | FieldsBlock | IdentityDecl | InlineInvariant | InvariantsBlock | NamedOperationDef | OperationsBlock | ReactionsBlock | ReferencesBlock | SatisfiesDecl | StatesBlock | TransitionsBlock;
 
 export const EntityBodyItem = 'EntityBodyItem';
 
@@ -365,10 +364,10 @@ export function isIdent(item: unknown): item is Ident {
     return isKeywordAsIdent(item) || (typeof item === 'string' && (/[a-zA-Z_][a-zA-Z0-9_]*/.test(item)));
 }
 
-export type KeywordAsIdent = 'accepts' | 'action' | 'active' | 'aggregate' | 'agreement' | 'alert' | 'and' | 'append' | 'application' | 'as' | 'boolean' | 'cancelled' | 'command' | 'compensate' | 'compensation' | 'condition' | 'contains' | 'context' | 'coordination' | 'count' | 'creates' | 'date' | 'datetime' | 'days' | 'decimal' | 'default' | 'depends' | 'detection' | 'domain' | 'downstream' | 'duration' | 'effect' | 'emits' | 'enforcement' | 'entities' | 'entity' | 'enum' | 'error' | 'escalation' | 'event' | 'every' | 'exists' | 'exposes' | 'external' | 'false' | 'field' | 'fields' | 'final' | 'forall' | 'foreach' | 'from' | 'future' | 'futureOrPresent' | 'guard' | 'hours' | 'id' | 'identifier' | 'if' | 'immutable' | 'in' | 'infrastructure' | 'instant' | 'int' | 'integer' | 'interface' | 'internal' | 'invariant' | 'is' | 'isEmpty' | 'isNotEmpty' | 'list' | 'long' | 'machine' | 'manual' | 'map' | 'max' | 'maxLength' | 'message' | 'min' | 'minLength' | 'minutes' | 'module' | 'months' | 'must' | 'name' | 'no' | 'not' | 'now' | 'number' | 'offset' | 'on' | 'operation' | 'optional' | 'or' | 'ordered' | 'organization' | 'participants' | 'past' | 'pastOrPresent' | 'pattern' | 'policy' | 'postcondition' | 'precondition' | 'predicate' | 'query' | 'range' | 'reaction' | 'reconciliation' | 'reference' | 'reject' | 'required' | 'resolves' | 'retry' | 'returns' | 'root' | 'satisfies' | 'schedule' | 'searching' | 'seconds' | 'service' | 'set' | 'sets' | 'shortname' | 'size' | 'some' | 'start' | 'state' | 'statemachine' | 'status' | 'step' | 'string' | 'sum' | 'suspend' | 'symmetric' | 'temporal' | 'then' | 'time' | 'today' | 'transition' | 'trigger' | 'true' | 'type' | 'unique' | 'upstream' | 'uses' | 'uuid' | 'value' | 'violation' | 'void' | 'warn' | 'weeks' | 'when' | 'where' | 'years';
+export type KeywordAsIdent = 'accepts' | 'action' | 'active' | 'aggregate' | 'agreement' | 'alert' | 'and' | 'append' | 'application' | 'as' | 'boolean' | 'cancelled' | 'command' | 'compensate' | 'compensation' | 'condition' | 'contains' | 'context' | 'coordination' | 'count' | 'creates' | 'date' | 'datetime' | 'days' | 'decimal' | 'default' | 'depends' | 'detection' | 'domain' | 'downstream' | 'duration' | 'effect' | 'emits' | 'enforcement' | 'entities' | 'entity' | 'enum' | 'error' | 'escalation' | 'event' | 'every' | 'exists' | 'exposes' | 'external' | 'false' | 'field' | 'fields' | 'final' | 'forall' | 'foreach' | 'from' | 'future' | 'futureOrPresent' | 'guard' | 'hours' | 'id' | 'identifier' | 'if' | 'immutable' | 'in' | 'infrastructure' | 'instant' | 'int' | 'integer' | 'interface' | 'internal' | 'invariant' | 'is' | 'isEmpty' | 'isNotEmpty' | 'list' | 'long' | 'machine' | 'manual' | 'map' | 'max' | 'maxLength' | 'message' | 'min' | 'minLength' | 'minutes' | 'module' | 'months' | 'must' | 'name' | 'no' | 'not' | 'now' | 'number' | 'offset' | 'on' | 'operation' | 'optional' | 'or' | 'ordered' | 'organization' | 'participants' | 'past' | 'pastOrPresent' | 'pattern' | 'postcondition' | 'precondition' | 'predicate' | 'query' | 'range' | 'reaction' | 'reconciliation' | 'reference' | 'reject' | 'required' | 'resolves' | 'retry' | 'returns' | 'root' | 'satisfies' | 'schedule' | 'searching' | 'seconds' | 'service' | 'set' | 'sets' | 'shortname' | 'size' | 'some' | 'start' | 'state' | 'statemachine' | 'status' | 'step' | 'string' | 'sum' | 'suspend' | 'symmetric' | 'temporal' | 'then' | 'time' | 'today' | 'transition' | 'trigger' | 'true' | 'type' | 'unique' | 'upstream' | 'uses' | 'uuid' | 'value' | 'violation' | 'void' | 'warn' | 'weeks' | 'when' | 'where' | 'years';
 
 export function isKeywordAsIdent(item: unknown): item is KeywordAsIdent {
-    return item === 'required' || item === 'optional' || item === 'value' || item === 'type' || item === 'status' || item === 'id' || item === 'message' || item === 'name' || item === 'identifier' || item === 'trigger' || item === 'effect' || item === 'start' || item === 'action' || item === 'state' || item === 'event' || item === 'command' || item === 'query' || item === 'schedule' || item === 'reference' || item === 'offset' || item === 'instant' || item === 'guard' || item === 'from' || item === 'on' || item === 'when' || item === 'then' || item === 'as' || item === 'root' || item === 'final' || item === 'fields' || item === 'entities' || item === 'contains' || item === 'exposes' || item === 'accepts' || item === 'returns' || item === 'emits' || item === 'creates' || item === 'sets' || item === 'resolves' || item === 'policy' || item === 'precondition' || item === 'postcondition' || item === 'foreach' || item === 'invariant' || item === 'agreement' || item === 'predicate' || item === 'participants' || item === 'reconciliation' || item === 'detection' || item === 'compensation' || item === 'coordination' || item === 'escalation' || item === 'step' || item === 'condition' || item === 'must' || item === 'enforcement' || item === 'violation' || item === 'module' || item === 'context' || item === 'organization' || item === 'interface' || item === 'entity' || item === 'aggregate' || item === 'service' || item === 'enum' || item === 'statemachine' || item === 'transition' || item === 'machine' || item === 'reaction' || item === 'operation' || item === 'satisfies' || item === 'depends' || item === 'uses' || item === 'map' || item === 'upstream' || item === 'downstream' || item === 'symmetric' || item === 'external' || item === 'error' || item === 'temporal' || item === 'domain' || item === 'application' || item === 'infrastructure' || item === 'internal' || item === 'not' || item === 'and' || item === 'or' || item === 'in' || item === 'is' || item === 'if' || item === 'every' || item === 'no' || item === 'field' || item === 'count' || item === 'sum' || item === 'now' || item === 'today' || item === 'size' || item === 'isEmpty' || item === 'isNotEmpty' || item === 'append' || item === 'true' || item === 'false' || item === 'reject' || item === 'warn' || item === 'alert' || item === 'suspend' || item === 'manual' || item === 'retry' || item === 'compensate' || item === 'shortname' || item === 'void' || item === 'string' || item === 'int' || item === 'integer' || item === 'long' || item === 'decimal' || item === 'boolean' || item === 'date' || item === 'datetime' || item === 'time' || item === 'duration' || item === 'uuid' || item === 'list' || item === 'set' || item === 'unique' || item === 'immutable' || item === 'ordered' || item === 'default' || item === 'min' || item === 'max' || item === 'range' || item === 'minLength' || item === 'maxLength' || item === 'pattern' || item === 'past' || item === 'future' || item === 'pastOrPresent' || item === 'futureOrPresent' || item === 'months' || item === 'days' || item === 'years' || item === 'hours' || item === 'minutes' || item === 'seconds' || item === 'weeks' || item === 'some' || item === 'forall' || item === 'exists' || item === 'where' || item === 'number' || item === 'active' || item === 'searching' || item === 'cancelled';
+    return item === 'required' || item === 'optional' || item === 'value' || item === 'type' || item === 'status' || item === 'id' || item === 'message' || item === 'name' || item === 'identifier' || item === 'trigger' || item === 'effect' || item === 'start' || item === 'action' || item === 'state' || item === 'event' || item === 'command' || item === 'query' || item === 'schedule' || item === 'reference' || item === 'offset' || item === 'instant' || item === 'guard' || item === 'from' || item === 'on' || item === 'when' || item === 'then' || item === 'as' || item === 'root' || item === 'final' || item === 'fields' || item === 'entities' || item === 'contains' || item === 'exposes' || item === 'accepts' || item === 'returns' || item === 'emits' || item === 'creates' || item === 'sets' || item === 'resolves' || item === 'precondition' || item === 'postcondition' || item === 'foreach' || item === 'invariant' || item === 'agreement' || item === 'predicate' || item === 'participants' || item === 'reconciliation' || item === 'detection' || item === 'compensation' || item === 'coordination' || item === 'escalation' || item === 'step' || item === 'condition' || item === 'must' || item === 'enforcement' || item === 'violation' || item === 'module' || item === 'context' || item === 'organization' || item === 'interface' || item === 'entity' || item === 'aggregate' || item === 'service' || item === 'enum' || item === 'statemachine' || item === 'transition' || item === 'machine' || item === 'reaction' || item === 'operation' || item === 'satisfies' || item === 'depends' || item === 'uses' || item === 'map' || item === 'upstream' || item === 'downstream' || item === 'symmetric' || item === 'external' || item === 'error' || item === 'temporal' || item === 'domain' || item === 'application' || item === 'infrastructure' || item === 'internal' || item === 'not' || item === 'and' || item === 'or' || item === 'in' || item === 'is' || item === 'if' || item === 'every' || item === 'no' || item === 'field' || item === 'count' || item === 'sum' || item === 'now' || item === 'today' || item === 'size' || item === 'isEmpty' || item === 'isNotEmpty' || item === 'append' || item === 'true' || item === 'false' || item === 'reject' || item === 'warn' || item === 'alert' || item === 'suspend' || item === 'manual' || item === 'retry' || item === 'compensate' || item === 'shortname' || item === 'void' || item === 'string' || item === 'int' || item === 'integer' || item === 'long' || item === 'decimal' || item === 'boolean' || item === 'date' || item === 'datetime' || item === 'time' || item === 'duration' || item === 'uuid' || item === 'list' || item === 'set' || item === 'unique' || item === 'immutable' || item === 'ordered' || item === 'default' || item === 'min' || item === 'max' || item === 'range' || item === 'minLength' || item === 'maxLength' || item === 'pattern' || item === 'past' || item === 'future' || item === 'pastOrPresent' || item === 'futureOrPresent' || item === 'months' || item === 'days' || item === 'years' || item === 'hours' || item === 'minutes' || item === 'seconds' || item === 'weeks' || item === 'some' || item === 'forall' || item === 'exists' || item === 'where' || item === 'number' || item === 'active' || item === 'searching' || item === 'cancelled';
 }
 
 export type LiteralValue = BooleanLiteral | NumberLiteral | StringLiteral;
@@ -387,7 +386,7 @@ export function isNamedOpItem(item: unknown): item is NamedOpItem {
     return reflection.isInstance(item, NamedOpItem);
 }
 
-export type OperationClause = CreatesClause | EmitsClause | ForeachClause | PolicyCallClause | PostconditionClause | PreconditionClause | ResolvesClause | ReturnsClause | ScopedPolicyDef | ServiceCallClause | SetsClause;
+export type OperationClause = CreatesClause | EmitsClause | ForeachClause | PostconditionClause | PreconditionClause | ReactionCallClause | ResolvesClause | ReturnsClause | ServiceCallClause | SetsClause;
 
 export const OperationClause = 'OperationClause';
 
@@ -417,7 +416,7 @@ export function isQueryBodyItem(item: unknown): item is QueryBodyItem {
     return reflection.isInstance(item, QueryBodyItem);
 }
 
-export type ReactionItem = Description | EffectsClause | SatisfiesDecl | TriggeredByClause;
+export type ReactionItem = Description | EffectClause | EffectsClause | GuardClause | TriggerClause | TriggeredByClause;
 
 export const ReactionItem = 'ReactionItem';
 
@@ -441,7 +440,7 @@ export function isRecordBodyItem(item: unknown): item is RecordBodyItem {
     return reflection.isInstance(item, RecordBodyItem);
 }
 
-export type ServiceBodyItem = Description | InterfaceDef | InvariantsBlock | NamedOperationDef | OperationsBlock | PoliciesBlock | SatisfiesDecl;
+export type ServiceBodyItem = Description | InterfaceDef | InvariantsBlock | NamedOperationDef | OperationsBlock | ReactionsBlock | SatisfiesDecl;
 
 export const ServiceBodyItem = 'ServiceBodyItem';
 
@@ -635,7 +634,7 @@ export function isApplicationServiceDef(item: unknown): item is ApplicationServi
 }
 
 export interface ArgList extends langium.AstNode {
-    readonly $container: ExprServiceCall | FunctionCallExpr | PolicyCallClause | ServiceCallClause;
+    readonly $container: ExprServiceCall | FunctionCallExpr | ReactionCallClause | ServiceCallClause;
     readonly $type: 'ArgList';
     args: Array<Expression>;
     namedArgs?: NamedArgList;
@@ -686,7 +685,7 @@ export function isAssignmentClause(item: unknown): item is AssignmentClause {
 }
 
 export interface BinaryExpr extends langium.AstNode {
-    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PolicyCallClause | PolicyDef | PostconditionClause | PreconditionClause | PredicateExpr | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | ScopedPolicyDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
+    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | GuardClause | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PostconditionClause | PreconditionClause | PredicateExpr | ReactionCallClause | ReactionDef | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
     readonly $type: 'BinaryExpr';
     left: Expression;
     op: '*' | '+' | '-' | '/' | 'and' | 'or' | CompOp;
@@ -712,7 +711,7 @@ export function isBooleanLiteral(item: unknown): item is BooleanLiteral {
 }
 
 export interface BooleanLiteralExpr extends langium.AstNode {
-    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PolicyCallClause | PolicyDef | PostconditionClause | PreconditionClause | PredicateExpr | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | ScopedPolicyDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
+    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | GuardClause | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PostconditionClause | PreconditionClause | PredicateExpr | ReactionCallClause | ReactionDef | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
     readonly $type: 'BooleanLiteralExpr';
     value: 'false' | 'true';
 }
@@ -817,7 +816,7 @@ export function isConstraint(item: unknown): item is Constraint {
 }
 
 export interface ContainsExpr extends langium.AstNode {
-    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PolicyCallClause | PolicyDef | PostconditionClause | PreconditionClause | PredicateExpr | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | ScopedPolicyDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
+    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | GuardClause | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PostconditionClause | PreconditionClause | PredicateExpr | ReactionCallClause | ReactionDef | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
     readonly $type: 'ContainsExpr';
     left: Expression;
     target: DotPath;
@@ -897,7 +896,7 @@ export function isDependsBlock(item: unknown): item is DependsBlock {
 }
 
 export interface Description extends langium.AstNode {
-    readonly $container: AbsoluteTemporalEvent | AggregateDef | AgreementDef | ApplicationServiceDef | ClassicStateDef | CommandDef | CommandTriggeredOp | ContextDef | DomainServiceDef | EntityDef | EnumDef | ErrorEventDef | EscalationChainDef | EscalationStep | EventDef | EventTriggeredOp | ExternalEventDef | InfrastructureServiceDef | InlineInvariant | InterfaceDef | InternalOp | InvariantDef | ModuleDef | NamedOperationDef | OrganizationDef | PolicyCallClause | PolicyDef | PostconditionClause | PreconditionClause | QueryDef | ReactionDef | ReconciliationDef | RecurringTemporalEvent | RelativeTemporalEvent | ScopedInvariantDef | ScopedPolicyDef | ServiceCallClause | ServiceDef | StateInvariantDef | StateMachineDef | ValueDef | ValueOpDef;
+    readonly $container: AbsoluteTemporalEvent | AggregateDef | AgreementDef | ApplicationServiceDef | ClassicStateDef | CommandDef | CommandTriggeredOp | ContextDef | DomainServiceDef | EntityDef | EnumDef | ErrorEventDef | EscalationChainDef | EscalationStep | EventDef | EventTriggeredOp | ExternalEventDef | InfrastructureServiceDef | InlineInvariant | InterfaceDef | InternalOp | InvariantDef | ModuleDef | NamedOperationDef | OrganizationDef | PostconditionClause | PreconditionClause | QueryDef | ReactionCallClause | ReactionDef | ReconciliationDef | RecurringTemporalEvent | RelativeTemporalEvent | ScopedInvariantDef | ServiceCallClause | ServiceDef | StateInvariantDef | StateMachineDef | ValueDef | ValueOpDef;
     readonly $type: 'Description';
     text: string;
 }
@@ -959,7 +958,7 @@ export function isDotPath(item: unknown): item is DotPath {
 }
 
 export interface DotPathExpr extends langium.AstNode {
-    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ExprServiceCall | ForallPred | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PolicyCallClause | PolicyDef | PostconditionClause | PreconditionClause | PredicateExpr | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | ScopedPolicyDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
+    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ExprServiceCall | ForallPred | GuardClause | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PostconditionClause | PreconditionClause | PredicateExpr | ReactionCallClause | ReactionDef | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
     readonly $type: 'DotPathExpr';
     path: DotPath;
 }
@@ -996,7 +995,7 @@ export function isDuplicateDetection(item: unknown): item is DuplicateDetection 
 }
 
 export interface DurationLiteral extends langium.AstNode {
-    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PolicyCallClause | PolicyDef | PostconditionClause | PreconditionClause | PredicateExpr | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | ScopedPolicyDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
+    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | GuardClause | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PostconditionClause | PreconditionClause | PredicateExpr | ReactionCallClause | ReactionDef | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
     readonly $type: 'DurationLiteral';
     amount: string;
     unit: DurationUnit;
@@ -1006,6 +1005,18 @@ export const DurationLiteral = 'DurationLiteral';
 
 export function isDurationLiteral(item: unknown): item is DurationLiteral {
     return reflection.isInstance(item, DurationLiteral);
+}
+
+export interface EffectClause extends langium.AstNode {
+    readonly $container: ReactionDef;
+    readonly $type: 'EffectClause';
+    command: TypeName;
+}
+
+export const EffectClause = 'EffectClause';
+
+export function isEffectClause(item: unknown): item is EffectClause {
+    return reflection.isInstance(item, EffectClause);
 }
 
 export interface EffectsClause extends langium.AstNode {
@@ -1305,7 +1316,7 @@ export function isEventTypeClassifier(item: unknown): item is EventTypeClassifie
 }
 
 export interface EveryExpr extends langium.AstNode {
-    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PolicyCallClause | PolicyDef | PostconditionClause | PreconditionClause | PredicateExpr | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | ScopedPolicyDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
+    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | GuardClause | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PostconditionClause | PreconditionClause | PredicateExpr | ReactionCallClause | ReactionDef | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
     readonly $type: 'EveryExpr';
     body: Expression;
     collection: DotPath;
@@ -1344,7 +1355,7 @@ export function isExposesClause(item: unknown): item is ExposesClause {
 }
 
 export interface ExprServiceCall extends langium.AstNode {
-    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PolicyCallClause | PolicyDef | PostconditionClause | PreconditionClause | PredicateExpr | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | ScopedPolicyDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
+    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | GuardClause | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PostconditionClause | PreconditionClause | PredicateExpr | ReactionCallClause | ReactionDef | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
     readonly $type: 'ExprServiceCall';
     args?: ArgList;
     path: DotPathExpr;
@@ -1440,7 +1451,7 @@ export function isFinalState(item: unknown): item is FinalState {
 export interface ForeachClause extends langium.AstNode {
     readonly $container: CommandTriggeredOp | EventTriggeredOp | InternalOp;
     readonly $type: 'ForeachClause';
-    body: Array<EmitsClause | PolicyCallClause | ResolvesClause | ServiceCallClause | SetsClause>;
+    body: Array<EmitsClause | ReactionCallClause | ResolvesClause | ServiceCallClause | SetsClause>;
     collection: DotPath;
     variable: Ident;
 }
@@ -1452,7 +1463,7 @@ export function isForeachClause(item: unknown): item is ForeachClause {
 }
 
 export interface FunctionCallExpr extends langium.AstNode {
-    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PolicyCallClause | PolicyDef | PostconditionClause | PreconditionClause | PredicateExpr | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | ScopedPolicyDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
+    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | GuardClause | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PostconditionClause | PreconditionClause | PredicateExpr | ReactionCallClause | ReactionDef | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
     readonly $type: 'FunctionCallExpr';
     args?: ArgList;
     name: FunctionName;
@@ -1462,6 +1473,18 @@ export const FunctionCallExpr = 'FunctionCallExpr';
 
 export function isFunctionCallExpr(item: unknown): item is FunctionCallExpr {
     return reflection.isInstance(item, FunctionCallExpr);
+}
+
+export interface GuardClause extends langium.AstNode {
+    readonly $container: ReactionDef;
+    readonly $type: 'GuardClause';
+    expr: Expression;
+}
+
+export const GuardClause = 'GuardClause';
+
+export function isGuardClause(item: unknown): item is GuardClause {
+    return reflection.isInstance(item, GuardClause);
 }
 
 export interface IdentityDecl extends langium.AstNode {
@@ -1478,7 +1501,7 @@ export function isIdentityDecl(item: unknown): item is IdentityDecl {
 }
 
 export interface IfExpr extends langium.AstNode {
-    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PolicyCallClause | PolicyDef | PostconditionClause | PreconditionClause | PredicateExpr | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | ScopedPolicyDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
+    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | GuardClause | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PostconditionClause | PreconditionClause | PredicateExpr | ReactionCallClause | ReactionDef | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
     readonly $type: 'IfExpr';
     body: Expression;
     condition: Expression;
@@ -1491,7 +1514,7 @@ export function isIfExpr(item: unknown): item is IfExpr {
 }
 
 export interface InExpr extends langium.AstNode {
-    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PolicyCallClause | PolicyDef | PostconditionClause | PreconditionClause | PredicateExpr | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | ScopedPolicyDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
+    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | GuardClause | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PostconditionClause | PreconditionClause | PredicateExpr | ReactionCallClause | ReactionDef | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
     readonly $type: 'InExpr';
     path: DotPath;
     values: ValueList;
@@ -1616,7 +1639,7 @@ export function isInvariantsBlock(item: unknown): item is InvariantsBlock {
 }
 
 export interface IsDefinedExpr extends langium.AstNode {
-    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PolicyCallClause | PolicyDef | PostconditionClause | PreconditionClause | PredicateExpr | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | ScopedPolicyDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
+    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | GuardClause | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PostconditionClause | PreconditionClause | PredicateExpr | ReactionCallClause | ReactionDef | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
     readonly $type: 'IsDefinedExpr';
     path: DotPath;
 }
@@ -1628,7 +1651,7 @@ export function isIsDefinedExpr(item: unknown): item is IsDefinedExpr {
 }
 
 export interface IsNotDefinedExpr extends langium.AstNode {
-    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PolicyCallClause | PolicyDef | PostconditionClause | PreconditionClause | PredicateExpr | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | ScopedPolicyDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
+    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | GuardClause | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PostconditionClause | PreconditionClause | PredicateExpr | ReactionCallClause | ReactionDef | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
     readonly $type: 'IsNotDefinedExpr';
     path: DotPath;
 }
@@ -1640,7 +1663,7 @@ export function isIsNotDefinedExpr(item: unknown): item is IsNotDefinedExpr {
 }
 
 export interface IsNotNullExpr extends langium.AstNode {
-    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PolicyCallClause | PolicyDef | PostconditionClause | PreconditionClause | PredicateExpr | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | ScopedPolicyDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
+    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | GuardClause | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PostconditionClause | PreconditionClause | PredicateExpr | ReactionCallClause | ReactionDef | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
     readonly $type: 'IsNotNullExpr';
     path: DotPath;
 }
@@ -1652,7 +1675,7 @@ export function isIsNotNullExpr(item: unknown): item is IsNotNullExpr {
 }
 
 export interface IsNullExpr extends langium.AstNode {
-    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PolicyCallClause | PolicyDef | PostconditionClause | PreconditionClause | PredicateExpr | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | ScopedPolicyDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
+    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | GuardClause | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PostconditionClause | PreconditionClause | PredicateExpr | ReactionCallClause | ReactionDef | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
     readonly $type: 'IsNullExpr';
     path: DotPath;
 }
@@ -1664,7 +1687,7 @@ export function isIsNullExpr(item: unknown): item is IsNullExpr {
 }
 
 export interface MatchesExpr extends langium.AstNode {
-    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PolicyCallClause | PolicyDef | PostconditionClause | PreconditionClause | PredicateExpr | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | ScopedPolicyDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
+    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | GuardClause | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PostconditionClause | PreconditionClause | PredicateExpr | ReactionCallClause | ReactionDef | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
     readonly $type: 'MatchesExpr';
     left: Expression;
     pattern: MatchPattern;
@@ -1689,7 +1712,7 @@ export function isMatchPattern(item: unknown): item is MatchPattern {
 }
 
 export interface MetadataBlock extends langium.AstNode {
-    readonly $container: AbsoluteTemporalEvent | AggregateDef | AgreementDef | ApplicationServiceDef | ClassicStateDef | CommandDef | CommandTriggeredOp | ContextDef | DomainServiceDef | EntityDef | EnumDef | ErrorEventDef | EscalationChainDef | EscalationStep | EventDef | EventTriggeredOp | ExternalEventDef | InfrastructureServiceDef | InterfaceDef | InternalOp | InvariantDef | ModuleDef | OrganizationDef | PolicyCallClause | PolicyDef | PostconditionClause | PreconditionClause | QueryDef | ReconciliationDef | RecurringTemporalEvent | RelativeTemporalEvent | ScopedInvariantDef | ScopedPolicyDef | ServiceDef | StateInvariantDef | StateMachineDef | ValueDef | ValueOpDef;
+    readonly $container: AbsoluteTemporalEvent | AggregateDef | AgreementDef | ApplicationServiceDef | ClassicStateDef | CommandDef | CommandTriggeredOp | ContextDef | DomainServiceDef | EntityDef | EnumDef | ErrorEventDef | EscalationChainDef | EscalationStep | EventDef | EventTriggeredOp | ExternalEventDef | InfrastructureServiceDef | InterfaceDef | InternalOp | InvariantDef | ModuleDef | OrganizationDef | PostconditionClause | PreconditionClause | QueryDef | ReactionCallClause | ReactionDef | ReconciliationDef | RecurringTemporalEvent | RelativeTemporalEvent | ScopedInvariantDef | ServiceDef | StateInvariantDef | StateMachineDef | ValueDef | ValueOpDef;
     readonly $type: 'MetadataBlock';
     entries: Array<MetadataEntry>;
 }
@@ -1821,7 +1844,7 @@ export function isNamedPrecondition(item: unknown): item is NamedPrecondition {
 }
 
 export interface NoFieldContainsExpr extends langium.AstNode {
-    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PolicyCallClause | PolicyDef | PostconditionClause | PreconditionClause | PredicateExpr | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | ScopedPolicyDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
+    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | GuardClause | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PostconditionClause | PreconditionClause | PredicateExpr | ReactionCallClause | ReactionDef | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
     readonly $type: 'NoFieldContainsExpr';
     target: DotPath;
 }
@@ -1833,7 +1856,7 @@ export function isNoFieldContainsExpr(item: unknown): item is NoFieldContainsExp
 }
 
 export interface NotInExpr extends langium.AstNode {
-    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PolicyCallClause | PolicyDef | PostconditionClause | PreconditionClause | PredicateExpr | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | ScopedPolicyDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
+    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | GuardClause | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PostconditionClause | PreconditionClause | PredicateExpr | ReactionCallClause | ReactionDef | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
     readonly $type: 'NotInExpr';
     path: DotPath;
     values: ValueList;
@@ -1846,7 +1869,7 @@ export function isNotInExpr(item: unknown): item is NotInExpr {
 }
 
 export interface NullLiteralExpr extends langium.AstNode {
-    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PolicyCallClause | PolicyDef | PostconditionClause | PreconditionClause | PredicateExpr | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | ScopedPolicyDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
+    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | GuardClause | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PostconditionClause | PreconditionClause | PredicateExpr | ReactionCallClause | ReactionDef | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
     readonly $type: 'NullLiteralExpr';
     value: 'null';
 }
@@ -1870,7 +1893,7 @@ export function isNumberLiteral(item: unknown): item is NumberLiteral {
 }
 
 export interface NumberLiteralExpr extends langium.AstNode {
-    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PolicyCallClause | PolicyDef | PostconditionClause | PreconditionClause | PredicateExpr | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | ScopedPolicyDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
+    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | GuardClause | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PostconditionClause | PreconditionClause | PredicateExpr | ReactionCallClause | ReactionDef | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
     readonly $type: 'NumberLiteralExpr';
     value: string;
 }
@@ -1949,7 +1972,7 @@ export function isParamDeclOpt(item: unknown): item is ParamDeclOpt {
 }
 
 export interface ParamList extends langium.AstNode {
-    readonly $container: InternalOp | ScopedInvariantDef | ScopedPolicyDef | ValueOpDef;
+    readonly $container: InternalOp | ReactionDef | ScopedInvariantDef | ValueOpDef;
     readonly $type: 'ParamList';
     params: Array<ParamDecl>;
 }
@@ -1961,7 +1984,7 @@ export function isParamList(item: unknown): item is ParamList {
 }
 
 export interface ParenExpr extends langium.AstNode {
-    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PolicyCallClause | PolicyDef | PostconditionClause | PreconditionClause | PredicateExpr | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | ScopedPolicyDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
+    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | GuardClause | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PostconditionClause | PreconditionClause | PredicateExpr | ReactionCallClause | ReactionDef | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
     readonly $type: 'ParenExpr';
     expr: Expression;
 }
@@ -1996,52 +2019,6 @@ export const PathSegment = 'PathSegment';
 
 export function isPathSegment(item: unknown): item is PathSegment {
     return reflection.isInstance(item, PathSegment);
-}
-
-export interface PoliciesBlock extends langium.AstNode {
-    readonly $container: AggregateDef | ApplicationServiceDef | DomainServiceDef | EntityDef | InfrastructureServiceDef | ServiceDef;
-    readonly $type: 'PoliciesBlock';
-    policies: Array<ScopedInvariantDef>;
-}
-
-export const PoliciesBlock = 'PoliciesBlock';
-
-export function isPoliciesBlock(item: unknown): item is PoliciesBlock {
-    return reflection.isInstance(item, PoliciesBlock);
-}
-
-export interface PolicyCallClause extends langium.AstNode {
-    readonly $container: CommandTriggeredOp | EventTriggeredOp | ForeachClause | InternalOp;
-    readonly $type: 'PolicyCallClause';
-    args?: ArgList;
-    description?: Description;
-    expr?: Expression;
-    metadata?: MetadataBlock;
-    name: Ident;
-}
-
-export const PolicyCallClause = 'PolicyCallClause';
-
-export function isPolicyCallClause(item: unknown): item is PolicyCallClause {
-    return reflection.isInstance(item, PolicyCallClause);
-}
-
-export interface PolicyDef extends langium.AstNode {
-    readonly $container: ContextDef | DomainFile | ModuleBody;
-    readonly $type: 'PolicyDef';
-    description?: Description;
-    effect: TypeName;
-    guard?: Expression;
-    metadata?: MetadataBlock;
-    name: TypeName;
-    satisfies?: SatisfiesDecl;
-    triggers: Array<TypeName>;
-}
-
-export const PolicyDef = 'PolicyDef';
-
-export function isPolicyDef(item: unknown): item is PolicyDef {
-    return reflection.isInstance(item, PolicyDef);
 }
 
 export interface PostconditionClause extends langium.AstNode {
@@ -2125,17 +2102,50 @@ export function isQueryDef(item: unknown): item is QueryDef {
     return reflection.isInstance(item, QueryDef);
 }
 
+export interface ReactionCallClause extends langium.AstNode {
+    readonly $container: CommandTriggeredOp | EventTriggeredOp | ForeachClause | InternalOp;
+    readonly $type: 'ReactionCallClause';
+    args?: ArgList;
+    description?: Description;
+    expr?: Expression;
+    metadata?: MetadataBlock;
+    name: Ident;
+}
+
+export const ReactionCallClause = 'ReactionCallClause';
+
+export function isReactionCallClause(item: unknown): item is ReactionCallClause {
+    return reflection.isInstance(item, ReactionCallClause);
+}
+
 export interface ReactionDef extends langium.AstNode {
     readonly $container: ContextDef | DomainFile | ModuleBody;
     readonly $type: 'ReactionDef';
+    description?: Description;
+    guard?: Expression;
     items: Array<ReactionItem>;
-    name: string;
+    metadata?: MetadataBlock;
+    name: Ident | TypeName | string;
+    params?: ParamList;
+    satisfies?: SatisfiesDecl;
 }
 
 export const ReactionDef = 'ReactionDef';
 
 export function isReactionDef(item: unknown): item is ReactionDef {
     return reflection.isInstance(item, ReactionDef);
+}
+
+export interface ReactionsBlock extends langium.AstNode {
+    readonly $container: AggregateDef | ApplicationServiceDef | DomainServiceDef | EntityDef | InfrastructureServiceDef | ServiceDef;
+    readonly $type: 'ReactionsBlock';
+    reactions: Array<ScopedInvariantDef>;
+}
+
+export const ReactionsBlock = 'ReactionsBlock';
+
+export function isReactionsBlock(item: unknown): item is ReactionsBlock {
+    return reflection.isInstance(item, ReactionsBlock);
 }
 
 export interface ReconciliationDef extends langium.AstNode {
@@ -2293,7 +2303,7 @@ export function isReturnsDecl(item: unknown): item is ReturnsDecl {
 }
 
 export interface SatisfiesDecl extends langium.AstNode {
-    readonly $container: AbsoluteTemporalEvent | AggregateDef | AgreementDef | ApplicationServiceDef | CommandDef | CommandTriggeredOp | DomainServiceDef | EntityDef | EnumDef | ErrorEventDef | EventDef | EventTriggeredOp | ExternalEventDef | InfrastructureServiceDef | InlineInvariant | InternalOp | InvariantDef | NamedOperationDef | PolicyDef | QueryDef | ReactionDef | RecurringTemporalEvent | RelativeTemporalEvent | ScopedInvariantDef | ScopedPolicyDef | ServiceDef | ValueDef;
+    readonly $container: AbsoluteTemporalEvent | AggregateDef | AgreementDef | ApplicationServiceDef | CommandDef | CommandTriggeredOp | DomainServiceDef | EntityDef | EnumDef | ErrorEventDef | EventDef | EventTriggeredOp | ExternalEventDef | InfrastructureServiceDef | InlineInvariant | InternalOp | InvariantDef | NamedOperationDef | QueryDef | ReactionDef | RecurringTemporalEvent | RelativeTemporalEvent | ScopedInvariantDef | ServiceDef | ValueDef;
     readonly $type: 'SatisfiesDecl';
     ids: Array<string>;
 }
@@ -2305,7 +2315,7 @@ export function isSatisfiesDecl(item: unknown): item is SatisfiesDecl {
 }
 
 export interface ScopedInvariantDef extends langium.AstNode {
-    readonly $container: InvariantsBlock | PoliciesBlock;
+    readonly $container: InvariantsBlock | ReactionsBlock;
     readonly $type: 'ScopedInvariantDef';
     description?: Description;
     expr?: Expression;
@@ -2319,23 +2329,6 @@ export const ScopedInvariantDef = 'ScopedInvariantDef';
 
 export function isScopedInvariantDef(item: unknown): item is ScopedInvariantDef {
     return reflection.isInstance(item, ScopedInvariantDef);
-}
-
-export interface ScopedPolicyDef extends langium.AstNode {
-    readonly $container: CommandTriggeredOp | ContextDef | DomainFile | EventTriggeredOp | InternalOp | ModuleBody;
-    readonly $type: 'ScopedPolicyDef';
-    description?: Description;
-    expr?: Expression;
-    metadata?: MetadataBlock;
-    name: Ident;
-    params?: ParamList;
-    satisfies?: SatisfiesDecl;
-}
-
-export const ScopedPolicyDef = 'ScopedPolicyDef';
-
-export function isScopedPolicyDef(item: unknown): item is ScopedPolicyDef {
-    return reflection.isInstance(item, ScopedPolicyDef);
 }
 
 export interface ServiceCallClause extends langium.AstNode {
@@ -2393,7 +2386,7 @@ export function isShortname(item: unknown): item is Shortname {
 }
 
 export interface SomeExpr extends langium.AstNode {
-    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PolicyCallClause | PolicyDef | PostconditionClause | PreconditionClause | PredicateExpr | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | ScopedPolicyDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
+    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | GuardClause | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PostconditionClause | PreconditionClause | PredicateExpr | ReactionCallClause | ReactionDef | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
     readonly $type: 'SomeExpr';
     body: Expression;
     collection: DotPath;
@@ -2499,7 +2492,7 @@ export function isStringLiteral(item: unknown): item is StringLiteral {
 }
 
 export interface StringLiteralExpr extends langium.AstNode {
-    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PolicyCallClause | PolicyDef | PostconditionClause | PreconditionClause | PredicateExpr | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | ScopedPolicyDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
+    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | GuardClause | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PostconditionClause | PreconditionClause | PredicateExpr | ReactionCallClause | ReactionDef | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
     readonly $type: 'StringLiteralExpr';
     value: string;
 }
@@ -2549,6 +2542,19 @@ export function isTransitionsBlock(item: unknown): item is TransitionsBlock {
     return reflection.isInstance(item, TransitionsBlock);
 }
 
+export interface TriggerClause extends langium.AstNode {
+    readonly $container: ReactionDef;
+    readonly $type: 'TriggerClause';
+    event: TypeName;
+    more: Array<TypeName>;
+}
+
+export const TriggerClause = 'TriggerClause';
+
+export function isTriggerClause(item: unknown): item is TriggerClause {
+    return reflection.isInstance(item, TriggerClause);
+}
+
 export interface TriggeredByClause extends langium.AstNode {
     readonly $container: ReactionDef;
     readonly $type: 'TriggeredByClause';
@@ -2562,7 +2568,7 @@ export function isTriggeredByClause(item: unknown): item is TriggeredByClause {
 }
 
 export interface UnaryExpr extends langium.AstNode {
-    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PolicyCallClause | PolicyDef | PostconditionClause | PreconditionClause | PredicateExpr | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | ScopedPolicyDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
+    readonly $container: AbsoluteTemporalEvent | ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ClassicTransitionDef | ContainsExpr | DuplicateDetection | EscalationThen | EscalationWhen | EventGuard | EveryExpr | ExistsPred | ForallPred | GuardClause | IfExpr | MatchesExpr | MustBlock | NamedArg | NamedPostcondition | NamedPrecondition | ParenExpr | PostconditionClause | PreconditionClause | PredicateExpr | ReactionCallClause | ReactionDef | RecurringTemporalEvent | RelativeTemporalEvent | ReturnsClause | ScopedInvariantDef | SomeExpr | StateInvariantDef | UnaryExpr | ValueList;
     readonly $type: 'UnaryExpr';
     op: 'not';
     operand: Expression;
@@ -2747,6 +2753,7 @@ export type SpecyDomainAstType = {
     DownstreamRelation: DownstreamRelation
     DuplicateDetection: DuplicateDetection
     DurationLiteral: DurationLiteral
+    EffectClause: EffectClause
     EffectsClause: EffectsClause
     EmitsClause: EmitsClause
     EnforcementStrategy: EnforcementStrategy
@@ -2787,6 +2794,7 @@ export type SpecyDomainAstType = {
     ForeachClause: ForeachClause
     FunctionCallExpr: FunctionCallExpr
     GenericType: GenericType
+    GuardClause: GuardClause
     IdentityDecl: IdentityDecl
     IfExpr: IfExpr
     InExpr: InExpr
@@ -2831,9 +2839,6 @@ export type SpecyDomainAstType = {
     ParenExpr: ParenExpr
     ParticipantsClause: ParticipantsClause
     PathSegment: PathSegment
-    PoliciesBlock: PoliciesBlock
-    PolicyCallClause: PolicyCallClause
-    PolicyDef: PolicyDef
     PostconditionClause: PostconditionClause
     PrdSourceDecl: PrdSourceDecl
     PreconditionClause: PreconditionClause
@@ -2842,8 +2847,10 @@ export type SpecyDomainAstType = {
     PrimitiveType: PrimitiveType
     QueryBodyItem: QueryBodyItem
     QueryDef: QueryDef
+    ReactionCallClause: ReactionCallClause
     ReactionDef: ReactionDef
     ReactionItem: ReactionItem
+    ReactionsBlock: ReactionsBlock
     ReconciliationDef: ReconciliationDef
     ReconciliationItem: ReconciliationItem
     ReconciliationTrigger: ReconciliationTrigger
@@ -2859,7 +2866,6 @@ export type SpecyDomainAstType = {
     ReturnsDecl: ReturnsDecl
     SatisfiesDecl: SatisfiesDecl
     ScopedInvariantDef: ScopedInvariantDef
-    ScopedPolicyDef: ScopedPolicyDef
     ServiceBodyItem: ServiceBodyItem
     ServiceCallClause: ServiceCallClause
     ServiceDef: ServiceDef
@@ -2881,6 +2887,7 @@ export type SpecyDomainAstType = {
     TopLevelElement: TopLevelElement
     TransitionInline: TransitionInline
     TransitionsBlock: TransitionsBlock
+    TriggerClause: TriggerClause
     TriggeredByClause: TriggeredByClause
     UnaryExpr: UnaryExpr
     UpstreamRelation: UpstreamRelation
@@ -2896,7 +2903,7 @@ export type SpecyDomainAstType = {
 export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
 
     getAllTypes(): string[] {
-        return [AbsoluteTemporalEvent, AcceptsClause, AggregateBodyItem, AggregateContainsDecl, AggregateDef, AggregateEntitiesDecl, AggregateRootDecl, AgreementDef, AgreementItem, ApplicationServiceDef, ArgList, ArrayIndex, ArrayLiteral, AssignmentClause, BinaryExpr, BooleanLiteral, BooleanLiteralExpr, ClassicStateDef, ClassicTransitionDef, CollectionType, CommandDef, CommandTriggeredOp, CompensationClause, Constraint, ContainsExpr, ContextDef, ContextMapBlock, ContextRelation, CoordinationClause, CreatesClause, Definition, DependsBlock, Description, DetectionClause, DomainFile, DomainServiceDef, DotPath, DotPathExpr, DownstreamRelation, DuplicateDetection, DurationLiteral, EffectsClause, EmitsClause, EnforcementStrategy, EntityBodyItem, EntityDef, EntityTransition, EnumDef, EnumValue, ErrorEventDef, EscalationAction, EscalationActionClause, EscalationChainDef, EscalationCondition, EscalationMaxAttempts, EscalationStep, EscalationStepItem, EscalationThen, EscalationWhen, EventBodyItem, EventDef, EventGuard, EventInstant, EventSchedule, EventTriggeredOp, EventTypeClassifier, EveryExpr, ExistsPred, ExposesClause, ExprServiceCall, Expression, ExternalEventDef, FieldDecl, FieldType, FieldTypeOpt, FieldsBlock, FinalState, ForallPred, ForeachClause, FunctionCallExpr, GenericType, IdentityDecl, IfExpr, InExpr, InfrastructureServiceDef, InlineEnumBlock, InlineInvariant, InterfaceDef, InternalOp, InvariantDef, InvariantsBlock, IsDefinedExpr, IsNotDefinedExpr, IsNotNullExpr, IsNullExpr, LiteralValue, MatchPattern, MatchesExpr, MetadataBlock, MetadataEntry, ModuleBody, ModuleDef, MustBlock, NamedArg, NamedArgList, NamedOpItem, NamedOperationDef, NamedPostcondition, NamedPrecondition, NoFieldContainsExpr, NotInExpr, NullLiteralExpr, NumberLiteral, NumberLiteralExpr, OnClause, OperationClause, OperationDef, OperationsBlock, OrganizationDef, ParamDecl, ParamDeclOpt, ParamList, ParenExpr, ParticipantsClause, PathSegment, PoliciesBlock, PolicyCallClause, PolicyDef, PostconditionClause, PrdSourceDecl, PreconditionClause, PredicateBlock, PredicateExpr, PrimitiveType, QueryBodyItem, QueryDef, ReactionDef, ReactionItem, ReconciliationDef, ReconciliationItem, ReconciliationTrigger, ReconciliationTriggerClause, RecordBodyItem, RecurringTemporalEvent, ReferenceDecl, ReferencesBlock, RelativeTemporalEvent, RequirementsSourceDecl, ResolvesClause, ReturnsClause, ReturnsDecl, SatisfiesDecl, ScopedInvariantDef, ScopedPolicyDef, ServiceBodyItem, ServiceCallClause, ServiceDef, SetsClause, Shortname, SomeExpr, SourceDecl, StateDef, StateInvariantDef, StateMachineDef, StatemachineDef, StatemachineItem, StatemachineStart, StatesBlock, StringLiteral, StringLiteralExpr, SymmetricRelation, TemporalEventDef, TopLevelElement, TransitionInline, TransitionsBlock, TriggeredByClause, UnaryExpr, UpstreamRelation, UsesDecl, ValueBodyItem, ValueDef, ValueExpr, ValueList, ValueOpDef, ValueOperationsBlock];
+        return [AbsoluteTemporalEvent, AcceptsClause, AggregateBodyItem, AggregateContainsDecl, AggregateDef, AggregateEntitiesDecl, AggregateRootDecl, AgreementDef, AgreementItem, ApplicationServiceDef, ArgList, ArrayIndex, ArrayLiteral, AssignmentClause, BinaryExpr, BooleanLiteral, BooleanLiteralExpr, ClassicStateDef, ClassicTransitionDef, CollectionType, CommandDef, CommandTriggeredOp, CompensationClause, Constraint, ContainsExpr, ContextDef, ContextMapBlock, ContextRelation, CoordinationClause, CreatesClause, Definition, DependsBlock, Description, DetectionClause, DomainFile, DomainServiceDef, DotPath, DotPathExpr, DownstreamRelation, DuplicateDetection, DurationLiteral, EffectClause, EffectsClause, EmitsClause, EnforcementStrategy, EntityBodyItem, EntityDef, EntityTransition, EnumDef, EnumValue, ErrorEventDef, EscalationAction, EscalationActionClause, EscalationChainDef, EscalationCondition, EscalationMaxAttempts, EscalationStep, EscalationStepItem, EscalationThen, EscalationWhen, EventBodyItem, EventDef, EventGuard, EventInstant, EventSchedule, EventTriggeredOp, EventTypeClassifier, EveryExpr, ExistsPred, ExposesClause, ExprServiceCall, Expression, ExternalEventDef, FieldDecl, FieldType, FieldTypeOpt, FieldsBlock, FinalState, ForallPred, ForeachClause, FunctionCallExpr, GenericType, GuardClause, IdentityDecl, IfExpr, InExpr, InfrastructureServiceDef, InlineEnumBlock, InlineInvariant, InterfaceDef, InternalOp, InvariantDef, InvariantsBlock, IsDefinedExpr, IsNotDefinedExpr, IsNotNullExpr, IsNullExpr, LiteralValue, MatchPattern, MatchesExpr, MetadataBlock, MetadataEntry, ModuleBody, ModuleDef, MustBlock, NamedArg, NamedArgList, NamedOpItem, NamedOperationDef, NamedPostcondition, NamedPrecondition, NoFieldContainsExpr, NotInExpr, NullLiteralExpr, NumberLiteral, NumberLiteralExpr, OnClause, OperationClause, OperationDef, OperationsBlock, OrganizationDef, ParamDecl, ParamDeclOpt, ParamList, ParenExpr, ParticipantsClause, PathSegment, PostconditionClause, PrdSourceDecl, PreconditionClause, PredicateBlock, PredicateExpr, PrimitiveType, QueryBodyItem, QueryDef, ReactionCallClause, ReactionDef, ReactionItem, ReactionsBlock, ReconciliationDef, ReconciliationItem, ReconciliationTrigger, ReconciliationTriggerClause, RecordBodyItem, RecurringTemporalEvent, ReferenceDecl, ReferencesBlock, RelativeTemporalEvent, RequirementsSourceDecl, ResolvesClause, ReturnsClause, ReturnsDecl, SatisfiesDecl, ScopedInvariantDef, ServiceBodyItem, ServiceCallClause, ServiceDef, SetsClause, Shortname, SomeExpr, SourceDecl, StateDef, StateInvariantDef, StateMachineDef, StatemachineDef, StatemachineItem, StatemachineStart, StatesBlock, StringLiteral, StringLiteralExpr, SymmetricRelation, TemporalEventDef, TopLevelElement, TransitionInline, TransitionsBlock, TriggerClause, TriggeredByClause, UnaryExpr, UpstreamRelation, UsesDecl, ValueBodyItem, ValueDef, ValueExpr, ValueList, ValueOpDef, ValueOperationsBlock];
     }
 
     protected override computeIsSubtype(subtype: string, supertype: string): boolean {
@@ -2928,7 +2935,6 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
             case ExternalEventDef:
             case InfrastructureServiceDef:
             case InvariantDef:
-            case PolicyDef:
             case QueryDef:
             case ReactionDef:
             case ServiceDef:
@@ -2996,17 +3002,16 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
             }
             case CreatesClause:
             case ForeachClause:
-            case PolicyCallClause:
             case PostconditionClause:
             case PreconditionClause:
+            case ReactionCallClause:
             case ResolvesClause:
             case ReturnsClause:
             case ServiceCallClause:
             case SetsClause: {
                 return this.isSubtype(OperationClause, supertype);
             }
-            case Description:
-            case SatisfiesDecl: {
+            case Description: {
                 return this.isSubtype(AggregateBodyItem, supertype) || this.isSubtype(AgreementItem, supertype) || this.isSubtype(EntityBodyItem, supertype) || this.isSubtype(EventBodyItem, supertype) || this.isSubtype(NamedOpItem, supertype) || this.isSubtype(QueryBodyItem, supertype) || this.isSubtype(ReactionItem, supertype) || this.isSubtype(RecordBodyItem, supertype) || this.isSubtype(ServiceBodyItem, supertype) || this.isSubtype(ValueBodyItem, supertype);
             }
             case DownstreamRelation:
@@ -3021,7 +3026,10 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
             case TransitionsBlock: {
                 return this.isSubtype(AggregateBodyItem, supertype) || this.isSubtype(EntityBodyItem, supertype);
             }
+            case EffectClause:
             case EffectsClause:
+            case GuardClause:
+            case TriggerClause:
             case TriggeredByClause: {
                 return this.isSubtype(ReactionItem, supertype);
             }
@@ -3074,7 +3082,7 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                 return this.isSubtype(NamedOpItem, supertype) || this.isSubtype(StatemachineItem, supertype);
             }
             case OperationsBlock:
-            case PoliciesBlock: {
+            case ReactionsBlock: {
                 return this.isSubtype(AggregateBodyItem, supertype) || this.isSubtype(EntityBodyItem, supertype) || this.isSubtype(ServiceBodyItem, supertype);
             }
             case ParticipantsClause:
@@ -3089,8 +3097,8 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
             case ReturnsDecl: {
                 return this.isSubtype(NamedOpItem, supertype) || this.isSubtype(QueryBodyItem, supertype);
             }
-            case ScopedPolicyDef: {
-                return this.isSubtype(Definition, supertype) || this.isSubtype(OperationClause, supertype);
+            case SatisfiesDecl: {
+                return this.isSubtype(AggregateBodyItem, supertype) || this.isSubtype(AgreementItem, supertype) || this.isSubtype(EntityBodyItem, supertype) || this.isSubtype(EventBodyItem, supertype) || this.isSubtype(NamedOpItem, supertype) || this.isSubtype(QueryBodyItem, supertype) || this.isSubtype(RecordBodyItem, supertype) || this.isSubtype(ServiceBodyItem, supertype) || this.isSubtype(ValueBodyItem, supertype);
             }
             default: {
                 return false;
@@ -3453,6 +3461,14 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     ]
                 };
             }
+            case EffectClause: {
+                return {
+                    name: EffectClause,
+                    properties: [
+                        { name: 'command' }
+                    ]
+                };
+            }
             case EffectsClause: {
                 return {
                     name: EffectsClause,
@@ -3771,6 +3787,14 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     properties: [
                         { name: 'args' },
                         { name: 'name' }
+                    ]
+                };
+            }
+            case GuardClause: {
+                return {
+                    name: GuardClause,
+                    properties: [
+                        { name: 'expr' }
                     ]
                 };
             }
@@ -4148,40 +4172,6 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     ]
                 };
             }
-            case PoliciesBlock: {
-                return {
-                    name: PoliciesBlock,
-                    properties: [
-                        { name: 'policies', defaultValue: [] }
-                    ]
-                };
-            }
-            case PolicyCallClause: {
-                return {
-                    name: PolicyCallClause,
-                    properties: [
-                        { name: 'args' },
-                        { name: 'description' },
-                        { name: 'expr' },
-                        { name: 'metadata' },
-                        { name: 'name' }
-                    ]
-                };
-            }
-            case PolicyDef: {
-                return {
-                    name: PolicyDef,
-                    properties: [
-                        { name: 'description' },
-                        { name: 'effect' },
-                        { name: 'guard' },
-                        { name: 'metadata' },
-                        { name: 'name' },
-                        { name: 'satisfies' },
-                        { name: 'triggers', defaultValue: [] }
-                    ]
-                };
-            }
             case PostconditionClause: {
                 return {
                     name: PostconditionClause,
@@ -4240,12 +4230,37 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     ]
                 };
             }
+            case ReactionCallClause: {
+                return {
+                    name: ReactionCallClause,
+                    properties: [
+                        { name: 'args' },
+                        { name: 'description' },
+                        { name: 'expr' },
+                        { name: 'metadata' },
+                        { name: 'name' }
+                    ]
+                };
+            }
             case ReactionDef: {
                 return {
                     name: ReactionDef,
                     properties: [
+                        { name: 'description' },
+                        { name: 'guard' },
                         { name: 'items', defaultValue: [] },
-                        { name: 'name' }
+                        { name: 'metadata' },
+                        { name: 'name' },
+                        { name: 'params' },
+                        { name: 'satisfies' }
+                    ]
+                };
+            }
+            case ReactionsBlock: {
+                return {
+                    name: ReactionsBlock,
+                    properties: [
+                        { name: 'reactions', defaultValue: [] }
                     ]
                 };
             }
@@ -4370,19 +4385,6 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
             case ScopedInvariantDef: {
                 return {
                     name: ScopedInvariantDef,
-                    properties: [
-                        { name: 'description' },
-                        { name: 'expr' },
-                        { name: 'metadata' },
-                        { name: 'name' },
-                        { name: 'params' },
-                        { name: 'satisfies' }
-                    ]
-                };
-            }
-            case ScopedPolicyDef: {
-                return {
-                    name: ScopedPolicyDef,
                     properties: [
                         { name: 'description' },
                         { name: 'expr' },
@@ -4537,6 +4539,15 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     name: TransitionsBlock,
                     properties: [
                         { name: 'transitions', defaultValue: [] }
+                    ]
+                };
+            }
+            case TriggerClause: {
+                return {
+                    name: TriggerClause,
+                    properties: [
+                        { name: 'event' },
+                        { name: 'more', defaultValue: [] }
                     ]
                 };
             }
