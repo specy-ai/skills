@@ -86,7 +86,7 @@ An organization groups bounded contexts. It serves as the top-level container fo
 Relations:
 - 1..n "has" relation with bounded contexts
 
-## Bounded Context
+#Bounded Context
 
 A boundary within which a model is well-defined and its language is consistent. Words, types, and rules inside a bounded context share a single meaning. A bounded context has a shortname. A bounded context must not be used for decomposition into different modules, in doubt use a module. Interactions between bounded contexts should be asynchronous. Transactions cannot span across bounded contexts — there is a rupture of transactional consistency at context boundaries.
 
@@ -517,7 +517,7 @@ Relations:
 
 ## Domain Service
 
-A named set of operations that span multiple entities or aggregates, where assigning ownership to any single one would be arbitrary. A domain service may invoke domain objects, and domain objects may invoke a domain service.
+A named set of operations that span multiple entities or aggregates, where assigning ownership to any single one would be arbitrary. A domain service may invoke domain objects, and domain objects may invoke a domain service. A domain service may change the state of one or several entities or aggregates, if not the domain service must "do something" and produce a result. Typical example: a transfer service between two bank accounts doesn't belong to either the source or target account but the domain service orchestrates the state change in both account. 
 
 Relations:
 - 1..n "owns" relation with operations
@@ -527,7 +527,7 @@ Relations:
 
 ## Application Service
 
-An orchestrator that interprets requests from the presentation layer (API controllers, UI handlers) and delegates to domain services and domain objects. Application services manage use-case state but contain no domain logic.
+An orchestrator that interprets requests from the presentation layer (API controllers, UI handlers) and delegates to domain services and domain objects. Application services manage use-case state but contain no domain logic. An application service is tied to a particular set of technologies (e.g. HTTP protocol and JSON for a REST API controller).
 
 Relations:
 - 0..n "delegates to" relation with domain services
@@ -538,7 +538,7 @@ Relations:
 ## Infrastructure Service
 
 An adapter that exposes an external system's capabilities through the domain's ubiquitous language. Domain objects call infrastructure services, never the reverse. Infrastructure services belong to the infrastructure layer of the hexagonal architecture.
-An infrastructure service is described by an interface whose operations are consumed by entity operations or domain service operations. The interface defines the contract; an adapter provides the implementation for the real infrastructure component.
+An infrastructure service is described by an interface called an SPI (Service Provider Interface) whose operations are consumed by entity operations or domain service operations. The interface defines the contract; an adapter provides the implementation for the real infrastructure component. The repository is a kind of infrastructure service as it exposes persistence and querying capabilities to each entities of the domain layer.
 
 The Anti-Corruption Layer (ACL) pattern is implemented as an infrastructure service.
 
@@ -548,7 +548,7 @@ Relations:
 - 1..1 "belongs to" relation with a module
 
 
-## Properties - Reaction and Invariant
+## Properties - Reactions and Invariant
 
 Properties constrain system behavior.
 A property has a name (anchored in the domain's ubiquitous language), a scope (the entity, domain service, or value type that guarantees the property holds). A property separates what must hold (a predicate for invariant, a reactive rule for reaction) from the enforcement mechanism (what happens when an invariant is violated or a reaction fires).
@@ -568,7 +568,7 @@ Relations:
 
 ### Reaction
 
-A reaction listens to internal events and issues commands in response.
+A reaction listens to internal events and issues commands in response to perform effects.
 A reaction is triggered by an internal event, so it listens to one or more internal events.
 It has a name (anchored in the ubiquitous language), a trigger (one or more event references), a guard (a condition that must hold for the reaction to fire), and an effect (a command reference)
 
