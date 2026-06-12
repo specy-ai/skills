@@ -120,9 +120,9 @@
   <rect x="520" y="895" width="200" height="44" rx="4" fill="white" stroke="#2C3E50" stroke-width="1.8"/>
   <text x="620" y="922" text-anchor="middle" font-size="14" font-weight="700" fill="#2C3E50">Invariant</text>
 
-  <!-- Policy -->
+  <!-- Reaction -->
   <rect x="750" y="895" width="200" height="44" rx="4" fill="white" stroke="#2C3E50" stroke-width="1.8"/>
-  <text x="850" y="922" text-anchor="middle" font-size="14" font-weight="700" fill="#2C3E50">Policy</text>
+  <text x="850" y="922" text-anchor="middle" font-size="14" font-weight="700" fill="#2C3E50">Reaction</text>
 
   <!-- Agreement -->
   <rect x="520" y="970" width="200" height="44" rx="4" fill="white" stroke="#2C3E50" stroke-width="1.8"/>
@@ -266,20 +266,20 @@
   <path d="M 870,684 Q 700,720 613,619" fill="none" stroke="#E8707A" stroke-width="1.2" stroke-dasharray="3,2" marker-end="url(#arr)"/>
   <text x="740" y="708" font-size="9" fill="#E8707A" font-weight="500">1..n triggers</text>
 
-  <!-- ── Policy reactive loop ── -->
+  <!-- ── Reaction reactive loop ── -->
 
-  <!-- 29. Internal Event → Policy (triggers) -->
+  <!-- 29. Internal Event → Reaction (triggers) -->
   <path d="M 598,684 Q 700,790 780,895" fill="none" stroke="#E8707A" stroke-width="1.3" marker-end="url(#arr)"/>
   <text x="660" y="810" font-size="9" fill="#E8707A" font-weight="500">triggers</text>
 
-  <!-- 30. Error Event → Policy (triggers) -->
+  <!-- 30. Error Event → Reaction (triggers) -->
   <path d="M 763,684 Q 800,790 840,895" fill="none" stroke="#E8707A" stroke-width="1.2" marker-end="url(#arr)"/>
 
-  <!-- 31. Temporal Event → Policy (triggers) -->
+  <!-- 31. Temporal Event → Reaction (triggers) -->
   <path d="M 1080,684 Q 980,790 880,895" fill="none" stroke="#E8707A" stroke-width="1.2" stroke-dasharray="3,2" marker-end="url(#arr)"/>
   <text x="1000" y="800" font-size="9" fill="#E8707A" font-weight="500">triggers</text>
 
-  <!-- 32. Policy → Command (effect) -->
+  <!-- 32. Reaction → Command (effect) -->
   <path d="M 850,939 Q 900,960 920,945 Q 960,920 920,880 Q 850,820 700,720 Q 640,680 613,619" fill="none" stroke="#E8707A" stroke-width="1.3" marker-end="url(#arr)"/>
   <text x="940" y="875" font-size="9" fill="#E8707A" font-weight="500">effect</text>
 
@@ -356,7 +356,7 @@
   <!-- REACTIVE LOOP ANNOTATION             -->
   <!-- ════════════════════════════════════ -->
   <rect x="505" y="460" width="720" height="650" rx="10" fill="none" stroke="#CCC" stroke-width="1" stroke-dasharray="6,4"/>
-  <text x="865" y="1098" text-anchor="middle" font-size="10" fill="#AAA" font-style="italic">Reactive loop: Command → Operation → Event → Policy → Command</text>
+  <text x="865" y="1098" text-anchor="middle" font-size="10" fill="#AAA" font-style="italic">Reactive loop: Command → Operation → Event → Reaction → Command</text>
 
   <!-- Query annotation -->
   <text x="790" y="630" text-anchor="middle" font-size="9" fill="#777" font-style="italic">safe, idempotent</text>

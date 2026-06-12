@@ -1,0 +1,22 @@
+{
+  "name": "specy",
+  "owner": {
+    "name": "Jeremie Grodziski",
+    "email": "jeremie@defsquare.com"
+  },
+  "metadata": {
+    "description": "Specy DDD toolkit — design and reverse-engineer PRDs, system requirements, and domain models, and generate code from a domain model.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "specy",
+      "description": "Specy DDD toolkit skills (prd/sysreq/domain design, code generation, and extraction from code).",
+      "source": {
+        "source": "relative",
+        "path": "dist"
+      },
+      "version": "1.0.0"
+    }
+  ]
+}

@@ -408,7 +408,7 @@
     <text x="1080" y="1005" font-size="9.5" fill="#F07070" font-weight="500" class="body">Event-driven</text>
     <text x="1200" y="1005" font-size="9.5" fill="#8A9BB5" class="body">→ Command → Operation → Event  (implemented-by)</text>
     <text x="1080" y="1021" font-size="9.5" fill="#F07070" font-weight="500" class="body">Unwanted</text>
-    <text x="1200" y="1021" font-size="9.5" fill="#8A9BB5" class="body">→ Error Event, Policy  (detected-by, enforced-by)</text>
+    <text x="1200" y="1021" font-size="9.5" fill="#8A9BB5" class="body">→ Error Event, Reaction  (detected-by, enforced-by)</text>
     <text x="1080" y="1037" font-size="9.5" fill="#F07070" font-weight="500" class="body">Optional</text>
     <text x="1200" y="1037" font-size="9.5" fill="#8A9BB5" class="body">→ Module, conditional Operation  (structured-by)</text>
   </g>
@@ -436,7 +436,7 @@
   <rect x="30" y="1155" width="1740" height="25" fill="#58D68D" fill-opacity="0.05"/>
   <text x="60" y="1158" font-size="17" font-weight="700" fill="#58D68D" class="header">DOMAIN-METAMODEL</text>
   <text x="370" y="1158" font-size="14" fill="#58D68D" font-style="italic" class="header">"How the System Is Structured &amp; Behaves"</text>
-  <text x="60" y="1175" font-size="10" fill="#8A9BB5" class="body">Audience: Engineers, Domain Experts  |  File: .domain.specy  |  Language: DDD — Entities, Aggregates, Events, Policies</text>
+  <text x="60" y="1175" font-size="10" fill="#8A9BB5" class="body">Audience: Engineers, Domain Experts  |  File: .domain  |  Language: DDD — Entities, Aggregates, Events, Reactions</text>
 
   <!-- ── STRUCTURAL TIER ── -->
 
@@ -489,11 +489,11 @@
   <path d="M 340,1720 L 510,1765" fill="none" stroke="#F07070" stroke-width="1.1" stroke-dasharray="5,3" marker-end="url(#open-rd)"/>
   <path d="M 365,1720 L 680,1765" fill="none" stroke="#F07070" stroke-width="1.1" stroke-dasharray="5,3" marker-end="url(#open-rd)"/>
 
-  <!-- Internal Event → Policy -->
+  <!-- Internal Event → Reaction -->
   <path d="M 340,1805 Q 350,1850 365,1880" fill="none" stroke="#48C9B0" stroke-width="1.4" marker-end="url(#arr-tl)"/>
   <text x="355" y="1845" font-size="8.5" fill="#48C9B0" font-weight="500" class="body">triggers</text>
 
-  <!-- Policy → Command -->
+  <!-- Reaction → Command -->
   <path d="M 380,1920 Q 280,1940 155,1625" fill="none" stroke="#48C9B0" stroke-width="1.3" marker-end="url(#arr-tl)"/>
   <text x="230" y="1810" font-size="8.5" fill="#48C9B0" font-weight="500" class="body">effect (command)</text>
 
@@ -608,10 +608,10 @@
     <text x="490" y="1577" text-anchor="middle" font-size="13" font-weight="600" fill="#FFFFFF" class="header">Query</text>
   </g>
 
-  <!-- Policy -->
+  <!-- Reaction -->
   <g>
     <rect x="310" y="1880" width="120" height="40" rx="6" fill="#1A3535" stroke="#48C9B0" stroke-width="1.6"/>
-    <text x="370" y="1904" text-anchor="middle" font-size="13" font-weight="600" fill="#FFFFFF" class="header">Policy</text>
+    <text x="370" y="1904" text-anchor="middle" font-size="13" font-weight="600" fill="#FFFFFF" class="header">Reaction</text>
   </g>
 
   <!-- Invariant -->
@@ -648,7 +648,7 @@
 
   <!-- Reactive loop highlight -->
   <rect x="55" y="1545" width="540" height="400" rx="10" fill="none" stroke="#8A9BB5" stroke-width="0.8" stroke-dasharray="6,4" stroke-opacity="0.3"/>
-  <text x="325" y="1938" text-anchor="middle" font-size="9" fill="#6B7B8D" font-style="italic" class="body">Reactive loop: Command → Operation → Event → Policy → Command</text>
+  <text x="325" y="1938" text-anchor="middle" font-size="9" fill="#6B7B8D" font-style="italic" class="body">Reactive loop: Command → Operation → Event → Reaction → Command</text>
 
   <!-- Domain Concerns summary -->
   <g>
@@ -656,7 +656,7 @@
     <text x="1220" y="1800" font-size="12" font-weight="600" fill="#58D68D" class="header">Concerns</text>
     <text x="1220" y="1818" font-size="10" fill="#C5CED8" class="body">What are the domain concepts? (Entity, Aggregate, Value Type)</text>
     <text x="1220" y="1834" font-size="10" fill="#C5CED8" class="body">How do they behave? (Operation, State Machine, Command → Event)</text>
-    <text x="1220" y="1850" font-size="10" fill="#C5CED8" class="body">What rules must hold? (Invariant, Policy, Precondition)</text>
+    <text x="1220" y="1850" font-size="10" fill="#C5CED8" class="body">What rules must hold? (Invariant, Reaction, Precondition)</text>
     <text x="1220" y="1866" font-size="10" fill="#C5CED8" class="body">How do aggregates coordinate? (Agreement, Reconciliation)</text>
     <text x="1220" y="1882" font-size="10" fill="#C5CED8" class="body">What events flow? (Internal, External, Error, Temporal)</text>
   </g>

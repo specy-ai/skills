@@ -1,25 +1,219 @@
-# Specy Skills
+# Specy
 
-Specy is a Domain-Driven Design toolkit that makes business knowledge explicit, portable, and verifiable. It provides AI-assisted skills that reverse-engineer, explore, specify, and formalize domain models using either:
-- a structured DSL (`.prd`, `.sysreq`, `.domain` files).
-- a YAML  (`.prd.yaml`, `.sysreq.yaml`, `.domain.yaml` files).
-- a Markdown files (`.prd.md`, `.sysreq.md`, `.domain.md` files) 
+> **Capture business knowledge as living models — then design, reverse-engineer, explore, and generate code from it, with full traceability from product vision to implementation.**
 
-Business knowledge — rules, invariants, constraints, operational decisions — is the real asset. Code is a derivation. Specy captures that knowledge so it survives rewrites, anchors AI-generated code to real intent, and evolves with the business.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+[![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-da7756.svg)](https://github.com/specy-ai/skills)
+[![Skills](https://img.shields.io/badge/skills-7-success.svg)](#skills)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#contributing)
+
+![Specy domain metamodel](./domain-metamodel-diagram.svg)
+
+Specy is a Domain-Driven Design toolkit that ships as a **Claude Code plugin** (`specy`). Its AI-assisted skills work across three structured DSLs:
+
+- **`.prd`** — product requirements (the *why* and *what*)
+- **`.sysreq`** — system requirements in EARS syntax (the formal *what*)
+- **`.domain`** — the domain model in DDD notation (the *how*)
+
+A companion parser/CLI additionally renders a `.domain` model to **JSON, YAML, or Markdown**.
+
+## Why Specy?
+
+Business knowledge — rules, invariants, constraints, operational decisions — is the real asset; **code is a derivation.** Yet most of that knowledge lives only in people's heads and scattered across a codebase, so it evaporates on every rewrite and every AI-generated change quietly drifts from intent.
+
+Specy makes that knowledge **explicit, traceable, and executable.** Model it once and every element stays linked along a single chain — product vision (`.prd`) → testable requirement (`.sysreq`) → domain model (`.domain`) → generated code — and back again.
+
+> *Why not just prompt the LLM directly?* A prompt is throwaway and unverifiable. A Specy model is a durable, reviewable artifact you can diff, trace, regenerate code from, and reverse-engineer out of legacy code.
+
+## Quick start
+
+```bash
+git clone https://github.com/specy-ai/skills.git specy && cd specy
+./src/skills/build.sh          # build the `specy` plugin → dist/
+./install-skills-for-user.sh   # install into ~/.claude/skills/specy
+```
+
+Then, in Claude Code:
+
+```
+specy:prd-design          # capture product requirements from an idea or brief
+specy:domain-design       # model a domain from requirements or prose
+specy:domain-build-code   # generate code (Java/Spring, TS/NestJS, Clojure) from a .domain
+specy:domain-extract-from-code   # reverse-engineer a .domain from an existing codebase
+```
+
+Full options in [Setup](#setup); browse complete models in [`examples/`](./examples).
+
+## See it work
+
+A few lines of `.domain` …
+
+```
+value Slug {
+  value : String
+  invariant "max-length" { value.length <= 30 }
+}
+
+entity ShortLink {
+  id : ShortLinkId
+  slug : Slug
+  status : LinkStatus
+}
+```
+
+… become idiomatic code via `specy:domain-build-code` (Java/Spring shown):
+
+```java
+public record Slug(String value) {                 // immutable value, validated at construction
+    public Slug {
+        if (value.length() > 30)
+            throw new IllegalArgumentException("A slug must not exceed 30 characters");
+    }
+}
+
+public final class ShortLink {                      // aggregate root — no public setters
+    private final ShortLinkId id;
+    private Slug slug;
+    private LinkStatus status;
+    // state changes only through domain operations; satisfies traceability carried as annotations
+}
+```
+
+The same model can also be rendered to JSON/YAML/Markdown, explored conversationally, or kept in sync with code — see [Skills](#skills).
+
+## Table of Contents
+
+- [Skills](#skills)
+- [Two Approaches](#two-approaches)
+- [Metamodels](#metamodels)
+- [Folder Structure](#folder-structure)
+- [Prerequisites](#prerequisites)
+- [Setup](#setup)
+- [Usage](#usage)
+- [LSP Server](#lsp-server)
+- [Contributing](#contributing)
+
+## Skills
+
+Specy ships as a single Claude Code plugin — **`specy`** — providing 7 AI-assisted skills: 6 **core**
+skills named after their input→output artefact, plus 1 **auxiliary** skill. Each is invoked as
+`specy:<name>`.
+
+| Skill | Input | Output |
+|---|---|---|
+| `specy:prd-design` | product idea / brief / prose | `.prd` |
+| `specy:sysreq-design` | `.prd` / business rules / prose | `.sysreq` (EARS) |
+| `specy:sysreq-extract-from-code` | codebase | `.sysreq` (EARS) |
+| `specy:domain-design` | `.sysreq` / `.prd` / prose | `.domain` |
+| `specy:domain-build-code` | `.domain` + target stack | source code |
+| `specy:domain-extract-from-code` | codebase | `.domain` (+ refactoring report) |
+| `specy:domain-dialogue` *(aux)* | `.domain` | — (read-only conversation) |
+
+### `specy:prd-design` — Product Requirements
+
+**Input:** a product idea, brief, or business context in prose. **Output:** a `.prd` file.
+
+Guides creation of a `.prd` file. Interactive 7-phase conversation (Problem & Vision, Personas & Jobs,
+Goals & Metrics, Evidence & Hypotheses, Features & Stories, Risks & Constraints, Journeys & Releases),
+or one-shot from a brief.
+
+### `specy:sysreq-design` — System Requirements
+
+**Input:** a `.prd`, business rules, or prose. **Output:** a `.sysreq` file (EARS).
+
+Formalizes testable system requirements in EARS syntax. Interactive 4-phase (Context, Functional
+Requirements, NFR Discovery, Cross-Requirement Analysis), or one-shot from a `.prd` with
+feature-to-requirement mapping and gap analysis.
+
+### `specy:sysreq-extract-from-code` — Requirements from Code
+
+**Input:** a codebase. **Output:** a `.sysreq` file (EARS) per bounded context.
+
+Reverse-engineers what the code *actually does* into testable EARS requirements (bottom-up). For a
+domain model from code instead, use `specy:domain-extract-from-code`.
+
+### `specy:domain-design` — Domain Modeling
+
+**Input:** a `.sysreq`, `.prd`, or prose description of business logic. **Output:** a `.domain` file.
+
+Builds a DDD model. Interactive 7-phase conversation (Bounded Contexts, Entities/Aggregates/Values,
+Operations/Commands/Events, State Machines, Invariants/Reactions/Properties, Services, Traceability)
+with DDD quality challenges, or one-shot from `.sysreq`/`.prd` with requirement traceability.
+
+### `specy:domain-build-code` — Code Generation
+
+**Input:** a `.domain` model + a target stack. **Output:** idiomatic source code for every building block.
+
+Generates a hexagonal source tree from a domain model — mapping entities, value types, aggregates,
+commands, queries, events, operations, reactions, invariants, repositories, and domain/application/
+infrastructure services to a chosen stack (**Java/Spring, TypeScript/NestJS, Clojure**), preserving
+`satisfies` traceability as code annotations. The inverse of `specy:domain-extract-from-code`.
+
+### `specy:domain-extract-from-code` — Domain from Code
+
+**Input:** source code in any supported language. **Output:** a `.domain` file + `specy/refactoring.report` + `specy/.meta.json`.
+
+Reverse-engineers source code into a `.domain` model and produces DDD refactoring recommendations.
+Creation / incremental (`git diff` + `.meta.json`) / targeted modes; stack-specific heuristics for
+Java/Spring, TypeScript/NestJS, Clojure; test-aware enrichment.
+
+### `specy:domain-dialogue` — Domain Exploration *(auxiliary)*
+
+**Input:** existing `.domain` files. **Output:** none — a read-only conversation.
+
+Navigates the domain-model graph (organization → operation clauses), synthesizing, tracing, and
+challenging the model without modifying it. Modes: Explorer, Questioner, Confronter, Completer. When a
+change is warranted, it points back to `specy:domain-design` to evolve the model.
+
+## Two Approaches
+
+Specy supports two complementary approaches to domain modeling. Both converge on the same artifact — the `.domain` file — and once it exists, the other skills can operate on it (explore and generate code).
+
+```
+     Top-down (greenfield)                Bottom-up (brownfield)
+
+     Business vision                      Existing codebase
+          │                                      │
+          ▼                                      ▼
+  specy:prd-design → .prd          specy:domain-extract-from-code → .domain
+          │                                      │
+          ▼                                      ▼
+ specy:sysreq-design → .sysreq        specy:domain-dialogue (explore)
+          │                                      │
+          ▼                                      ▼
+ specy:domain-design → .domain ◄────────► specy:domain-design (evolve)
+          │                                      │
+          ▼                                (implement + re-extract)
+ specy:domain-build-code → code
+```
+
+### Top-down: from product vision to domain model
+
+Start with *why* (product vision, personas, jobs-to-be-done) and progressively formalize *what* the system should do (testable requirements) then *how* the domain is structured (entities, operations, rules).
+
+1. **`specy:prd-design`** — capture the product vision: problem statement, personas, goals, hypotheses, features, user stories, and releases into a `.prd` file.
+2. **`specy:sysreq-design`** — formalize testable system requirements in EARS syntax from the PRD, producing a `.sysreq` file with traceability back to features.
+3. **`specy:domain-design`** — build the domain model from requirements: entities, aggregates, commands, events, operations, state machines, invariants, reactions. Each construct traces back to specific requirements via `satisfies`.
+4. **`specy:domain-build-code`** — generate idiomatic source code for every building block of the `.domain`, for a chosen stack.
+
+This is the **greenfield** path — no code exists yet. Knowledge flows from intent to structure to code.
+
+### Bottom-up: from existing code to explicit knowledge
+
+Start with *what exists* (source code) and extract the implicit business knowledge into an explicit, verifiable model. Then explore it, challenge it, and evolve it.
+
+1. **`specy:domain-extract-from-code`** — reverse-engineer source code into `.domain` files. The extracted model becomes the source of truth for the other skills. (Use **`specy:sysreq-extract-from-code`** to recover EARS requirements from code.)
+2. **`specy:domain-dialogue`** — explore and question the domain model through conversation. Surface gaps, trace behaviors, challenge assumptions.
+3. **`specy:domain-design`** — when a change is needed, evolve the model. **`specy:domain-build-code`** then regenerates the affected code.
+4. The developer implements the change, then runs **`specy:domain-extract-from-code`** (incremental) to bring the model back in sync with the code.
+
+This is the **brownfield** path — code already exists. Knowledge flows from implementation to model, and change proposals flow from model back to code.
 
 ## Metamodels
 
 Specy organizes business knowledge into three layers, each with its own metamodel, file format, and grammar. Together they form a **traceability chain** from product vision down to domain implementation.
 
-```
-  Product Requirements          System Requirements            Domain Model
-  ┌─────────────────┐          ┌─────────────────┐          ┌─────────────────┐
-  │  .prd            │  ──────▶│  .sysreq         │  ──────▶│  .domain         │
-  │                  │ derives │                  │ realizes│                  │
-  │  WHY + WHAT      │         │  WHAT (formal)   │         │  HOW (model)     │
-  └─────────────────┘         └─────────────────┘          └─────────────────┘
-   Audience: PO, PM            Audience: PO, Dev             Audience: Dev, Arch
-```
+![Specy metamodels comparison](./metamodel-comparison.svg)
 
 ### Product Requirements (`.prd`)
 
@@ -27,7 +221,10 @@ Specy organizes business knowledge into three layers, each with its own metamode
 
 A `.prd` file structures product thinking into traceable concepts: problem statement, personas, jobs-to-be-done, desired outcomes, goals with success metrics, hypotheses, features, user stories, user journeys, risks, assumptions, constraints, open questions, and releases.
 
-**Key concepts:**
+**Traceability:** each feature traces to goals and personas; each user story traces to a feature; each release groups features. The PRD feeds into system requirements via feature-to-requirement coverage.
+
+<details>
+<summary><b>PRD key concepts</b></summary>
 
 | Concept | Description |
 |---------|-------------|
@@ -42,7 +239,7 @@ A `.prd` file structures product thinking into traceable concepts: problem state
 | User Journey | A sequence of steps a persona takes to accomplish a job |
 | Release | A time-boxed delivery grouping features by priority (MoSCoW) |
 
-**Traceability:** each feature traces to goals and personas; each user story traces to a feature; each release groups features. The PRD feeds into system requirements via feature-to-requirement coverage.
+</details>
 
 ### System Requirements (`.sysreq`)
 
@@ -50,7 +247,10 @@ A `.prd` file structures product thinking into traceable concepts: problem state
 
 A `.sysreq` file contains requirement sets grouped by feature or capability, using the **EARS** (Easy Approach to Requirements Syntax) patterns. Each requirement has a unique ID, a priority (MoSCoW), and traces back to a PRD feature.
 
-**EARS patterns:**
+**Traceability:** each requirement set links to a PRD feature via `feature-ref`; each requirement has a unique ID (e.g., `REQ-ORD-001`) that domain model constructs reference via `satisfies`.
+
+<details>
+<summary><b>EARS patterns &amp; key concepts</b></summary>
 
 | Pattern | Template | When to use |
 |---------|----------|-------------|
@@ -61,8 +261,6 @@ A `.sysreq` file contains requirement sets grouped by feature or capability, usi
 | Optional | "Where [feature], the system shall..." | Feature-gated behavior |
 | Complex | Combines two or more patterns | Multi-condition requirements |
 
-**Key concepts:**
-
 | Concept | Description |
 |---------|-------------|
 | Requirement Set | A group of related requirements, traced to a PRD feature |
@@ -70,7 +268,7 @@ A `.sysreq` file contains requirement sets grouped by feature or capability, usi
 | NFR (Non-Functional) | Performance, security, availability, scalability requirements |
 | Traceability | `prd-source` links to the originating `.prd` file |
 
-**Traceability:** each requirement set links to a PRD feature via `feature-ref`; each requirement has a unique ID (e.g., `REQ-ORD-001`) that domain model constructs reference via `satisfies`.
+</details>
 
 ### Domain Model (`.domain`)
 
@@ -78,7 +276,10 @@ A `.sysreq` file contains requirement sets grouped by feature or capability, usi
 
 A `.domain` file captures the full domain model for a bounded context: the structural concepts (what exists), the behavioral concepts (what happens), and the properties (what must hold true). It uses a hierarchical structure: `organization > context > module`.
 
-**Key concepts:**
+**Traceability:** `requirements-source` links to the `.sysreq` file; individual constructs use `satisfies [REQ-XXX-001]` to trace back to specific requirements.
+
+<details>
+<summary><b>Domain key concepts</b></summary>
 
 | Concept | Description |
 |---------|-------------|
@@ -90,7 +291,7 @@ A `.domain` file captures the full domain model for a bounded context: the struc
 | Event | Recorded fact: internal, external (from upstream), error, or temporal |
 | Operation | Named behavior owned by an entity — command-triggered or event-triggered |
 | Precondition | Named guard on an operation (`rejects` with message) |
-| Policy | Reactive rule: listens to an event, issues a command (trigger/guard/effect) |
+| Reaction | Reactive rule: listens to an event, issues a command (triggered-by/effects) |
 | Invariant | Safety property that must hold after any mutation (with enforcement strategy) |
 | Agreement | Cross-aggregate consistency property with reconciliation mechanism |
 | State Machine | Named lifecycle with states, transitions, guards, and actions |
@@ -99,121 +300,7 @@ A `.domain` file captures the full domain model for a bounded context: the struc
 | Infrastructure Service | External system adapter (notifications, payments, storage) |
 | Interface | Named surface exposing a subset of operations |
 
-**Traceability:** `requirements-source` links to the `.sysreq` file; individual constructs use `satisfies [REQ-XXX-001]` to trace back to specific requirements.
-
-## Skills
-
-Specy provides 6 AI-assisted skills, each specialized for a step in the product-to-code lifecycle.
-
-### `/prd` — Product Requirements
-
-Guides the creation of a `.prd` file through an interactive conversation. Works in two modes:
-
-- **Interactive mode** — 7-phase conversation: Problem & Vision, Personas & Jobs, Goals & Metrics, Evidence & Hypotheses, Features & Stories, Risks & Constraints, Journeys & Releases. Each phase produces a section of the PRD, validated before moving on.
-- **One-shot mode** — given a brief or description, generates a complete `.prd` in one pass.
-
-**Input:** product idea, brief, or business context in prose.
-**Output:** `specy/{product}.prd` file following the PRD metamodel.
-
-### `/sysreq` — System Requirements
-
-Formalizes system requirements in EARS syntax from a PRD, business rules, or prose. Works in two modes:
-
-- **Interactive mode** — 4-phase conversation: Context Identification, Functional Requirements, NFR Discovery, Cross-Requirement Analysis. Iteratively builds requirement sets from features.
-- **One-shot mode** — reads an existing `.prd` file and generates a complete `.sysreq` with feature-to-requirement mapping, NFR discovery, and gap analysis.
-
-**Input:** `.prd` file, business rules, or prose requirements.
-**Output:** `specy/{domain}.sysreq` file following the system requirements metamodel.
-
-### `/domain` — Domain Modeling
-
-Builds `.domain` files from system requirements, PRDs, or prose descriptions. Covers the full DDD modeling workflow:
-
-- **Interactive mode** — 7-phase conversation: Bounded Contexts & Organization, Entities/Aggregates/Values, Operations/Commands/Events, State Machines, Invariants/Policies/Properties, Services & Infrastructure, Traceability. Includes DDD quality challenges (entity vs value, aggregate boundaries, anemic model detection).
-- **One-shot mode** — reads `.sysreq` (or `.prd`) files and derives a complete domain model with requirement traceability.
-
-**Input:** `.sysreq` file, `.prd` file, or prose description of business logic.
-**Output:** `specy/{domain}.domain` file following the domain metamodel.
-
-### `/distill` — Reverse Engineering
-
-Reverse-engineers existing source code into `.domain` files. Extracts the business logic buried in code — entities, commands, events, operations, preconditions, policies, invariants, state machines — and formalizes it.
-
-- **Creation mode** — full extraction from scratch.
-- **Incremental mode** — uses `git diff` + `.meta.json` to extract only what changed since the last run.
-- **Targeted mode** — re-extracts a single definition by name.
-
-Supports stack-specific heuristics for Java/Spring, TypeScript/NestJS, and Clojure. Uses test assertions as evidence (test-aware enrichment).
-
-**Input:** source code in any supported language.
-**Output:** `specy/{domain}.domain` file + `specy/gaps.report` + `specy/.meta.json`.
-
-### `/dialogue` — Domain Exploration
-
-Read-only conversational exploration of existing `.domain` files. Navigates the domain model graph — from organization down to individual operation clauses — synthesizing, tracing, and challenging the model without ever modifying it.
-
-4 conversation modes driven by automatic tests:
-- **Explorer** — "How does X work?" — breadth-first behavioral summaries
-- **Questioner** — "What happens if...?" — detailed scenario traces through operations
-- **Confronter** — "We should allow X" — finds contradictions with existing preconditions, policies, invariants
-- **Completer** — "What's missing?" — runs a 22-point completeness checklist
-
-**Input:** questions or propositions about the domain.
-**Output:** conversational responses anchored in the models, with follow-up offers.
-
-### `/spec` — Business Specifications
-
-Formalizes a business specification (user story, business rule, feature request) against existing `.domain` models. Produces a `.spec` file that captures the analysis and projected changes without ever modifying the domain models.
-
-5-phase workflow: Decomposition, Anchoring, Confrontation, Proposition, Confirmation. Includes a `spec verify` mode that checks whether projected changes have been realized after implementation.
-
-**Input:** business requirement in prose + existing `.domain` models.
-**Output:** `specy/specs/{number}_{name}.spec` file with narrative, concept anchoring, confrontation analysis, projected changes in native Specy syntax, and impact analysis.
-
-## Two Approaches
-
-Specy supports two complementary approaches to domain modeling. Both converge on the same artifact — the `.domain` file — and once it exists, all six skills can operate on it.
-
-```
-     Top-down (greenfield)                Bottom-up (brownfield)
-
-     Business vision                      Existing codebase
-          │                                      │
-          ▼                                      ▼
-      /prd → .prd                          /distill → .domain
-          │                                      │
-          ▼                                      ▼
-    /sysreq → .sysreq                    /dialogue (explore)
-          │                                      │
-          ▼                                      ▼
-    /domain → .domain ◄──────────────────► /spec → .spec
-                                                 │
-                                          (implement + /distill)
-                                                 │
-                                          /spec verify → REALIZED
-```
-
-### Top-down: from product vision to domain model
-
-Start with *why* (product vision, personas, jobs-to-be-done) and progressively formalize *what* the system should do (testable requirements) then *how* the domain is structured (entities, operations, rules).
-
-1. **`/prd`** — capture the product vision: problem statement, personas, goals, hypotheses, features, user stories, and releases into a `.prd` file.
-2. **`/sysreq`** — formalize testable system requirements in EARS syntax from the PRD, producing a `.sysreq` file with traceability back to features.
-3. **`/domain`** — build the domain model from requirements: entities, aggregates, commands, events, operations, state machines, invariants, policies. Each construct traces back to specific requirements via `satisfies`.
-
-This is the **greenfield** path — no code exists yet. Knowledge flows from intent to structure.
-
-### Bottom-up: from existing code to explicit knowledge
-
-Start with *what exists* (source code) and extract the implicit business knowledge into an explicit, verifiable model. Then explore it, challenge it, and propose changes that flow back through code.
-
-1. **`/distill`** — reverse-engineer source code into `.domain` files. The extracted model becomes the source of truth for the other skills.
-2. **`/dialogue`** — explore and question the domain model through conversation. Surface gaps, trace behaviors, challenge assumptions. When a change is needed, the dialogue naturally leads to `/spec`.
-3. **`/spec`** — formalize a business change proposal against the existing model. Produces a `.spec` file with confrontation analysis and projected changes — without touching the `.domain` files.
-4. The developer implements the change in code, then runs **`/distill`** (incremental) to update the model.
-5. **`/spec verify`** checks whether the projected changes have been realized. When all changes match, the spec is marked as `REALIZED`.
-
-This is the **brownfield** path — code already exists. Knowledge flows from implementation to model, and change proposals flow from model back to code.
+</details>
 
 ## Folder Structure
 
@@ -221,15 +308,15 @@ This is the **brownfield** path — code already exists. Knowledge flows from im
 specy-skill/
 ├── src/                          # All source material (humans edit here)
 │   ├── skills/                   # Skill templates and build system
-│   │   ├── build.sh              # Assembles SKILL.md from templates → dist/
-│   │   ├── distill/           # Distill skill source
-│   │   │   ├── main.md           # Template with <!-- include: --> markers
-│   │   │   └── heuristics/       # Stack-specific extraction heuristics (source)
-│   │   ├── dialogue/             # Dialogue skill source
-│   │   ├── spec/                 # Spec skill source
-│   │   ├── prd/                  # PRD skill source
-│   │   ├── sysreq/              # System requirements skill source
-│   │   └── domain/              # Domain skill source
+│   │   ├── build.sh              # Assembles dist/ plugin (skills + manifest) from templates
+│   │   ├── plugin/               # Plugin manifest template (plugin.json)
+│   │   ├── prd-design/           # specy:prd-design source
+│   │   ├── sysreq-design/        # specy:sysreq-design source
+│   │   ├── sysreq-extract-from-code/   # specy:sysreq-extract-from-code source
+│   │   ├── domain-design/        # specy:domain-design source
+│   │   ├── domain-build-code/    # specy:domain-build-code source (main.md + heuristics/)
+│   │   ├── domain-extract-from-code/   # specy:domain-extract-from-code source (main.md + heuristics/)
+│   │   └── domain-dialogue/      # specy:domain-dialogue source (auxiliary)
 │   ├── grammars/                 # Canonical EBNF grammars (source of truth)
 │   │   ├── domain.ebnf           # Domain model grammar (.domain)
 │   │   ├── prd.ebnf              # Product requirements grammar (.prd)
@@ -246,36 +333,31 @@ specy-skill/
 │   └── langium/                  # Langium-based LSP server + parser CLI
 │       └── specy-domain/         # .domain language server (parse/validate/JSON)
 │
-├── dist/                         # Built output (generated — do not edit)
-│   ├── distill/               # Distill skill
-│   │   ├── SKILL.md
-│   │   ├── heuristics/           # Runtime heuristics (copied from src)
-│   │   └── grammars/             # Runtime grammar (domain.ebnf)
-│   ├── dialogue/
-│   ├── spec/
-│   ├── prd/
-│   │   ├── SKILL.md
-│   │   ├── grammar/              # prd.ebnf
-│   │   └── references/           # PRODUCT-REQ-METAMODEL.md
-│   ├── sysreq/
-│   │   ├── SKILL.md
-│   │   ├── grammar/              # sysreq.ebnf
-│   │   └── references/           # SYSTEM-REQ + PRODUCT-REQ metamodels
-│   └── domain/
-│       ├── SKILL.md
-│       ├── grammar/              # domain.ebnf
-│       └── references/           # All 3 metamodels
+├── dist/                         # Built `specy` plugin (generated — do not edit)
+│   ├── .claude-plugin/
+│   │   └── plugin.json           # Plugin manifest
+│   └── skills/
+│       ├── prd-design/           # SKILL.md + grammar/ + references/
+│       ├── sysreq-design/        # SKILL.md + grammar/ + references/
+│       ├── sysreq-extract-from-code/   # SKILL.md + grammar/ + references/
+│       ├── domain-design/        # SKILL.md + grammar/ + references/
+│       ├── domain-build-code/    # SKILL.md + heuristics/ + grammar/ + references/
+│       ├── domain-extract-from-code/   # SKILL.md + heuristics/ + grammars/
+│       └── domain-dialogue/      # SKILL.md (auxiliary)
 │
 ├── examples/                     # Example Specy projects
 │   ├── business-loan/            # .prd, .sysreq, .domain
 │   ├── url-shortener/            # .prd, .sysreq, .domain
-│   ├── uber/                     # Multi-context ride-sharing domain
-│   └── ecommerce/                # Orders example (v2 format)
+│   ├── ride-now/                 # Multi-context ride-sharing (.prd, .sysreq, .domain)
+│   ├── ecommerce/                # Orders example (.domain, v2 format)
+│   └── uber-old/                 # Legacy ride-sharing example (superseded by ride-now)
 │
 ├── hooks/                        # Git hooks
 │   └── pre-commit                # Ensures dist/ stays in sync with src/
 │
-├── install-skills-for-user.sh    # Symlinks dist/ skills to ~/.claude/skills/
+├── install-skills-for-user.sh    # Symlinks the built plugin (dist/) to ~/.claude/skills/specy
+├── parse-domain.sh               # Render a .domain to JSON / YAML / Markdown
+├── LICENSE                       # MIT
 ├── VISION.md                     # Specy thesis and design philosophy
 ├── CORE_TEAM.md                  # Core review panel
 └── VISION_TEAM.md                # Vision review panel
@@ -285,9 +367,9 @@ specy-skill/
 
 **`src/`** — Everything humans edit. Skill templates, grammars, metamodels, and tree-sitter sources. The `src/skills/build.sh` script assembles the final `SKILL.md` files from templates using `<!-- include: path -->` and `<!-- include-code: lang path -->` markers.
 
-**`dist/`** — Build output produced by `src/skills/build.sh`. Contains the assembled `SKILL.md` files and runtime files (heuristics, grammars, metamodel references) that skills load on demand. Never edit files here directly — they are overwritten on each build.
+**`dist/`** — Build output produced by `src/skills/build.sh`: the `specy` plugin (`.claude-plugin/plugin.json` + `skills/<name>/SKILL.md`) plus runtime files (heuristics, grammars, metamodel references) bundled inside each skill. Never edit files here directly — they are overwritten on each build.
 
-**`src/grammars/`** — Canonical EBNF grammars for each file format. The build script copies them to the relevant `dist/` skill directories.
+**`src/grammars/`** — Canonical EBNF grammars for each file format. The build script copies them into the relevant `dist/skills/` directories.
 
 **`src/metamodels/`** — Prose documentation of each metamodel. These describe the concepts, relationships, and constraints that the grammars formalize. Copied to `dist/` as runtime references for skills that need them.
 
@@ -301,7 +383,7 @@ specy-skill/
 
 You need one of the following AI coding assistants:
 
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (Anthropic)
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (Anthropic) — first-class, installs as the `specy` plugin
 - [GitHub Copilot](https://docs.github.com/en/copilot) with custom skills support
 - [Vibe](https://docs.mistral.ai/vibe/) (Mistral)
 
@@ -309,27 +391,31 @@ You need one of the following AI coding assistants:
 
 ### Claude Code (recommended)
 
-Run the install script to symlink all skills from `dist/` to `~/.claude/skills/`:
+Build the plugin, then install it (symlinks the built plugin into `~/.claude/skills/specy`, where
+Claude Code auto-loads it as the `specy@skills-dir` plugin):
 
 ```bash
-./install-skills-for-user.sh
+./src/skills/build.sh          # assemble dist/ (the specy plugin)
+./install-skills-for-user.sh   # symlink dist/ → ~/.claude/skills/specy
 ```
 
-This installs: distill, dialogue, spec, prd, sysreq, domain.
+Skills then invoke as `specy:<name>` — e.g. `specy:domain-design`, `specy:domain-build-code`.
+
+Alternatives:
+
+```bash
+claude --plugin-dir ./dist                                  # load for one session, no install
+claude plugin marketplace add . && claude plugin install specy   # via the local marketplace
+```
 
 ### Manual setup (any assistant)
 
-Skills are self-contained directories with a `SKILL.md` and optional runtime files. Symlink or copy from `dist/` to your assistant's skill directory:
+The built plugin lives in `dist/` (a `.claude-plugin/plugin.json` + `skills/<name>/SKILL.md` tree).
+For assistants without plugin support, each skill is a self-contained directory under `dist/skills/`
+that can be symlinked individually:
 
 ```bash
-# Claude Code
-ln -sf /path/to/specy-skill/dist/distill ~/.claude/skills/distill
-
-# GitHub Copilot (in your target project)
-ln -sf /path/to/specy-skill/dist/distill .github/skills/distill
-
-# Vibe (Mistral)
-ln -sf /path/to/specy-skill/dist/distill ~/.vibe/skills/distill
+ln -sf /path/to/specy/dist/skills/domain-design ~/.claude/skills/domain-design
 ```
 
 ## Usage
@@ -337,22 +423,24 @@ ln -sf /path/to/specy-skill/dist/distill ~/.vibe/skills/distill
 The typical workflow follows the traceability chain:
 
 ```
-1. /prd          Define the product (problem, personas, features)
-2. /sysreq       Formalize testable requirements from the PRD
-3. /domain       Build the domain model from requirements
-4. /dialogue     Explore and question the domain model
-5. /spec         Formalize change specifications against the model
-6. /distill      Reverse-engineer domain models from existing code
+1. specy:prd-design                Define the product (problem, personas, features)        → .prd
+2. specy:sysreq-design             Formalize testable requirements from the PRD            → .sysreq
+3. specy:domain-design             Build the domain model from requirements                → .domain
+4. specy:domain-build-code         Generate code from the domain model                     → code
+   specy:domain-extract-from-code  Reverse-engineer a domain model from existing code      → .domain
+   specy:sysreq-extract-from-code  Recover EARS requirements from existing code            → .sysreq
+5. specy:domain-dialogue           Explore and question a domain model                     → (read-only)
 ```
 
 | Workflow | What to run |
 |----------|-------------|
-| Define product requirements | `/prd` |
-| Formalize system requirements (EARS) | `/sysreq` after PRD is done |
-| Build domain model from requirements | `/domain` after system requirements are written |
-| Explore and question a domain model | `/dialogue` in a project with `*.domain` files |
-| Formalize a business rule or feature | `/spec` against existing models |
-| Extract domain models from existing code | `/distill` in your project |
+| Define product requirements | `specy:prd-design` |
+| Formalize system requirements (EARS) | `specy:sysreq-design` after the PRD is done |
+| Build a domain model from requirements | `specy:domain-design` after requirements are written |
+| Generate code from a domain model | `specy:domain-build-code` with a target stack |
+| Reverse-engineer a domain model from code | `specy:domain-extract-from-code` in your project |
+| Recover EARS requirements from code | `specy:sysreq-extract-from-code` in your project |
+| Explore and question a domain model | `specy:domain-dialogue` in a project with `*.domain` files |
 
 In your target project, Specy files live under `specy/` at the project root.
 
@@ -392,7 +480,7 @@ The easiest entry point is the `parse-domain.sh` wrapper at the repository root.
 | `--pretty` | Pretty-print JSON output |
 | `--raw` | Emit the faithful Langium AST (with `$type` discriminators) instead of the clean domain model — `json`/`yaml` only |
 
-`json` and `yaml` share a **clean domain model**: Langium internals are stripped and definitions are grouped by kind (`entities`, `values`, `enums`, `commands`, `queries`, `events`, `services`, `policies`, …) under their owning context/module. `markdown` renders the same model as a documentation-style document (heading hierarchy, field tables, operation summaries). Pass `--raw` when you need the verbatim AST.
+`json` and `yaml` share a **clean domain model**: Langium internals are stripped and definitions are grouped by kind (`entities`, `values`, `enums`, `commands`, `queries`, `events`, `services`, `reactions`, …) under their owning context/module. `markdown` renders the same model as a documentation-style document (heading hierarchy, field tables, operation summaries). Pass `--raw` when you need the verbatim AST.
 
 Under the hood the wrapper calls the CLI directly, which you can also invoke from `src/langium/specy-domain/`:
 
@@ -440,6 +528,8 @@ Emits one `path:line:col [severity] message` line per diagnostic. Exits `0` when
 
 ## Contributing
 
+Specy is built in the open — issues and PRs are welcome. The design philosophy lives in [VISION.md](./VISION.md); if it resonates, a ⭐ helps.
+
 ### Setup
 
 After cloning, configure the git hooks:
@@ -455,8 +545,8 @@ Always edit files in `src/skills/`, never the generated files in `dist/`.
 After editing, regenerate:
 
 ```bash
-src/skills/build.sh            # Build all skills
-src/skills/build.sh distill # Build a single skill
+src/skills/build.sh                          # Build all skills
+src/skills/build.sh domain-extract-from-code # Build a single skill
 ```
 
 The pre-commit hook blocks commits if `dist/` is out of date with `src/`.

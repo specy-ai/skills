@@ -17,14 +17,14 @@ fi
 # Run the build
 "$BUILD_SCRIPT" > /dev/null 2>&1
 
-# Check all SKILL.md files and runtime files in dist/ for drift
+# Check all SKILL.md files and runtime files in dist/skills/ for drift
 DIRTY=()
-for skill_dir in "$REPO_ROOT"/dist/*/; do
+for skill_dir in "$REPO_ROOT"/dist/skills/*/; do
   skill=$(basename "$skill_dir")
   # Check SKILL.md
   if [[ -f "$skill_dir/SKILL.md" ]]; then
     if ! git diff --quiet -- "$skill_dir/SKILL.md" 2>/dev/null; then
-      DIRTY+=("dist/$skill/SKILL.md")
+      DIRTY+=("dist/skills/$skill/SKILL.md")
     fi
   fi
   # Check runtime files (heuristics, grammars, grammar, references)
@@ -33,7 +33,7 @@ for skill_dir in "$REPO_ROOT"/dist/*/; do
       for f in "$skill_dir/$subdir"/*; do
         [[ -f "$f" ]] || continue
         if ! git diff --quiet -- "$f" 2>/dev/null; then
-          DIRTY+=("dist/$skill/$subdir/$(basename "$f")")
+          DIRTY+=("dist/skills/$skill/$subdir/$(basename "$f")")
         fi
       done
     fi

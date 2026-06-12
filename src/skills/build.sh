@@ -76,7 +76,7 @@ resolve_includes() {
 build_skill() {
   local skill="$1"
   local src_dir="$SCRIPT_DIR/$skill"
-  local out_dir="$DIST_DIR/$skill"
+  local out_dir="$DIST_DIR/skills/$skill"
   local template="$src_dir/main.md"
   local output="$out_dir/SKILL.md"
 
@@ -101,60 +101,77 @@ build_skill() {
 # These are files the agent reads on demand during execution, not embedded in SKILL.md.
 # -----------------------------------------------------------------------------
 copy_runtime_files() {
-  # distill: stack-specific heuristics
-  local distill_v3_heuristics="$DIST_DIR/distill/heuristics"
-  mkdir -p "$distill_v3_heuristics"
+  local SKILLS_OUT="$DIST_DIR/skills"
+
+  # domain-extract-from-code: stack-specific heuristics + domain grammar
+  local dxc_heuristics="$SKILLS_OUT/domain-extract-from-code/heuristics"
+  mkdir -p "$dxc_heuristics"
   for f in java-spring.md typescript-nestjs.md clojure.md; do
-    cp "$SCRIPT_DIR/distill/heuristics/$f" "$distill_v3_heuristics/$f"
+    cp "$SCRIPT_DIR/domain-extract-from-code/heuristics/$f" "$dxc_heuristics/$f"
   done
-  echo "  distill/heuristics/: 3 files copied"
+  local dxc_grammars="$SKILLS_OUT/domain-extract-from-code/grammars"
+  mkdir -p "$dxc_grammars"
+  cp "$REPO_ROOT/src/grammars/domain.ebnf" "$dxc_grammars/domain.ebnf"
+  echo "  domain-extract-from-code/: 3 heuristics + 1 grammar copied"
 
-  # distill: domain grammar
-  local distill_v3_grammars="$DIST_DIR/distill/grammars"
-  mkdir -p "$distill_v3_grammars"
-  cp "$REPO_ROOT/src/grammars/domain.ebnf" "$distill_v3_grammars/domain.ebnf"
-  echo "  distill/grammars/: 1 file copied"
+  # domain-build-code: stack-specific heuristics + domain grammar + metamodel
+  local dbc_heuristics="$SKILLS_OUT/domain-build-code/heuristics"
+  mkdir -p "$dbc_heuristics"
+  for f in java-spring.md typescript-nestjs.md clojure.md; do
+    cp "$SCRIPT_DIR/domain-build-code/heuristics/$f" "$dbc_heuristics/$f"
+  done
+  local dbc_grammar="$SKILLS_OUT/domain-build-code/grammar"
+  local dbc_refs="$SKILLS_OUT/domain-build-code/references"
+  mkdir -p "$dbc_grammar" "$dbc_refs"
+  cp "$REPO_ROOT/src/grammars/domain.ebnf" "$dbc_grammar/domain.ebnf"
+  cp "$REPO_ROOT/src/metamodels/DOMAIN-METAMODEL.md" "$dbc_refs/DOMAIN-METAMODEL.md"
+  echo "  domain-build-code/: 3 heuristics + 1 grammar + 1 reference copied"
 
-  # spec: v3 domain grammar (runtime reference for changes blocks)
-  local spec_grammars="$DIST_DIR/spec/grammars"
-  mkdir -p "$spec_grammars"
-  cp "$REPO_ROOT/src/grammars/domain.ebnf" "$spec_grammars/domain.ebnf"
-  echo "  spec/grammars/: 1 file copied"
+  # sysreq-extract-from-code: sysreq grammar + metamodel reference
+  local sxc_refs="$SKILLS_OUT/sysreq-extract-from-code/references"
+  local sxc_grammar="$SKILLS_OUT/sysreq-extract-from-code/grammar"
+  mkdir -p "$sxc_refs" "$sxc_grammar"
+  cp "$REPO_ROOT/src/metamodels/SYSTEM-REQ-METAMODEL.md" "$sxc_refs/SYSTEM-REQ-METAMODEL.md"
+  cp "$REPO_ROOT/src/grammars/sysreq.ebnf" "$sxc_grammar/sysreq.ebnf"
+  echo "  sysreq-extract-from-code/: 1 reference + 1 grammar copied"
 
-  # distill-sysreq: sysreq grammar + metamodel reference
-  local distill_sysreq_refs="$DIST_DIR/distill-sysreq/references"
-  local distill_sysreq_grammar="$DIST_DIR/distill-sysreq/grammar"
-  mkdir -p "$distill_sysreq_refs" "$distill_sysreq_grammar"
-  cp "$REPO_ROOT/src/metamodels/SYSTEM-REQ-METAMODEL.md" "$distill_sysreq_refs/SYSTEM-REQ-METAMODEL.md"
-  cp "$REPO_ROOT/src/grammars/sysreq.ebnf" "$distill_sysreq_grammar/sysreq.ebnf"
-  echo "  distill-sysreq/references/: 1 file, distill-sysreq/grammar/: 1 file copied"
-
-  # prd: grammar + references
-  local prd_grammar="$DIST_DIR/prd/grammar"
-  local prd_refs="$DIST_DIR/prd/references"
+  # prd-design: grammar + references
+  local prd_grammar="$SKILLS_OUT/prd-design/grammar"
+  local prd_refs="$SKILLS_OUT/prd-design/references"
   mkdir -p "$prd_grammar" "$prd_refs"
   cp "$REPO_ROOT/src/grammars/prd.ebnf" "$prd_grammar/prd.ebnf"
   cp "$REPO_ROOT/src/metamodels/PRODUCT-REQ-METAMODEL.md" "$prd_refs/PRODUCT-REQ-METAMODEL.md"
-  echo "  prd/grammar/: 1 file, prd/references/: 1 file copied"
+  echo "  prd-design/: 1 grammar + 1 reference copied"
 
-  # sysreq: grammar + references
-  local sysreq_grammar="$DIST_DIR/sysreq/grammar"
-  local sysreq_refs="$DIST_DIR/sysreq/references"
+  # sysreq-design: grammar + references
+  local sysreq_grammar="$SKILLS_OUT/sysreq-design/grammar"
+  local sysreq_refs="$SKILLS_OUT/sysreq-design/references"
   mkdir -p "$sysreq_grammar" "$sysreq_refs"
   cp "$REPO_ROOT/src/grammars/sysreq.ebnf" "$sysreq_grammar/sysreq.ebnf"
   cp "$REPO_ROOT/src/metamodels/SYSTEM-REQ-METAMODEL.md" "$sysreq_refs/SYSTEM-REQ-METAMODEL.md"
   cp "$REPO_ROOT/src/metamodels/PRODUCT-REQ-METAMODEL.md" "$sysreq_refs/PRODUCT-REQ-METAMODEL.md"
-  echo "  sysreq/grammar/: 1 file, sysreq/references/: 2 files copied"
+  echo "  sysreq-design/: 1 grammar + 2 references copied"
 
-  # domain: grammar + references
-  local domain_grammar="$DIST_DIR/domain/grammar"
-  local domain_refs="$DIST_DIR/domain/references"
+  # domain-design: grammar + references
+  local domain_grammar="$SKILLS_OUT/domain-design/grammar"
+  local domain_refs="$SKILLS_OUT/domain-design/references"
   mkdir -p "$domain_grammar" "$domain_refs"
   cp "$REPO_ROOT/src/grammars/domain.ebnf" "$domain_grammar/domain.ebnf"
   cp "$REPO_ROOT/src/metamodels/DOMAIN-METAMODEL.md" "$domain_refs/DOMAIN-METAMODEL.md"
   cp "$REPO_ROOT/src/metamodels/SYSTEM-REQ-METAMODEL.md" "$domain_refs/SYSTEM-REQ-METAMODEL.md"
   cp "$REPO_ROOT/src/metamodels/PRODUCT-REQ-METAMODEL.md" "$domain_refs/PRODUCT-REQ-METAMODEL.md"
-  echo "  domain/grammar/: 1 file, domain/references/: 3 files copied"
+  echo "  domain-design/: 1 grammar + 3 references copied"
+}
+
+# -----------------------------------------------------------------------------
+# copy_plugin_manifest: writes the Claude Code plugin manifest into dist/
+# so dist/ is a self-contained `specy` plugin (dist/.claude-plugin/plugin.json).
+# -----------------------------------------------------------------------------
+copy_plugin_manifest() {
+  local manifest_dir="$DIST_DIR/.claude-plugin"
+  mkdir -p "$manifest_dir"
+  cp "$SCRIPT_DIR/plugin/plugin.json" "$manifest_dir/plugin.json"
+  echo "  .claude-plugin/plugin.json copied"
 }
 
 # -----------------------------------------------------------------------------
@@ -167,15 +184,18 @@ if [[ $# -gt 0 ]]; then
     build_skill "$skill"
   done
 else
-  build_skill dialogue
-  build_skill spec
-  build_skill distill
-  build_skill distill-sysreq
-  build_skill prd
-  build_skill sysreq
-  build_skill domain
+  # Core skills (artefact-oriented names; invoked as specy:<name>)
+  build_skill prd-design
+  build_skill sysreq-design
+  build_skill sysreq-extract-from-code
+  build_skill domain-design
+  build_skill domain-build-code
+  build_skill domain-extract-from-code
+  # Auxiliary skills
+  build_skill domain-dialogue
 fi
 
 copy_runtime_files
+copy_plugin_manifest
 
 echo "Done."

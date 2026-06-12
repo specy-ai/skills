@@ -1,0 +1,21 @@
+{
+  "name": "specy",
+  "version": "1.0.0",
+  "description": "Specy — a Domain-Driven Design toolkit. Design PRDs, system requirements (EARS), and domain models; generate code from a domain model; and extract requirements or a domain model from existing code.",
+  "author": {
+    "name": "Jeremie Grodziski",
+    "email": "jeremie@defsquare.com"
+  },
+  "homepage": "https://github.com/specy-ai/skills",
+  "repository": "https://github.com/specy-ai/skills",
+  "license": "MIT",
+  "keywords": [
+    "ddd",
+    "domain-driven-design",
+    "prd",
+    "requirements",
+    "ears",
+    "code-generation",
+    "reverse-engineering"
+  ]
+}

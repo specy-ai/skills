@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-Specy is a DDD toolkit that captures business knowledge in structured DSL files (`.domain`, `.prd`, `.sysreq`). This repo contains the AI skill definitions that power `/distill`, `/dialogue`, `/spec`, `/prd`, `/sysreq`, and `/domain` commands. Skills are assembled from modular templates into self-contained SKILL.md files.
+Specy is a DDD toolkit that captures business knowledge in structured DSL files (`.domain`, `.prd`, `.sysreq`). This repo contains the AI skill definitions, packaged as a single Claude Code **plugin** named `specy`. The 7 skills (invoked as `specy:<name>`) are: 6 core — `prd-design`, `sysreq-design`, `sysreq-extract-from-code`, `domain-design`, `domain-build-code`, `domain-extract-from-code` — plus 1 auxiliary — `domain-dialogue`. Skills are assembled from modular templates into self-contained `dist/skills/<name>/SKILL.md` files.
 
 ## Build Commands
 
@@ -13,12 +13,12 @@ Specy is a DDD toolkit that captures business knowledge in structured DSL files 
 ./src/skills/build.sh
 
 # Build a single skill
-./src/skills/build.sh distill
+./src/skills/build.sh domain-extract-from-code
 
 # Build tree-sitter parsers + run smoke tests against examples/
 ./src/tree-sitters/build.sh    # requires: tree-sitter CLI
 
-# Install skills to ~/.claude/skills/ (symlinks from dist/)
+# Install the `specy` plugin (symlinks dist/ → ~/.claude/skills/specy)
 ./install-skills-for-user.sh
 ```
 
@@ -33,13 +33,16 @@ Skills are assembled by `src/skills/build.sh` from modular templates:
    - `<!-- include: path -->` — inlines file content as-is
    - `<!-- include-code: lang path -->` — wraps in a fenced code block
 3. Include paths resolve first relative to the skill directory, then fall back to `src/skills/`
-4. Output goes to `dist/{skill}/SKILL.md`
+4. Output goes to `dist/skills/{skill}/SKILL.md`
 
-The build script also copies **runtime files** (heuristics, grammars) to `dist/` — these are loaded on demand by skill agents, not inlined into SKILL.md.
+The build assembles the `specy` plugin into `dist/`: `dist/.claude-plugin/plugin.json` plus a
+`dist/skills/{skill}/` directory per skill. It also copies **runtime files** (heuristics, grammars,
+metamodel references) **inside each skill's dir** — loaded on demand by skill agents, not inlined into
+SKILL.md (a plugin can't reference files outside its own directory).
 
 ### Source of Truth
 
-- **Domain grammar**: `src/grammars/domain.ebnf` is the single canonical grammar. It gets copied to `dist/distill/grammars/` by the build script.
+- **Domain grammar**: `src/grammars/domain.ebnf` is the single canonical grammar. It gets copied to `dist/skills/domain-extract-from-code/grammars/` (and the other domain skills) by the build script.
 - **Metamodels**: `src/metamodels/DOMAIN-METAMODEL.md` documents the v3 domain metamodel concepts and constraints.
 - **Skill templates**: `src/skills/{skill}/main.md` — always edit here, never in `dist/`.
 
@@ -66,7 +69,7 @@ The current domain DSL (v3) uses a hierarchical structure:
 organization > context (with context map) > module > entities/aggregates/values/...
 ```
 
-Key v3 constructs: entity (with `identity`, `duplicate detection`, `states { machine }`), aggregate, value, command, query, event, external/error/temporal events, three service types (domain/application/infrastructure), policy (reactive: trigger/guard/effect), invariant (with enforcement), precondition/postcondition on operations, agreement/reconciliation, interface.
+Key v3 constructs: entity (with `identity`, `duplicate detection`, `states { machine }`), aggregate, value, command, query, event, external/error/temporal events, three service types (domain/application/infrastructure), reaction (reactive rule: `triggered-by` event / `effects` command), invariant (with enforcement), precondition/postcondition on operations, agreement/reconciliation, interface.
 
 ## Development Workflow
 

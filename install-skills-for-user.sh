@@ -1,38 +1,38 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Install Specy skills by symlinking from this repo to ~/.claude/skills/
-# Skills: distill, distill-sysreq, dialogue, spec, prd, sysreq, domain
+# Install the Specy plugin by symlinking the built plugin (dist/) into ~/.claude/skills/specy.
+# Placed there, Claude Code auto-loads it as the `specy@skills-dir` plugin, and its skills invoke as:
+#   specy:prd-design  specy:sysreq-design  specy:sysreq-extract-from-code
+#   specy:domain-design  specy:domain-build-code  specy:domain-extract-from-code
+#   specy:domain-dialogue
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-SKILLS_SRC="$SCRIPT_DIR/dist"
-SKILLS_DST="$HOME/.claude/skills"
+PLUGIN_SRC="$SCRIPT_DIR/dist"
+PLUGIN_DST="$HOME/.claude/skills/specy"
 
-SKILLS=(distill distill-sysreq dialogue spec prd sysreq domain)
+if [ ! -f "$PLUGIN_SRC/.claude-plugin/plugin.json" ]; then
+    echo "Plugin not built: $PLUGIN_SRC/.claude-plugin/plugin.json not found."
+    echo "Run ./src/skills/build.sh first."
+    exit 1
+fi
 
-echo "Installing Specy skills from $SKILLS_SRC"
-echo "Destination: $SKILLS_DST"
+echo "Installing the Specy plugin from $PLUGIN_SRC"
+echo "Destination: $PLUGIN_DST"
 echo ""
 
-for skill in "${SKILLS[@]}"; do
-    src="$SKILLS_SRC/$skill"
-    dst="$SKILLS_DST/$skill"
+mkdir -p "$HOME/.claude/skills"
 
-    if [ ! -d "$src" ]; then
-        echo "  SKIP  $skill (source directory not found)"
-        continue
-    fi
+if [ -e "$PLUGIN_DST" ] || [ -L "$PLUGIN_DST" ]; then
+    rm -rf "$PLUGIN_DST"
+    echo "  CLEAN removed existing $PLUGIN_DST"
+fi
 
-    # Remove existing skill directory or symlink
-    if [ -e "$dst" ] || [ -L "$dst" ]; then
-        rm -rf "$dst"
-        echo "  CLEAN $skill (removed existing)"
-    fi
-
-    # Create symlink to the entire skill directory
-    ln -s "$src" "$dst"
-    echo "  OK    $skill -> $src"
-done
-
+ln -s "$PLUGIN_SRC" "$PLUGIN_DST"
+echo "  OK    specy -> $PLUGIN_SRC"
 echo ""
-echo "Done. Installed ${#SKILLS[@]} skills."
+echo "Done. Skills invoke as specy:<name> — e.g. specy:domain-design, specy:domain-build-code."
+echo ""
+echo "Alternatives:"
+echo "  claude --plugin-dir \"$PLUGIN_SRC\"                  # load for one session, no install"
+echo "  claude plugin marketplace add \"$SCRIPT_DIR\" && claude plugin install specy   # via marketplace"
