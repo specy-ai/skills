@@ -1,4 +1,4 @@
-# Specy
+![Specy.AI logo](./specy-ai-logo.png)
 
 > **Capture business knowledge as living models — then design, reverse-engineer, explore, and generate code from it, with full traceability from product vision to implementation.**
 
