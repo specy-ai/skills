@@ -7,7 +7,7 @@
 [![Skills](https://img.shields.io/badge/skills-7-success.svg)](#skills)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#contributing)
 
-![Specy domain metamodel](./domain-metamodel-diagram.svg)
+![Specy domain metamodel](./specy-DDD-metamodel.png)
 
 Specy is a Domain-Driven Design toolkit that ships as a **Claude Code plugin** (`specy`). Its AI-assisted skills work across three structured DSLs:
 
