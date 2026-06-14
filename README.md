@@ -9,7 +9,7 @@
 
 ![Specy domain metamodel](./specy-DDD-metamodel.png)
 
-Specy is a Domain-Driven Design toolkit that ships as a **Claude Code plugin** (`specy`). Its AI-assisted skills work across three structured DSLs:
+Specy is a Domain-Driven Design toolkit that ships as a **Claude Code plugin** (`specy`). Its agent skills work across three structured DSLs:
 
 - **`.prd`** — product requirements (the *why* and *what*)
 - **`.sysreq`** — system requirements in EARS syntax (the formal *what*)
@@ -19,9 +19,9 @@ A companion parser/CLI additionally renders a `.domain` model to **JSON, YAML, o
 
 ## Why Specy?
 
-Business knowledge — rules, invariants, constraints, operational decisions — is the real asset; **code is a derivation.** Yet most of that knowledge lives only in people's heads and scattered across a codebase, so it evaporates on every rewrite and every AI-generated change quietly drifts from intent.
+Domain knowledge — rules, invariants, constraints, operational decisions — is the real asset; **code is a derivation.** Yet most of that knowledge lives only in people's heads and scattered across a codebase, so it evaporates on every rewrite and every AI-generated change quietly drifts from intent.
 
-Specy makes that knowledge **explicit, traceable, and executable.** Model it once and every element stays linked along a single chain — product vision (`.prd`) → testable requirement (`.sysreq`) → domain model (`.domain`) → generated code — and back again.
+Specy makes that knowledge **explicit, comprehensive, traceable, and executable.** The domain model is sufficiently complete and comprehensive to describe the structure, behavior, and interactions with the expected software system. Model it once and every element stays linked along a single chain — product vision (`.prd`) → testable requirement (`.sysreq`) → domain model (`.domain`) → generated code — and back again.
 
 > *Why not just prompt the LLM directly?* A prompt is throwaway and unverifiable. A Specy model is a durable, reviewable artifact you can diff, trace, regenerate code from, and reverse-engineer out of legacy code.
 
