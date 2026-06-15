@@ -156,6 +156,7 @@ module.exports = grammar({
       $.application_service_def,
       $.infrastructure_service_def,
       $.service_def,
+      $.repository_def,
       $.invariant_def,
       $.agreement_def,
       $.reaction_def,
@@ -1058,6 +1059,34 @@ module.exports = grammar({
       $.returns_clause,
       $.precondition_clause,
       $.postcondition_clause,
+    ),
+
+    // =========================================================================
+    // Repository (persistence port derived from an entity / aggregate root)
+    // =========================================================================
+
+    repository_def: $ => seq(
+      'repository',
+      field('name', $.type_name),
+      'for',
+      field('entity', $.type_name),
+      optional($.description),
+      optional($.metadata_block),
+      '{',
+      optional($.satisfies_decl),
+      repeat($.repository_op_def),
+      '}',
+    ),
+
+    // Signature-style operation: `name(params): returnType` (return type optional)
+    repository_op_def: $ => seq(
+      field('name', $.identifier),
+      '(',
+      optional($.param_list),
+      ')',
+      optional(seq(':', field('return_type', $.field_type))),
+      optional($.description),
+      optional($.metadata_block),
     ),
 
     // =========================================================================

@@ -500,6 +500,29 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
     aggregate RideRequestAggregate root RideRequest { contains [RideOffer] }
     aggregate RideAggregate root Ride { contains [EmergencyEvent, SafetyReport] }
 
+    // --- Repositories (persistence ports for the aggregate roots) ---
+
+    repository RideRequestRepository for RideRequest
+        :: "Persists and retrieves ride requests" {
+        satisfies [REQ-RIDE-001]
+        store(rideRequest: RideRequest)
+        getById(id: UUID): RideRequest
+        remove(id: UUID)
+        search(criteria: RideRequestSearchCriteria): list<RideRequest>
+        findByRiderId(riderId: UUID): list<RideRequest>
+        findByStatus(status: RideRequestStatus): list<RideRequest>
+    }
+
+    repository RideRepository for Ride
+        :: "Persists and retrieves rides" {
+        store(ride: Ride)
+        getById(id: UUID): Ride
+        remove(id: UUID)
+        search(criteria: RideSearchCriteria): list<Ride>
+        findByRiderId(riderId: UUID): list<Ride>
+        findByDriverId(driverId: UUID): list<Ride>
+    }
+
     statemachine RideRequestLifecycle on RideRequest {
         start searching
         state searching {}

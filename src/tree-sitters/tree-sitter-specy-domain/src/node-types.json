@@ -732,6 +732,10 @@
           "named": true
         },
         {
+          "type": "repository_def",
+          "named": true
+        },
+        {
           "type": "requirements_source_decl",
           "named": true
         },
@@ -2570,6 +2574,10 @@
           "named": true
         },
         {
+          "type": "repository_def",
+          "named": true
+        },
+        {
           "type": "service_def",
           "named": true
         },
@@ -3566,6 +3574,98 @@
     }
   },
   {
+    "type": "repository_def",
+    "named": true,
+    "fields": {
+      "entity": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "repository_op_def",
+          "named": true
+        },
+        {
+          "type": "satisfies_decl",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "repository_op_def",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "return_type": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "field_type",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        },
+        {
+          "type": "param_list",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "requirements_source_decl",
     "named": true,
     "fields": {},
@@ -3930,6 +4030,10 @@
         },
         {
           "type": "reaction_def",
+          "named": true
+        },
+        {
+          "type": "repository_def",
           "named": true
         },
         {
@@ -5028,6 +5132,10 @@
     "named": false
   },
   {
+    "type": "for",
+    "named": false
+  },
+  {
     "type": "forall",
     "named": false
   },
@@ -5357,6 +5465,10 @@
   },
   {
     "type": "relative-to",
+    "named": false
+  },
+  {
+    "type": "repository",
     "named": false
   },
   {
