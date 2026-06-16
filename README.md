@@ -19,11 +19,23 @@ A companion parser/CLI additionally renders a `.domain` model to **JSON, YAML, o
 
 ## Why Specy?
 
-Domain knowledge — rules, invariants, constraints, operational decisions — is the real asset; **code is a derivation.** Yet most of that knowledge lives only in people's heads and scattered across a codebase, so it evaporates on every rewrite and every AI-generated change quietly drifts from intent.
+**Domain knowledge is the asset. Code is a derivation.**
+Domain knowledge — concepts, their relationships, their structure, behavior, lifecycle, rules, etc. — is the real asset; Yet, most of this knowledge remains trapped in people's heads or scattered across a fragmented codebase. As a result, critical intent evaporates during rewrites, and AI-assisted changes quietly drift away from the original design.
 
-Specy makes that knowledge **explicit, comprehensive, traceable, and executable.** The domain model is sufficiently complete and comprehensive to describe the structure, behavior, and interactions with the expected software system. Model it once and every element stays linked along a single chain — product vision (`.prd`) → testable requirement (`.sysreq`) → domain model (`.domain`) → generated code — and back again.
+![Domain concept mindmap](./domain-concept.png)
 
-> *Why not just prompt the LLM directly?* A prompt is throwaway and unverifiable. A Specy model is a durable, reviewable artifact you can diff, trace, regenerate code from, and reverse-engineer out of legacy code.
+Specy fixes this by making domain knowledge **explicit, comprehensive, traceable, and executable.** Engineered for scale and carefully crafted by humans, [Specy’s meta-model](https://github.com/specy-ai/skills/blob/main/src/metamodels/DOMAIN-METAMODEL.md) provides the structural depth required to seamlessly map large, highly complex, and reactive software systems.
+
+### The Bi-Directional Chain of Truth
+Specy captures the structure, behavior, and interactions of your software in a unified model. Define it once, and every element stays linked along a continuous, bi-directional pipeline:
+Product Vision (.prd) ⇄ Testable Requirements (.sysreq) ⇄ Domain Model (.domain) ⇄ Generated Code
+Because the chain works both ways, your code always reflects your intent, and your documentation never goes out of date.
+
+### Specy vs. Raw LLM Prompts
+Why not just prompt your way through development? Because prompts are ephemeral and unverifiable. A Specy model is a rigorous, durable engineering artifact. It gives you the power to:
+•	Version & Diff: Track changes to your business logic just like code.
+•	Prevent AI Drift: Ground AI generation within strict, verifiable domain boundaries.
+•	Regenerate & Recover: Seamlessly spin up clean code from your models, or reverse-engineer clean models out of legacy code.
 
 ## Quick start
 
