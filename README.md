@@ -1,6 +1,6 @@
 ![Specy.AI logo](./specy-ai-logo.svg)
 
-> **Capture business knowledge as living models — then design, reverse-engineer, explore, and generate code from it, with full traceability from product vision to implementation.**
+> **The most critical aspect of software is the domain concepts it handles. Specy explicitly defines and structures these concepts to transform them directly into code.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-da7756.svg)](https://github.com/specy-ai/skills)
