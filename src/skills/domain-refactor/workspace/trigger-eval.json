@@ -1,0 +1,23 @@
+[
+  {"query": "i ran specy:domain-extract-from-code on our billing service and the resulting specy/billing.domain is a mess — anemic entities, booleans everywhere. can you redesign it properly?", "should_trigger": true},
+  {"query": "take the extracted loan.domain plus the refactoring.report and give me a clean DDD model", "should_trigger": true},
+  {"query": "the distilled model has primitive obsession all over (raw decimals for money). refactor specy/orders.domain into proper value objects and aggregates", "should_trigger": true},
+  {"query": "turn specy/inventory.domain (reverse-engineered from our legacy code) into a model a DDD purist would approve of, fixing the smells in refactoring.report", "should_trigger": true},
+  {"query": "redesign the payments domain from first principles — the extracted one mirrors the database tables, not the business", "should_trigger": true},
+  {"query": "we reverse-engineered a .domain from the monolith; now make it actually good DDD", "should_trigger": true},
+  {"query": "clean up the god entity in specy/customer.domain and split it into a tight aggregate with proper boundaries", "should_trigger": true},
+  {"query": "the refactoring report flags flag-driven state on Shipment. rework the extracted domain so the illegal states are unrepresentable", "should_trigger": true},
+  {"query": "produce proper-loan.domain from the extracted loan.domain, fixing every smell and telling me which fix addresses which smell", "should_trigger": true},
+  {"query": "our extracted domain model has generic 'OrderUpdated' events and no error paths — refactor it into intent-revealing domain events with explicit error events", "should_trigger": true},
+
+  {"query": "design a domain model for a brand-new ride-sharing product from these product requirements and prose notes", "should_trigger": false},
+  {"query": "extract a domain model from our Spring Boot codebase under ./src — we have no .domain yet", "should_trigger": false},
+  {"query": "generate the Java/Spring code from specy/orders.domain", "should_trigger": false},
+  {"query": "walk me through what the payment context actually does in specy/payment.domain, I just want to understand it", "should_trigger": false},
+  {"query": "refactor this Python function to reduce nesting and pull out a helper", "should_trigger": false},
+  {"query": "write EARS system requirements from our PRD for the checkout feature", "should_trigger": false},
+  {"query": "my specy/loan.domain won't parse with the CLI — fix the syntax errors so it validates", "should_trigger": false},
+  {"query": "rename all the OrderStatus enum values to camelCase across specy/orders.domain", "should_trigger": false},
+  {"query": "create a PRD for a subscription billing product, capture personas and goals", "should_trigger": false},
+  {"query": "review my React component folder structure for better separation of concerns", "should_trigger": false}
+]
