@@ -92,6 +92,7 @@ definition       = enumDef
                  | domainServiceDef
                  | applicationServiceDef
                  | infrastructureServiceDef
+                 | repositoryDef
                  | reactionDef
                  | invariantDef
                  | agreementDef ;
@@ -385,6 +386,19 @@ applicationServiceDef = "application" , "service" , typeName , [ description ] ,
 infrastructureServiceDef = "infrastructure" , "service" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
                          ,   "operations" , "{" , { comment | serviceOpDef } , "}"
                          , "}" ;
+
+// -----------------------------------------------------------------------------
+// Repository — collection-like persistence port derived from an entity or
+// aggregate root. A repository is a kind of infrastructure service; its
+// operations are signatures only (store/getById/remove/search + findByField).
+// The "for" clause names the entity or aggregate root it persists.
+// -----------------------------------------------------------------------------
+
+repositoryDef    = "repository" , typeName , "for" , typeName , [ description ] , [ metadataBlock ] , "{"
+                 ,   [ satisfiesDecl ] , { comment | repositoryOpDef }
+                 , "}" ;
+
+repositoryOpDef  = identifier , "(" , [ paramList ] , ")" , [ ":" , fieldType ] ;
 
 // -----------------------------------------------------------------------------
 // Reaction — reactive rule triggered by an internal event
