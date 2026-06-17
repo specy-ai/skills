@@ -1,0 +1,9 @@
+# Refactoring report — orders
+
+- **Anemic entity**: `Order` holds only fields and no operations; all behaviour lives in `OrderController`.
+- **Primitive obsession**: money as `totalAmount: decimal` + `currency: string`; `customerEmail: string`.
+- **Illegal states representable**: paired flags + satellites — `isPaid`/`paidAt`/`paymentRef`,
+  `isShipped`/`shippedAt`/`trackingNumber`, plus a free-text `status` that can contradict the flags.
+- **Generic event**: `OrderUpdated` reveals no intent; no specific domain events.
+- **No error paths**: operations cannot fail explicitly (no error events).
+- **No aggregate / no state machine**: lifecycle is implicit in boolean flags.

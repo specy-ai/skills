@@ -1,0 +1,379 @@
+// Redesigned from first principles by domain-refactor (greenfield: no requirements-source, satisfies empty).
+// Source of vocabulary: the extracted orders.domain + refactoring.report.
+// The extracted structure (flat anemic entity + flag triplets + generic event) is treated as
+// a description of the implementation, NOT a blueprint. Behaviour drives structure here.
+organization "ShopCo" {
+
+  context "Orders" (orders) :: "Lifecycle of a customer order from placement through payment, shipment and delivery." {
+
+    module "Orders" {
+
+      // =====================================================================
+      // Value types — kill primitive obsession; make invalid values unrepresentable.
+      // =====================================================================
+
+      // from: currency: string. ISO 4217 carries precision/symbol so Money rounds correctly.
+      value Currency :: "An ISO 4217 currency." {
+        fields {
+          code : string required pattern("[A-Z]{3}")
+          precision : integer min(0) max(4)
+          symbol : string
+          displayName : string
+        }
+      }
+
+      // The closed set of currencies ShopCo trades in. A Money amount must use one of these.
+      enum Currencies {
+        USD
+        EUR
+        GBP
+      }
+
+      // from: totalAmount: decimal + currency: string (two loose primitives that could disagree).
+      // Collapsed into one constructor-validated value: amount and currency travel together.
+      value Money :: "A monetary amount in a single currency. Immutable; arithmetic returns new Money." {
+        fields {
+          amount : decimal min(0)
+          currency : Currency required
+        }
+        operations {
+          add(other : Money) : Money :: "Sum of two Money values; defined only for the same currency."
+          isZero() : boolean
+        }
+        invariants {
+          nonNegative :: "An order amount is never negative." {
+            amount >= 0
+          }
+        }
+      }
+
+      // from: customerEmail: string. A validated value, not free text.
+      value EmailAddress :: "A syntactically valid email address." {
+        fields {
+          value : string required pattern(".+@.+\\..+")
+        }
+      }
+
+      // from: isPaid + paidAt + paymentRef (a flag plus two satellite fields that can contradict it).
+      // Collapsed into a present-or-absent value object: an Order either has a Payment or it does not.
+      // The illegal combinations (paid but no ref, ref but not paid) are now unrepresentable.
+      value Payment :: "Evidence that an order was paid: when, and the gateway reference." {
+        fields {
+          reference : string required
+          amount : Money required
+          paidAt : datetime required
+        }
+      }
+
+      // from: isShipped + shippedAt + trackingNumber. Same flag-triplet collapse as Payment.
+      value Shipment :: "Evidence that an order was dispatched: when, and the carrier tracking number." {
+        fields {
+          trackingNumber : string required
+          shippedAt : datetime required
+        }
+      }
+
+      // =====================================================================
+      // Aggregate — Order is its own root. Boundary justified by one shared invariant:
+      // the order's lifecycle state and its payment/shipment facts must commit together
+      // (you cannot ship an unpaid order, cannot pay a cancelled order). One entity, so a
+      // tight aggregate by construction.
+      // =====================================================================
+
+      // from: entity Order (anemic data bag). Now behaviour-rich, with explicit lifecycle.
+      aggregate Order :: "A customer's order through its full lifecycle." {
+        root Order
+        entities { Order }
+        identity id : uuid
+
+        fields {
+          customer : EmailAddress required immutable
+          // from: totalAmount + currency, replaced by a single Money value.
+          total : Money required immutable
+          // from: isPaid/paidAt/paymentRef — present iff the order has been paid.
+          payment : Payment optional
+          // from: isShipped/shippedAt/trackingNumber — present iff the order has shipped.
+          shipment : Shipment optional
+          // from: status: string (free text). Replaced by the OrderLifecycle state machine below;
+          // this field is the machine's current state, not arbitrary text.
+        }
+
+        // from: UpdateOrder(field, value) generic mutator + behaviour buried in OrderController.
+        // One generic mutator becomes intent-revealing operations, each a state transition.
+        operations {
+
+          "Place order" on PlaceOrder :: "Register a new, unpaid order." {
+            precondition positiveTotal {
+              not total.isZero()
+            } rejects "An order must have a positive total."
+            emits OrderPlaced {
+              orderId = id
+              customer = customer
+              total = total
+            }
+          }
+
+          "Record payment" on PayOrder :: "Attach proof of payment to an awaiting order." {
+            precondition awaitingPayment {
+              payment is not defined
+            } rejects "Order is not awaiting payment."
+            // UNCLEAR: must the captured amount equal the order total exactly, or may a
+            // gateway settle a different amount (currency conversion, partial capture)? Modelled
+            // as exact-match for now; a domain expert should confirm.
+            precondition amountMatchesTotal {
+              payment.amount = total
+            } rejects "Captured amount does not match the order total."
+            sets Order {
+              payment = payment
+            }
+            emits OrderPaid {
+              orderId = id
+              reference = payment.reference
+              paidAt = payment.paidAt
+            }
+          }
+
+          "Ship order" on ShipOrder :: "Dispatch a paid order to the customer." {
+            precondition isPaid {
+              payment is defined
+            } rejects "An unpaid order cannot be shipped."
+            sets Order {
+              shipment = shipment
+            }
+            emits OrderShipped {
+              orderId = id
+              trackingNumber = shipment.trackingNumber
+              shippedAt = shipment.shippedAt
+            }
+          }
+
+          "Confirm delivery" on ConfirmDelivery :: "Mark a shipped order as delivered." {
+            precondition isShipped {
+              shipment is defined
+            } rejects "An order that has not shipped cannot be delivered."
+            emits OrderDelivered {
+              orderId = id
+            }
+          }
+
+          // from: isCancelled flag. A cancellation is a transition, not a standalone boolean.
+          "Cancel order" on CancelOrder :: "Cancel an order before it has shipped." {
+            // NOTE: divergence from extracted model. The flat flags allowed isCancelled to be set
+            // at any time, even alongside isShipped. We reject cancelling a shipped order with a
+            // precondition rather than modelling a recover-from-shipped state. Post-shipment
+            // returns/refunds are a separate concern, out of scope of placement→delivery.
+            precondition notYetShipped {
+              shipment is not defined
+            } rejects "A shipped order cannot be cancelled; initiate a return instead."
+            emits OrderCancelled {
+              orderId = id
+              reason = reason
+            }
+          }
+        }
+
+        // from: status: string. The implicit boolean-flag lifecycle made explicit, with no
+        // dead or trap states. State-scoped invariants pin which facts must be present in each state.
+        states {
+          machine OrderLifecycle {
+            [*] --> AwaitingPayment on "Place order"
+
+            state AwaitingPayment :: "Placed, not yet paid." {
+              invariant noPaymentYet { payment is not defined }
+              invariant noShipmentYet { shipment is not defined }
+            }
+
+            state Paid :: "Paid, awaiting dispatch." {
+              invariant paymentPresent { payment is defined }
+              invariant noShipmentYet { shipment is not defined }
+            }
+
+            state Shipped :: "Dispatched, in transit." {
+              invariant paymentPresent { payment is defined }
+              invariant shipmentPresent { shipment is defined }
+            }
+
+            final state Delivered :: "Received by the customer." {
+              invariant shipmentPresent { shipment is defined }
+            }
+
+            final state Cancelled :: "Cancelled before dispatch." {
+              invariant neverShipped { shipment is not defined }
+            }
+
+            AwaitingPayment --> Paid on "Record payment"
+            AwaitingPayment --> Cancelled on "Cancel order"
+            Paid --> Shipped on "Ship order"
+            Paid --> Cancelled on "Cancel order"
+            Shipped --> Delivered on "Confirm delivery"
+          }
+        }
+
+        // Aggregate-level invariant spanning the whole lifecycle, independent of current state.
+        invariants {
+          shipmentImpliesPayment :: "A shipped order has always been paid." {
+            if shipment is defined { payment is defined }
+          }
+        }
+      }
+
+      // =====================================================================
+      // Commands — replace the single generic UpdateOrder(field, value) mutator.
+      // Each carries an orderId correlation id (CancelOrder/PayOrder also carry intent payload).
+      // =====================================================================
+
+      command PlaceOrder {
+        fields {
+          orderId : uuid required
+          customer : EmailAddress required
+          total : Money required
+        }
+      }
+
+      command PayOrder {
+        fields {
+          orderId : uuid required
+          payment : Payment required
+        }
+      }
+
+      command ShipOrder {
+        fields {
+          orderId : uuid required
+          shipment : Shipment required
+        }
+      }
+
+      command ConfirmDelivery {
+        fields {
+          orderId : uuid required
+        }
+      }
+
+      command CancelOrder {
+        fields {
+          orderId : uuid required
+          reason : string required
+        }
+      }
+
+      // =====================================================================
+      // Events — replace the single generic OrderUpdated. Each is intent-revealing,
+      // past tense, and carries the entity id as correlation/causation key.
+      // =====================================================================
+
+      event OrderPlaced {
+        fields {
+          orderId : uuid required
+          customer : EmailAddress required
+          total : Money required
+        }
+      }
+
+      event OrderPaid {
+        fields {
+          orderId : uuid required
+          reference : string required
+          paidAt : datetime required
+        }
+      }
+
+      event OrderShipped {
+        fields {
+          orderId : uuid required
+          trackingNumber : string required
+          shippedAt : datetime required
+        }
+      }
+
+      event OrderDelivered {
+        fields {
+          orderId : uuid required
+        }
+      }
+
+      event OrderCancelled {
+        fields {
+          orderId : uuid required
+          reason : string required
+        }
+      }
+
+      // =====================================================================
+      // Error events — the extracted model had NO error paths. Every operation that can
+      // be refused now has an explicit failure fact.
+      // =====================================================================
+
+      error event OrderPlacementRejected {
+        fields {
+          orderId : uuid required
+          reason : string required
+        }
+      }
+
+      error event PaymentRejected {
+        fields {
+          orderId : uuid required
+          reason : string required
+        }
+      }
+
+      error event ShipmentRejected {
+        fields {
+          orderId : uuid required
+          reason : string required
+        }
+      }
+
+      error event CancellationRejected {
+        fields {
+          orderId : uuid required
+          reason : string required
+        }
+      }
+
+      // =====================================================================
+      // Temporal event — payment deadline. Surfaced from time itself, replacing whatever
+      // cron/batch swept unpaid orders in the implementation (no such concern was extracted,
+      // so this is a NOTE-level addition the lifecycle implies).
+      // =====================================================================
+
+      // NOTE: added concern not present in the extracted model. An order left AwaitingPayment
+      // indefinitely is a real-world gap; we give it an explicit 24h expiry deadline.
+      // UNCLEAR: the 24-hour window is assumed — a domain expert should confirm the SLA.
+      temporal event PaymentDeadlineElapsed :: "Fires when an order remains unpaid past its deadline." {
+        reference OrderPlaced
+        offset "24 hours"
+        guard { payment is not defined }
+        fields {
+          orderId : uuid required
+        }
+      }
+
+      // When the payment deadline elapses on a still-unpaid order, cancel it automatically.
+      reaction expireUnpaidOrder :: "Cancel an order whose payment window has elapsed." {
+        trigger PaymentDeadlineElapsed
+        guard { payment is not defined }
+        effect CancelOrder
+      }
+
+      // =====================================================================
+      // Read surface — queries read current state through the derived OrderRepository.
+      // =====================================================================
+
+      query getOrder :: "Retrieve a single order by id." {
+        fields {
+          orderId : uuid required
+        }
+        returns Order
+      }
+
+      query findOrdersByCustomer :: "List a customer's orders." {
+        fields {
+          customer : EmailAddress required
+        }
+        returns list<Order>
+      }
+    }
+  }
+}

@@ -4,7 +4,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-da7756.svg)](https://github.com/specy-ai/skills)
-[![Skills](https://img.shields.io/badge/skills-7-success.svg)](#skills)
+[![Skills](https://img.shields.io/badge/skills-8-success.svg)](#skills)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#contributing)
 
 ![Specy domain metamodel](./specy-DDD-metamodel.png)
@@ -107,7 +107,7 @@ The same model can also be rendered to JSON/YAML/Markdown, explored conversation
 
 ## Skills
 
-Specy ships as a single Claude Code plugin — **`specy`** — providing 7 AI-assisted skills: 6 **core**
+Specy ships as a single Claude Code plugin — **`specy`** — providing 8 AI-assisted skills: 7 **core**
 skills named after their input→output artefact, plus 1 **auxiliary** skill. Each is invoked as
 `specy:<name>`.
 
@@ -119,6 +119,7 @@ skills named after their input→output artefact, plus 1 **auxiliary** skill. Ea
 | `specy:domain-design` | `.sysreq` / `.prd` / prose | `.domain` |
 | `specy:domain-build-code` | `.domain` + target stack | source code |
 | `specy:domain-extract-from-code` | codebase | `.domain` (+ refactoring report) |
+| `specy:domain-refactor` | extracted `.domain` (+ refactoring report) | `.refactored.domain` + rationale |
 | `specy:domain-dialogue` *(aux)* | `.domain` | — (read-only conversation) |
 
 ### `specy:prd-design` — Product Requirements
@@ -168,6 +169,17 @@ infrastructure services to a chosen stack (**Java/Spring, TypeScript/NestJS, Clo
 Reverse-engineers source code into a `.domain` model and produces DDD refactoring recommendations.
 Creation / incremental (`git diff` + `.meta.json`) / targeted modes; stack-specific heuristics for
 Java/Spring, TypeScript/NestJS, Clojure; test-aware enrichment.
+
+### `specy:domain-refactor` — Redesign an Extracted Model
+
+**Input:** an extracted `specy/<domain>.domain` (+ optional `specy/refactoring.report`). **Output:** `specy/<domain>.refactored.domain` + `specy/<domain>.refactor-rationale.md`.
+
+Redesigns a reverse-engineered model **from first principles** into a proper DDD model: re-derives
+entities, value types, aggregates, and behaviour from the business problem while preserving the
+ubiquitous language, and fixes the extracted model's design smells (anemic/god entities, primitive
+obsession, flag-driven illegal states, generic events, missing temporal/error paths). The bridge from
+`domain-extract-from-code` (faithful but flawed) to a clean target model. Maps every change to the smell
+it resolves and flags rules a domain expert should confirm.
 
 ### `specy:domain-dialogue` — Domain Exploration *(auxiliary)*
 
@@ -328,6 +340,7 @@ specy-skill/
 │   │   ├── domain-design/        # specy:domain-design source
 │   │   ├── domain-build-code/    # specy:domain-build-code source (main.md + heuristics/)
 │   │   ├── domain-extract-from-code/   # specy:domain-extract-from-code source (main.md + heuristics/)
+│   │   ├── domain-refactor/      # specy:domain-refactor source
 │   │   └── domain-dialogue/      # specy:domain-dialogue source (auxiliary)
 │   ├── grammars/                 # Canonical EBNF grammars (source of truth)
 │   │   ├── domain.ebnf           # Domain model grammar (.domain)
@@ -355,6 +368,7 @@ specy-skill/
 │       ├── domain-design/        # SKILL.md + grammar/ + references/
 │       ├── domain-build-code/    # SKILL.md + heuristics/ + grammar/ + references/
 │       ├── domain-extract-from-code/   # SKILL.md + heuristics/ + grammars/
+│       ├── domain-refactor/      # SKILL.md + grammar/ + references/
 │       └── domain-dialogue/      # SKILL.md (auxiliary)
 │
 ├── examples/                     # Example Specy projects
@@ -440,6 +454,7 @@ The typical workflow follows the traceability chain:
 3. specy:domain-design             Build the domain model from requirements                → .domain
 4. specy:domain-build-code         Generate code from the domain model                     → code
    specy:domain-extract-from-code  Reverse-engineer a domain model from existing code      → .domain
+   specy:domain-refactor           Redesign an extracted model from first principles       → .refactored.domain
    specy:sysreq-extract-from-code  Recover EARS requirements from existing code            → .sysreq
 5. specy:domain-dialogue           Explore and question a domain model                     → (read-only)
 ```
@@ -451,6 +466,7 @@ The typical workflow follows the traceability chain:
 | Build a domain model from requirements | `specy:domain-design` after requirements are written |
 | Generate code from a domain model | `specy:domain-build-code` with a target stack |
 | Reverse-engineer a domain model from code | `specy:domain-extract-from-code` in your project |
+| Redesign an extracted model into proper DDD | `specy:domain-refactor` on the extracted `.domain` |
 | Recover EARS requirements from code | `specy:sysreq-extract-from-code` in your project |
 | Explore and question a domain model | `specy:domain-dialogue` in a project with `*.domain` files |
 

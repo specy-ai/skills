@@ -1,0 +1,37 @@
+// Reverse-engineered from code by domain-extract-from-code (faithful but flawed)
+organization "ShopCo" {
+  context "orders" {
+    module "Orders" {
+
+      // anemic: data bag, no behaviour; primitive obsession; flag-driven state
+      entity Order {
+        // source: src/main/java/shopco/Order.java
+        id : uuid
+        customerEmail : string
+        totalAmount : decimal
+        currency : string
+        isPaid : boolean
+        paidAt : datetime
+        paymentRef : string
+        isShipped : boolean
+        shippedAt : datetime
+        trackingNumber : string
+        isCancelled : boolean
+        status : string
+      }
+
+      command UpdateOrder {
+        // source: src/main/java/shopco/OrderController.java
+        orderId : uuid
+        field : string
+        value : string
+      }
+
+      // generic, intent-poor event; no error events anywhere
+      event OrderUpdated {
+        // source: src/main/java/shopco/OrderController.java
+        orderId : uuid
+      }
+    }
+  }
+}

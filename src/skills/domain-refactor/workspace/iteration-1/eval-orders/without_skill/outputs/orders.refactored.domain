@@ -1,0 +1,284 @@
+// Redesigned from first principles — fixes the smells in refactoring.report.
+// source: src/main/java/shopco/Order.java, OrderController.java (reverse-engineered)
+organization "ShopCo" {
+  context "orders" :: "Customer orders from placement through payment and shipment" {
+    module "Orders" {
+
+      // -----------------------------------------------------------------
+      // Enums — the lifecycle is now an explicit, closed set of states,
+      // replacing the free-text `status` string and the contradictory
+      // isPaid / isShipped / isCancelled flag soup.
+      // -----------------------------------------------------------------
+
+      enum OrderStatus { placed, paid, shipped, delivered, cancelled }
+      enum Currency { USD, EUR, GBP }
+      enum CancellationReason { customerRequested, paymentFailed, outOfStock, fraudSuspected }
+
+      // -----------------------------------------------------------------
+      // Value types — kill primitive obsession. Money, email, payment and
+      // tracking references become first-class, validated values instead
+      // of loose decimal / string fields.
+      // -----------------------------------------------------------------
+
+      value Money :: "An amount in a single currency; created only if valid" {
+        fields {
+          amount : decimal min(0)
+          currency : Currency
+        }
+      }
+
+      value EmailAddress :: "A syntactically valid customer email" {
+        fields {
+          value : string matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
+        }
+      }
+
+      // Payment and shipment facts are cohesive bundles, not loose satellite
+      // fields. Each exists as a whole or not at all — no half-set paid/paidAt.
+      value PaymentDetail :: "Proof that the order was paid" {
+        fields {
+          paymentRef : string
+          amountPaid : Money
+          paidAt : datetime
+        }
+      }
+
+      value ShipmentDetail :: "Proof that the order was dispatched" {
+        fields {
+          trackingNumber : string
+          shippedAt : datetime
+        }
+      }
+
+      value CancellationDetail :: "Why and when an order was cancelled" {
+        fields {
+          reason : CancellationReason
+          cancelledAt : datetime
+        }
+      }
+
+      value OrderLine :: "A product and the quantity ordered, at a captured price" {
+        fields {
+          productRef : string
+          quantity : int min(1)
+          unitPrice : Money
+        }
+      }
+
+      // -----------------------------------------------------------------
+      // Entity — Order is now a behaviour-bearing aggregate root with an
+      // explicit lifecycle, replacing the anemic data bag whose logic lived
+      // in OrderController.
+      //
+      // Illegal states are made unrepresentable: the optional payment /
+      // shipment / cancellation details are present iff the status requires
+      // them, enforced by invariants and the state machine. There is exactly
+      // one source of truth for lifecycle (status), so flags can no longer
+      // contradict each other.
+      // -----------------------------------------------------------------
+
+      entity Order :: "A customer's order through its lifecycle" {
+        identifier orderId : uuid
+
+        duplicate-detection on [customerEmail, placedAt]
+
+        fields {
+          customerEmail : EmailAddress
+          lines : list<OrderLine>
+          total : Money
+          status : OrderStatus default("placed")
+          payment : PaymentDetail optional
+          shipment : ShipmentDetail optional
+          cancellation : CancellationDetail optional
+          placedAt : datetime
+          updatedAt : datetime
+        }
+
+        invariants {
+          paidHasPayment :: "Paid (or later) orders carry payment proof" enforcement reject {
+            if status = paid or status = shipped or status = delivered { payment is defined }
+          }
+          shippedHasShipment :: "Shipped (or later) orders carry shipment proof" enforcement reject {
+            if status = shipped or status = delivered { shipment is defined }
+          }
+          cancelledHasReason :: "Cancelled orders record a reason" enforcement reject {
+            if status = cancelled { cancellation is defined }
+          }
+          totalMatchesLines :: "Order total equals the sum of its line amounts" enforcement reject {
+            total.amount = sum(lines.unitPrice.amount * lines.quantity)
+          }
+          nonEmpty :: "An order has at least one line" enforcement reject {
+            lines is not empty
+          }
+        }
+
+        operations {
+
+          "Place order" on PlaceOrder {
+            precondition hasLines { placeOrder.lines is not empty }
+            sets Order {
+              customerEmail = placeOrder.customerEmail
+              lines = placeOrder.lines
+              total = placeOrder.total
+              status = placed
+              placedAt = now()
+              updatedAt = now()
+            }
+            emits OrderPlaced {
+              orderId = Order.orderId
+              customerEmail = Order.customerEmail
+              total = Order.total
+              placedAt = Order.placedAt
+            }
+          }
+
+          "Pay order" on PayOrder {
+            precondition awaitingPayment { Order.status = placed }
+            precondition amountMatchesTotal { payOrder.amountPaid = Order.total }
+            sets Order {
+              status = paid
+              payment = PaymentDetail(
+                paymentRef = payOrder.paymentRef,
+                amountPaid = payOrder.amountPaid,
+                paidAt = now()
+              )
+              updatedAt = now()
+            }
+            emits OrderPaid {
+              orderId = Order.orderId
+              paymentRef = Order.payment.paymentRef
+              amountPaid = Order.payment.amountPaid
+              paidAt = Order.payment.paidAt
+            }
+          }
+
+          "Reject payment" on RejectPayment {
+            precondition awaitingPayment { Order.status = placed }
+            raises PaymentRejected {
+              orderId = Order.orderId
+              reason = rejectPayment.reason
+              rejectedAt = now()
+            }
+          }
+
+          "Ship order" on ShipOrder {
+            precondition mustBePaid { Order.status = paid }
+            sets Order {
+              status = shipped
+              shipment = ShipmentDetail(
+                trackingNumber = shipOrder.trackingNumber,
+                shippedAt = now()
+              )
+              updatedAt = now()
+            }
+            emits OrderShipped {
+              orderId = Order.orderId
+              trackingNumber = Order.shipment.trackingNumber
+              shippedAt = Order.shipment.shippedAt
+            }
+          }
+
+          "Confirm delivery" on ConfirmDelivery {
+            precondition mustBeShipped { Order.status = shipped }
+            sets Order {
+              status = delivered
+              updatedAt = now()
+            }
+            emits OrderDelivered {
+              orderId = Order.orderId
+              deliveredAt = now()
+            }
+          }
+
+          "Cancel order" on CancelOrder {
+            precondition notShippedYet {
+              Order.status = placed or Order.status = paid
+            }
+            sets Order {
+              status = cancelled
+              cancellation = CancellationDetail(
+                reason = cancelOrder.reason,
+                cancelledAt = now()
+              )
+              updatedAt = now()
+            }
+            emits OrderCancelled {
+              orderId = Order.orderId
+              reason = Order.cancellation.reason
+              cancelledAt = Order.cancellation.cancelledAt
+            }
+          }
+        }
+      }
+
+      // -----------------------------------------------------------------
+      // Aggregate + state machine — the lifecycle that used to be implicit
+      // in boolean flags is now explicit and enumerable.
+      // -----------------------------------------------------------------
+
+      aggregate OrderAggregate root Order { contains [Order] }
+
+      statemachine OrderLifecycle on Order {
+        start placed
+        state placed {}
+        state paid {
+          invariant hasPayment { Order.payment is defined }
+        }
+        state shipped {
+          invariant hasShipment { Order.shipment is defined }
+        }
+        state delivered {}
+        state cancelled {
+          invariant hasCancellation { Order.cancellation is defined }
+        }
+        transition placed -> paid on PayOrder
+        transition paid -> shipped on ShipOrder
+        transition shipped -> delivered on ConfirmDelivery
+        transition placed -> cancelled on CancelOrder
+        transition paid -> cancelled on CancelOrder
+        final delivered
+        final cancelled
+      }
+
+      // -----------------------------------------------------------------
+      // Commands — replace the catch-all UpdateOrder(field, value) reflection
+      // command with one intention-revealing command per business action.
+      // -----------------------------------------------------------------
+
+      command PlaceOrder { fields { orderId : uuid; customerEmail : EmailAddress; lines : list<OrderLine>; total : Money } }
+      command PayOrder { fields { orderId : uuid; paymentRef : string; amountPaid : Money } }
+      command RejectPayment { fields { orderId : uuid; reason : string } }
+      command ShipOrder { fields { orderId : uuid; trackingNumber : string } }
+      command ConfirmDelivery { fields { orderId : uuid } }
+      command CancelOrder { fields { orderId : uuid; reason : CancellationReason } }
+
+      // -----------------------------------------------------------------
+      // Events — intent-rich domain events replace the single, meaningless
+      // OrderUpdated. Each event names the business fact that occurred.
+      // -----------------------------------------------------------------
+
+      event OrderPlaced { fields { orderId : uuid; customerEmail : EmailAddress; total : Money; placedAt : datetime } }
+      event OrderPaid { fields { orderId : uuid; paymentRef : string; amountPaid : Money; paidAt : datetime } }
+      event OrderShipped { fields { orderId : uuid; trackingNumber : string; shippedAt : datetime } }
+      event OrderDelivered { fields { orderId : uuid; deliveredAt : datetime } }
+      event OrderCancelled { fields { orderId : uuid; reason : CancellationReason; cancelledAt : datetime } }
+
+      // -----------------------------------------------------------------
+      // Error events — the missing failure paths. Operations can now fail
+      // explicitly instead of silently.
+      // -----------------------------------------------------------------
+
+      error-event PaymentRejected { fields { orderId : uuid; reason : string; rejectedAt : datetime } }
+
+      // -----------------------------------------------------------------
+      // Reactions — make the cross-event policy explicit: a rejected payment
+      // cancels the order.
+      // -----------------------------------------------------------------
+
+      reaction cancelOnPaymentRejected :: "Cancel an order whose payment was rejected" {
+        trigger PaymentRejected
+        effect CancelOrder(orderId = event.orderId, reason = paymentFailed)
+      }
+    }
+  }
+}

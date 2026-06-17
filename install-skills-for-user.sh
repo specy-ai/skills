@@ -5,7 +5,7 @@ set -euo pipefail
 # Placed there, Claude Code auto-loads it as the `specy@skills-dir` plugin, and its skills invoke as:
 #   specy:prd-design  specy:sysreq-design  specy:sysreq-extract-from-code
 #   specy:domain-design  specy:domain-build-code  specy:domain-extract-from-code
-#   specy:domain-dialogue
+#   specy:domain-refactor  specy:domain-dialogue
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_SRC="$SCRIPT_DIR/dist"

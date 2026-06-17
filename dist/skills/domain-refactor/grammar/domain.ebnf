@@ -1,0 +1,670 @@
+// =============================================================================
+// Specy — Domain Model Grammar (.domain)
+// Full metamodel DSL covering all DDD concepts
+// EBNF (ISO 14977 style)
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// Top-level structure
+// -----------------------------------------------------------------------------
+
+domainFile       = { comment | organizationDef } ;
+
+// -----------------------------------------------------------------------------
+// Organization
+// -----------------------------------------------------------------------------
+
+organizationDef  = "organization" , typeName , [ description ] , [ metadataBlock ] , "{"
+                 , { comment | boundedContextDef }
+                 , "}" ;
+
+// -----------------------------------------------------------------------------
+// Bounded Context
+// -----------------------------------------------------------------------------
+
+boundedContextDef = "context" , typeName , [ shortname ] , [ description ] , [ metadataBlock ] , "{"
+                  , { requirementsSourceDecl }
+                  , [ contextMapBlock ]
+                  , { comment | moduleDef }
+                  , "}" ;
+
+requirementsSourceDecl = "requirements-source" , stringLiteral ;
+
+shortname        = "(" , identifier , ")" ;
+
+// -----------------------------------------------------------------------------
+// Context Map — relations between bounded contexts
+// -----------------------------------------------------------------------------
+
+contextMapBlock  = "map" , "{" , { comment | contextRelation } , "}" ;
+
+contextRelation  = upstreamRelation
+                 | downstreamRelation
+                 | symmetricRelation ;
+
+upstreamRelation    = "upstream" , typeName , ":" , upstreamPattern ;
+
+downstreamRelation  = "downstream" , typeName , ":" , downstreamPattern ;
+
+symmetricRelation   = "symmetric" , typeName , ":" , symmetricPattern ;
+
+upstreamPattern  = "OHS" ;
+
+downstreamPattern = "CS" | "Conformist" | "ACL" ;
+
+symmetricPattern = "SharedKernel" | "PublishedLanguage" | "Partnership" | "SeparateWays" ;
+
+// -----------------------------------------------------------------------------
+// Module
+// -----------------------------------------------------------------------------
+
+moduleDef        = "module" , typeName , [ description ] , [ metadataBlock ] , "{"
+                 , [ dependsBlock ]
+                 , { comment | interfaceDef | definition }
+                 , "}" ;
+
+dependsBlock     = "depends" , "on" , "{" , { typeName } , "}" ;
+
+// -----------------------------------------------------------------------------
+// Interface
+// -----------------------------------------------------------------------------
+
+interfaceDef     = "interface" , typeName , [ description ] , [ metadataBlock ] , "{"
+                 , { comment | exposesClause }
+                 , "}" ;
+
+exposesClause    = "exposes" , dotPath ;
+
+// -----------------------------------------------------------------------------
+// Definitions — all domain concepts within a module
+// -----------------------------------------------------------------------------
+
+definition       = enumDef
+                 | valueDef
+                 | entityDef
+                 | aggregateDef
+                 | commandDef
+                 | queryDef
+                 | eventDef
+                 | externalEventDef
+                 | errorEventDef
+                 | temporalEventDef
+                 | domainServiceDef
+                 | applicationServiceDef
+                 | infrastructureServiceDef
+                 | reactionDef
+                 | invariantDef
+                 | agreementDef ;
+
+// -----------------------------------------------------------------------------
+// Enum
+// -----------------------------------------------------------------------------
+
+enumDef          = "enum" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
+                 , enumValue , { enumValue }
+                 , "}" ;
+
+// -----------------------------------------------------------------------------
+// Satisfies — traceability link to system requirements
+// Links a domain element to the requirement(s) it realizes.
+// -----------------------------------------------------------------------------
+
+satisfiesDecl    = "satisfies" , "[" , requirementId , { "," , requirementId } , "]" ;
+
+requirementId    = "REQ" , "-" , idSegment , "-" , idNumber ;
+
+idSegment        = upperLetter , { upperLetter | digit | "-" } ;
+
+idNumber         = digit , digit , digit ;
+
+enumValue        = identifier ;
+
+// -----------------------------------------------------------------------------
+// Value Type
+// -----------------------------------------------------------------------------
+
+valueDef         = "value" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
+                 ,   "fields" , "{" , { comment | fieldDecl } , "}"
+                 , [ "operations" , "{" , { comment | valueOpDef } , "}" ]
+                 , [ "invariants" , "{" , { scopedInvariantDef } , "}" ]
+                 , "}" ;
+
+valueOpDef       = identifier , "(" , [ paramList ] , ")" , ":" , fieldType
+                 , [ description ] , [ metadataBlock ] ;
+
+// -----------------------------------------------------------------------------
+// Entity
+// -----------------------------------------------------------------------------
+
+entityDef        = "entity" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
+                 ,   "identity" , fieldName , ":" , fieldType
+                 , [ "duplicate" , "detection" , "{" , expression , "}" ]
+                 ,   "fields" , "{" , { comment | fieldDecl } , "}"
+                 , [ "references" , "{" , { referenceDecl } , "}" ]
+                 , [ "operations" , "{" , { comment | operationDef } , "}" ]
+                 , [ "states" , "{" , { stateMachineDef } , "}" ]
+                 , [ "invariants" , "{" , { scopedInvariantDef } , "}" ]
+                 , "}" ;
+
+// -----------------------------------------------------------------------------
+// Aggregate
+// -----------------------------------------------------------------------------
+
+aggregateDef     = "aggregate" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
+                 ,   "root" , typeName
+                 ,   "entities" , "{" , { typeName } , "}"
+                 ,   "identity" , fieldName , ":" , fieldType
+                 , [ "duplicate" , "detection" , "{" , expression , "}" ]
+                 ,   "fields" , "{" , { comment | fieldDecl } , "}"
+                 , [ "references" , "{" , { referenceDecl } , "}" ]
+                 , [ "operations" , "{" , { comment | operationDef } , "}" ]
+                 , [ "states" , "{" , { stateMachineDef } , "}" ]
+                 , [ "invariants" , "{" , { scopedInvariantDef } , "}" ]
+                 , "}" ;
+
+// -----------------------------------------------------------------------------
+// References and cardinality
+// -----------------------------------------------------------------------------
+
+referenceDecl    = fieldName , ":" , typeName , cardinality ;
+
+cardinality      = number , ".." , ( number | "N" ) ;
+
+// -----------------------------------------------------------------------------
+// State Machine
+// -----------------------------------------------------------------------------
+
+stateMachineDef  = "machine" , typeName , [ description ] , [ metadataBlock ] , "{"
+                 , { comment | stateDef | transitionDef }
+                 , "}" ;
+
+stateDef         = ( "state" | "final" ) , identifier , [ description ] , [ metadataBlock ]
+                 , [ "{" , { stateInvariantDef } , "}" ] ;
+
+stateInvariantDef = "invariant" , identifier , [ description ] , [ metadataBlock ] , "{"
+                  , expression
+                  , "}" ;
+
+transitionDef    = transitionSource , "-->" , identifier
+                 , "on" , identifier
+                 , [ "when" , "{" , expression , "}" ]
+                 , [ "then" , "{" , expression , "}" ] ;
+
+transitionSource = "[*]" | identifier ;
+
+// -----------------------------------------------------------------------------
+// Operations (entity / aggregate owned)
+//
+// Three forms:
+//   Command-triggered:  "Label" on CommandType { ... }
+//   Event-triggered:    "Label" when EventType then CommandType { ... }
+//   Internal:           name(params) : ReturnType { ... }
+// -----------------------------------------------------------------------------
+
+operationDef     = commandTriggeredOp
+                 | eventTriggeredOp
+                 | internalOp ;
+
+commandTriggeredOp = stringLiteral , "on" , typeName
+                   , [ description ] , [ metadataBlock ] , "{"
+                   , { operationClause }
+                   , "}" ;
+
+eventTriggeredOp   = stringLiteral , "when" , typeName , "then" , typeName
+                   , [ description ] , [ metadataBlock ] , "{"
+                   , { operationClause }
+                   , "}" ;
+
+internalOp         = identifier , "(" , [ paramList ] , ")" , [ ":" , fieldType ]
+                   , [ description ] , [ metadataBlock ] , "{"
+                   , { operationClause }
+                   , "}" ;
+
+// -----------------------------------------------------------------------------
+// Operation clauses — statements inside an operation body
+// -----------------------------------------------------------------------------
+
+operationClause  = preconditionClause
+                 | postconditionClause
+                 | resolvesClause
+                 | reactionCallClause
+                 | createsClause
+                 | setsClause
+                 | emitsClause
+                 | serviceCallClause
+                 | foreachClause
+                 | comment ;
+
+// -----------------------------------------------------------------------------
+// Precondition and Postcondition
+// -----------------------------------------------------------------------------
+
+preconditionClause  = "precondition" , identifier , [ description ] , [ metadataBlock ] , "{"
+                    , expression
+                    , "}" , "rejects" , stringLiteral ;
+
+postconditionClause = "postcondition" , identifier , [ description ] , [ metadataBlock ] , "{"
+                    , postconditionExpr
+                    , "}" ;
+
+// Postcondition can reference state_before, state_after, and arguments
+postconditionExpr   = expression ;
+
+// -----------------------------------------------------------------------------
+// Operation body clauses
+// -----------------------------------------------------------------------------
+
+resolvesClause   = "resolves" , typeName , "from" , dotPath ;
+
+reactionCallClause = "reaction" , identifier , "(" , [ argList ] , ")" ;
+
+createsClause    = "creates" , typeName , "{" , { assignmentClause } , "}" ;
+
+setsClause       = "sets" , typeName , "{" , { assignmentClause } , "}" ;
+
+emitsClause      = "emits" , typeName , "{" , { assignmentClause } , "}" ;
+
+assignmentClause = fieldName , "=" , valueExpr ;
+
+serviceCallClause = dotPath , "(" , [ argList ] , ")" , [ description ] ;
+
+foreachClause    = "foreach" , dotPath , "as" , identifier , "{"
+                 , { resolvesClause | setsClause | emitsClause
+                   | serviceCallClause | reactionCallClause }
+                 , "}" ;
+
+// -----------------------------------------------------------------------------
+// Command
+// -----------------------------------------------------------------------------
+
+commandDef       = "command" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
+                 ,   "fields" , "{" , { comment | fieldDecl } , "}"
+                 , "}" ;
+
+// -----------------------------------------------------------------------------
+// Query
+// -----------------------------------------------------------------------------
+
+queryDef         = "query" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
+                 ,   "fields" , "{" , { comment | fieldDecl } , "}"
+                 ,   "returns" , fieldType
+                 , "}" ;
+
+// -----------------------------------------------------------------------------
+// Event (internal — raised within our bounded context)
+// -----------------------------------------------------------------------------
+
+eventDef         = "event" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
+                 ,   "fields" , "{" , { comment | fieldDecl } , "}"
+                 , "}" ;
+
+// -----------------------------------------------------------------------------
+// External Event (consumed from upstream bounded context)
+// -----------------------------------------------------------------------------
+
+externalEventDef = "external" , "event" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
+                 ,   "from" , typeName
+                 ,   "triggers" , "{" , typeName , { "," , typeName } , "}"
+                 , "}" ;
+
+// -----------------------------------------------------------------------------
+// Error Event — raised by an operation on failure
+// -----------------------------------------------------------------------------
+
+errorEventDef    = "error" , "event" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
+                 ,   "fields" , "{" , { comment | fieldDecl } , "}"
+                 , "}" ;
+
+// -----------------------------------------------------------------------------
+// Temporal Event — domain fact caused by the passage of time
+//
+// Three flavors:
+//   relative: fires after a duration from a reference event
+//   absolute: fires at an instant described by an entity field
+//   recurring: fires on each occurrence of a schedule expression
+// -----------------------------------------------------------------------------
+
+temporalEventDef = relativeTemporalEvent
+                 | absoluteTemporalEvent
+                 | recurringTemporalEvent ;
+
+relativeTemporalEvent = "temporal" , "event" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
+                      ,   "reference" , typeName
+                      ,   "offset" , valueExpr
+                      , [ "guard" , "{" , expression , "}" ]
+                      ,   "fields" , "{" , { comment | fieldDecl } , "}"
+                      , "}" ;
+
+absoluteTemporalEvent = "temporal" , "event" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
+                      ,   "instant" , dotPath
+                      , [ "guard" , "{" , expression , "}" ]
+                      ,   "fields" , "{" , { comment | fieldDecl } , "}"
+                      , "}" ;
+
+recurringTemporalEvent = "temporal" , "event" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
+                       ,   "schedule" , stringLiteral
+                       , [ "guard" , "{" , expression , "}" ]
+                       ,   "fields" , "{" , { comment | fieldDecl } , "}"
+                       , "}" ;
+
+// -----------------------------------------------------------------------------
+// Domain Service
+// -----------------------------------------------------------------------------
+
+domainServiceDef = "domain" , "service" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
+                 ,   "operations" , "{" , { comment | serviceOpDef } , "}"
+                 , "}" ;
+
+serviceOpDef     = identifier , "(" , [ paramList ] , ")" , [ ":" , fieldType ]
+                 , [ description ] , [ metadataBlock ] , "{"
+                 , { serviceClause }
+                 , "}" ;
+
+serviceClause    = foreachClause
+                 | resolvesClause
+                 | serviceCallClause
+                 | returnsClause
+                 | preconditionClause
+                 | postconditionClause
+                 | comment ;
+
+returnsClause    = "returns" , valueExpr ;
+
+// -----------------------------------------------------------------------------
+// Application Service
+// -----------------------------------------------------------------------------
+
+applicationServiceDef = "application" , "service" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
+                      ,   "operations" , "{" , { comment | serviceOpDef } , "}"
+                      , "}" ;
+
+// -----------------------------------------------------------------------------
+// Infrastructure Service
+// -----------------------------------------------------------------------------
+
+infrastructureServiceDef = "infrastructure" , "service" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
+                         ,   "operations" , "{" , { comment | serviceOpDef } , "}"
+                         , "}" ;
+
+// -----------------------------------------------------------------------------
+// Reaction — reactive rule triggered by an internal event
+// -----------------------------------------------------------------------------
+
+reactionDef        = "reaction" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
+                 ,   "trigger" , typeName , { "," , typeName }
+                 , [ "guard" , "{" , expression , "}" ]
+                 ,   "effect" , typeName
+                 , "}" ;
+
+// Scoped reaction inside an entity/aggregate reactions { } block
+scopedReactionDef  = identifier , [ description ] , [ metadataBlock ] , "{"
+                 ,   "trigger" , typeName , { "," , typeName }
+                 , [ "guard" , "{" , expression , "}" ]
+                 ,   "effect" , typeName
+                 , "}" ;
+
+// -----------------------------------------------------------------------------
+// Invariant — property that must hold at every observable point
+// -----------------------------------------------------------------------------
+
+invariantDef     = "invariant" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
+                 ,   "on" , typeName
+                 ,   "must" , "{" , expression , "}"
+                 ,   "enforcement" , enforcementStrategy
+                 , "}" ;
+
+enforcementStrategy = "rejection"
+                    | "compensation" , typeName
+                    | "alert" ;
+
+// Scoped invariant inside invariants { } block (no keyword repetition)
+scopedInvariantDef = identifier , [ description ] , [ metadataBlock ] , "{"
+                   , expression
+                   , "}" ;
+
+// -----------------------------------------------------------------------------
+// Agreement — cross-aggregate consistency property
+// -----------------------------------------------------------------------------
+
+agreementDef     = "agreement" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
+                 ,   "participants" , "{" , typeName , { "," , typeName } , "}"
+                 ,   "predicate" , "{" , expression , "}"
+                 ,   reconciliationDef
+                 , "}" ;
+
+// -----------------------------------------------------------------------------
+// Reconciliation — enforcement mechanism for an agreement
+// -----------------------------------------------------------------------------
+
+reconciliationDef = "reconciliation" , typeName , [ description ] , [ metadataBlock ] , "{"
+                  ,   "trigger" , reconciliationTrigger
+                  ,   "detection" , detectionStrategy
+                  ,   "compensation" , "{" , typeName , { "," , typeName } , "}"
+                  , [ "coordination" , coordinationStyle ]
+                  , [ escalationChainDef ]
+                  , "}" ;
+
+reconciliationTrigger = "event" , typeName , { "," , typeName }
+                      | "schedule" , stringLiteral ;
+
+detectionStrategy     = "query" | "event-sourced" ;
+
+coordinationStyle     = "choreography" | "orchestration" ;
+
+// -----------------------------------------------------------------------------
+// Escalation Chain — ordered recovery steps when compensation fails
+// -----------------------------------------------------------------------------
+
+escalationChainDef = "escalation" , [ description ] , [ metadataBlock ] , "{"
+                   , escalationStep , { escalationStep }
+                   , "}" ;
+
+escalationStep   = "step" , identifier , [ description ] , [ metadataBlock ] , "{"
+                 ,   "when" , "{" , expression , "}"
+                 ,   "action" , escalationAction
+                 , "}" ;
+
+// Terminal actions: alert, suspend, manual
+// Non-terminal actions: retry, compensate (must not be final step)
+escalationAction = "retry" , "(" , integer , ")"
+                 | "compensate" , "{" , typeName , { "," , typeName } , "}"
+                 | "alert" , stringLiteral
+                 | "suspend"
+                 | "manual" , stringLiteral ;
+
+// -----------------------------------------------------------------------------
+// Fields
+// -----------------------------------------------------------------------------
+
+fieldDecl        = fieldName , ":" , fieldType , { constraint } ;
+
+fieldName        = identifier ;
+
+fieldType        = primitiveType
+                 | collectionType
+                 | typeName ;
+
+primitiveType    = "string"
+                 | "int" | "integer"
+                 | "long"
+                 | "decimal"
+                 | "boolean"
+                 | "date"
+                 | "datetime"
+                 | "time"
+                 | "duration"
+                 | "uuid" ;
+
+collectionType   = ( "list" | "set" | "map" ) , "<" , fieldType , [ "," , fieldType ] , ">" ;
+
+// -----------------------------------------------------------------------------
+// Constraints
+// -----------------------------------------------------------------------------
+
+constraint       = "required"
+                 | "optional"
+                 | "unique"
+                 | "immutable"
+                 | "ordered"
+                 | "default" , "(" , literalValue , ")"
+                 | "min" , "(" , number , ")"
+                 | "max" , "(" , number , ")"
+                 | "range" , "(" , number , "," , number , ")"
+                 | "minLength" , "(" , integer , ")"
+                 | "maxLength" , "(" , integer , ")"
+                 | "pattern" , "(" , stringLiteral , ")"
+                 | "past"
+                 | "future"
+                 | "pastOrPresent"
+                 | "futureOrPresent" ;
+
+// -----------------------------------------------------------------------------
+// Parameters
+// -----------------------------------------------------------------------------
+
+paramList        = paramDecl , { "," , paramDecl } ;
+
+paramDecl        = identifier , ":" , fieldType ;
+
+argList          = expression , { "," , expression }
+                 | namedArgList ;
+
+namedArgList     = namedArg , { "," , namedArg } ;
+
+namedArg         = identifier , "=" , valueExpr ;
+
+// -----------------------------------------------------------------------------
+// Description — :: operator
+// Attaches a human-readable description to any construct. Does not change semantics.
+// -----------------------------------------------------------------------------
+
+description      = "::" , stringLiteral ;
+
+// -----------------------------------------------------------------------------
+// Metadata — arbitrary key/value annotations
+// Attaches domain or tooling metadata to any construct.
+// -----------------------------------------------------------------------------
+
+metadataBlock    = "meta" , "{" , { metadataEntry } , "}" ;
+
+metadataEntry    = identifier , "=" , literalValue ;
+
+// -----------------------------------------------------------------------------
+// Expressions
+// -----------------------------------------------------------------------------
+
+expression       = orExpr ;
+
+orExpr           = andExpr , { "or" , andExpr } ;
+
+andExpr          = notExpr , { "and" , notExpr } ;
+
+notExpr          = [ "not" ] , comparison ;
+
+comparison       = addExpr , [ compOp , addExpr ] ;
+
+compOp           = "=" | "!=" | ">" | "<" | ">=" | "<=" ;
+
+addExpr          = mulExpr , { ( "+" | "-" ) , mulExpr } ;
+
+mulExpr          = unaryExpr , { ( "*" | "/" ) , unaryExpr } ;
+
+unaryExpr        = ifExpr
+                 | everyExpr
+                 | dotPath , "is" , "defined"
+                 | dotPath , "is" , "not" , "defined"
+                 | dotPath , "in" , "{" , valueList , "}"
+                 | dotPath , "not" , "in" , "{" , valueList , "}"
+                 | functionCall
+                 | dotPath
+                 | literal
+                 | "(" , expression , ")" ;
+
+// if — logical implication (if A then B ≡ not A or B)
+// Used in reactions/invariants for conditional validation.
+ifExpr           = "if" , expression , "{" , expression , "}" ;
+
+// every — universal quantifier over a collection
+everyExpr        = "every" , typeName , "in" , dotPath , "{" , expression , "}" ;
+
+// -----------------------------------------------------------------------------
+// Dot-path: references to fields across the model
+// -----------------------------------------------------------------------------
+
+dotPath          = identifier , { "." , identifier } ;
+
+// -----------------------------------------------------------------------------
+// Value expressions (right-hand side of assignments, comparisons, etc.)
+// -----------------------------------------------------------------------------
+
+valueExpr        = expression
+                 | serviceCallExpr ;
+
+serviceCallExpr  = dotPath , "(" , [ argList ] , ")" ;
+
+valueList        = valueExpr , { "," , valueExpr } ;
+
+// -----------------------------------------------------------------------------
+// Built-in functions
+// -----------------------------------------------------------------------------
+
+functionCall     = functionName , "(" , [ argList ] , ")" ;
+
+functionName     = "count"
+                 | "sum"
+                 | "now"
+                 | "today"
+                 | "size"
+                 | "isEmpty"
+                 | "isNotEmpty" ;
+
+// -----------------------------------------------------------------------------
+// Literals and identifiers
+// -----------------------------------------------------------------------------
+
+literalValue     = stringLiteral | number | "true" | "false" ;
+
+literal          = literalValue ;
+
+stringLiteral    = '"' , { character } , '"' ;
+
+number           = [ "-" ] , digit , { digit } , [ "." , digit , { digit } ] ;
+
+integer          = [ "-" ] , digit , { digit } ;
+
+typeName         = pascalCaseId ;
+
+identifier       = camelCaseId | pascalCaseId ;
+
+pascalCaseId     = upperLetter , { letter | digit } ;
+
+camelCaseId      = lowerLetter , { letter | digit } ;
+
+// -----------------------------------------------------------------------------
+// Comments
+// -----------------------------------------------------------------------------
+
+comment          = "//" , { character } , newline ;
+
+// -----------------------------------------------------------------------------
+// Character classes
+// -----------------------------------------------------------------------------
+
+upperLetter      = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I"
+                 | "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R"
+                 | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" ;
+
+lowerLetter      = "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i"
+                 | "j" | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r"
+                 | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" ;
+
+letter           = upperLetter | lowerLetter ;
+
+digit            = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+
+character        = letter | digit | " " | "!" | "@" | "#" | "$" | "%" | "^"
+                 | "&" | "*" | "(" | ")" | "-" | "_" | "=" | "+" | "["
+                 | "]" | "{" | "}" | "|" | "\\" | ":" | ";" | "'" | ","
+                 | "." | "<" | ">" | "/" | "?" | "~" | "`" ;
+
+newline          = "\n" ;

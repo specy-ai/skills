@@ -308,6 +308,41 @@ context OrderContext {
 
 The `requirements-source` path is relative to the `.domain` file's location. Multiple `requirements-source` declarations are allowed when requirements span several files.
 
+## State machine syntax
+
+Model an entity's lifecycle with a top-level `statemachine` block. Prefer this form — it is what the
+examples use and what every Specy parser (tree-sitter **and** the Langium CLI) accepts, so the model
+validates cleanly. Avoid the mermaid-flavoured `states { machine X { [*] --> S } }` block: although the
+canonical grammar allows it, the Langium CLI does not yet parse it, so `specy:domain-build-code` and the
+`parse-domain.sh` tooling will reject it.
+
+```
+statemachine OrderLifecycle {
+  on Order
+  start AwaitingPayment
+
+  state AwaitingPayment {
+    invariant "unpaid" {
+      must { payment is not defined }
+      message "An order awaiting payment has no recorded payment"
+    }
+  }
+  state Paid {}
+  state Shipped {}
+  final Delivered {}
+  final Cancelled {}
+
+  transition AwaitingPayment -> Paid triggered-by "pay order"
+  transition Paid -> Shipped triggered-by "ship order"
+  transition Shipped -> Delivered triggered-by "confirm delivery"
+  transition AwaitingPayment -> Cancelled triggered-by "cancel order"
+}
+```
+
+Key points: `on <Entity>`; exactly one `start` state; zero or more `final` states; each `state` carries
+its own state-scoped invariants; each `transition A -> B triggered-by "operation label"` names the
+entity operation that drives it (the string must match an operation label on the entity).
+
 ## Agent instruction summary
 
 When building or updating a domain model:

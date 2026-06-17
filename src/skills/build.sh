@@ -127,6 +127,14 @@ copy_runtime_files() {
   cp "$REPO_ROOT/src/metamodels/DOMAIN-METAMODEL.md" "$dbc_refs/DOMAIN-METAMODEL.md"
   echo "  domain-build-code/: 3 heuristics + 1 grammar + 1 reference copied"
 
+  # domain-refactor: domain grammar + metamodel (emits a redesigned .domain)
+  local dr_grammar="$SKILLS_OUT/domain-refactor/grammar"
+  local dr_refs="$SKILLS_OUT/domain-refactor/references"
+  mkdir -p "$dr_grammar" "$dr_refs"
+  cp "$REPO_ROOT/src/grammars/domain.ebnf" "$dr_grammar/domain.ebnf"
+  cp "$REPO_ROOT/src/metamodels/DOMAIN-METAMODEL.md" "$dr_refs/DOMAIN-METAMODEL.md"
+  echo "  domain-refactor/: 1 grammar + 1 reference copied"
+
   # sysreq-extract-from-code: sysreq grammar + metamodel reference
   local sxc_refs="$SKILLS_OUT/sysreq-extract-from-code/references"
   local sxc_grammar="$SKILLS_OUT/sysreq-extract-from-code/grammar"
@@ -191,6 +199,7 @@ else
   build_skill domain-design
   build_skill domain-build-code
   build_skill domain-extract-from-code
+  build_skill domain-refactor
   # Auxiliary skills
   build_skill domain-dialogue
 fi

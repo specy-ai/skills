@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-Specy is a DDD toolkit that captures business knowledge in structured DSL files (`.domain`, `.prd`, `.sysreq`). This repo contains the AI skill definitions, packaged as a single Claude Code **plugin** named `specy`. The 7 skills (invoked as `specy:<name>`) are: 6 core — `prd-design`, `sysreq-design`, `sysreq-extract-from-code`, `domain-design`, `domain-build-code`, `domain-extract-from-code` — plus 1 auxiliary — `domain-dialogue`. Skills are assembled from modular templates into self-contained `dist/skills/<name>/SKILL.md` files.
+Specy is a DDD toolkit that captures business knowledge in structured DSL files (`.domain`, `.prd`, `.sysreq`). This repo contains the AI skill definitions, packaged as a single Claude Code **plugin** named `specy`. The 8 skills (invoked as `specy:<name>`) are: 7 core — `prd-design`, `sysreq-design`, `sysreq-extract-from-code`, `domain-design`, `domain-build-code`, `domain-extract-from-code`, `domain-refactor` — plus 1 auxiliary — `domain-dialogue`. Skills are assembled from modular templates into self-contained `dist/skills/<name>/SKILL.md` files.
 
 ## Build Commands
 
