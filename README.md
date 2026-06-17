@@ -196,18 +196,21 @@ Specy supports two complementary approaches to domain modeling. Both converge on
 ```
      Top-down (greenfield)                Bottom-up (brownfield)
 
-     Business vision                      Existing codebase
-          │                                      │
-          ▼                                      ▼
-  specy:prd-design → .prd          specy:domain-extract-from-code → .domain
-          │                                      │
-          ▼                                      ▼
- specy:sysreq-design → .sysreq        specy:domain-dialogue (explore)
-          │                                      │
-          ▼                                      ▼
+                                          Existing codebase
+                                                   │
+                                                   ▼
+ Business vision                          specy:domain-extract-from-code → .domain
+          │                                        │
+          ▼                                        ▼
+ specy:prd-design → .prd                  specy:domain-refactor → .refactored.domain
+          │                                        │
+          ▼                                        ▼
+ specy:sysreq-design → .sysreq            specy:domain-dialogue (explore)
+          │                                        │
+          ▼                                        ▼
  specy:domain-design → .domain ◄────────► specy:domain-design (evolve)
-          │                                      │
-          ▼                                (implement + re-extract)
+          │                                        │
+          ▼                               (implement + re-extract)
  specy:domain-build-code → code
 ```
 
@@ -226,10 +229,11 @@ This is the **greenfield** path — no code exists yet. Knowledge flows from int
 
 Start with *what exists* (source code) and extract the implicit business knowledge into an explicit, verifiable model. Then explore it, challenge it, and evolve it.
 
-1. **`specy:domain-extract-from-code`** — reverse-engineer source code into `.domain` files. The extracted model becomes the source of truth for the other skills. (Use **`specy:sysreq-extract-from-code`** to recover EARS requirements from code.)
-2. **`specy:domain-dialogue`** — explore and question the domain model through conversation. Surface gaps, trace behaviors, challenge assumptions.
-3. **`specy:domain-design`** — when a change is needed, evolve the model. **`specy:domain-build-code`** then regenerates the affected code.
-4. The developer implements the change, then runs **`specy:domain-extract-from-code`** (incremental) to bring the model back in sync with the code.
+1. **`specy:domain-extract-from-code`** — reverse-engineer source code into `.domain` files. The extracted model is faithful to the implementation but carries its design debt, and becomes the source of truth for the other skills. (Use **`specy:sysreq-extract-from-code`** to recover EARS requirements from code.)
+2. **`specy:domain-refactor`** — redesign the extracted model from first principles into proper DDD, fixing the smells flagged in `refactoring.report` (anemic/god entities, primitive obsession, flag-driven illegal states, generic events). Produces a `<domain>.refactored.domain` plus a rationale mapping each fix to the smell it resolves — never overwriting the extracted file.
+3. **`specy:domain-dialogue`** — explore and question the domain model through conversation. Surface gaps, trace behaviors, challenge assumptions.
+4. **`specy:domain-design`** — when a change is needed, evolve the model. **`specy:domain-build-code`** then regenerates the affected code.
+5. The developer implements the change, then runs **`specy:domain-extract-from-code`** (incremental) to bring the model back in sync with the code.
 
 This is the **brownfield** path — code already exists. Knowledge flows from implementation to model, and change proposals flow from model back to code.
 
