@@ -4,3 +4,10 @@ proposals
 *.pptx
 src/langium/specy-domain/node_modules/
 package-lock.json
+
+# Vim swapfiles
+*.swp
+# Compiled tree-sitter parsers
+*.so
+# Skill-creator eval/optimization scratch output
+src/skills/*/workspace/
