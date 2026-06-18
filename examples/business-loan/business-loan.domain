@@ -128,9 +128,9 @@ value DelegationMatrix :: "A configurable matrix mapping amount tiers and score 
 
 value ChecklistItem :: "An item on a product-specific document checklist" {
     fields {
-        label    : string
-        required : boolean
-        present  : boolean default("false")
+        label      : string
+        isRequired : boolean
+        present    : boolean default("false")
     }
 }
 

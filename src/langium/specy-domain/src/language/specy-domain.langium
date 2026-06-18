@@ -454,6 +454,13 @@ CollectionKind returns string:
 GenericType:
     typeName=TypeName '<' elementType=FieldType (',' valueType=FieldType)? '>';
 
+// NOTE (known limitation): `required` and `optional` are bare constraint keywords
+// AND legal field names (KeywordAsIdent). A field named exactly `required`/`optional`
+// that *follows* another field (e.g. `label : string` then `required : boolean`) is
+// only distinguishable from a trailing constraint by the `:` after it. Langium's
+// default ALL(*) strategy resolves the constraint repetition greedily; the LL(k)
+// strategy that would see the `:` is exponentially slow on this grammar's constraint
+// chains. The tree-sitter (GLR) parser handles it. Affects one field in the examples.
 Constraint:
     {infer Constraint} kind='required'
     | {infer Constraint} kind='optional'
@@ -548,12 +555,17 @@ PostconditionClause:
 ResolvesClause:
     'resolves' type=TypeName 'from' source=DotPath;
 
+// Inside an operation, `reaction` appears in two forms (both accepted by tree-sitter):
+//   - a reference/call with arguments:  `reaction defaultThresholdRule(Loan)`
+//   - an inline definition:             `reaction myRule :: "why" { <guard expr> }`
+// So the argument list is optional, and the name may be followed directly by a
+// `::` description and/or a `{ guard }` body.
 ReactionCallClause:
     'reaction' name=Ident
-    '(' args=ArgList? ')'
+    ('(' args=ArgList? ')')?
     description=Description?
     metadata=MetadataBlock?
-    ('{' expr=Expression '}')?;
+    ('{' satisfies=SatisfiesDecl? expr=Expression? '}')?;
 
 CreatesClause:
     'creates' type=TypeName '{'
@@ -616,13 +628,19 @@ StateInvariantDef:
     '}';
 
 ClassicTransitionDef:
-    source=TransitionSource '-->' target=Ident
+    source=TransitionSource '-->' target=StateName
     'on' trigger=Ident
     ('when' '{' guard=Expression '}')?
     ('then' '{' action=Expression '}')?;
 
+// State names are written in any case: `DRAFT` (all-caps → TYPE_NAME token),
+// `UNDER_REVIEW`/`STAGE_1` (underscores/digits → ID token), or lowercase. The
+// source may also be the start marker `[*]`.
 TransitionSource returns string:
-    '[*]' | ID;
+    '[*]' | StateName;
+
+StateName returns string:
+    ID | TYPE_NAME | KeywordAsIdent;
 
 // -----------------------------------------------------------------------------
 // Transitions (entity-level shorthand)
@@ -632,7 +650,7 @@ TransitionsBlock:
     'transitions' '{' (transitions+=EntityTransition)* '}';
 
 EntityTransition:
-    source=TransitionSource '-->' target=Ident
+    source=TransitionSource '-->' target=StateName
     ('on' triggers+=STRING (',' triggers+=STRING)*)?;
 
 // -----------------------------------------------------------------------------
@@ -999,7 +1017,14 @@ MetadataEntry:
 // -----------------------------------------------------------------------------
 
 Expression:
-    OrExpr;
+    ConditionalExpr;
+
+// Ternary / conditional: `cond ? whenTrue : whenFalse`. Lowest precedence, so the
+// condition is any OrExpr (e.g. a comparison like `daysPastDue > 0`) and both
+// branches are full expressions, allowing nesting. The tree-sitter grammar
+// supports this on assignment RHS (e.g. `status = x > 0 ? DELINQUENT : status`).
+ConditionalExpr infers Expression:
+    OrExpr ({infer ConditionalExpr.condition=current} '?' whenTrue=Expression ':' whenFalse=Expression)?;
 
 OrExpr infers Expression:
     AndExpr ({infer BinaryExpr.left=current} op='or' right=AndExpr)*;
@@ -1189,11 +1214,21 @@ hidden terminal HASH_COMMENT: /#[^\n]*/;
 
 terminal REQUIREMENT_ID: /REQ-[A-Z][A-Z0-9]*-\d{3}/;
 terminal CARDINALITY: /\d+\.\.\d+|\d+\.\.N/;
-terminal TYPE_NAME: /[A-Z][a-zA-Z0-9]*/;
+// PascalCase type names. The trailing `(?!\w)` stops TYPE_NAME from claiming the
+// uppercase prefix of an UPPER_SNAKE_CASE identifier (e.g. matching `UNDER` inside
+// `UNDER_REVIEW`, or `STAGE` inside `STAGE_1`): since TYPE_NAME has no underscore and
+// is tried before ID, first-match would otherwise split the token at the underscore.
+// Declining when a word char (here, `_`) follows lets ID claim the whole identifier.
+terminal TYPE_NAME: /[A-Z][a-zA-Z0-9]*(?!\w)/;
 terminal ID: /[a-zA-Z_][a-zA-Z0-9_]*/;
 terminal STRING: /"[^"]*"/;
 terminal NUMBER: /-?\d+(\.\d+)?/;
-// REGEX matches bracket expressions like [a-zA-Z0-9-]+.
-// Restricted to require at least one lowercase letter or range (a-z),
-// to avoid consuming [REQ-XXX-NNN] (all uppercase) as a regex.
-terminal REGEX: /\[[^\]]*[a-z][^\]]*\][*+?]?/;
+// REGEX matches bracket expressions like [a-zA-Z0-9-]+ used by `matches`.
+// Two restrictions keep this context-free terminal from swallowing other `[...]`
+// uses that the parser needs as real `[`/`]` tokens:
+//   1. require a lowercase letter inside, so [REQ-XXX-NNN] (all uppercase) is not a regex;
+//   2. require a trailing quantifier (* + ?), so array literals (`[foo]`, `[a.b]`) and
+//      subscripts (`[i]`, `[i - 1]`) — which never end in a quantifier — are lexed as
+//      brackets. Unquoted regexes therefore must end in a quantifier; otherwise quote
+//      them (`matches "[a-z]"`). The tree-sitter parser distinguishes these by context.
+terminal REGEX: /\[[^\]]*[a-z][^\]]*\][*+?]/;
