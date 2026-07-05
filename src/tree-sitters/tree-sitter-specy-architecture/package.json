@@ -1,0 +1,26 @@
+{
+  "name": "tree-sitter-specy-architecture",
+  "version": "1.0.0",
+  "description": "Tree-sitter grammar for Specy Software Architecture (.arch)",
+  "main": "bindings/node",
+  "keywords": [
+    "tree-sitter",
+    "parser",
+    "specy",
+    "architecture",
+    "c4"
+  ],
+  "tree-sitter": [
+    {
+      "scope": "source.specy_architecture",
+      "file-types": [
+        "arch"
+      ],
+      "highlights": "queries/highlights.scm"
+    }
+  ],
+  "dependencies": {},
+  "devDependencies": {
+    "tree-sitter-cli": ">=0.20.0"
+  }
+}

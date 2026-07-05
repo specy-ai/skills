@@ -1,0 +1,342 @@
+// =============================================================================
+// Specy — Software Architecture Grammar (.arch)
+// C4-inspired (Context / Container / Component), Thrift-inspired typed contracts,
+// ports + connectors, first-class async channels. Level 4 (code) is out of scope.
+// EBNF (ISO 14977 style)
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// Top-level structure
+//
+// One file describes ONE software system in focus, surrounded by the persons
+// and external systems it interacts with (the C4 System Context view).
+// -----------------------------------------------------------------------------
+
+architectureFile  = { comment | architectureDef } ;
+
+architectureDef   = "architecture" , ( typeName | stringLiteral ) , [ description ] , [ metadataBlock ] , "{"
+                  , { comment | architectureMember }
+                  , "}" ;
+
+architectureMember = domainSourceDecl
+                   | requirementsSourceDecl
+                   | personDef
+                   | externalSystemDef
+                   | systemDef ;
+
+// -----------------------------------------------------------------------------
+// Provenance — paths the satisfies / realizes / import references resolve against
+// -----------------------------------------------------------------------------
+
+domainSourceDecl       = "domain-source" , stringLiteral ;
+
+requirementsSourceDecl = "requirements-source" , stringLiteral ;
+
+// -----------------------------------------------------------------------------
+// Level 1 — System Context: persons and external systems
+// -----------------------------------------------------------------------------
+
+personDef         = "person" , typeName , [ description ] , [ metadataBlock ] ;
+
+externalSystemDef = "externalSystem" , typeName , [ description ] , [ metadataBlock ] , [ realizesDecl ]
+                  , [ "{" , { comment | providesClause | consumesClause } , "}" ] ;
+
+// -----------------------------------------------------------------------------
+// System — the one software system in focus
+// -----------------------------------------------------------------------------
+
+systemDef         = "system" , ( typeName | stringLiteral ) , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , [ realizesDecl ] , "{"
+                  , { comment | systemMember }
+                  , "}" ;
+
+systemMember      = namedTypeDef
+                  | interfaceDef
+                  | boundedContextDecl
+                  | containerDef
+                  | channelDef
+                  | connectorDef
+                  | environmentDef ;
+
+// -----------------------------------------------------------------------------
+// Bounded Context — optional grouping over components (declared, then referenced
+// by a component's boundedContext clause). Carries no runtime meaning.
+// -----------------------------------------------------------------------------
+
+boundedContextDecl = "boundedContext" , typeName , [ description ] , [ metadataBlock ] ;
+
+// -----------------------------------------------------------------------------
+// Level 2 — Container: a runnable/deployable unit, identified by free-form
+// technology. No closed kind taxonomy (a database/broker is just a container).
+// -----------------------------------------------------------------------------
+
+containerDef      = "container" , typeName , [ description ] , [ metadataBlock ]
+                  , [ technologyDecl ] , [ satisfiesDecl ] , [ realizesDecl ]
+                  , [ "{" , { comment | providesClause | requiresClause | componentDef } , "}" ] ;
+
+technologyDecl    = "technology" , stringLiteral ;
+
+// -----------------------------------------------------------------------------
+// Level 3 — Component: finest logical unit (level 4 / code is out of scope)
+// -----------------------------------------------------------------------------
+
+componentDef      = "component" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , [ realizesDecl ]
+                  , [ "{" , { comment | componentClause } , "}" ] ;
+
+componentClause   = boundedContextRef
+                  | providesClause
+                  | requiresClause
+                  | publishesClause
+                  | subscribesClause ;
+
+boundedContextRef = "boundedContext" , typeName ;
+
+// -----------------------------------------------------------------------------
+// Ports — provided / required interfaces (and external consumes)
+// -----------------------------------------------------------------------------
+
+providesClause    = "provides" , typeName ;
+
+requiresClause    = "requires" , typeName ;
+
+consumesClause    = "consumes" , typeName ;
+
+// -----------------------------------------------------------------------------
+// Channel participation — async publish / subscribe
+// -----------------------------------------------------------------------------
+
+publishesClause   = "publishes" , typeName , "to" , identifier ;
+
+subscribesClause  = "subscribes" , identifier ;
+
+// -----------------------------------------------------------------------------
+// Interface — first-class named contract (a set of operations).
+// Owns its operations; may realize a domain interface.
+// -----------------------------------------------------------------------------
+
+interfaceDef      = "interface" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , [ realizesDecl ] , "{"
+                  , { comment | operationDef }
+                  , "}" ;
+
+// -----------------------------------------------------------------------------
+// Operation — technical signature with interaction style.
+//   (default)  request-response, unsafe  (~ command)
+//   safe       request-response, no mutation, idempotent  (~ query)
+//   oneway     fire-and-forget, must return void  (~ event emission)
+//   streaming  a stream of results over one call
+// -----------------------------------------------------------------------------
+
+operationDef      = [ operationStyle ] , identifier , "(" , [ argList ] , ")"
+                  , "returns" , returnType , [ throwsClause ]
+                  , [ description ] , [ metadataBlock ] ;
+
+operationStyle    = "safe" | "oneway" | "streaming" ;
+
+returnType        = "void" | fieldType ;
+
+throwsClause      = "throws" , "(" , typeName , { "," , typeName } , ")" ;
+
+// -----------------------------------------------------------------------------
+// Arguments — Thrift-style: ordinal, requiredness, type, name, optional default
+// -----------------------------------------------------------------------------
+
+argList           = argDecl , { "," , argDecl } ;
+
+argDecl           = ordinal , ":" , requiredness , fieldType , identifier , [ "=" , literalValue ] ;
+
+// -----------------------------------------------------------------------------
+// Named types — Thrift-inspired type system + domain imports
+// -----------------------------------------------------------------------------
+
+namedTypeDef      = structDef
+                  | enumDef
+                  | typedefDef
+                  | unionDef
+                  | exceptionDef
+                  | importDecl ;
+
+structDef         = "struct" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
+                  , fieldDef , { fieldDef | comment }
+                  , "}" ;
+
+exceptionDef      = "exception" , typeName , [ description ] , [ metadataBlock ] , "{"
+                  , fieldDef , { fieldDef | comment }
+                  , "}" ;
+
+fieldDef          = ordinal , ":" , requiredness , fieldType , identifier , [ "=" , literalValue ] , [ description ] ;
+
+unionDef          = "union" , typeName , [ description ] , [ metadataBlock ] , "{"
+                  , unionMember , { unionMember | comment }
+                  , "}" ;
+
+unionMember       = ordinal , ":" , fieldType , identifier ;
+
+enumDef           = "enum" , typeName , [ description ] , [ metadataBlock ] , "{"
+                  , enumMember , { enumMember | comment }
+                  , "}" ;
+
+enumMember        = identifier , "=" , integer ;
+
+typedefDef        = "typedef" , typeName , "=" , fieldType ;
+
+importDecl        = "import" , importKind , typeName , "from" , "domain" ;
+
+importKind        = ( "value" , "type" ) | "event" ;
+
+requiredness      = "required" | "optional" ;
+
+ordinal           = integer ;
+
+// -----------------------------------------------------------------------------
+// Channel — first-class async topic/queue hosted on a broker container
+// -----------------------------------------------------------------------------
+
+channelDef        = "channel" , identifier , "on" , typeName , [ description ] , [ metadataBlock ] , "{"
+                  , carriesClause
+                  , "}" ;
+
+carriesClause     = "carries" , typeName , { "," , typeName } ;
+
+// -----------------------------------------------------------------------------
+// Connector — wires a consumer (or required port) to a provider (or provided
+// port), carrying protocol + interaction style. External systems may appear at
+// either end, so the connector set is the full dependency graph.
+// -----------------------------------------------------------------------------
+
+connectorDef      = "connect" , connectorRef , "->" , connectorRef
+                  , "over" , stringLiteral , connectorStyle
+                  , [ description ] , [ metadataBlock ] ;
+
+// e.g. WebApp | LinkController.LinkCommands | Analytics.AnalyticsIngest
+connectorRef      = typeName , { "." , typeName } ;
+
+connectorStyle    = "sync" | "async" | "streaming" ;
+
+// -----------------------------------------------------------------------------
+// Deployment view — lightweight: environments + container placement + replicas
+// -----------------------------------------------------------------------------
+
+environmentDef    = "environment" , identifier , [ description ] , [ metadataBlock ] , "{"
+                  , { comment | deployClause }
+                  , "}" ;
+
+deployClause      = "deploy" , typeName , { "," , typeName } , [ "replicas" , integer ] ;
+
+// -----------------------------------------------------------------------------
+// Realizes — traceability link to domain elements (module / interface / event /
+// value type / context). Many-to-many; references resolve against domain-source.
+// -----------------------------------------------------------------------------
+
+realizesDecl      = "realizes" , realizesRef , { "," , realizesRef } ;
+
+// module / context names are quoted multi-word strings in .domain; value types,
+// events, and interfaces are PascalCase type names there.
+realizesRef       = ( "module" , domainName )
+                  | ( "context" , domainName )
+                  | ( "interface" , typeName )
+                  | ( "event" , typeName )
+                  | ( "value" , "type" , typeName ) ;
+
+domainName        = typeName | stringLiteral ;
+
+// -----------------------------------------------------------------------------
+// Satisfies — traceability link to system requirements (incl. NFRs)
+// -----------------------------------------------------------------------------
+
+satisfiesDecl     = "satisfies" , "[" , requirementId , { "," , requirementId } , "]" ;
+
+// Accepts REQ-… and NFR-… style identifiers
+requirementId     = reqPrefix , "-" , idSegment , "-" , idNumber ;
+
+reqPrefix         = upperLetter , { upperLetter } ;
+
+idSegment         = upperLetter , { upperLetter | digit | "-" } ;
+
+idNumber          = digit , digit , digit ;
+
+// -----------------------------------------------------------------------------
+// Field types — lowercase primitives (shared vocabulary with .domain, plus the
+// wire-oriented additions double / instant / binary) + containers + named types
+// -----------------------------------------------------------------------------
+
+fieldType         = primitiveType
+                  | collectionType
+                  | typeName ;
+
+primitiveType     = "string"
+                  | "int" | "integer"
+                  | "long"
+                  | "double"
+                  | "decimal"
+                  | "boolean"
+                  | "date"
+                  | "datetime"
+                  | "time"
+                  | "instant"
+                  | "duration"
+                  | "uuid"
+                  | "binary" ;
+
+collectionType    = ( "list" | "set" | "map" ) , "<" , fieldType , [ "," , fieldType ] , ">" ;
+
+// -----------------------------------------------------------------------------
+// Description — :: operator (house style, shared with .domain)
+// -----------------------------------------------------------------------------
+
+description       = "::" , stringLiteral ;
+
+// -----------------------------------------------------------------------------
+// Metadata — arbitrary key/value annotations
+// -----------------------------------------------------------------------------
+
+metadataBlock     = "meta" , "{" , { metadataEntry } , "}" ;
+
+metadataEntry     = identifier , "=" , literalValue ;
+
+// -----------------------------------------------------------------------------
+// Literals and identifiers (shared lexical base with .domain)
+// -----------------------------------------------------------------------------
+
+literalValue      = stringLiteral | number | "true" | "false" | "null" ;
+
+stringLiteral     = '"' , { character } , '"' ;
+
+number            = [ "-" ] , digit , { digit } , [ "." , digit , { digit } ] ;
+
+integer           = [ "-" ] , digit , { digit } ;
+
+typeName          = pascalCaseId ;
+
+identifier        = camelCaseId | pascalCaseId ;
+
+pascalCaseId      = upperLetter , { letter | digit } ;
+
+camelCaseId       = lowerLetter , { letter | digit } ;
+
+// -----------------------------------------------------------------------------
+// Comments
+// -----------------------------------------------------------------------------
+
+comment           = "//" , { character } , newline ;
+
+// -----------------------------------------------------------------------------
+// Character classes
+// -----------------------------------------------------------------------------
+
+upperLetter       = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I"
+                  | "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R"
+                  | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" ;
+
+lowerLetter       = "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i"
+                  | "j" | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r"
+                  | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" ;
+
+letter            = upperLetter | lowerLetter ;
+
+digit             = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+
+character         = letter | digit | " " | "!" | "@" | "#" | "$" | "%" | "^"
+                  | "&" | "*" | "(" | ")" | "-" | "_" | "=" | "+" | "["
+                  | "]" | "{" | "}" | "|" | "\\" | ":" | ";" | "'" | ","
+                  | "." | "<" | ">" | "/" | "?" | "~" | "`" ;
+
+newline           = "\n" ;

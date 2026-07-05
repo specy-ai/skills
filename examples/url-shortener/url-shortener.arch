@@ -1,0 +1,459 @@
+// =============================================================================
+// Sniplink — Software Architecture (.arch)
+// C4-inspired (System Context / Container / Component) with Thrift-typed
+// contracts, provided/required ports + connectors, and first-class async
+// channels. This model `satisfies` the .sysreq (incl. NFRs) and `realizes`
+// the .domain modules, value types, and events.
+//
+// Reading guide:
+//   level 1 — persons + externalSystems + the one `system` in focus (Sniplink)
+//   shared contracts — interfaces + Thrift types declared at system scope
+//   level 2 — containers (edge API, redirect edge, SPA, broker, databases…)
+//   level 3 — components inside containers, each realizing real domain modules
+//   wiring  — connectors (sync/async) + channels carrying imported domain events
+//   deploy  — one lightweight production environment
+// =============================================================================
+
+architecture Sniplink :: "Sniplink URL-shortening platform — software architecture" {
+
+  // Provenance: the satisfies / realizes / import references below resolve
+  // against these two sibling files.
+  domain-source       "url-shortener.domain"
+  requirements-source  "url-shortener.sysreq"
+
+  // ───────────────────────────────────────────────────────────────────────
+  // LEVEL 1 — System Context: the people and external systems around Sniplink
+  // ───────────────────────────────────────────────────────────────────────
+
+  person Visitor   :: "An anonymous consumer who follows a short link in a browser"
+  person Publisher :: "A registered user who shortens URLs, manages links, and reads analytics"
+  person Developer :: "A third-party integrator who drives Sniplink through its public HTTP API"
+
+  // The external safety-scanning provider. It corresponds to the upstream
+  // source the Link Safety Scanning module adapts (ThreatIntelligenceService).
+  externalSystem GoogleSafeBrowsing
+      :: "Google Safe Browsing — external URL threat-intelligence API"
+      realizes module "Link Safety Scanning" {
+    // Sniplink calls this interface; it is `required` by our safety scanner.
+    provides ThreatLookup
+  }
+
+  externalSystem AcmeCdn
+      :: "Edge CDN / TLS terminator fronting the redirect hot path (also serves custom-domain certs)" {
+    provides EdgeRouting
+  }
+
+  externalSystem LetsEncrypt
+      :: "ACME certificate authority used to provision SSL for verified custom domains"
+      realizes module "Custom Domains" {
+    provides AcmeIssuance
+  }
+
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // THE SYSTEM IN FOCUS
+  // ═══════════════════════════════════════════════════════════════════════
+
+  system Sniplink :: "The Sniplink platform: link shortening, redirect, analytics, safety, API"
+      satisfies [REQ-NFR-008, REQ-NFR-009, REQ-NFR-020] {
+
+    // ─────────────────────────────────────────────────────────────────────
+    // BOUNDED CONTEXTS — optional groupings projected onto components.
+    // Names mirror the .domain modules they belong to.
+    // ─────────────────────────────────────────────────────────────────────
+
+    boundedContext LinkShortening   :: "Creation and lifecycle of short links"
+    boundedContext SafetyScanning   :: "URL threat scanning and re-scanning"
+    boundedContext Redirecting      :: "Click handling, safety gating, and redirect"
+    boundedContext Analytics        :: "Channel-attributed click analytics"
+    boundedContext ApiAccess        :: "Public HTTP API surface, auth, and rate limiting"
+    boundedContext CustomDomains    :: "Branded custom domain setup and SSL"
+
+    // ─────────────────────────────────────────────────────────────────────
+    // IMPORTED DOMAIN TYPES — reference the .domain rather than re-declaring.
+    // Imported value types behave as named field types; imported events
+    // behave as message contracts carried by channels.
+    // ─────────────────────────────────────────────────────────────────────
+
+    import value type Slug           from domain
+    import value type ShortUrl       from domain
+    import value type DestinationUrl from domain
+    import value type SafetyStatus   from domain
+    import value type LinkStatus     from domain
+    import value type ReferralChannel from domain
+
+    import event LinkShortened   from domain   // emitted on successful creation
+    import event LinkDeactivated from domain
+    import event ClickRecorded   from domain   // emitted by the redirect path
+    import event UrlFlaggedAsUnsafe from domain
+
+    // ─────────────────────────────────────────────────────────────────────
+    // SHARED THRIFT TYPES — the wire-grade payloads of interfaces & channels.
+    // Field ordinals + required/optional give evolution safety (no versioning).
+    // ─────────────────────────────────────────────────────────────────────
+
+    typedef Url = string
+
+    enum RedirectDisposition :: "How a redirect request was resolved" {
+      redirected           = 1
+      interstitialShown    = 2
+      warningPageShown     = 3
+      deactivatedPageShown = 4
+    }
+
+    struct ShortLinkDTO :: "Wire view of a created short link" {
+      1: required Slug           slug          :: "imported domain value type"
+      2: required DestinationUrl target
+      3: required ShortUrl       shortUrl
+      4: required LinkStatus     status
+      5: optional datetime       expiresAt
+      6: required datetime       createdAt
+    }
+
+    struct ClickContextDTO :: "PII-free context captured at click time (REQ-NFR-011)" {
+      1: optional string   refererHeader
+      2: optional string   utmSource
+      3: optional string   utmMedium
+      4: required string   userAgentFamily   :: "coarse family only — never the raw UA"
+      5: optional string   ipCountry         :: "country granularity only, never the raw IP"
+    }
+
+    struct RedirectResult :: "Resolved target + disposition returned to the edge" {
+      1: required RedirectDisposition disposition
+      2: optional Url                 target        :: "absent when not redirecting"
+      3: required string              slug
+    }
+
+    struct AnalyticsSummaryDTO :: "Aggregated, channel-attributed analytics for a link" {
+      1: required string             shortLinkId
+      2: required long               totalClicks
+      3: required list<ChannelCount> byChannel
+      4: required datetime           asOf
+    }
+
+    struct ChannelCount {
+      1: required ReferralChannel channel
+      2: required long            clickCount
+    }
+
+    struct DateRangeDTO :: "Inclusive date filter for analytics queries" {
+      1: required date fromDate
+      2: required date toDate
+    }
+
+    struct PageRequest :: "Cursor/page pagination for API list responses (REQ-API-007)" {
+      1: required int  page
+      2: required int  pageSize
+    }
+
+    struct ScanRequest {
+      1: required Url destinationUrl
+    }
+
+    struct ScanResult :: "Outcome of an external threat lookup" {
+      1: required SafetyStatus     status
+      2: required list<string>     threats
+      3: required datetime         scannedAt
+      4: required boolean          fromCache   :: "true when served from the degraded-mode cache (REQ-NFR-014)"
+    }
+
+    // Exceptions — architecture realization of domain error events.
+    exception SlugTaken         :: "Requested custom slug is already in use" {
+      1: required string requestedSlug
+      2: optional string suggestedAlternative
+    }
+    exception UnsafeDestination :: "Destination URL failed the safety gate before creation" {
+      1: required string destinationUrl
+      2: required list<string> threats
+    }
+    exception RateLimitExceeded :: "Caller exceeded its per-minute API quota (REQ-API-008)" {
+      1: required int retryAfterSeconds
+    }
+    exception AuthenticationFailed :: "API key missing, malformed, or revoked" {
+      1: required string reason
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // SHARED INTERFACES — first-class contracts, owned by whoever `provides`.
+    // Operation styles: bare = request-response/command, `safe` = query,
+    // `oneway` = event emission (returns void), `streaming` = result stream.
+    // ─────────────────────────────────────────────────────────────────────
+
+    interface LinkCommands :: "Write side of link lifecycle"
+        satisfies [REQ-LNK-001, REQ-LNK-008] {
+      createShortLink(1: required DestinationUrl target, 2: optional Slug customSlug)
+        returns ShortLinkDTO throws (SlugTaken, UnsafeDestination)
+        :: "Shorten a URL; rejects until safety scan returns Safe (REQ-LNK-008)"
+
+      deactivateLink(1: required string shortLinkId, 2: required string reason)
+        returns ShortLinkDTO
+        :: "Deactivate an active link (REQ-SAF-008)"
+    }
+
+    interface LinkQueries :: "Read side of link lifecycle" {
+      safe resolveBySlug(1: required string slug) returns ShortLinkDTO
+        :: "Resolve a slug to its link record (used by the redirect path)"
+
+      safe checkSlugAvailability(1: required string slug) returns boolean
+        :: "Is this custom slug free? (REQ-LNK-006)"
+    }
+
+    interface RedirectApi :: "Edge contract: turn a slug + click context into a redirect decision"
+        satisfies [REQ-RED-001, REQ-NFR-001] {
+      resolveRedirect(1: required string slug, 2: required ClickContextDTO context)
+        returns RedirectResult
+        :: "Resolve a click to a redirect/interstitial/warning within 200ms p95 (REQ-NFR-001)"
+    }
+
+    interface SafetyScanning :: "URL threat scanning"
+        satisfies [REQ-SAF-001] {
+      scan(1: required ScanRequest request) returns ScanResult
+        :: "Scan a destination URL before a link is created"
+
+      safe currentStatus(1: required string slug) returns SafetyStatus
+        :: "Cheap cached safety lookup used on the redirect hot path (REQ-SAF-002)"
+    }
+
+    interface ThreatLookup :: "External threat-intelligence contract (provided by Google Safe Browsing)"
+        satisfies [REQ-NFR-014, REQ-NFR-015] {
+      safe lookup(1: required Url url) returns ScanResult
+        :: "Look up a single URL; callers fall back to cache on failure (REQ-NFR-014)"
+    }
+
+    interface AnalyticsQueries :: "Read side of channel-attributed analytics"
+        satisfies [REQ-ANA-003] {
+      safe linkAnalytics(1: required string shortLinkId, 2: optional DateRangeDTO range)
+        returns AnalyticsSummaryDTO
+        :: "Aggregated analytics for one link"
+
+      safe publisherAnalytics(1: required string publisherId, 2: optional DateRangeDTO range)
+        returns list<AnalyticsSummaryDTO>
+        :: "Aggregated analytics across all of a publisher's links (REQ-ANA-007)"
+    }
+
+    interface PublicApi :: "Public HTTP API surface for third-party developers"
+        satisfies [REQ-API-001, REQ-API-002, REQ-API-003] {
+      shortenViaApi(1: required string apiKey, 2: required Url target, 3: optional string customSlug)
+        returns ShortLinkDTO throws (AuthenticationFailed, RateLimitExceeded, SlugTaken)
+        :: "Authenticate, rate-limit, then create a short link (REQ-API-001..003)"
+
+      safe getAnalyticsViaApi(1: required string apiKey, 2: required string shortLinkId,
+                              3: optional DateRangeDTO range, 4: optional PageRequest page)
+        returns AnalyticsSummaryDTO throws (AuthenticationFailed, RateLimitExceeded)
+        :: "Read link analytics with date filtering + pagination (REQ-API-005..007)"
+    }
+
+    interface CustomDomainProvisioning :: "Branded-domain DNS verification + SSL provisioning"
+        satisfies [REQ-DOM-002, REQ-DOM-003] {
+      verifyDomain(1: required string customDomainId) returns boolean
+        :: "Check the CNAME record for a pending custom domain (REQ-DOM-002)"
+
+      oneway requestCertificate(1: required string domainName) returns void
+        :: "Fire ACME issuance for a verified domain; completion arrives async (REQ-DOM-003)"
+    }
+
+    // The async ingest contract. `oneway` = fire-and-forget event emission;
+    // the actual fan-out happens over the `clickEvents` channel below.
+    interface ClickIngest :: "One-way ingestion of recorded clicks into analytics"
+        satisfies [REQ-ANA-004] {
+      oneway ingestClick(1: required string shortLinkId, 2: required ReferralChannel channel,
+                         3: required datetime clickedAt)
+        returns void
+        :: "Record a click for analytics aggregation (consumed off the channel)"
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // LEVEL 2 / LEVEL 3 — Containers and their components.
+    // Components `realizes` the REAL .domain modules (quoted multi-word names).
+    // ─────────────────────────────────────────────────────────────────────
+
+    // --- Edge API service: the write side + public API + domain management ---
+    container EdgeApi :: "Edge HTTP service: link write-side, public API, custom domains"
+        technology "Clojure/Ring + Reitit"
+        satisfies [REQ-NFR-005, REQ-NFR-008] {
+
+      provides LinkCommands
+      provides LinkQueries
+      provides PublicApi
+
+      component LinkController :: "HTTP edge for link lifecycle commands & queries"
+          satisfies [REQ-LNK-001, REQ-LNK-003]
+          realizes module "Link Shortening", module "Link Management" {
+        boundedContext LinkShortening
+        provides LinkCommands
+        provides LinkQueries
+        requires SafetyScanning            // must scan before shortening (REQ-LNK-008)
+        publishes LinkShortened to linkEvents
+        publishes LinkDeactivated to linkEvents
+      }
+
+      component ApiGateway :: "Authentication, per-publisher rate limiting, and API translation"
+          satisfies [REQ-API-002, REQ-API-003, REQ-NFR-007, REQ-NFR-010]
+          realizes module "API Access", module "API Gateway" {
+        boundedContext ApiAccess
+        provides PublicApi
+        requires LinkCommands              // translates HTTP into domain commands (ACL)
+        requires AnalyticsQueries          // exposes analytics through the API
+      }
+
+      component DomainManager :: "Custom-domain setup, DNS verification, SSL orchestration"
+          satisfies [REQ-DOM-001, REQ-DOM-002, REQ-DOM-003]
+          realizes module "Custom Domains", module "Domain Management" {
+        boundedContext CustomDomains
+        provides CustomDomainProvisioning
+      }
+    }
+
+    // --- Redirect service: the consumer-facing hot path (its own deployable) ---
+    container RedirectEdge :: "Low-latency redirect service on the consumer hot path"
+        technology "Rust/Axum"
+        satisfies [REQ-NFR-001, REQ-NFR-004, REQ-NFR-006] {
+
+      provides RedirectApi
+
+      component RedirectResolver :: "Resolves a slug to a redirect decision with safety gating"
+          satisfies [REQ-RED-001, REQ-RED-003, REQ-NFR-001]
+          realizes module "Redirect", module "Click Handling" {
+        boundedContext Redirecting
+        provides RedirectApi
+        requires LinkQueries               // resolve slug -> link
+        requires SafetyScanning            // gate on cached safety status (REQ-SAF-002)
+        publishes ClickRecorded to clickEvents
+      }
+    }
+
+    // --- Safety scanning worker: adapts the external threat API with caching ---
+    container SafetyWorker :: "Safety scanning + periodic re-scan worker"
+        technology "Clojure"
+        satisfies [REQ-SAF-001, REQ-SAF-009] {
+
+      provides SafetyScanning
+
+      component SafetyScanner :: "Scans URLs, caches verdicts, and re-scans periodically"
+          satisfies [REQ-SAF-001, REQ-NFR-014, REQ-NFR-015]
+          realizes module "Link Safety Scanning", module "Safety Scanning" {
+        boundedContext SafetyScanning
+        provides SafetyScanning
+        requires ThreatLookup              // external Google Safe Browsing (with cache fallback)
+        publishes UrlFlaggedAsUnsafe to linkEvents   // propagates flags back to the link side
+      }
+    }
+
+    // --- Analytics service: consumes click events, serves aggregated reads ---
+    container AnalyticsService :: "Click-analytics aggregation + read API"
+        technology "Clojure + ClickHouse client"
+        satisfies [REQ-ANA-003, REQ-NFR-011, REQ-NFR-019] {
+
+      provides AnalyticsQueries
+      provides ClickIngest
+
+      component ClickAggregator :: "Subscribes to click events and maintains per-link aggregates"
+          satisfies [REQ-ANA-004, REQ-ANA-006, REQ-NFR-011]
+          realizes module "Auto-Channel Analytics", module "Analytics" {
+        boundedContext Analytics
+        provides ClickIngest
+        subscribes clickEvents             // fan-out consumer of ClickRecorded
+      }
+
+      component AnalyticsReader :: "Serves aggregated, channel-attributed analytics reads"
+          satisfies [REQ-ANA-003, REQ-ANA-007]
+          realizes module "Auto-Channel Analytics", module "Analytics" {
+        boundedContext Analytics
+        provides AnalyticsQueries
+      }
+    }
+
+    // --- Single-page app: the publisher console (browser) ---
+    container Console :: "Publisher web console (SPA): create links, manage, read analytics"
+        technology "TypeScript/React SPA"
+
+    // --- Message broker, datastores, cache (black-box containers) ---
+    container EventBus    :: "Event broker for first-class async channels" technology "Kafka"
+    container LinkDb       :: "Relational store for links, domains, API clients" technology "PostgreSQL"
+    container AnalyticsDb  :: "Columnar store for click aggregates" technology "ClickHouse"
+    container SafetyCache  :: "Cache of recent safety verdicts (degraded-mode fallback)" technology "Redis"
+        satisfies [REQ-NFR-014]
+
+    // ─────────────────────────────────────────────────────────────────────
+    // CHANNELS — first-class async. A channel is hosted on the broker and
+    // CARRIES message types (here, imported domain events).
+    // ─────────────────────────────────────────────────────────────────────
+
+    channel linkEvents on EventBus :: "Link lifecycle + safety-flag fan-out" {
+      carries LinkShortened, LinkDeactivated, UrlFlaggedAsUnsafe
+    }
+
+    channel clickEvents on EventBus
+        :: "Recorded clicks fanned out to analytics (one-to-many)"
+        meta { delivery = "at-least-once" retention = "7d" } {
+      carries ClickRecorded
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // CONNECTORS — wire required ports to provided ports with protocol + style.
+    // External systems appear at either end, so this is the full dep graph.
+    // ─────────────────────────────────────────────────────────────────────
+
+    // -- People into the system (front doors) --
+    connect Visitor -> AcmeCdn.EdgeRouting over "HTTPS" sync
+      :: "Consumers hit the CDN/TLS edge first (TLS 1.2+, REQ-NFR-008)"
+    connect AcmeCdn -> RedirectEdge.RedirectApi over "HTTP/2" sync
+      :: "CDN forwards the slug to the redirect service"
+    connect Publisher -> Console over "HTTPS" sync
+    connect Developer -> EdgeApi.PublicApi over "REST/JSON" sync
+      :: "Third-party developers drive the public API directly (REQ-API-001)"
+
+    // -- SPA into the edge API --
+    connect Console -> EdgeApi.LinkCommands over "REST/JSON" sync
+    connect Console -> EdgeApi.LinkQueries over "REST/JSON" sync
+    connect Console -> AnalyticsService.AnalyticsQueries over "REST/JSON" sync
+
+    // -- API gateway translating into domain commands/queries (ACL) --
+    connect ApiGateway -> LinkController.LinkCommands over "in-process" sync
+    connect ApiGateway -> AnalyticsReader.AnalyticsQueries over "gRPC" sync
+
+    // -- Link write-side requires the safety gate before creation (REQ-LNK-008) --
+    connect LinkController.SafetyScanning -> SafetyScanner over "gRPC" sync
+
+    // -- Redirect hot path: resolve link + cheap cached safety check --
+    connect RedirectResolver.LinkQueries -> LinkController.LinkQueries over "gRPC" sync
+    connect RedirectResolver.SafetyScanning -> SafetyScanner over "gRPC" sync
+      :: "Cached safety status only — stays within the 200ms p95 budget (REQ-NFR-001)"
+
+    // -- EDGE TO EXTERNAL SYSTEM: safety worker calls Google Safe Browsing --
+    connect SafetyScanner.ThreatLookup -> GoogleSafeBrowsing.ThreatLookup over "HTTPS/REST" async
+      :: "External threat lookup; circuit-broken with cache fallback (REQ-NFR-014, REQ-NFR-015)"
+    connect SafetyScanner -> SafetyCache over "RESP" sync
+      :: "Read/write the verdict cache backing degraded-mode operation (REQ-NFR-014)"
+
+    // -- EDGE TO EXTERNAL SYSTEM: custom-domain SSL issuance --
+    connect DomainManager.CustomDomainProvisioning -> LetsEncrypt.AcmeIssuance over "ACME/HTTPS" async
+      :: "Provision SSL for a verified custom domain (REQ-DOM-003)"
+
+    // -- ASYNC: analytics consumes recorded clicks off the channel --
+    connect ClickAggregator.ClickIngest -> AnalyticsService.ClickIngest over "Kafka" async
+      :: "Click ingestion fan-out (one-to-many) via the clickEvents channel (REQ-ANA-004)"
+
+    // -- Persistence edges --
+    connect LinkController -> LinkDb over "JDBC" sync
+    connect DomainManager -> LinkDb over "JDBC" sync
+    connect ApiGateway -> LinkDb over "JDBC" sync
+    connect AnalyticsReader -> AnalyticsDb over "HTTP/native" sync
+    connect ClickAggregator -> AnalyticsDb over "HTTP/native" sync
+
+    // ─────────────────────────────────────────────────────────────────────
+    // DEPLOYMENT VIEW — one lightweight environment: placement + replica hint.
+    // ─────────────────────────────────────────────────────────────────────
+
+    environment production :: "Multi-AZ production deployment" {
+      // Redirect is the hot path — scaled out for 10k req/s peak (REQ-NFR-006).
+      deploy RedirectEdge replicas 8
+      deploy EdgeApi replicas 3
+      deploy SafetyWorker replicas 2
+      deploy AnalyticsService replicas 2
+      deploy Console replicas 2
+      // Stateful + broker containers: single logical placement here.
+      deploy EventBus, LinkDb, AnalyticsDb, SafetyCache
+    }
+  }
+}

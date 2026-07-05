@@ -12,6 +12,7 @@ GRAMMARS=(
   "tree-sitter-specy-prd"
   "tree-sitter-specy-sysreq"
   "tree-sitter-specy-domain"
+  "tree-sitter-specy-architecture"
 )
 
 EXAMPLES=(
@@ -30,6 +31,7 @@ EXAMPLES=(
   "examples/ride-now/ride-management.domain"
   "examples/ride-now/geolocation-routing.domain"
   "examples/ride-now/payment.domain"
+  "examples/url-shortener/url-shortener.arch"
 )
 
 RED='\033[0;31m'
