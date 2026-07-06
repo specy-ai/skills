@@ -260,23 +260,6 @@ A condition is a named predicate expression over the operation's arguments and, 
 - A **postcondition** evaluates over state-before, state-after, and arguments: `P(state_before, state_after, arguments) -> boolean`.
 
 
-## State machine
-
-A state machine structures the lifecycle of an entity through an explicit set of states and transitions.
-
-- One start state, zero or more final states.
-- Each state carries its own invariants.
-- Transitions connect states. Each transition has preconditions (guards) and postconditions.
-- Entity operations trigger transitions; the transition is the effect of the operation.
-- An operation may participate in transitions from multiple states and therefore raise different events depending on the source state.
-- The set of valid transitions from each state is finite and enumerable.
-
-Relations:
-- 1..1 "belongs to" relation with entity
-- 1..n "has" relation with states
-- Each transition 1..1 "triggered by" relation with an entity operation
-
-
 ## Entity
 
 A domain concept with a fixed identity and a lifecycle. An entity changes through time; its identity stays the same. Two entities are equal if and only if their identities are equal.
@@ -301,8 +284,23 @@ Relations:
 - 0..n "relates to" relation with other entities
 - 0..n "constrained by" relation with invariants
 
-### Read-only Entity (Master Data)
+## State machine
 
+A state machine structures the lifecycle of an entity through an explicit set of states and transitions.
+
+- One start state, zero or more final states.
+- Each state carries its own invariants.
+- Transitions connect states. Each transition has preconditions (guards) and postconditions.
+- Entity operations trigger transitions; the transition is the effect of the operation.
+- An operation may participate in transitions from multiple states and therefore raise different events depending on the source state.
+- The set of valid transitions from each state is finite and enumerable.
+
+Relations:
+- 1..1 "belongs to" relation with entity
+- 1..n "has" relation with states
+- Each transition 1..1 "triggered by" relation with an entity operation
+
+### Read-only Entity (Master Data)
 
 A read-only entity is an entity whose state is owned by another bounded context or an external system. Within this bounded context it is observable but not mutable — operations that change its state do not exist locally, and its repository exposes only read operations.
 
