@@ -86,7 +86,7 @@ An organization groups bounded contexts. It serves as the top-level container fo
 Relations:
 - 1..n "has" relation with bounded contexts
 
-#Bounded Context
+# Bounded Context
 
 A boundary within which a model is well-defined and its language is consistent. Words, types, and rules inside a bounded context share a single meaning. A bounded context has a shortname. A bounded context must not be used for decomposition into different modules, in doubt use a module. Interactions between bounded contexts should be asynchronous. Transactions cannot span across bounded contexts — there is a rupture of transactional consistency at context boundaries.
 
