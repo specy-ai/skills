@@ -5,7 +5,7 @@
 - [Domain model metamodel](#domain-model-metamodel)
   - [Convention](#convention)
   - [Organization](#organization)
-  - [Bounded Context](#bounded-context)
+    - [Bounded Context](#bounded-context)
     - [Context map patterns](#context-map-patterns)
       - [Upstream patterns](#upstream-patterns)
       - [Open Host Service (OHS)](#open-host-service-ohs)
@@ -20,13 +20,16 @@
       - [Separate Ways](#separate-ways)
   - [Module](#module)
   - [Interface](#interface)
-  - [Operation](#operation)
-    - [Precondition and postcondition](#precondition-and-postcondition)
-  - [State machine](#state-machine)
+  - [Behavior: Command, Operation and Reaction](#behavior-command-operation-and-reaction)
+    - [Operation](#operation)
+      - [Precondition and postcondition](#precondition-and-postcondition)
+    - [Command](#command)
+    - [Reaction](#reaction)
   - [Entity](#entity)
+  - [State machine](#state-machine)
+  - [Read-only Entity (Master Data)](#read-only-entity-master-data)
   - [Aggregate](#aggregate)
   - [Repository](#repository)
-  - [Command](#command)
   - [Query](#query)
   - [Event](#event)
     - [Internal Event](#internal-event)
@@ -40,13 +43,16 @@
       - [Recomputation heuristic](#recomputation-heuristic)
       - [Differentiators with other event types](#differentiators-with-other-event-types)
   - [Value Type](#value-type)
+  - [Enums (Referential)](#enums-referential)
   - [Domain Service](#domain-service)
   - [Application Service](#application-service)
   - [Infrastructure Service](#infrastructure-service)
-  - [Properties - Reaction and Invariant](#properties---reaction-and-invariant)
+  - [Property - Invariant, Condition & Agreement](#property---invariant-condition--agreement)
     - [Invariant](#invariant)
-    - [Reaction](#reaction)
-      - [Differentiators with other property types](#differentiators-with-other-property-types)
+    - [Condition (precondition and postcondition)](#condition-precondition-and-postcondition)
+      - [Precondition](#precondition)
+      - [Postcondition](#postcondition)
+      - [Invariant vs condition](#invariant-vs-condition)
     - [Agreement and Reconciliation](#agreement-and-reconciliation)
       - [Agreement](#agreement)
       - [Reconciliation](#reconciliation)
@@ -86,7 +92,7 @@ An organization groups bounded contexts. It serves as the top-level container fo
 Relations:
 - 1..n "has" relation with bounded contexts
 
-#Bounded Context
+### Bounded Context
 
 A boundary within which a model is well-defined and its language is consistent. Words, types, and rules inside a bounded context share a single meaning. A bounded context has a shortname. A bounded context must not be used for decomposition into different modules, in doubt use a module. Interactions between bounded contexts should be asynchronous. Transactions cannot span across bounded contexts — there is a rupture of transactional consistency at context boundaries.
 
@@ -104,7 +110,6 @@ Relations:
 A context map pattern defines the behavioral constraints that govern how two bounded contexts interact. The pattern determines who controls the shared model, how translation happens, and what coupling is accepted. Each pattern imposes specific obligations on message handling, model evolution, and dependency management.
 
 Patterns are grouped by the position of the bounded context in the relationship: upstream (the context that provides), downstream (the context that consumes), or symmetric (both contexts share responsibility).
-
 
 #### Upstream patterns
 
@@ -220,61 +225,94 @@ Typical use: contexts that operate in genuinely distinct domains with no meaning
 
 ## Module
 
-A unit of decomposition that groups related domain concepts behind a controlled interface. A module encapsulates its internals and exposes only its interfaces; everything else stays hidden. A module should always be preferred to Bounded Context for pure decomposition of concerns or if the user states it should be context.
+A unit of decomposition that groups related domain concepts behind a controlled interface. A module encapsulates its internals and exposes only its API interfaces; everything else stays hidden. A module should always be preferred to Bounded Context for pure decomposition of concerns or if the user states it should be context.
+
+A module's two interface relations are not symmetric. The **APIs** it exposes are its public surface — what consumers may call. The **SPIs** it depends on are the capabilities it needs from the outside, stated in its own language; they are part of the module's requirements, not of its public surface. A consumer reads a module's APIs to know what it offers, and its SPIs to know what it must be given.
 
 Relations:
-- 0..n "exposes" relation with interfaces
+- 0..n "exposes" relation with interfaces playing the API role (the module's public surface)
+- 0..n "depends on" relation with interfaces playing the SPI role (the ports the module requires; adapters implement them outside the domain)
 - 0..n "depends on" relation with other modules
 - 1..1 "belongs to" relation with a bounded context
 
 ## Interface
 
-A named surface that exposes a subset of operations from entities or domain services within a module. An interface selects which operations are visible to consumers; the operations themselves remain owned by their entity or domain service.
+A named contract: a set of operation signatures stated independently of the artefact that owns or implements them. In the hexagonal architecture an interface is a **port**, and it plays one of two roles depending on which side of the domain it sits. Every interface declares its role.
+
+**API — driving port (inbound).** The interface *selects*: it exposes a subset of the operations already owned by the entities, aggregates, domain services or application services of its module, and makes exactly that subset visible to consumers (other modules, the presentation layer, the outside world). The operations remain owned by their artefact; the interface only decides what is visible. Everything a module does not expose through an API stays hidden.
+
+**SPI — driven port (outbound).** The interface *defines*: it states the operations the domain **needs from** an external capability, expressed in the domain's own ubiquitous language. It is the contract that an infrastructure service — or a repository, which is a kind of infrastructure service — fulfils. The domain layer depends only on the SPI; an adapter in the infrastructure layer implements it. The Anti-Corruption Layer is the archetypal SPI.
+
+Both roles are the same construct. What separates them is **who owns the contract**: in an API the operations pre-exist and the interface publishes them; in an SPI the interface comes first and the provider is written to satisfy it. In both cases the dependency points inward, toward the domain — which is what makes them ports rather than mere signatures.
+
+| | API | SPI |
+|---|---|---|
+| **Position** | Driving port — the domain is called | Driven port — the domain calls out |
+| **Operations come from** | Entities, aggregates, domain services, application services | Infrastructure services, repositories |
+| **Who owns the contract** | The owning artefact; the interface selects from it | The domain; the provider conforms to it |
+| **Who implements** | The artefact that already owns the operations | An adapter in the infrastructure layer |
+| **Typical use** | Publishing a module's use cases to its consumers | Persistence (repository), payment gateway, notification, ACL |
 
 Relations:
-- 1..n "exposes" relation with operations
-- 0..n "exposes from" relation with entities (the entities whose operations appear in this interface)
-- 0..n "exposes from" relation with domain services (the domain services whose operations appear in this interface)
+- 1..1 "plays" relation with a role (`API` or `SPI`)
+- 1..n "exposes" relation with operations (the signatures that make up the contract)
+- 1..n "exposes from" relation with entities, aggregates, domain services or application services — API only (the artefacts whose operations this interface publishes)
+- 1..1 "describes" relation with an infrastructure service or a repository — SPI only (the provider whose contract this interface defines)
+- 0..n "used by" relation with entity or domain service operations — SPI only (the domain operations that depend on this contract)
 - 1..1 "belongs to" relation with a module
 
-## Operation
+## Behavior: Command, Operation and Reaction
+
+### Operation
 
 A named unit of behavior with typed input arguments and one typed output (which may be an error). An operation is either safe (no mutation, read-only) or unsafe (mutates domain state). An operation is either idempotent or not. An operation may emit multiple events, including errors that must be explicitely defined as Error event.
 
-Ownership and exposure follow a strict hierarchy: entities own operations, interfaces expose a subset of entity or domain service operations, and state machine transitions reference entity operations.
+Ownership and exposure are distinct: an operation is owned by exactly one artefact, and an interface only publishes (API) or defines (SPI) operations — it never owns them. State machine transitions reference entity operations.
 
 An operation may declare preconditions and postconditions.
 
 Relations:
-- 1..1 "owned by" relation with entity or domain service (mutually exclusive — an operation has exactly one owner)
+- 1..1 "owned by" relation with entity, aggregate, domain service, application service, infrastructure service, repository or value type (mutually exclusive, an operation has exactly one owner)
 - 0..n "exposed by" relation with interfaces
 - 0..n "emits" relation with events
 - 0..n "has" relation with preconditions
 - 0..n "has" relation with postconditions
 
-### Precondition and postcondition
+#### Precondition and postcondition
 
 A condition is a named predicate expression over the operation's arguments and, if the operation belongs to an entity, its state.
 
 - A **precondition** on an interface operation references arguments only. A precondition on an entity operation references both state and arguments. Each precondition declares a violation reason.
 - A **postcondition** evaluates over state-before, state-after, and arguments: `P(state_before, state_after, arguments) -> boolean`.
 
+Conditions are properties: they are declared here, on the operation, but they belong to the same family as invariants. See [Condition (precondition and postcondition)](#condition-precondition-and-postcondition) for how they relate to invariants and how each is enforced.
 
-## State machine
 
-A state machine structures the lifecycle of an entity through an explicit set of states and transitions.
+### Command
 
-- One start state, zero or more final states.
-- Each state carries its own invariants.
-- Transitions connect states. Each transition has preconditions (guards) and postconditions.
-- Entity operations trigger transitions; the transition is the effect of the operation.
-- An operation may participate in transitions from multiple states and therefore raise different events depending on the source state.
-- The set of valid transitions from each state is finite and enumerable.
+An inbound message expressing an intention to change domain state. A command triggers an operation (owned by an entity, aggregate or a service), which produces one or more events as its result. A command must always include an identifier field (that will represent the correlation id in the chain of causality downstream). The command separates the stimulus with all its details that triggers the effects (the operation)
+
+A command succeeds or fails. Success implies at least one state change occurred. Failure produces an error event.
+
+**Naming**: Commands use a verb in present tense or infinitive followed by a domain noun (the target entity or aggregate type). Example: `PlaceOrder`, `CancelBooking`.
 
 Relations:
-- 1..1 "belongs to" relation with entity
-- 1..n "has" relation with states
-- Each transition 1..1 "triggered by" relation with an entity operation
+- 1..1 "targets" relation with entity, aggregate or domain service (the domain object whose state will change)
+- 1..1 "triggers" relation with the operation that handles this command
+- 1..n "produces" relation with events (success events or error events)
+
+### Reaction
+
+A reaction listens to events and issues a command in response to perform effects. It has a name (anchored in the ubiquitous language), a trigger (one or more event references), a guard (a condition that must hold for the reaction to fire), and an effect (a command reference).
+
+**A reaction is the only way an event causes a command.** It is uniform across the four event types — internal, external, error and temporal: whatever raised the event, the way the domain responds to it is a reaction. An event never reaches a command directly. This gives every event the same three things: a named rule in the ubiquitous language, a guard, and an explicit effect.
+
+The guard is what makes the uniformity worth having. It is a predicate over domain state, evaluated when the event arrives; if it is false, the reaction does not fire and no command is issued. Without it, consuming an event would mean issuing its command unconditionally — so "when `PaymentSettled` arrives, release the order **only if** it is still held" would have nowhere to live. A reaction with no guard fires on every occurrence of its trigger.
+
+Relations:
+- 1..n "triggered by" relation with events (internal, external, error or temporal — any event type)
+- 0..1 "guarded by" predicate expression over domain state (evaluated when the event arrives; the reaction fires only if it holds)
+- 1..1 "effects" relation with command (the command issued when the reaction fires)
 
 
 ## Entity
@@ -301,34 +339,56 @@ Relations:
 - 0..n "relates to" relation with other entities
 - 0..n "constrained by" relation with invariants
 
-### Read-only Entity (Master Data)
+## State machine
 
+A state machine structures the lifecycle of an entity through an explicit set of states and transitions.
 
-A read-only entity is an entity whose state is owned by another bounded context or an external system. Within this bounded context it is observable but not mutable — operations that change its state do not exist locally, and its repository exposes only read operations.
+- One start state, zero or more final states.
+- Each state carries its own invariants.
+- Transitions connect states. Each transition has preconditions (guards) and postconditions.
+- Entity operations trigger transitions; the transition is the effect of the operation.
+- An operation may participate in transitions from multiple states and therefore raise different events depending on the source state.
+- The set of valid transitions from each state is finite and enumerable.
 
-Common examples are the master-data archetypes: `Customer`, `Supplier`, `Product`. They are referenced by higher-level operations of this context (e.g. an `Order` references a `Product`) but their lifecycle is governed elsewhere.
+Relations:
+- 1..1 "belongs to" relation with entity
+- 1..n "has" relation with states
+- Each transition 1..1 "triggered by" relation with an entity operation
+
+## Read-only Entity (Master Data)
+
+A read-only entity is a kind of entity whose state is owned by another bounded context or an external system. Within this bounded context it is observable but not mutable — operations that change its state do not exist locally, and its repository exposes only read operations.
+
+Common examples are the master-data archetypes: `Customer`, `Supplier`, `Product`. They are referenced by other entities, aggregates or domain service of this context (e.g. an `Order` references a `Product`) but their lifecycle is governed elsewhere.
 
 A read-only entity is kept in sync with its source through one of two patterns:
 
 - **Synchronous lookup**: this context issues a query to the upstream context every time it needs the entity's current state. No local copy.
 - **Asynchronous projection**: this context subscribes to the upstream context's events and maintains a local read-model that is updated each time a relevant event arrives.
 
-The entity declares its sync pattern explicitly. Its repository derives only read operations (`getById`, `findByField`, `search`) — no `store`, no `delete`, no `update`. Domain operations defined locally on a read-only entity are forbidden; the entity is structural, not behavioural.
+The entity declares its sync pattern explicitly. Its repository derives only read operations (`getById`, `findByField`, `search`) — no `store`, no `delete`, no `update`. Unsafe domain operations (state-changing operations) defined locally on a read-only entity are forbidden, only safe operations are permitted; the entity is structural, not behavioural.
+
+**The projection write path**: an asynchronous projection must nevertheless be *written* — the local read-model changes each time an upstream event arrives. That write is not a domain operation and does not contradict the rules above, because it happens **outside the domain layer**. The projection is maintained by the adapter that implements the read-only entity's SPI: the adapter subscribes to the upstream context's events, translates them into the local representation (it is an Anti-Corruption Layer), and refreshes the read-model behind the port. The domain layer never sees the write; it only ever reads through the repository's read operations, and what it reads is a fact already established upstream.
+
+Two rules follow, and both are auditable:
+
+- **The domain declares no reaction, no command and no operation for projection maintenance.** If a model contains a command whose only purpose is to update a read-only entity's local copy, the read-only entity has been misidentified — the state is in fact owned by this context, and the entity should be a normal entity.
+- **The upstream events that feed the projection are not modeled as external events of this context.** An external event is one this context *reacts to* with domain behavior. An event consumed solely to refresh a projection has no domain consequence here; it is part of the adapter's contract with the upstream context, and the model records it — if at all — as metadata on the sync pattern, not as a domain event.
+
+The consequence for the modeler is a sharp test: *does an upstream event change what this context decides, or only what it knows?* If it changes a decision, model it as an external event with a reaction. If it only refreshes knowledge, it belongs to the projection adapter and stays out of the domain model.
 
 Relations:
-- ◁ "is-a" relation with entity (inheritance — all entity rules apply except it owns no operations)
 - 1..1 "sourced from" relation with an upstream bounded context or external system
 - 0..1 "synced via" relation with a sync pattern (`synchronous-query` or `asynchronous-projection`)
+- 0..1 "projected by" relation with an infrastructure service — asynchronous projection only (the adapter that subscribes upstream and refreshes the local read-model behind the repository's SPI)
 
 
 ## Aggregate
 
-A group of entities with a designated root that enforces the integrity of the whole. All state changes pass through the root; every operation evaluates the aggregate's invariants. An aggregate is itself an entity — all entity rules apply.
+A group of entities with a designated root among that entities (the aggregate itself) that enforces the integrity of the whole. All state changes pass through the root; every operation evaluates the aggregate's invariants. An aggregate is itself an entity — all entity rules apply.
 
 Relations (in addition to all entity relations):
-- ◁ "is-a" relation with entity (inheritance — all entity relations apply)
-- 1..1 "has root" relation with entity (the root entity that controls all access)
-- 1..n "contains" relation with entities (the cluster of entities inside the aggregate boundary, including the root)
+- 1..n "contains" relation with entities (the cluster of entities inside the aggregate boundary, excluding the root as it is the aggregate)
 - 0..n "constrained by" relation with invariants (aggregate-level invariants that span the whole cluster)
 
 ## Repository
@@ -350,21 +410,9 @@ A repository is **derived, not hand-authored**: it falls out of its owning entit
 Relations:
 - 1..1 "derived from" relation with entity or aggregate root (the domain object whose persistence it manages; absent for non-root child entities of an aggregate)
 - 1..n "provides" relation with operations (`store`, `getById`, `remove`, `search`, and deduced `findByField` operations)
+- 1..1 "described by" relation with an interface playing the SPI role (the persistence port the domain depends on; an adapter in the infrastructure layer implements it)
 - 0..n "read by" relation with queries (a query reads current state through the repository's read surface)
 - 1..1 "belongs to" relation with the module of its owning entity or aggregate
-
-## Command
-
-An inbound message expressing an intention to change domain state. A command triggers an entity operation, which produces one or more events as its result. A command must always include an identifier field (that will represent the correlation id in the chain of causality downstream).
-
-A command succeeds or fails. Success implies at least one state change occurred. Failure produces an error event.
-
-**Naming**: Commands use a verb in present tense or infinitive followed by a domain noun (the target entity or aggregate type). Example: `PlaceOrder`, `CancelBooking`.
-
-Relations:
-- 1..1 "targets" relation with entity or aggregate (the domain object whose state will change)
-- 1..1 "triggers" relation with operation (the entity operation that handles this command)
-- 1..n "produces" relation with events (success events or error events)
 
 
 ## Query
@@ -381,13 +429,12 @@ Relations:
 
 ## Event
 
-A recorded fact about something that happened in the domain. An event is raised when an entity reaches a new state after a transition. Events are append-only: they cannot be retracted, only superseded by a subsequent event. An event may reference the command or query identifier that caused it.An event related to an entity must always include a field that reference the entity identifier.
+A recorded fact about something that happened in the domain. An event is raised when an entity reaches a new state after a transition. Events are append-only: they cannot be retracted, only superseded by a subsequent event. An event may reference the command or query identifier that caused it. An event related to an entity must always include a field that reference the entity identifier.
 
 **Naming**: Events use a past participle. Example: `OrderPlaced`, `PaymentReceived`.
 
 Relations:
 - 0..1 "caused by" relation with command or query (the correlation/causation link to the originating message)
-- 1..1 "raised by" relation with operation (the operation whose execution produced this event)
 
 ### Internal Event
 
@@ -395,13 +442,19 @@ An event raised within the bounded context from an entity state transition. Inte
 
 Relations:
 - 0..n "triggers" relation with reactions
+- 1..1 "raised by" relation with operation (the operation whose execution produced this event)
 
 ### External Event
 
-An event originating from an upstream bounded context. if the external event doesn't have an Id we should add one that will act as a correlation id for the chain of causality.
+An event originating from an upstream bounded context. If the external event doesn't have an id we should add one that will act as a correlation id for the chain of causality.
+
+An external event is consumed through a reaction, exactly like an internal event: the reaction names the rule, guards it against local state, and issues the resulting command. The external event does not reach a command directly — the guard is what lets this context decide whether the upstream fact is still relevant to it, which matters more for external events than for any other type, since the upstream context knows nothing of local state.
+
+An external event is declared only when this context **reacts** to it with domain behavior. An upstream event consumed solely to refresh a local read-model is not an external event — it belongs to the projection adapter (see [Read-only Entity](#read-only-entity-master-data)).
 
 Relations:
-- 1..n "triggers" relation with commands (the reactions deduced from consuming this event)
+- 0..n "triggers" relation with reactions
+- 1..1 "sourced from" relation with an upstream bounded context or external system
 
 ### Error Event
 
@@ -409,6 +462,7 @@ An error raised by an operation is a special case of event. Error events can be 
 
 Relations:
 - 0..n "triggers" relation with reactions
+- 1..1 "raised by" relation with operation (the operation whose execution produced this event)
 
 ### Temporal Event
 
@@ -470,13 +524,15 @@ The recomputation reaction is a regular reaction — no special metamodel constr
 | **Cause** | An operation within the BC | An upstream BC | An operation failure | Time, anchored to a domain reference |
 | **Firing** | Synchronous with operation | Asynchronous from upstream | Synchronous with operation | Asynchronous from clock |
 | **Suppression** | Cannot be suppressed | Cannot be suppressed | Cannot be suppressed | Guard can suppress at firing time |
-| **Triggers** | Reactions | Commands | Reactions | Reactions (same as internal) |
+| **Triggers** | Reactions | Reactions | Reactions | Reactions |
+
+All four types are consumed the same way — through a [reaction](#reaction), whose guard decides whether the event leads to a command. What differs between them is what *raises* the event, not what the domain does with it. Note that a temporal event's guard is evaluated twice over: once at firing time (suppressing the event itself, so no fact is ever recorded) and again in any reaction that consumes it.
 
 Relations:
 - 1..1 "references" relation with event (for relative), entity field (for absolute), or schedule expression (for recurring) — the temporal anchor that roots the causality chain
 - 0..1 "offset by" duration expression (for relative temporal events only)
 - 0..1 "guarded by" predicate expression over entity state (evaluated at firing time)
-- 0..n "triggers" relation with reactions (inherited from event)
+- 0..n "triggers" relation with reactions 
 
 
 ## Value Type
@@ -511,7 +567,7 @@ The `Currencies` enum holds every defined `Currency` value. Other parts of the s
 **Naming**: enums are named with a noun, typically pluralized when they hold value-type instances (`Currencies`, `Roles`) and singular when they hold a closed set of primitive labels (`Severity`, `PaymentMethodType`).
 
 Relations:
-- 1..1 "references" relation with the value type whose instances populate the enum (omitted when the enum holds primitive values)
+- 0..1 "references" relation with the value type whose instances populate the enum (omitted when the enum holds primitive values)
 - 1..n "holds" relation with values (the closed set of enum members)
 - 0..n "constrains" relation with fields (a field of enum-typed type is restricted to one of the enum's values)
 
@@ -521,6 +577,7 @@ A named set of operations that span multiple entities or aggregates, where assig
 
 Relations:
 - 1..n "owns" relation with operations
+- 0..n "targeted by" relation with commands
 - 1..1 "belongs to" relation with a module
 - 0..n "calls" relation with infrastructure service
 
@@ -530,8 +587,9 @@ Relations:
 An orchestrator that interprets requests from the presentation layer (API controllers, UI handlers) and delegates to domain services and domain objects. Application services manage use-case state but contain no domain logic. An application service is tied to a particular set of technologies (e.g. HTTP protocol and JSON for a REST API controller).
 
 Relations:
-- 0..n "delegates to" relation with domain services
-- 0..n "delegates to" relation with enties and aggregates
+- 1..n "owns" relation with operations
+- 0..n "delegates to" relation with domain services, entities or aggregates
+- 1..1 "exposed by" relation with an interface playing the API role (the driving port through which consumers reach this service's operations)
 - 1..1 "belongs to" relation with a module
 
 
@@ -543,44 +601,75 @@ An infrastructure service is described by an interface called an SPI (Service Pr
 The Anti-Corruption Layer (ACL) pattern is implemented as an infrastructure service.
 
 Relations:
-- 1..1 "has" relation with an interface (the contract that describes the service's operations)
-- 0..n "used by" relation with entity operations or domain service operations (domain objects depend on the infrastructure service's interface, never the reverse)
+- 1..n "owns" relation with operations (the operations that fulfil the SPI contract)
+- 1..1 "described by" relation with an interface playing the SPI role (the driven port whose contract this service fulfils)
+- 0..n "used by" relation with entity operations or domain service operations (domain objects depend on the infrastructure service's SPI, never the reverse)
 - 1..1 "belongs to" relation with a module
 
 
-## Properties - Reactions and Invariant
+## Property - Invariant, Condition & Agreement
 
 Properties constrain system behavior.
-A property has a name (anchored in the domain's ubiquitous language), a scope (the entity, domain service, or value type that guarantees the property holds). A property separates what must hold (a predicate for invariant, a reactive rule for reaction) from the enforcement mechanism (what happens when an invariant is violated or a reaction fires).
+A property has a name (anchored in the domain's ubiquitous language), a scope (the entity, domain service or value type that enforces the property holds). A property separates what must hold (a predicate for invariant, a pre or post-condition) from the enforcement mechanism (in which behavior the invariant is verified, and what happens when an invariant is violated).
 
 ### Invariant
 
-Invariants are safety properties: rules that must hold true at every point within a consistency boundary. They are synchronous, checked at a point in time, and scoped to a single aggregate or entity.
+Invariants are safety properties: rules that must hold true at every point within a consistency boundary. They are synchronous, checked at a point in time, and scoped to a single aggregate, entity or value type.
 Examples: "An order total must equal the sum of its line items." "A booking cannot overlap with another booking for the same resource."
 
 An invariant is "a named boolean expression over state that must evaluate to true at every observable point". Invariant(state) -> true.
-An invariant is enforced depending on its scope whenever a state mutation occurs for that entity or aggregate. Enforcement strategies are: rejection (the operation is refused and no state change occurs), compensation (the state change is accepted and a corrective command is issued), or alert (the violation is recorded for review). Each invariant shall declare its enforcement strategy.
+An invariant is enforced depending on its scope whenever a state mutation occurs for that entity or aggregate. Enforcement strategies are: rejection (the operation is refused and no state change occurs), compensation (the state change is accepted and a corrective command is issued), or alert (the violation is recorded for review). Each invariant shall declare its enforcement strategy (at construction, in operation not related to the current state, it's essentially related to every beheavior that could violates the invariant as a result).
 Each state from a state machine carries its own invariants (what must be true while in this state).
 An entity-level invariant must hold across all states of the entity's lifecycle. A state-scoped invariant must hold only while the entity occupies that specific state. State-scoped invariants are implicitly conjoined with entity-level invariants — both must hold simultaneously while the entity is in that state.
 
 Relations:
-- 1..1 "scoped to" relation with entity, aggregate, or state (the consistency boundary this invariant protects)
+- 1..1 "scoped to" relation with entity, aggregate, value type or state of an entity (the consistency boundary this invariant protects)
 
-### Reaction
 
-A reaction listens to internal events and issues commands in response to perform effects.
-A reaction is triggered by an internal event, so it listens to one or more internal events.
-It has a name (anchored in the ubiquitous language), a trigger (one or more event references), a guard (a condition that must hold for the reaction to fire), and an effect (a command reference)
+### Condition (precondition and postcondition)
+
+A condition is a property whose scope is a **behavior** — an operation or a state machine transition — rather than a consistency boundary. Conditions are declared on the behavior that carries them — see [Precondition and postcondition](#precondition-and-postcondition) under Operation for their declaration site — and are restated here because they are properties in the same sense as invariants: a named predicate in the ubiquitous language, separated from the mechanism that enforces it.
+
+A condition is a named predicate expression over the behavior's arguments and, when the behavior belongs to an entity, its state. Conditions come in two kinds, and they are distinct concepts: they differ in signature, in when they are evaluated, and in what a violation means.
+
+**Scope**: a condition attaches either to an **operation** — in which case it holds for every invocation of that operation — or to a single **state machine transition** — in which case it holds only for that transition. The distinction matters because one operation may drive transitions out of several source states (see [State machine](#state-machine)), and each of those transitions may carry its own condition. `cancel()` may be legal from `pending` when nothing has shipped, and legal from `paid` only within the refund window: two transitions of one operation, two different preconditions. An operation-scoped condition applies to all of an operation's transitions; a transition-scoped one applies to exactly one.
+
+#### Precondition
+
+A predicate that must hold **before** the behavior executes: `P(state_before, arguments) -> boolean`. It expresses what the caller must guarantee — the obligation the domain places on whoever invokes the behavior.
+
+A precondition on a behavior exposed through an API interface references arguments only. A precondition on an entity operation references both state and arguments.
+
+**Enforcement is always rejection** — the behavior is refused, no state change occurs, and the declared violation reason is returned (as an error event when the behavior was triggered by a command). Unlike an invariant, a precondition declares no enforcement strategy, because rejection is the only one available: there is no state change to compensate, and nothing has happened to alert about. Enforcement is therefore implicit.
 
 Relations:
-- 1..n "triggered by" relation with internal events (or error events)
-- 1..1 "effects" relation with command (the command issued when the reaction fires)
+- 1..1 "scoped to" relation with an operation or a state machine transition (the behavior this precondition guards)
+- 1..1 "declares" relation with a violation reason (the business language reason returned when the predicate fails)
 
-#### Differentiators with other property types
+#### Postcondition
 
-- From invariant: an invariant is a predicate over state, checked synchronously within one aggregate. A reaction is a reactive rule, triggered asynchronously across aggregates.
-- From precondition: a precondition gates the operation it belongs to. A reaction reacts to the outcome of an operation it doesn't own.
-- From agreement: an agreement is a cross-aggregate predicate maintained by a reconciliation mechanism. A reaction is a standalone reactive rule — it may participate in a reconciliation, but it has independent domain meaning.
+A predicate that must hold **after** the behavior executes: `P(state_before, state_after, arguments) -> boolean`. Because it can compare the two states, it expresses the behavior's *effect* — what the domain guarantees in return — rather than a static truth. This is what distinguishes it from an invariant: an invariant would still hold if the behavior did nothing at all; a postcondition would not.
+
+A postcondition has no violation reason and no enforcement strategy. A failing postcondition is not a domain outcome — the caller did nothing wrong, and no business rule was broken. It means the behavior did not do what the model says it does, which is a defect in the model or in its implementation. It is detected and reported, never rejected and never compensated.
+
+Relations:
+- 1..1 "scoped to" relation with an operation or a state machine transition (the behavior whose effect this postcondition asserts)
+
+#### Invariant vs condition
+
+The two are complementary, and both must hold.
+
+| | Invariant | Precondition | Postcondition |
+|---|---|---|---|
+| **Scope** | A consistency boundary: entity, aggregate, value type, or state | A behavior: an operation or a transition | A behavior: an operation or a transition |
+| **When it holds** | At every observable point of the boundary's lifecycle | Before the behavior runs | After the behavior runs |
+| **Signature** | `P(state)` | `P(state_before, arguments)` | `P(state_before, state_after, arguments)` |
+| **What it expresses** | A truth about state | What the caller must guarantee | What the behavior guarantees in return |
+| **Violation means** | A business rule was broken | The caller was not entitled to invoke the behavior | The model or its implementation is wrong |
+| **Enforcement** | Declared: rejection, compensation, or alert | Implicit: rejection, with a violation reason | None: detected as a defect |
+
+An operation therefore satisfies three property sets simultaneously: its preconditions on entry, its postconditions on exit, and — because it mutates the state of its owner — every invariant scoped to that owner and to the state the owner occupies.
+
 
 ### Agreement and Reconciliation
 
