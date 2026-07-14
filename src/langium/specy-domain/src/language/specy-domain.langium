@@ -1,12 +1,21 @@
 // =============================================================================
 // Specy Domain Model Grammar (.domain)
-// Langium grammar — translated from tree-sitter grammar.js (v1.0.0)
+//
+// Mirrors src/grammars/domain.ebnf — the normative grammar derived from
+// src/metamodels/DOMAIN-METAMODEL.md. Keep the three in sync.
+//
+// Langium is LL(*), so two rules that the (GLR) tree-sitter grammar enforces
+// structurally are enforced here by the validator instead. Both are marked
+// "VALIDATOR" below.
 // =============================================================================
 
 grammar SpecyDomain
 
 // -----------------------------------------------------------------------------
 // Top-level
+//
+// Outer containers (organization > context > module) may be ELIDED: a file may
+// start at a context, a module, or a bare definition.
 // -----------------------------------------------------------------------------
 
 entry DomainFile:
@@ -20,50 +29,43 @@ TopLevelElement:
 // -----------------------------------------------------------------------------
 
 OrganizationDef:
-    'organization' name=(TypeName | STRING)
+    'organization' name=TypeName
     description=Description?
     metadata=MetadataBlock?
     '{'
-        (sources+=SourceDecl)*
-        (contexts+=ContextDef)*
+        satisfies=SatisfiesDecl?
+        requirementsSource=RequirementsSourceDecl?
+        (contexts+=ContextDef)+
     '}';
-
-SourceDecl:
-    RequirementsSourceDecl | PrdSourceDecl;
 
 RequirementsSourceDecl:
     'requirements-source' path=STRING;
-
-PrdSourceDecl:
-    'prd-source' path=STRING;
 
 // -----------------------------------------------------------------------------
 // Bounded Context
 // -----------------------------------------------------------------------------
 
 ContextDef:
-    'context' name=(TypeName | STRING)
+    'context' name=TypeName
     shortname=Shortname?
     description=Description?
     metadata=MetadataBlock?
     '{'
-        (sources+=SourceDecl)*
+        satisfies=SatisfiesDecl?
+        requirementsSource=RequirementsSourceDecl?
         contextMap=ContextMapBlock?
         (members+=(ModuleDef | Definition))*
     '}';
 
 Shortname:
-    '(' value=Ident ')'
-    | 'shortname' value=(Ident | TypeName);
+    '(' value=Ident ')';
 
 // -----------------------------------------------------------------------------
 // Context Map
 // -----------------------------------------------------------------------------
 
 ContextMapBlock:
-    'map' '{'
-        (relations+=ContextRelation)*
-    '}';
+    'map' '{' (relations+=ContextRelation)* '}';
 
 ContextRelation:
     UpstreamRelation | DownstreamRelation | SymmetricRelation;
@@ -88,65 +90,107 @@ SymmetricPattern returns string:
 
 // -----------------------------------------------------------------------------
 // Module
+//
+// The two interface relations are NOT symmetric and are declared apart:
+//   exposes    { ApiName }     — the public surface
+//   requires   { SpiName }     — the capabilities needed from outside
+//   depends on { ModuleName }  — other modules
 // -----------------------------------------------------------------------------
 
 ModuleDef:
-    'module' name=(TypeName | STRING)
+    'module' name=TypeName
     description=Description?
     metadata=MetadataBlock?
-    (usesDecls+=UsesDecl)*
-    (reqSources+=RequirementsSourceDecl)*
-    (body=ModuleBody)?;
-
-ModuleBody:
     '{'
-        dependsBlock=DependsBlock?
-        (members+=(ModuleDef | InterfaceDef | Definition))*
+        satisfies=SatisfiesDecl?
+        // When the outer containers are elided, the module IS the top level, so it
+        // must be able to carry the requirements-source provenance link.
+        requirementsSource=RequirementsSourceDecl?
+        exposes=ExposesBlock?
+        requires=RequiresBlock?
+        dependsOn=DependsBlock?
+        (members+=Definition)*
     '}';
 
-UsesDecl:
-    'uses' 'module' module=TypeName;
+ExposesBlock:
+    'exposes' '{' (interfaces+=TypeName)+ '}';
+
+RequiresBlock:
+    'requires' '{' (interfaces+=TypeName)+ '}';
 
 DependsBlock:
-    'depends' 'on' '{'
-        (deps+=(TypeName | STRING))*
-    '}';
+    'depends' 'on' '{' (modules+=TypeName)+ '}';
 
 // -----------------------------------------------------------------------------
-// Interface
+// Definitions
+// -----------------------------------------------------------------------------
+
+Definition:
+    EnumDef | ValueDef
+    | EntityDef | ReadOnlyEntityDef | AggregateDef
+    | CommandDef | QueryDef
+    | EventDef | ExternalEventDef | ErrorEventDef | TemporalEventDef
+    | DomainServiceDef | ApplicationServiceDef | InfrastructureServiceDef
+    | RepositoryDef | InterfaceDef
+    | ReactionDef | InvariantDef | AgreementDef;
+
+// -----------------------------------------------------------------------------
+// Interface — a port. Every interface declares its role.
+//
+//   api interface — DRIVING port. `exposes` SELECTS operations that already exist
+//                   on an entity, aggregate, domain service or app service.
+//   spi interface — DRIVEN port. `describes` names the infrastructure service or
+//                   repository that fulfils the contract it DEFINES.
 // -----------------------------------------------------------------------------
 
 InterfaceDef:
-    'interface' name=TypeName
+    role=InterfaceRole 'interface' name=TypeName
     description=Description?
     metadata=MetadataBlock?
     '{'
-        (members+=(ExposesClause | NamedOperationDef))*
+        satisfies=SatisfiesDecl?
+        (members+=InterfaceMember)*
     '}';
+
+InterfaceRole returns string:
+    'api' | 'spi';
+
+InterfaceMember:
+    ExposesClause | DescribesClause | OperationSignature;
 
 ExposesClause:
     'exposes' path=DotPath;
 
+DescribesClause:
+    'describes' provider=TypeName;
+
+// A signature, with an optional body carrying only conditions.
+OperationSignature:
+    name=Ident '(' params=ParamList? ')' (':' returnType=FieldType)?
+    description=Description?
+    metadata=MetadataBlock?
+    ('{'
+        satisfies=SatisfiesDecl?
+        (conditions+=ConditionClause)*
+    '}')?;
+
 // -----------------------------------------------------------------------------
-// Definitions — all domain concepts within a module
+// Satisfies — always the first element inside the body braces.
 // -----------------------------------------------------------------------------
 
-Definition:
-    EnumDef | ValueDef | EntityDef | AggregateDef
-    | StatemachineDef
-    | CommandDef | QueryDef
-    | EventDef | ExternalEventDef | ErrorEventDef | TemporalEventDef
-    | DomainServiceDef | ApplicationServiceDef | InfrastructureServiceDef | ServiceDef
-    | InvariantDef
-    | AgreementDef
-    | ReactionDef;
+SatisfiesDecl:
+    'satisfies' '[' ids+=REQUIREMENT_ID (',' ids+=REQUIREMENT_ID)* ']';
 
 // -----------------------------------------------------------------------------
-// Enum
+// Enum (Referential)
+//
+// `of ValueType` — the enum holds instances of a value type, which must then
+// declare a `code` field.
 // -----------------------------------------------------------------------------
 
 EnumDef:
     'enum' name=TypeName
+    ('of' valueType=TypeName)?
     description=Description?
     metadata=MetadataBlock?
     '{'
@@ -155,25 +199,10 @@ EnumDef:
     '}';
 
 EnumValue:
-    value=(Ident | TypeName) ','?;
-
-// Inline enum (no name, inside value body)
-InlineEnumBlock:
-    'enum' '{'
-        first=TypeName (',' more+=TypeName)* ','?
-    '}';
+    name=Ident ('=' value=LiteralValue)? description=Description? ','?;
 
 // -----------------------------------------------------------------------------
-// Satisfies — traceability link to requirements
-// -----------------------------------------------------------------------------
-
-SatisfiesDecl:
-    'satisfies' '['
-        ids+=REQUIREMENT_ID (',' ids+=REQUIREMENT_ID)*
-    ']';
-
-// -----------------------------------------------------------------------------
-// Value Type — flexible body
+// Value Type
 // -----------------------------------------------------------------------------
 
 ValueDef:
@@ -181,25 +210,25 @@ ValueDef:
     description=Description?
     metadata=MetadataBlock?
     '{'
-        (bodyItems+=ValueBodyItem)*
+        satisfies=SatisfiesDecl?
+        fields=FieldsBlock
+        operations=ValueOperationsBlock?
+        invariants=InvariantsBlock?
     '}';
-
-ValueBodyItem:
-    SatisfiesDecl | Description | FieldDecl | FieldsBlock
-    | InlineEnumBlock | InlineInvariant | InvariantsBlock | ValueOperationsBlock;
 
 ValueOperationsBlock:
-    'operations' '{'
-        (ops+=ValueOpDef)*
-    '}';
+    'operations' '{' (ops+=ValueOpDef)* '}';
 
+// A value operation returns a new value. Its body may carry the preconditions of
+// the "transactional constructor".
 ValueOpDef:
     name=Ident '(' params=ParamList? ')' ':' returnType=FieldType
     description=Description?
-    metadata=MetadataBlock?;
+    metadata=MetadataBlock?
+    ('{' body=OperationBody '}')?;
 
 // -----------------------------------------------------------------------------
-// Entity — flexible body
+// Entity
 // -----------------------------------------------------------------------------
 
 EntityDef:
@@ -207,24 +236,87 @@ EntityDef:
     description=Description?
     metadata=MetadataBlock?
     '{'
-        (bodyItems+=EntityBodyItem)*
+        satisfies=SatisfiesDecl?
+        identity=IdentityDecl
+        duplicateDetection=DuplicateDetection?
+        fields=FieldsBlock
+        references=ReferencesBlock?
+        operations=OperationsBlock?
+        states=StatesBlock?
+        invariants=InvariantsBlock?
     '}';
 
-EntityBodyItem:
-    SatisfiesDecl | Description | FieldDecl | FieldsBlock
-    | IdentityDecl | DuplicateDetection
-    | NamedOperationDef | OperationsBlock
-    | InlineInvariant | InvariantsBlock
-    | ReactionsBlock | StatesBlock | TransitionsBlock | ReferencesBlock;
-
 IdentityDecl:
-    ('identity' | 'identifier') name=Ident ':' type=FieldType;
+    'identity' name=Ident ':' type=FieldType;
 
 DuplicateDetection:
     'duplicate' 'detection' '{' expr=Expression '}';
 
 // -----------------------------------------------------------------------------
-// Aggregate — flexible body
+// Read-only Entity (Master Data)
+//
+// State owned by an upstream context or external system. The operations block
+// admits only SAFE clauses — no sets / creates / emits — so "no unsafe operations
+// on master data" is enforced by the grammar, not a validator.
+// -----------------------------------------------------------------------------
+
+ReadOnlyEntityDef:
+    'read-only' 'entity' name=TypeName
+    description=Description?
+    metadata=MetadataBlock?
+    '{'
+        satisfies=SatisfiesDecl?
+        sourcedFrom=SourcedFromClause
+        syncedVia=SyncedViaClause?
+        projectedBy=ProjectedByClause?
+        identity=IdentityDecl
+        fields=FieldsBlock
+        references=ReferencesBlock?
+        operations=SafeOperationsBlock?
+        invariants=InvariantsBlock?
+    '}';
+
+SourcedFromClause:
+    'sourced-from' source=(TypeName | STRING);
+
+SyncedViaClause:
+    'synced-via' pattern=SyncPattern;
+
+SyncPattern returns string:
+    'synchronous-query' | 'asynchronous-projection';
+
+// The ACL adapter that refreshes the local read-model (asynchronous projection).
+ProjectedByClause:
+    'projected-by' adapter=TypeName;
+
+SafeOperationsBlock:
+    'operations' '{' (ops+=SafeOpDef)* '}';
+
+SafeOpDef:
+    name=Ident '(' params=ParamList? ')' (':' returnType=FieldType)?
+    description=Description?
+    metadata=MetadataBlock?
+    '{'
+        satisfies=SatisfiesDecl?
+        safe?='safe'?
+        (clauses+=SafeOperationClause)*
+    '}';
+
+SafeOperationClause:
+    PreconditionClause | PostconditionClause | ResolvesClause
+    | ServiceCallClause | SafeForeachClause | ReturnsClause;
+
+SafeForeachClause:
+    'foreach' collection=DotPath 'as' variable=Binder '{'
+        (body+=SafeOperationClause)*
+    '}';
+
+// -----------------------------------------------------------------------------
+// Aggregate
+//
+// An aggregate IS its root entity: it carries the identity, fields, operations,
+// states and invariants directly. There is no `root` clause. `entities { }` lists
+// the NON-ROOT children of the cluster.
 // -----------------------------------------------------------------------------
 
 AggregateDef:
@@ -232,159 +324,19 @@ AggregateDef:
     description=Description?
     metadata=MetadataBlock?
     '{'
-        (bodyItems+=AggregateBodyItem)*
+        satisfies=SatisfiesDecl?
+        identity=IdentityDecl
+        duplicateDetection=DuplicateDetection?
+        fields=FieldsBlock
+        entities=AggregateEntitiesDecl
+        references=ReferencesBlock?
+        operations=OperationsBlock?
+        states=StatesBlock?
+        invariants=InvariantsBlock?
     '}';
-
-AggregateBodyItem:
-    SatisfiesDecl | Description
-    | AggregateRootDecl | AggregateEntitiesDecl | AggregateContainsDecl
-    | IdentityDecl | DuplicateDetection
-    | FieldDecl | FieldsBlock | ReferencesBlock
-    | InvariantsBlock | ReactionsBlock
-    | OperationsBlock | StatesBlock | TransitionsBlock;
-
-AggregateRootDecl:
-    'root' root=TypeName;
 
 AggregateEntitiesDecl:
-    'entities' '{' (entities+=TypeName)* '}';
-
-AggregateContainsDecl:
-    'contains' first=TypeName (',' more+=TypeName)*;
-
-// -----------------------------------------------------------------------------
-// Statemachine (top-level, flat form)
-// -----------------------------------------------------------------------------
-
-StatemachineDef:
-    'statemachine' name=TypeName
-    '{'
-        (items+=StatemachineItem)*
-    '}';
-
-StatemachineItem:
-    OnClause | StatemachineStart | StateDef | TransitionInline | FinalState;
-
-StatemachineStart:
-    'start' state=TypeName;
-
-StateDef:
-    'state' name=TypeName
-    '{'
-        (invariants+=InlineInvariant)*
-    '}';
-
-TransitionInline:
-    'transition' from=TypeName '->' to=TypeName
-    'triggered-by' trigger=STRING;
-
-FinalState:
-    'final' state=TypeName;
-
-// -----------------------------------------------------------------------------
-// Reaction
-// -----------------------------------------------------------------------------
-
-ReactionDef:
-    'reaction' name=(Ident | TypeName | STRING)
-    ('(' params=ParamList ')')?
-    description=Description?
-    metadata=MetadataBlock?
-    '{'
-        satisfies=SatisfiesDecl?
-        // Either clause items (triggered-by/trigger/effects/effect/guard) or a single
-        // bare guard expression (the scoped-reaction form, formerly `policy name { expr }`).
-        // Item keywords and expression starts are disjoint, so the loop exit is LL-decidable;
-        // the guard expression is parsed once (never repeated) to avoid expression ambiguity.
-        (items+=ReactionItem)*
-        (guard=Expression)?
-    '}';
-
-ReactionItem:
-    Description | TriggeredByClause | EffectsClause | TriggerClause | GuardClause | EffectClause;
-
-TriggeredByClause:
-    'triggered-by' event=TypeName;
-
-EffectsClause:
-    'effects' command=TypeName;
-
-TriggerClause:
-    'trigger' event=TypeName (',' more+=TypeName)*;
-
-GuardClause:
-    'guard' '{' expr=Expression '}';
-
-EffectClause:
-    'effect' command=TypeName;
-
-// -----------------------------------------------------------------------------
-// Named Operation (inline in entity/service/interface)
-// operation "name" { on X, accepts ..., returns ..., emits ... }
-// -----------------------------------------------------------------------------
-
-NamedOperationDef:
-    'operation' name=STRING
-    '{'
-        (items+=NamedOpItem)*
-    '}';
-
-NamedOpItem:
-    SatisfiesDecl | Description | OnClause | AcceptsClause
-    | ReturnsDecl | EmitsClause | NamedPrecondition | NamedPostcondition;
-
-OnClause:
-    'on' type=TypeName;
-
-AcceptsClause:
-    'accepts' first=ParamDeclOpt (',' more+=ParamDeclOpt)*;
-
-ParamDeclOpt:
-    name=Ident ':' type=FieldType optional?='?'?;
-
-ReturnsDecl:
-    'returns' type=FieldTypeOpt;
-
-FieldTypeOpt:
-    type=FieldType optional?='?'?;
-
-EmitsClause:
-    'emits' event=TypeName
-    ('{' (assignments+=AssignmentClause)* '}')?;
-
-NamedPrecondition:
-    'precondition' name=STRING
-    '{'
-        expr=Expression
-        ('violation' message=STRING)?
-    '}';
-
-NamedPostcondition:
-    'postcondition' name=STRING
-    '{'
-        expr=Expression
-    '}';
-
-// -----------------------------------------------------------------------------
-// Inline Invariant (inside value/entity/statemachine bodies)
-// -----------------------------------------------------------------------------
-
-InlineInvariant:
-    'invariant' name=STRING
-    '{'
-        satisfies=SatisfiesDecl?
-        description=Description?
-        on=OnClause?
-        must=MustBlock?
-        ('message' message=STRING)?
-        ('enforcement' enforcement=EnforcementValue)?
-    '}';
-
-MustBlock:
-    'must' '{' expr=Expression '}';
-
-EnforcementValue returns string:
-    'reject' | 'warn' | 'rejection' | 'compensation' | 'alert';
+    'entities' '{' (entities+=TypeName)+ '}';
 
 // -----------------------------------------------------------------------------
 // Fields & References
@@ -393,47 +345,23 @@ EnforcementValue returns string:
 FieldsBlock:
     'fields' '{' (fields+=FieldDecl)* '}';
 
+// NOTE (known limitation, carried over): `required` and `optional` are bare
+// constraint keywords AND legal field names (KeywordAsIdent). A field named
+// exactly `required`/`optional` that follows another field is only distinguishable
+// from a trailing constraint by the `:` after it. Langium's ALL(*) strategy
+// resolves the constraint repetition greedily; the tree-sitter (GLR) parser
+// handles it.
 FieldDecl:
     name=FieldName ':' type=FieldType optional?='?'?
-    (constraints+=Constraint)*;
+    (constraints+=Constraint)*
+    description=Description?
+    satisfies=SatisfiesDecl?;
 
-// Keywords that can also appear as field names, identifiers, or dot-path segments.
-// The tree-sitter grammar uses a general /[a-zA-Z_][a-zA-Z0-9_]*/ identifier that
-// subsumes keywords; Langium needs an explicit escape-hatch for each.
-KeywordAsIdent returns string:
-    'required' | 'optional' | 'value' | 'type' | 'status' | 'id'
-    | 'message' | 'name' | 'identifier' | 'trigger' | 'effect' | 'start'
-    | 'action' | 'state' | 'event' | 'command' | 'query' | 'schedule'
-    | 'reference' | 'offset' | 'instant' | 'guard'
-    | 'from' | 'on' | 'when' | 'then' | 'as' | 'root' | 'final'
-    | 'fields' | 'entities' | 'contains' | 'exposes' | 'accepts' | 'returns'
-    | 'emits' | 'creates' | 'sets' | 'resolves' | 'precondition'
-    | 'postcondition' | 'foreach' | 'invariant' | 'agreement' | 'predicate'
-    | 'participants' | 'reconciliation' | 'detection' | 'compensation'
-    | 'coordination' | 'escalation' | 'step' | 'condition'
-    | 'must' | 'enforcement' | 'violation'
-    | 'module' | 'context' | 'organization' | 'interface'
-    | 'entity' | 'aggregate' | 'service' | 'enum' | 'statemachine'
-    | 'transition' | 'machine' | 'reaction' | 'operation'
-    | 'satisfies' | 'depends' | 'uses' | 'map'
-    | 'upstream' | 'downstream' | 'symmetric'
-    | 'external' | 'error' | 'temporal' | 'domain' | 'application' | 'infrastructure'
-    | 'internal' | 'not' | 'and' | 'or' | 'in' | 'is' | 'if' | 'every' | 'no' | 'field'
-    | 'count' | 'sum' | 'now' | 'today' | 'size' | 'isEmpty' | 'isNotEmpty' | 'append'
-    | 'true' | 'false'
-    | 'reject' | 'warn' | 'alert' | 'suspend' | 'manual'
-    | 'retry' | 'compensate' | 'shortname'
-    | 'void' | 'string' | 'int' | 'integer' | 'long' | 'decimal' | 'boolean'
-    | 'date' | 'datetime' | 'time' | 'duration' | 'uuid'
-    | 'list' | 'set' | 'unique' | 'immutable' | 'ordered'
-    | 'default' | 'min' | 'max' | 'range' | 'minLength' | 'maxLength' | 'pattern'
-    | 'past' | 'future' | 'pastOrPresent' | 'futureOrPresent'
-    | 'months' | 'days' | 'years' | 'hours' | 'minutes' | 'seconds' | 'weeks'
-    | 'some' | 'forall' | 'exists' | 'where'
-    | 'number' | 'active' | 'searching' | 'cancelled';
+ReferencesBlock:
+    'references' '{' (refs+=ReferenceDecl)* '}';
 
-FieldName returns string:
-    ID | KeywordAsIdent;
+ReferenceDecl:
+    name=Ident ':' target=TypeName cardinality=CARDINALITY description=Description?;
 
 FieldType:
     PrimitiveType | CollectionType | GenericType | {infer FieldType} typeName=TypeName;
@@ -454,19 +382,14 @@ CollectionKind returns string:
 GenericType:
     typeName=TypeName '<' elementType=FieldType (',' valueType=FieldType)? '>';
 
-// NOTE (known limitation): `required` and `optional` are bare constraint keywords
-// AND legal field names (KeywordAsIdent). A field named exactly `required`/`optional`
-// that *follows* another field (e.g. `label : string` then `required : boolean`) is
-// only distinguishable from a trailing constraint by the `:` after it. Langium's
-// default ALL(*) strategy resolves the constraint repetition greedily; the LL(k)
-// strategy that would see the `:` is exponentially slow on this grammar's constraint
-// chains. The tree-sitter (GLR) parser handles it. Affects one field in the examples.
+// `code` marks the field by which an enum's value-type instances are referenced.
 Constraint:
     {infer Constraint} kind='required'
     | {infer Constraint} kind='optional'
     | {infer Constraint} kind='unique'
     | {infer Constraint} kind='immutable'
     | {infer Constraint} kind='ordered'
+    | {infer Constraint} kind='code'
     | {infer Constraint} kind='default' '(' value=LiteralValue ')'
     | {infer Constraint} kind='min' '(' numValue=NUMBER ')'
     | {infer Constraint} kind='max' '(' numValue=NUMBER ')'
@@ -479,127 +402,8 @@ Constraint:
     | {infer Constraint} kind='pastOrPresent'
     | {infer Constraint} kind='futureOrPresent';
 
-ReferencesBlock:
-    'references' '{' (refs+=ReferenceDecl)* '}';
-
-ReferenceDecl:
-    name=Ident ':' target=TypeName cardinality=CARDINALITY;
-
 // -----------------------------------------------------------------------------
-// Operations (classic block-based)
-// "Label" on CommandType { ... }
-// "Label" when EventType then CommandType { ... }
-// name(params) : ReturnType { ... }
-// -----------------------------------------------------------------------------
-
-OperationsBlock:
-    'operations' '{' (ops+=OperationDef)* '}';
-
-OperationDef:
-    CommandTriggeredOp | EventTriggeredOp | InternalOp;
-
-CommandTriggeredOp:
-    label=STRING 'on' command=TypeName
-    description=Description?
-    metadata=MetadataBlock?
-    '{'
-        satisfies=SatisfiesDecl?
-        (clauses+=OperationClause)*
-    '}';
-
-EventTriggeredOp:
-    label=STRING 'when' event=TypeName 'then' command=TypeName
-    description=Description?
-    metadata=MetadataBlock?
-    '{'
-        satisfies=SatisfiesDecl?
-        (clauses+=OperationClause)*
-    '}';
-
-InternalOp:
-    name=(Ident | STRING) '(' params=ParamList? ')' (':' returnType=FieldType)?
-    description=Description?
-    metadata=MetadataBlock?
-    ('{'
-        satisfies=SatisfiesDecl?
-        (clauses+=OperationClause)*
-    '}')?;
-
-OperationClause:
-    PreconditionClause | PostconditionClause
-    | ResolvesClause | ReactionCallClause
-    | CreatesClause | SetsClause | EmitsClause
-    | ServiceCallClause | ForeachClause | ReturnsClause;
-
-// -----------------------------------------------------------------------------
-// Operation Clauses
-// -----------------------------------------------------------------------------
-
-PreconditionClause:
-    'precondition' name=Ident
-    description=Description?
-    metadata=MetadataBlock?
-    '{'
-        expr=Expression
-    '}'
-    'rejects' message=STRING;
-
-PostconditionClause:
-    'postcondition' name=Ident
-    description=Description?
-    metadata=MetadataBlock?
-    '{'
-        expr=Expression
-    '}';
-
-ResolvesClause:
-    'resolves' type=TypeName 'from' source=DotPath;
-
-// Inside an operation, `reaction` appears in two forms (both accepted by tree-sitter):
-//   - a reference/call with arguments:  `reaction defaultThresholdRule(Loan)`
-//   - an inline definition:             `reaction myRule :: "why" { <guard expr> }`
-// So the argument list is optional, and the name may be followed directly by a
-// `::` description and/or a `{ guard }` body.
-ReactionCallClause:
-    'reaction' name=Ident
-    ('(' args=ArgList? ')')?
-    description=Description?
-    metadata=MetadataBlock?
-    ('{' satisfies=SatisfiesDecl? expr=Expression? '}')?;
-
-CreatesClause:
-    'creates' type=TypeName '{'
-        (assignments+=AssignmentClause)*
-    '}';
-
-SetsClause:
-    'sets' type=TypeName '{'
-        (assignments+=AssignmentClause)*
-    '}';
-
-AssignmentClause:
-    field=Ident '=' value=ValueExpr;
-
-
-ReturnsClause:
-    'returns' (
-        (returnName=Ident ':' returnType=FieldType)
-        | returnType=FieldType
-        | value=ValueExpr
-    );
-
-ServiceCallClause:
-    path=DotPath '(' args=ArgList? ')'
-    description=Description?;
-
-ForeachClause:
-    'foreach' collection=DotPath 'as' variable=Ident '{'
-        (body+=(ResolvesClause | SetsClause | EmitsClause
-            | ServiceCallClause | ReactionCallClause))*
-    '}';
-
-// -----------------------------------------------------------------------------
-// State Machine (classic block-based)
+// State Machine
 // -----------------------------------------------------------------------------
 
 StatesBlock:
@@ -610,51 +414,153 @@ StateMachineDef:
     description=Description?
     metadata=MetadataBlock?
     '{'
-        (members+=(ClassicStateDef | ClassicTransitionDef))*
+        satisfies=SatisfiesDecl?
+        (members+=(StateDef | TransitionDef))*
     '}';
 
-ClassicStateDef:
-    kind=('state' | 'final') name=Ident
+// A state carries its own invariants (which hold while the entity occupies it).
+StateDef:
+    kind=('state' | 'final') name=StateName
     description=Description?
     metadata=MetadataBlock?
-    ('{' (invariants+=StateInvariantDef)* '}')?;
+    ('{'
+        satisfies=SatisfiesDecl?
+        invariants=InvariantsBlock?
+    '}')?;
 
-StateInvariantDef:
-    'invariant' name=Ident
-    description=Description?
-    metadata=MetadataBlock?
-    '{'
-        expr=Expression
-    '}';
-
-ClassicTransitionDef:
+// `on` must be able to name EITHER operation form: an internal one (identifier) or
+// a command-triggered one (its "Label" string).
+//
+// Conditions on a transition are named and 0..n — a precondition declares its
+// violation reason, exactly as on an operation.
+TransitionDef:
     source=TransitionSource '-->' target=StateName
-    'on' trigger=Ident
-    ('when' '{' guard=Expression '}')?
-    ('then' '{' action=Expression '}')?;
+    'on' trigger=OperationRef
+    description=Description?
+    metadata=MetadataBlock?
+    ('{'
+        satisfies=SatisfiesDecl?
+        (conditions+=ConditionClause)*
+    '}')?;
 
-// State names are written in any case: `DRAFT` (all-caps → TYPE_NAME token),
-// `UNDER_REVIEW`/`STAGE_1` (underscores/digits → ID token), or lowercase. The
-// source may also be the start marker `[*]`.
 TransitionSource returns string:
     '[*]' | StateName;
 
 StateName returns string:
     ID | TYPE_NAME | KeywordAsIdent;
 
-// -----------------------------------------------------------------------------
-// Transitions (entity-level shorthand)
-// -----------------------------------------------------------------------------
-
-TransitionsBlock:
-    'transitions' '{' (transitions+=EntityTransition)* '}';
-
-EntityTransition:
-    source=TransitionSource '-->' target=StateName
-    ('on' triggers+=STRING (',' triggers+=STRING)*)?;
+OperationRef returns string:
+    Ident | STRING;
 
 // -----------------------------------------------------------------------------
-// Command — flexible body
+// Operations
+//
+// Two forms only. There is NO event-triggered form: an event reaches a command
+// only through a `reaction`.
+// -----------------------------------------------------------------------------
+
+OperationsBlock:
+    'operations' '{' (ops+=OperationDef)* '}';
+
+OperationDef:
+    CommandTriggeredOp | InternalOp;
+
+CommandTriggeredOp:
+    label=STRING 'on' command=TypeName
+    description=Description?
+    metadata=MetadataBlock?
+    '{' body=OperationBody '}';
+
+InternalOp:
+    name=Ident '(' params=ParamList? ')' (':' returnType=FieldType)?
+    description=Description?
+    metadata=MetadataBlock?
+    '{' body=OperationBody '}';
+
+OperationBody:
+    satisfies=SatisfiesDecl?
+    safety=SafetyDecl?
+    idempotent?='idempotent'?
+    (clauses+=OperationClause)*;
+
+// safe = no mutation, read-only.  unsafe = mutates domain state.
+SafetyDecl returns string:
+    'safe' | 'unsafe';
+
+OperationClause:
+    PreconditionClause | PostconditionClause
+    | ResolvesClause | CreatesClause | SetsClause | EmitsClause
+    | ServiceCallClause | ForeachClause | ReturnsClause;
+
+// -----------------------------------------------------------------------------
+// Conditions — precondition and postcondition
+//
+// A precondition's enforcement is implicit and always rejection, so it declares no
+// strategy — but it MUST declare a violation reason (`rejects`). A postcondition
+// has neither: its failure is a defect, not a domain outcome.
+// -----------------------------------------------------------------------------
+
+ConditionClause:
+    PreconditionClause | PostconditionClause;
+
+PreconditionClause:
+    'precondition' name=ConditionName
+    description=Description?
+    metadata=MetadataBlock?
+    '{'
+        satisfies=SatisfiesDecl?
+        exprs+=Expression+
+    '}'
+    'rejects' reason=STRING;
+
+PostconditionClause:
+    'postcondition' name=ConditionName
+    description=Description?
+    metadata=MetadataBlock?
+    '{'
+        satisfies=SatisfiesDecl?
+        exprs+=Expression+
+    '}';
+
+ConditionName returns string:
+    Ident | STRING;
+
+// -----------------------------------------------------------------------------
+// Operation body clauses
+// -----------------------------------------------------------------------------
+
+ResolvesClause:
+    'resolves' type=TypeName 'from' source=DotPath;
+
+CreatesClause:
+    'creates' type=TypeName '{' (assignments+=AssignmentClause)* '}';
+
+SetsClause:
+    'sets' type=TypeName '{' (assignments+=AssignmentClause)* '}';
+
+// `emits` is the concrete syntax of the event's 1..1 "raised by" relation.
+EmitsClause:
+    'emits' event=TypeName ('{' (assignments+=AssignmentClause)* '}')?;
+
+AssignmentClause:
+    field=Ident '=' value=ValueExpr;
+
+ServiceCallClause:
+    path=DotPath '(' args=ArgList? ')' description=Description?;
+
+ReturnsClause:
+    'returns' value=ValueExpr;
+
+ForeachClause:
+    'foreach' collection=DotPath 'as' variable=Binder '{'
+        (body+=OperationClause)*
+    '}';
+
+// -----------------------------------------------------------------------------
+// Command
+//
+// A command MUST carry an identifier — the correlation id of the causality chain
+// it opens.
 // -----------------------------------------------------------------------------
 
 CommandDef:
@@ -662,14 +568,13 @@ CommandDef:
     description=Description?
     metadata=MetadataBlock?
     '{'
-        (bodyItems+=RecordBodyItem)*
+        satisfies=SatisfiesDecl?
+        identity=IdentityDecl
+        fields=FieldsBlock
     '}';
 
-RecordBodyItem:
-    SatisfiesDecl | Description | FieldDecl | FieldsBlock;
-
 // -----------------------------------------------------------------------------
-// Query — flexible body
+// Query — safe and idempotent by definition; reads through a repository.
 // -----------------------------------------------------------------------------
 
 QueryDef:
@@ -677,14 +582,20 @@ QueryDef:
     description=Description?
     metadata=MetadataBlock?
     '{'
-        (bodyItems+=QueryBodyItem)*
+        satisfies=SatisfiesDecl?
+        readsFrom=ReadsFromClause
+        fields=FieldsBlock
+        'returns' returnType=FieldType
     '}';
 
-QueryBodyItem:
-    SatisfiesDecl | Description | FieldDecl | FieldsBlock | ReturnsDecl;
+ReadsFromClause:
+    'reads-from' repository=TypeName;
 
 // -----------------------------------------------------------------------------
-// Event — flexible body with type classifier
+// Event (internal)
+//
+//   about     — the entity this event is a fact about
+//   caused-by — the command or query that originated it
 // -----------------------------------------------------------------------------
 
 EventDef:
@@ -692,28 +603,25 @@ EventDef:
     description=Description?
     metadata=MetadataBlock?
     '{'
-        (bodyItems+=EventBodyItem)*
+        satisfies=SatisfiesDecl?
+        about=AboutClause?
+        causedBy=CausedByClause?
+        fields=FieldsBlock
     '}';
 
-EventBodyItem:
-    SatisfiesDecl | Description | EventTypeClassifier
-    | FieldDecl | FieldsBlock
-    | EventSchedule | EventInstant | EventGuard;
+AboutClause:
+    'about' entity=TypeName;
 
-EventTypeClassifier:
-    'type' classifier=('internal' | 'external' | 'error' | 'temporal');
-
-EventSchedule:
-    'schedule' expr=STRING;
-
-EventInstant:
-    'instant' path=DotPath;
-
-EventGuard:
-    'guard' '{' expr=Expression '}';
+CausedByClause:
+    'caused-by' cause=TypeName;
 
 // -----------------------------------------------------------------------------
 // External Event
+//
+// Consumed THROUGH A REACTION, exactly like an internal event. There is no
+// `triggers` clause naming commands directly — that would skip the reaction's
+// guard, which is what lets this context decide whether the upstream fact still
+// matters to it.
 // -----------------------------------------------------------------------------
 
 ExternalEventDef:
@@ -722,12 +630,13 @@ ExternalEventDef:
     metadata=MetadataBlock?
     '{'
         satisfies=SatisfiesDecl?
-        'from' from=TypeName
-        'triggers' '{' first=TypeName (',' more+=TypeName)* '}'
+        'from' source=(TypeName | STRING)
+        about=AboutClause?
+        fields=FieldsBlock
     '}';
 
 // -----------------------------------------------------------------------------
-// Error Event — flexible body
+// Error Event — raised by an operation on failure
 // -----------------------------------------------------------------------------
 
 ErrorEventDef:
@@ -735,111 +644,156 @@ ErrorEventDef:
     description=Description?
     metadata=MetadataBlock?
     '{'
-        (bodyItems+=EventBodyItem)*
+        satisfies=SatisfiesDecl?
+        about=AboutClause?
+        causedBy=CausedByClause?
+        fields=FieldsBlock
     '}';
 
 // -----------------------------------------------------------------------------
-// Temporal Events
+// Temporal Event — a domain fact caused by the passage of time.
+//
+// Time alone is never the cause: every temporal event is anchored to a domain
+// reference. `about` binds the entity whose state the guard reads.
+//
+// One rule with three anchor alternatives (rather than three rules) — the three
+// flavors are identical up to the anchor keyword, which an LL parser must not
+// have to backtrack past.
 // -----------------------------------------------------------------------------
 
 TemporalEventDef:
-    RelativeTemporalEvent | AbsoluteTemporalEvent | RecurringTemporalEvent;
-
-RelativeTemporalEvent:
     'temporal' 'event' name=TypeName
     description=Description?
     metadata=MetadataBlock?
     '{'
         satisfies=SatisfiesDecl?
-        'reference' reference=TypeName
-        'offset' offset=ValueExpr
-        ('guard' '{' guard=Expression '}')?
+        about=AboutClause?
+        anchor=TemporalAnchor
+        guard=GuardBlock?
         fields=FieldsBlock
     '}';
 
-AbsoluteTemporalEvent:
-    'temporal' 'event' name=TypeName
-    description=Description?
-    metadata=MetadataBlock?
-    '{'
-        satisfies=SatisfiesDecl?
-        'instant' instant=DotPath
-        ('guard' '{' guard=Expression '}')?
-        fields=FieldsBlock
-    '}';
+TemporalAnchor:
+    RelativeAnchor | AbsoluteAnchor | RecurringAnchor;
 
-RecurringTemporalEvent:
-    'temporal' 'event' name=TypeName
-    description=Description?
-    metadata=MetadataBlock?
-    '{'
-        satisfies=SatisfiesDecl?
-        'schedule' schedule=STRING
-        ('guard' '{' guard=Expression '}')?
-        fields=FieldsBlock
-    '}';
+RelativeAnchor:
+    'reference' event=TypeName 'offset' offset=ValueExpr;
+
+AbsoluteAnchor:
+    'instant' instant=DotPath;
+
+RecurringAnchor:
+    'schedule' schedule=STRING;
+
+// Evaluated at firing time. If false the event is silently suppressed — no fact is
+// recorded and no reaction triggers. This absorbs cancellation.
+GuardBlock:
+    'guard' '{' expr=Expression '}';
 
 // -----------------------------------------------------------------------------
-// Services — flexible body
+// Services
 // -----------------------------------------------------------------------------
 
 DomainServiceDef:
-    ('domain-service' | 'domain' 'service') name=TypeName
-    description=Description?
-    metadata=MetadataBlock?
-    '{'
-        (bodyItems+=ServiceBodyItem)*
-    '}';
-
-ApplicationServiceDef:
-    ('application-service' | 'application' 'service') name=TypeName
-    description=Description?
-    metadata=MetadataBlock?
-    '{'
-        (bodyItems+=ServiceBodyItem)*
-    '}';
-
-InfrastructureServiceDef:
-    ('infrastructure-service' | 'infrastructure' 'service') name=TypeName
-    description=Description?
-    metadata=MetadataBlock?
-    '{'
-        (bodyItems+=ServiceBodyItem)*
-    '}';
-
-ServiceDef:
-    'service' name=TypeName
-    description=Description?
-    metadata=MetadataBlock?
-    '{'
-        (bodyItems+=ServiceBodyItem)*
-    '}';
-
-ServiceBodyItem:
-    SatisfiesDecl | Description
-    | NamedOperationDef | OperationsBlock
-    | InterfaceDef | InvariantsBlock | ReactionsBlock;
-
-// (Reactive rules are defined by `ReactionDef` above; the legacy `PolicyDef`
-// and `ScopedPolicyDef` forms were folded into it.)
-
-// -----------------------------------------------------------------------------
-// Invariant (top-level)
-// -----------------------------------------------------------------------------
-
-InvariantDef:
-    'invariant' name=(TypeName | STRING)
+    'domain' 'service' name=TypeName
     description=Description?
     metadata=MetadataBlock?
     '{'
         satisfies=SatisfiesDecl?
-        innerDescription=Description?
-        on=OnClause?
-        must=MustBlock?
-        ('message' message=STRING)?
-        ('enforcement' enforcement=EnforcementValue)?
-        enforcementStrategy=EnforcementStrategy?
+        calls=CallsBlock?
+        operations=OperationsBlock
     '}';
+
+// The infrastructure services this service depends on (through their SPIs).
+CallsBlock:
+    'calls' '{' (services+=TypeName)+ '}';
+
+ApplicationServiceDef:
+    'application' 'service' name=TypeName
+    description=Description?
+    metadata=MetadataBlock?
+    '{'
+        satisfies=SatisfiesDecl?
+        exposedBy=ExposedByClause?
+        operations=OperationsBlock
+    '}';
+
+ExposedByClause:
+    'exposed-by' interface=TypeName;
+
+// An adapter fulfilling an SPI contract. The model records the SIGNATURES it
+// provides, never an adapter body.
+InfrastructureServiceDef:
+    'infrastructure' 'service' name=TypeName
+    description=Description?
+    metadata=MetadataBlock?
+    '{'
+        satisfies=SatisfiesDecl?
+        describedBy=DescribedByClause?
+        operations=SignatureOperationsBlock
+    '}';
+
+DescribedByClause:
+    'described-by' interface=TypeName;
+
+SignatureOperationsBlock:
+    'operations' '{' (ops+=OperationSignature)* '}';
+
+// -----------------------------------------------------------------------------
+// Repository — a persistence port DERIVED from an entity or aggregate root.
+// A repository derived from a read-only entity is itself `read-only`.
+// -----------------------------------------------------------------------------
+
+RepositoryDef:
+    readOnly?='read-only'? 'repository' name=TypeName 'for' entity=TypeName
+    description=Description?
+    metadata=MetadataBlock?
+    '{'
+        satisfies=SatisfiesDecl?
+        describedBy=DescribedByClause?
+        (ops+=OperationSignature)*
+    '}';
+
+// -----------------------------------------------------------------------------
+// Reaction — THE ONLY WAY AN EVENT CAUSES A COMMAND.
+//
+// Uniform across all four event types: internal, external, error, temporal.
+// -----------------------------------------------------------------------------
+
+ReactionDef:
+    'reaction' name=TypeName
+    description=Description?
+    metadata=MetadataBlock?
+    '{'
+        satisfies=SatisfiesDecl?
+        triggeredBy=TriggeredByClause
+        guard=GuardBlock?
+        effects=EffectsClause
+    '}';
+
+TriggeredByClause:
+    'triggered-by' events+=TypeName (',' events+=TypeName)*;
+
+EffectsClause:
+    'effects' command=TypeName;
+
+// -----------------------------------------------------------------------------
+// Invariant — EVERY invariant declares its enforcement strategy.
+// -----------------------------------------------------------------------------
+
+InvariantDef:
+    'invariant' name=TypeName
+    description=Description?
+    metadata=MetadataBlock?
+    '{'
+        satisfies=SatisfiesDecl?
+        'on' scope=DotPath
+        must=MustBlock
+        'enforcement' enforcement=EnforcementStrategy
+    '}';
+
+MustBlock:
+    'must' '{' expr=Expression '}';
 
 EnforcementStrategy:
     {infer EnforcementStrategy} kind='rejection'
@@ -849,91 +803,82 @@ EnforcementStrategy:
 InvariantsBlock:
     'invariants' '{' (invariants+=ScopedInvariantDef)* '}';
 
-ReactionsBlock:
-    'reactions' '{' (reactions+=ScopedInvariantDef)* '}';
-
+// Inside an `invariants { }` block the owner is the enclosing entity, aggregate,
+// value type or state, so no `on` clause is needed.
 ScopedInvariantDef:
-    name=Ident
-    ('(' params=ParamList ')')?
+    name=Ident ('(' params=ParamList? ')')?
     description=Description?
     metadata=MetadataBlock?
     '{'
         satisfies=SatisfiesDecl?
-        expr=Expression?
+        expr=Expression
+        'enforcement' enforcement=EnforcementStrategy
     '}';
 
 // -----------------------------------------------------------------------------
-// Agreement
+// Agreement — a property spanning several aggregates. Bilateral (2) or
+// multilateral (n) — never unilateral.
 // -----------------------------------------------------------------------------
 
 AgreementDef:
-    'agreement' name=(TypeName | STRING)
+    'agreement' name=TypeName
     description=Description?
     metadata=MetadataBlock?
     '{'
-        (items+=AgreementItem)*
+        satisfies=SatisfiesDecl?
+        participants=ParticipantsClause
+        predicate=PredicateBlock
+        reconciliation=ReconciliationDef
     '}';
 
-AgreementItem:
-    SatisfiesDecl | Description | ParticipantsClause
-    | PredicateBlock | ReconciliationDef;
-
 ParticipantsClause:
-    'participants' first=TypeName (',' more+=TypeName)*;
+    'participants' '{'
+        participants+=TypeName ',' participants+=TypeName
+        (',' participants+=TypeName)*
+    '}';
 
 PredicateBlock:
-    'predicate' '{' expr=PredicateExpr '}';
-
-PredicateExpr:
-    ForallPred | {infer PredicateExpr} expression=Expression;
-
-ForallPred:
-    'forall' type=TypeName ('where' where=Expression)?
-    ':' (exists=ExistsPred | body=Expression);
-
-ExistsPred:
-    'exists' type=TypeName ('where' where=Expression)?;
+    'predicate' '{' expr=Expression '}';
 
 // -----------------------------------------------------------------------------
-// Reconciliation
+// Reconciliation — the enforcement counterpart of an agreement
 // -----------------------------------------------------------------------------
 
 ReconciliationDef:
-    'reconciliation' name=(TypeName | STRING)
+    'reconciliation' name=TypeName
     description=Description?
     metadata=MetadataBlock?
     '{'
-        (items+=ReconciliationItem)*
+        satisfies=SatisfiesDecl?
+        'trigger' trigger=ReconciliationTrigger
+        'detection' detection=DetectionStrategy
+        compensation=CompensationClause
+        ('coordination' coordination=CoordinationStyle)?
+        escalation=EscalationChainDef?
     '}';
-
-ReconciliationItem:
-    ReconciliationTriggerClause | DetectionClause
-    | CompensationClause | CoordinationClause | EscalationChainDef;
-
-ReconciliationTriggerClause:
-    'trigger' trigger=ReconciliationTrigger;
 
 ReconciliationTrigger:
     {infer ReconciliationTrigger} 'event' events+=TypeName (',' events+=TypeName)*
     | {infer ReconciliationTrigger} 'schedule' schedule=STRING;
 
-DetectionClause:
-    'detection' strategy=DetectionStrategy;
-
 DetectionStrategy returns string:
-    'query' | 'event-sourced' | 'query-based';
+    'query' | 'event-sourced';
 
 CompensationClause:
-    'compensation' types+=TypeName (',' types+=TypeName)*;
-
-CoordinationClause:
-    'coordination' style=CoordinationStyle;
+    'compensation' '{' commands+=TypeName (',' commands+=TypeName)* '}';
 
 CoordinationStyle returns string:
     'choreography' | 'orchestration';
 
 // -----------------------------------------------------------------------------
-// Escalation Chain
+// Escalation Chain — MUST TERMINATE.
+//
+// VALIDATOR: the tree-sitter (GLR) grammar encodes terminality structurally as
+// `{ nonTerminalStep } terminalStep`. An LL parser cannot: NonTerminalStep and
+// TerminalStep are identical until the `action` keyword, which is arbitrarily far
+// ahead. So Langium parses one uniform EscalationStep and the validator enforces
+// that the final step's action is alert / suspend / manual — never retry or
+// compensate, which could themselves fail forever.
 // -----------------------------------------------------------------------------
 
 EscalationChainDef:
@@ -941,43 +886,26 @@ EscalationChainDef:
     description=Description?
     metadata=MetadataBlock?
     '{'
+        satisfies=SatisfiesDecl?
         (steps+=EscalationStep)+
     '}';
 
 EscalationStep:
-    'step' name=(Ident | NUMBER)
+    'step' name=Ident
     description=Description?
     metadata=MetadataBlock?
     '{'
-        (items+=EscalationStepItem)*
+        satisfies=SatisfiesDecl?
+        'when' '{' when=Expression '}'
+        'action' action=EscalationAction
     '}';
 
-EscalationStepItem:
-    EscalationCondition | EscalationActionClause
-    | EscalationMaxAttempts | EscalationWhen | EscalationThen;
-
-EscalationCondition:
-    'condition' message=STRING;
-
-EscalationActionClause:
-    'action' action=EscalationAction;
-
-EscalationMaxAttempts:
-    'max-attempts' count=NUMBER;
-
-EscalationWhen:
-    'when' '{' expr=Expression '}';
-
-EscalationThen:
-    'then' '{' expr=Expression '}';
-
 EscalationAction:
-    {infer EscalationAction} kind='retry' ('(' count=NUMBER ')')?
-    | {infer EscalationAction} kind='compensate' ('{' types+=TypeName (',' types+=TypeName)* '}' | type=TypeName)
-    | {infer EscalationAction} kind='alert' message=STRING?
+    {infer EscalationAction} kind='retry' '(' count=NUMBER ')'
+    | {infer EscalationAction} kind='compensate' '{' commands+=TypeName (',' commands+=TypeName)* '}'
+    | {infer EscalationAction} kind='alert' message=STRING
     | {infer EscalationAction} kind='suspend'
-    | {infer EscalationAction} kind='manual' message=STRING?
-    | {infer EscalationAction} kind='manual-intervention';
+    | {infer EscalationAction} kind='manual' message=STRING;
 
 // -----------------------------------------------------------------------------
 // Parameters & Arguments
@@ -987,7 +915,7 @@ ParamList:
     params+=ParamDecl (',' params+=ParamDecl)*;
 
 ParamDecl:
-    name=Ident ':' type=FieldType;
+    name=Ident ':' type=FieldType optional?='?'?;
 
 ArgList:
     (args+=Expression (',' args+=Expression)*)
@@ -1014,15 +942,19 @@ MetadataEntry:
 
 // -----------------------------------------------------------------------------
 // Expressions
+//
+// Orthogonal to the metamodel, which only ever says "a predicate expression".
+// Precedence, loosest to tightest:
+//   ?:  <  or  <  and  <  not  <  comparison  <  + -  <  * /  <  unary
 // -----------------------------------------------------------------------------
 
 Expression:
-    ConditionalExpr;
+    CoalesceExpr;
 
-// Ternary / conditional: `cond ? whenTrue : whenFalse`. Lowest precedence, so the
-// condition is any OrExpr (e.g. a comparison like `daysPastDue > 0`) and both
-// branches are full expressions, allowing nesting. The tree-sitter grammar
-// supports this on assignment RHS (e.g. `status = x > 0 ? DELINQUENT : status`).
+// Elvis / null-coalescing: `a ?: b` is `b` when `a` is null.
+CoalesceExpr infers Expression:
+    ConditionalExpr ({infer BinaryExpr.left=current} op='?:' right=ConditionalExpr)*;
+
 ConditionalExpr infers Expression:
     OrExpr ({infer ConditionalExpr.condition=current} '?' whenTrue=Expression ':' whenFalse=Expression)?;
 
@@ -1043,7 +975,6 @@ Comparison infers Expression:
         | {infer ContainsExpr.left=current} 'contains' target=DotPath
     )?;
 
-// Regex pattern for 'matches': accepts STRING ("regex") or raw bracket syntax [a-zA-Z0-9-]+
 MatchPattern:
     value=STRING | value=REGEX;
 
@@ -1059,112 +990,106 @@ Multiplication infers Expression:
 UnaryExpr infers Expression:
     IfExpr
     | EveryExpr
-    | SomeExpr
-    | NoFieldContainsExpr
+    | QuantifierExpr
     | IsDefinedExpr
     | IsNotDefinedExpr
     | IsNullExpr
     | IsNotNullExpr
     | InExpr
     | NotInExpr
-    | FunctionCallExpr
     | DurationLiteral
     | DotPathOrCallExpr
     | Literal
     | ParenExpr;
 
-// Parse DotPath first, then optionally upgrade to service call (DotPath '(') or plain path.
-// Note: value constructors (TypeName { field = value }) are NOT handled here to avoid
-// ambiguity with { } blocks in if/every expressions. They are handled in AssignmentClause.
+// Parse a DotPath first, then optionally upgrade it to a call. A built-in function
+// and a service call are syntactically identical — telling them apart needs a
+// symbol table, not the grammar.
+//
+// Built-ins: count, sum, min, max, avg, abs, size, isEmpty, isNotEmpty, append,
+//            now, today.
 DotPathOrCallExpr infers Expression:
     {infer DotPathExpr} path=DotPath (
-        {infer ExprServiceCall.path=current} '(' args=ArgList? ')'
+        {infer CallExpr.path=current} '(' args=ArgList? ')'
     )?;
 
+// if — logical implication (if A then B ≡ not A or B).
+// Two spellings: the braced form, and a then/else form that yields a value.
 IfExpr:
-    'if' condition=Expression '{' body=Expression '}';
+    'if' condition=Expression (
+        '{' body=Expression '}'
+        | 'then' whenTrue=Expression 'else' whenFalse=Expression
+    );
 
+// every — universal quantifier. The binder is an identifier, matching
+// `foreach ... as <identifier>`.
+//
+// The binder accepts TypeName as well as Ident: the grammar's `identifier` is
+// camelCase OR PascalCase, and the lexer tries TYPE_NAME before ID, so a binder
+// written `every Product in lines` lexes as TYPE_NAME and would not otherwise parse.
 EveryExpr:
-    'every' type=TypeName 'in' collection=DotPath '{' body=Expression '}';
+    'every' variable=Binder 'in' collection=DotPath '{' body=Expression '}';
 
-SomeExpr:
-    'some' variable=Ident 'in' collection=DotPath '{' body=Expression '}';
+QuantifierExpr:
+    kind=('exists' | 'forall') variable=Binder 'in' collection=DotPath
+    ('where' predicate=Expression)?;
 
-NoFieldContainsExpr:
-    'no' 'field' 'contains' target=DotPath;
+Binder returns string:
+    Ident | TypeName;
 
-IsDefinedExpr:
-    path=DotPath 'is' 'defined';
+IsDefinedExpr:    path=DotPath 'is' 'defined';
+IsNotDefinedExpr: path=DotPath 'is' 'not' 'defined';
+IsNullExpr:       path=DotPath 'is' 'null';
+IsNotNullExpr:    path=DotPath 'is' 'not' 'null';
 
-IsNotDefinedExpr:
-    path=DotPath 'is' 'not' 'defined';
-
-IsNullExpr:
-    path=DotPath 'is' 'null';
-
-IsNotNullExpr:
-    path=DotPath 'is' 'not' 'null';
-
-InExpr:
-    path=DotPath 'in' '{' values=ValueList '}';
-
-NotInExpr:
-    path=DotPath 'not' 'in' '{' values=ValueList '}';
-
-FunctionCallExpr:
-    name=FunctionName '(' args=ArgList? ')';
-
-FunctionName returns string:
-    'count' | 'sum' | 'now' | 'today' | 'size' | 'isEmpty' | 'isNotEmpty' | 'append';
+InExpr:    path=DotPath 'in' '{' values=ValueList '}';
+NotInExpr: path=DotPath 'not' 'in' '{' values=ValueList '}';
 
 ParenExpr:
     '(' expr=Expression ')';
 
+// Spaced form: `5 minutes`. Compact form: `5min`, `24h`, `2businessDays`.
+DurationLiteral:
+    amount=NUMBER unit=DurationUnit;
+
+DurationUnit returns string:
+    'months' | 'days' | 'years' | 'hours' | 'minutes' | 'seconds' | 'weeks'
+    | 'ms' | 's' | 'min' | 'h' | 'd' | 'w' | 'y'
+    | 'businessDay' | 'businessDays';
+
 // -----------------------------------------------------------------------------
-// Dot-path
+// Dot-path — `?.` is safe navigation; `[expr]` subscripts a collection.
 // -----------------------------------------------------------------------------
 
 DotPath:
-    segments+=PathSegment ('.' segments+=PathSegment)*;
+    segments+=PathSegment (('.' | '?.') segments+=PathSegment)*;
 
 PathSegment:
-    value=(ID | KeywordAsIdent | TypeName | STRING)
-    index=ArrayIndex?;
+    value=(ID | KeywordAsIdent | TypeName | STRING) index=ArrayIndex?;
 
 ArrayIndex:
     '[' expr=Expression ']';
 
 // -----------------------------------------------------------------------------
 // Value expressions
+//
+// Service calls are already produced by Expression (via DotPathOrCallExpr), so a
+// standalone ServiceCallExpr alternative here would be an unresolvable LL conflict
+// — both start with a DotPath.
+//
+// NOTE (known limitation): value constructors (`TypeName { field = value }`) cannot
+// be parsed by an LL parser in expression position — ambiguous with `{ }` blocks in
+// if/every expressions. The tree-sitter GLR parser handles them.
 // -----------------------------------------------------------------------------
 
-// Service calls are already produced by Expression (via DotPathOrCallExpr ->
-// ExprServiceCall), so a standalone ServiceCallExpr alternative here is redundant
-// and was ambiguous with Expression — both start with a DotPath, which is an
-// unresolvable LL conflict that made the Chevrotain parser hang on array-literal
-// elements such as `[someField]`. Letting Expression handle it removes the conflict.
 ValueExpr:
     ArrayLiteral | Expression;
-
-// NOTE: Value constructors (TypeName { field = value, ... }) cannot be parsed
-// by an LL parser in expression position due to ambiguity with { } blocks.
-// The tree-sitter GLR parser handles these. This is a known limitation.
 
 ArrayLiteral:
     '[' first=ValueExpr (',' more+=ValueExpr)* ']';
 
 ValueList:
     values+=ValueExpr (',' values+=ValueExpr)*;
-
-// -----------------------------------------------------------------------------
-// Duration literal
-// -----------------------------------------------------------------------------
-
-DurationLiteral:
-    amount=NUMBER unit=DurationUnit;
-
-DurationUnit returns string:
-    'months' | 'days' | 'years' | 'hours' | 'minutes' | 'seconds' | 'weeks';
 
 // -----------------------------------------------------------------------------
 // Literals
@@ -1177,22 +1102,50 @@ Literal infers Expression:
     {infer StringLiteralExpr} value=STRING
     | {infer NumberLiteralExpr} value=NUMBER
     | {infer BooleanLiteralExpr} value=('true' | 'false')
-    // `null` is a keyword (used by `is null` / `is not null`); as a literal it
-    // keeps comparisons like `field != null` parsing as a value, not an identifier.
     | {infer NullLiteralExpr} value='null';
 
-StringLiteral:
-    value=STRING;
-
-NumberLiteral:
-    value=NUMBER;
-
-BooleanLiteral:
-    value=('true' | 'false');
+StringLiteral:  value=STRING;
+NumberLiteral:  value=NUMBER;
+BooleanLiteral: value=('true' | 'false');
 
 // -----------------------------------------------------------------------------
 // Helper rules for identifiers
+//
+// Keywords that may also appear as field names, identifiers, or dot-path segments.
+// Langium reserves every keyword, so each needs an explicit escape hatch (the
+// tree-sitter grammar's general identifier regex subsumes them for free).
 // -----------------------------------------------------------------------------
+
+KeywordAsIdent returns string:
+    'value' | 'type' | 'status' | 'id' | 'code' | 'name' | 'message'
+    | 'required' | 'optional' | 'unique' | 'immutable' | 'ordered'
+    | 'state' | 'final' | 'event' | 'command' | 'query' | 'entity' | 'aggregate'
+    | 'enum' | 'module' | 'context' | 'organization' | 'interface' | 'service'
+    | 'domain' | 'application' | 'infrastructure' | 'repository' | 'reaction'
+    | 'invariant' | 'agreement' | 'reconciliation' | 'escalation' | 'step'
+    | 'machine' | 'states' | 'fields' | 'entities' | 'operations' | 'invariants'
+    | 'references' | 'identity' | 'satisfies' | 'meta' | 'map'
+    | 'api' | 'spi' | 'exposes' | 'requires' | 'describes' | 'depends'
+    | 'about' | 'schedule' | 'reference' | 'offset' | 'instant' | 'guard'
+    | 'trigger' | 'detection' | 'compensation' | 'coordination' | 'participants'
+    | 'predicate' | 'action' | 'when' | 'must' | 'enforcement' | 'rejects'
+    | 'precondition' | 'postcondition' | 'safe' | 'unsafe' | 'idempotent'
+    | 'creates' | 'sets' | 'emits' | 'resolves' | 'returns' | 'foreach'
+    | 'from' | 'on' | 'as' | 'of' | 'for' | 'calls' | 'where'
+    | 'upstream' | 'downstream' | 'symmetric' | 'external' | 'error' | 'temporal'
+    | 'not' | 'and' | 'or' | 'in' | 'is' | 'if' | 'every' | 'exists' | 'forall'
+    | 'true' | 'false' | 'null'
+    | 'alert' | 'suspend' | 'manual' | 'retry' | 'compensate'
+    | 'rejection' | 'choreography' | 'orchestration'
+    | 'string' | 'int' | 'integer' | 'long' | 'decimal' | 'boolean'
+    | 'date' | 'datetime' | 'time' | 'duration' | 'uuid' | 'void'
+    | 'list' | 'set'
+    | 'default' | 'min' | 'max' | 'range' | 'minLength' | 'maxLength' | 'pattern'
+    | 'past' | 'future' | 'pastOrPresent' | 'futureOrPresent'
+    | 'months' | 'days' | 'years' | 'hours' | 'minutes' | 'seconds' | 'weeks';
+
+FieldName returns string:
+    ID | KeywordAsIdent;
 
 Ident returns string:
     ID | KeywordAsIdent;
@@ -1212,23 +1165,20 @@ hidden terminal HASH_COMMENT: /#[^\n]*/;
 // Terminals
 // -----------------------------------------------------------------------------
 
-terminal REQUIREMENT_ID: /REQ-[A-Z][A-Z0-9]*-\d{3}/;
-terminal CARDINALITY: /\d+\.\.\d+|\d+\.\.N/;
+terminal REQUIREMENT_ID: /REQ-[A-Z][A-Z0-9]*(-[A-Z][A-Z0-9]*)*-\d{3}/;
+terminal CARDINALITY: /\d+\.\.(\d+|[nN])/;
 // PascalCase type names. The trailing `(?!\w)` stops TYPE_NAME from claiming the
 // uppercase prefix of an UPPER_SNAKE_CASE identifier (e.g. matching `UNDER` inside
-// `UNDER_REVIEW`, or `STAGE` inside `STAGE_1`): since TYPE_NAME has no underscore and
-// is tried before ID, first-match would otherwise split the token at the underscore.
-// Declining when a word char (here, `_`) follows lets ID claim the whole identifier.
+// `UNDER_REVIEW`): TYPE_NAME has no underscore and is tried before ID, so
+// first-match would otherwise split the token at the underscore.
 terminal TYPE_NAME: /[A-Z][a-zA-Z0-9]*(?!\w)/;
 terminal ID: /[a-zA-Z_][a-zA-Z0-9_]*/;
 terminal STRING: /"[^"]*"/;
 terminal NUMBER: /-?\d+(\.\d+)?/;
 // REGEX matches bracket expressions like [a-zA-Z0-9-]+ used by `matches`.
-// Two restrictions keep this context-free terminal from swallowing other `[...]`
-// uses that the parser needs as real `[`/`]` tokens:
-//   1. require a lowercase letter inside, so [REQ-XXX-NNN] (all uppercase) is not a regex;
-//   2. require a trailing quantifier (* + ?), so array literals (`[foo]`, `[a.b]`) and
-//      subscripts (`[i]`, `[i - 1]`) — which never end in a quantifier — are lexed as
-//      brackets. Unquoted regexes therefore must end in a quantifier; otherwise quote
-//      them (`matches "[a-z]"`). The tree-sitter parser distinguishes these by context.
+// Two restrictions keep this from swallowing other `[...]` uses the parser needs as
+// real brackets:
+//   1. require a lowercase letter inside, so [REQ-XXX-NNN] is not a regex;
+//   2. require a trailing quantifier, so array literals (`[foo]`) and subscripts
+//      (`[i]`) — which never end in a quantifier — lex as brackets.
 terminal REGEX: /\[[^\]]*[a-z][^\]]*\][*+?]/;

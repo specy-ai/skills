@@ -8,27 +8,29 @@ export const SpecyDomainTerminals = {
     WS: /\s+/,
     SL_COMMENT: /\/\/[^\n]*/,
     HASH_COMMENT: /#[^\n]*/,
-    REQUIREMENT_ID: /REQ-[A-Z][A-Z0-9]*-\d{3}/,
-    CARDINALITY: /\d+\.\.\d+|\d+\.\.N/,
+    REQUIREMENT_ID: /REQ-[A-Z][A-Z0-9]*(-[A-Z][A-Z0-9]*)*-\d{3}/,
+    CARDINALITY: /\d+\.\.(\d+|[nN])/,
     TYPE_NAME: /[A-Z][a-zA-Z0-9]*(?!\w)/,
     ID: /[a-zA-Z_][a-zA-Z0-9_]*/,
     STRING: /"[^"]*"/,
     NUMBER: /-?\d+(\.\d+)?/,
     REGEX: /\[[^\]]*[a-z][^\]]*\][*+?]/,
 };
-export const AggregateBodyItem = 'AggregateBodyItem';
-export function isAggregateBodyItem(item) {
-    return reflection.isInstance(item, AggregateBodyItem);
-}
-export const AgreementItem = 'AgreementItem';
-export function isAgreementItem(item) {
-    return reflection.isInstance(item, AgreementItem);
+export function isBinder(item) {
+    return isIdent(item) || isTypeName(item);
 }
 export function isCollectionKind(item) {
     return item === 'list' || item === 'set' || item === 'map';
 }
 export function isCompOp(item) {
     return item === '=' || item === '!=' || item === '>' || item === '<' || item === '>=' || item === '<=';
+}
+export const ConditionClause = 'ConditionClause';
+export function isConditionClause(item) {
+    return reflection.isInstance(item, ConditionClause);
+}
+export function isConditionName(item) {
+    return isIdent(item) || (typeof item === 'string' && (/"[^"]*"/.test(item)));
 }
 export const ContextRelation = 'ContextRelation';
 export function isContextRelation(item) {
@@ -42,28 +44,13 @@ export function isDefinition(item) {
     return reflection.isInstance(item, Definition);
 }
 export function isDetectionStrategy(item) {
-    return item === 'query' || item === 'event-sourced' || item === 'query-based';
+    return item === 'query' || item === 'event-sourced';
 }
 export function isDownstreamPattern(item) {
     return item === 'CS' || item === 'Conformist' || item === 'ACL';
 }
 export function isDurationUnit(item) {
-    return item === 'months' || item === 'days' || item === 'years' || item === 'hours' || item === 'minutes' || item === 'seconds' || item === 'weeks';
-}
-export function isEnforcementValue(item) {
-    return item === 'reject' || item === 'warn' || item === 'rejection' || item === 'compensation' || item === 'alert';
-}
-export const EntityBodyItem = 'EntityBodyItem';
-export function isEntityBodyItem(item) {
-    return reflection.isInstance(item, EntityBodyItem);
-}
-export const EscalationStepItem = 'EscalationStepItem';
-export function isEscalationStepItem(item) {
-    return reflection.isInstance(item, EscalationStepItem);
-}
-export const EventBodyItem = 'EventBodyItem';
-export function isEventBodyItem(item) {
-    return reflection.isInstance(item, EventBodyItem);
+    return item === 'months' || item === 'days' || item === 'years' || item === 'hours' || item === 'minutes' || item === 'seconds' || item === 'weeks' || item === 'ms' || item === 's' || item === 'min' || item === 'h' || item === 'd' || item === 'w' || item === 'y' || item === 'businessDay' || item === 'businessDays';
 }
 export const Expression = 'Expression';
 export function isExpression(item) {
@@ -72,22 +59,22 @@ export function isExpression(item) {
 export function isFieldName(item) {
     return isKeywordAsIdent(item) || (typeof item === 'string' && (/[a-zA-Z_][a-zA-Z0-9_]*/.test(item)));
 }
-export function isFunctionName(item) {
-    return item === 'count' || item === 'sum' || item === 'now' || item === 'today' || item === 'size' || item === 'isEmpty' || item === 'isNotEmpty' || item === 'append';
-}
 export function isIdent(item) {
     return isKeywordAsIdent(item) || (typeof item === 'string' && (/[a-zA-Z_][a-zA-Z0-9_]*/.test(item)));
 }
+export const InterfaceMember = 'InterfaceMember';
+export function isInterfaceMember(item) {
+    return reflection.isInstance(item, InterfaceMember);
+}
+export function isInterfaceRole(item) {
+    return item === 'api' || item === 'spi';
+}
 export function isKeywordAsIdent(item) {
-    return item === 'required' || item === 'optional' || item === 'value' || item === 'type' || item === 'status' || item === 'id' || item === 'message' || item === 'name' || item === 'identifier' || item === 'trigger' || item === 'effect' || item === 'start' || item === 'action' || item === 'state' || item === 'event' || item === 'command' || item === 'query' || item === 'schedule' || item === 'reference' || item === 'offset' || item === 'instant' || item === 'guard' || item === 'from' || item === 'on' || item === 'when' || item === 'then' || item === 'as' || item === 'root' || item === 'final' || item === 'fields' || item === 'entities' || item === 'contains' || item === 'exposes' || item === 'accepts' || item === 'returns' || item === 'emits' || item === 'creates' || item === 'sets' || item === 'resolves' || item === 'precondition' || item === 'postcondition' || item === 'foreach' || item === 'invariant' || item === 'agreement' || item === 'predicate' || item === 'participants' || item === 'reconciliation' || item === 'detection' || item === 'compensation' || item === 'coordination' || item === 'escalation' || item === 'step' || item === 'condition' || item === 'must' || item === 'enforcement' || item === 'violation' || item === 'module' || item === 'context' || item === 'organization' || item === 'interface' || item === 'entity' || item === 'aggregate' || item === 'service' || item === 'enum' || item === 'statemachine' || item === 'transition' || item === 'machine' || item === 'reaction' || item === 'operation' || item === 'satisfies' || item === 'depends' || item === 'uses' || item === 'map' || item === 'upstream' || item === 'downstream' || item === 'symmetric' || item === 'external' || item === 'error' || item === 'temporal' || item === 'domain' || item === 'application' || item === 'infrastructure' || item === 'internal' || item === 'not' || item === 'and' || item === 'or' || item === 'in' || item === 'is' || item === 'if' || item === 'every' || item === 'no' || item === 'field' || item === 'count' || item === 'sum' || item === 'now' || item === 'today' || item === 'size' || item === 'isEmpty' || item === 'isNotEmpty' || item === 'append' || item === 'true' || item === 'false' || item === 'reject' || item === 'warn' || item === 'alert' || item === 'suspend' || item === 'manual' || item === 'retry' || item === 'compensate' || item === 'shortname' || item === 'void' || item === 'string' || item === 'int' || item === 'integer' || item === 'long' || item === 'decimal' || item === 'boolean' || item === 'date' || item === 'datetime' || item === 'time' || item === 'duration' || item === 'uuid' || item === 'list' || item === 'set' || item === 'unique' || item === 'immutable' || item === 'ordered' || item === 'default' || item === 'min' || item === 'max' || item === 'range' || item === 'minLength' || item === 'maxLength' || item === 'pattern' || item === 'past' || item === 'future' || item === 'pastOrPresent' || item === 'futureOrPresent' || item === 'months' || item === 'days' || item === 'years' || item === 'hours' || item === 'minutes' || item === 'seconds' || item === 'weeks' || item === 'some' || item === 'forall' || item === 'exists' || item === 'where' || item === 'number' || item === 'active' || item === 'searching' || item === 'cancelled';
+    return item === 'value' || item === 'type' || item === 'status' || item === 'id' || item === 'code' || item === 'name' || item === 'message' || item === 'required' || item === 'optional' || item === 'unique' || item === 'immutable' || item === 'ordered' || item === 'state' || item === 'final' || item === 'event' || item === 'command' || item === 'query' || item === 'entity' || item === 'aggregate' || item === 'enum' || item === 'module' || item === 'context' || item === 'organization' || item === 'interface' || item === 'service' || item === 'domain' || item === 'application' || item === 'infrastructure' || item === 'repository' || item === 'reaction' || item === 'invariant' || item === 'agreement' || item === 'reconciliation' || item === 'escalation' || item === 'step' || item === 'machine' || item === 'states' || item === 'fields' || item === 'entities' || item === 'operations' || item === 'invariants' || item === 'references' || item === 'identity' || item === 'satisfies' || item === 'meta' || item === 'map' || item === 'api' || item === 'spi' || item === 'exposes' || item === 'requires' || item === 'describes' || item === 'depends' || item === 'about' || item === 'schedule' || item === 'reference' || item === 'offset' || item === 'instant' || item === 'guard' || item === 'trigger' || item === 'detection' || item === 'compensation' || item === 'coordination' || item === 'participants' || item === 'predicate' || item === 'action' || item === 'when' || item === 'must' || item === 'enforcement' || item === 'rejects' || item === 'precondition' || item === 'postcondition' || item === 'safe' || item === 'unsafe' || item === 'idempotent' || item === 'creates' || item === 'sets' || item === 'emits' || item === 'resolves' || item === 'returns' || item === 'foreach' || item === 'from' || item === 'on' || item === 'as' || item === 'of' || item === 'for' || item === 'calls' || item === 'where' || item === 'upstream' || item === 'downstream' || item === 'symmetric' || item === 'external' || item === 'error' || item === 'temporal' || item === 'not' || item === 'and' || item === 'or' || item === 'in' || item === 'is' || item === 'if' || item === 'every' || item === 'exists' || item === 'forall' || item === 'true' || item === 'false' || item === 'null' || item === 'alert' || item === 'suspend' || item === 'manual' || item === 'retry' || item === 'compensate' || item === 'rejection' || item === 'choreography' || item === 'orchestration' || item === 'string' || item === 'int' || item === 'integer' || item === 'long' || item === 'decimal' || item === 'boolean' || item === 'date' || item === 'datetime' || item === 'time' || item === 'duration' || item === 'uuid' || item === 'void' || item === 'list' || item === 'set' || item === 'default' || item === 'min' || item === 'max' || item === 'range' || item === 'minLength' || item === 'maxLength' || item === 'pattern' || item === 'past' || item === 'future' || item === 'pastOrPresent' || item === 'futureOrPresent' || item === 'months' || item === 'days' || item === 'years' || item === 'hours' || item === 'minutes' || item === 'seconds' || item === 'weeks';
 }
 export const LiteralValue = 'LiteralValue';
 export function isLiteralValue(item) {
     return reflection.isInstance(item, LiteralValue);
-}
-export const NamedOpItem = 'NamedOpItem';
-export function isNamedOpItem(item) {
-    return reflection.isInstance(item, NamedOpItem);
 }
 export const OperationClause = 'OperationClause';
 export function isOperationClause(item) {
@@ -97,36 +84,18 @@ export const OperationDef = 'OperationDef';
 export function isOperationDef(item) {
     return reflection.isInstance(item, OperationDef);
 }
+export function isOperationRef(item) {
+    return isIdent(item) || (typeof item === 'string' && (/"[^"]*"/.test(item)));
+}
 export function isPrimitiveTypeKw(item) {
     return item === 'string' || item === 'int' || item === 'integer' || item === 'long' || item === 'decimal' || item === 'boolean' || item === 'date' || item === 'datetime' || item === 'time' || item === 'duration' || item === 'uuid' || item === 'void';
 }
-export const QueryBodyItem = 'QueryBodyItem';
-export function isQueryBodyItem(item) {
-    return reflection.isInstance(item, QueryBodyItem);
+export const SafeOperationClause = 'SafeOperationClause';
+export function isSafeOperationClause(item) {
+    return reflection.isInstance(item, SafeOperationClause);
 }
-export const ReactionItem = 'ReactionItem';
-export function isReactionItem(item) {
-    return reflection.isInstance(item, ReactionItem);
-}
-export const ReconciliationItem = 'ReconciliationItem';
-export function isReconciliationItem(item) {
-    return reflection.isInstance(item, ReconciliationItem);
-}
-export const RecordBodyItem = 'RecordBodyItem';
-export function isRecordBodyItem(item) {
-    return reflection.isInstance(item, RecordBodyItem);
-}
-export const ServiceBodyItem = 'ServiceBodyItem';
-export function isServiceBodyItem(item) {
-    return reflection.isInstance(item, ServiceBodyItem);
-}
-export const SourceDecl = 'SourceDecl';
-export function isSourceDecl(item) {
-    return reflection.isInstance(item, SourceDecl);
-}
-export const StatemachineItem = 'StatemachineItem';
-export function isStatemachineItem(item) {
-    return reflection.isInstance(item, StatemachineItem);
+export function isSafetyDecl(item) {
+    return item === 'safe' || item === 'unsafe';
 }
 export function isStateName(item) {
     return isKeywordAsIdent(item) || (typeof item === 'string' && (/[a-zA-Z_][a-zA-Z0-9_]*/.test(item) || /[A-Z][a-zA-Z0-9]*(?!\w)/.test(item)));
@@ -134,9 +103,12 @@ export function isStateName(item) {
 export function isSymmetricPattern(item) {
     return item === 'SharedKernel' || item === 'PublishedLanguage' || item === 'Partnership' || item === 'SeparateWays';
 }
-export const TemporalEventDef = 'TemporalEventDef';
-export function isTemporalEventDef(item) {
-    return reflection.isInstance(item, TemporalEventDef);
+export function isSyncPattern(item) {
+    return item === 'synchronous-query' || item === 'asynchronous-projection';
+}
+export const TemporalAnchor = 'TemporalAnchor';
+export function isTemporalAnchor(item) {
+    return reflection.isInstance(item, TemporalAnchor);
 }
 export const TopLevelElement = 'TopLevelElement';
 export function isTopLevelElement(item) {
@@ -151,25 +123,17 @@ export function isTypeName(item) {
 export function isUpstreamPattern(item) {
     return item === 'OHS';
 }
-export const ValueBodyItem = 'ValueBodyItem';
-export function isValueBodyItem(item) {
-    return reflection.isInstance(item, ValueBodyItem);
-}
 export const ValueExpr = 'ValueExpr';
 export function isValueExpr(item) {
     return reflection.isInstance(item, ValueExpr);
 }
-export const AbsoluteTemporalEvent = 'AbsoluteTemporalEvent';
-export function isAbsoluteTemporalEvent(item) {
-    return reflection.isInstance(item, AbsoluteTemporalEvent);
+export const AboutClause = 'AboutClause';
+export function isAboutClause(item) {
+    return reflection.isInstance(item, AboutClause);
 }
-export const AcceptsClause = 'AcceptsClause';
-export function isAcceptsClause(item) {
-    return reflection.isInstance(item, AcceptsClause);
-}
-export const AggregateContainsDecl = 'AggregateContainsDecl';
-export function isAggregateContainsDecl(item) {
-    return reflection.isInstance(item, AggregateContainsDecl);
+export const AbsoluteAnchor = 'AbsoluteAnchor';
+export function isAbsoluteAnchor(item) {
+    return reflection.isInstance(item, AbsoluteAnchor);
 }
 export const AggregateDef = 'AggregateDef';
 export function isAggregateDef(item) {
@@ -178,10 +142,6 @@ export function isAggregateDef(item) {
 export const AggregateEntitiesDecl = 'AggregateEntitiesDecl';
 export function isAggregateEntitiesDecl(item) {
     return reflection.isInstance(item, AggregateEntitiesDecl);
-}
-export const AggregateRootDecl = 'AggregateRootDecl';
-export function isAggregateRootDecl(item) {
-    return reflection.isInstance(item, AggregateRootDecl);
 }
 export const AgreementDef = 'AgreementDef';
 export function isAgreementDef(item) {
@@ -219,13 +179,17 @@ export const BooleanLiteralExpr = 'BooleanLiteralExpr';
 export function isBooleanLiteralExpr(item) {
     return reflection.isInstance(item, BooleanLiteralExpr);
 }
-export const ClassicStateDef = 'ClassicStateDef';
-export function isClassicStateDef(item) {
-    return reflection.isInstance(item, ClassicStateDef);
+export const CallExpr = 'CallExpr';
+export function isCallExpr(item) {
+    return reflection.isInstance(item, CallExpr);
 }
-export const ClassicTransitionDef = 'ClassicTransitionDef';
-export function isClassicTransitionDef(item) {
-    return reflection.isInstance(item, ClassicTransitionDef);
+export const CallsBlock = 'CallsBlock';
+export function isCallsBlock(item) {
+    return reflection.isInstance(item, CallsBlock);
+}
+export const CausedByClause = 'CausedByClause';
+export function isCausedByClause(item) {
+    return reflection.isInstance(item, CausedByClause);
 }
 export const CommandDef = 'CommandDef';
 export function isCommandDef(item) {
@@ -259,10 +223,6 @@ export const ContextMapBlock = 'ContextMapBlock';
 export function isContextMapBlock(item) {
     return reflection.isInstance(item, ContextMapBlock);
 }
-export const CoordinationClause = 'CoordinationClause';
-export function isCoordinationClause(item) {
-    return reflection.isInstance(item, CoordinationClause);
-}
 export const CreatesClause = 'CreatesClause';
 export function isCreatesClause(item) {
     return reflection.isInstance(item, CreatesClause);
@@ -271,13 +231,17 @@ export const DependsBlock = 'DependsBlock';
 export function isDependsBlock(item) {
     return reflection.isInstance(item, DependsBlock);
 }
+export const DescribedByClause = 'DescribedByClause';
+export function isDescribedByClause(item) {
+    return reflection.isInstance(item, DescribedByClause);
+}
+export const DescribesClause = 'DescribesClause';
+export function isDescribesClause(item) {
+    return reflection.isInstance(item, DescribesClause);
+}
 export const Description = 'Description';
 export function isDescription(item) {
     return reflection.isInstance(item, Description);
-}
-export const DetectionClause = 'DetectionClause';
-export function isDetectionClause(item) {
-    return reflection.isInstance(item, DetectionClause);
 }
 export const DomainFile = 'DomainFile';
 export function isDomainFile(item) {
@@ -307,10 +271,6 @@ export const DurationLiteral = 'DurationLiteral';
 export function isDurationLiteral(item) {
     return reflection.isInstance(item, DurationLiteral);
 }
-export const EffectClause = 'EffectClause';
-export function isEffectClause(item) {
-    return reflection.isInstance(item, EffectClause);
-}
 export const EffectsClause = 'EffectsClause';
 export function isEffectsClause(item) {
     return reflection.isInstance(item, EffectsClause);
@@ -326,10 +286,6 @@ export function isEnforcementStrategy(item) {
 export const EntityDef = 'EntityDef';
 export function isEntityDef(item) {
     return reflection.isInstance(item, EntityDef);
-}
-export const EntityTransition = 'EntityTransition';
-export function isEntityTransition(item) {
-    return reflection.isInstance(item, EntityTransition);
 }
 export const EnumDef = 'EnumDef';
 export function isEnumDef(item) {
@@ -347,73 +303,33 @@ export const EscalationAction = 'EscalationAction';
 export function isEscalationAction(item) {
     return reflection.isInstance(item, EscalationAction);
 }
-export const EscalationActionClause = 'EscalationActionClause';
-export function isEscalationActionClause(item) {
-    return reflection.isInstance(item, EscalationActionClause);
-}
 export const EscalationChainDef = 'EscalationChainDef';
 export function isEscalationChainDef(item) {
     return reflection.isInstance(item, EscalationChainDef);
-}
-export const EscalationCondition = 'EscalationCondition';
-export function isEscalationCondition(item) {
-    return reflection.isInstance(item, EscalationCondition);
-}
-export const EscalationMaxAttempts = 'EscalationMaxAttempts';
-export function isEscalationMaxAttempts(item) {
-    return reflection.isInstance(item, EscalationMaxAttempts);
 }
 export const EscalationStep = 'EscalationStep';
 export function isEscalationStep(item) {
     return reflection.isInstance(item, EscalationStep);
 }
-export const EscalationThen = 'EscalationThen';
-export function isEscalationThen(item) {
-    return reflection.isInstance(item, EscalationThen);
-}
-export const EscalationWhen = 'EscalationWhen';
-export function isEscalationWhen(item) {
-    return reflection.isInstance(item, EscalationWhen);
-}
 export const EventDef = 'EventDef';
 export function isEventDef(item) {
     return reflection.isInstance(item, EventDef);
-}
-export const EventGuard = 'EventGuard';
-export function isEventGuard(item) {
-    return reflection.isInstance(item, EventGuard);
-}
-export const EventInstant = 'EventInstant';
-export function isEventInstant(item) {
-    return reflection.isInstance(item, EventInstant);
-}
-export const EventSchedule = 'EventSchedule';
-export function isEventSchedule(item) {
-    return reflection.isInstance(item, EventSchedule);
-}
-export const EventTriggeredOp = 'EventTriggeredOp';
-export function isEventTriggeredOp(item) {
-    return reflection.isInstance(item, EventTriggeredOp);
-}
-export const EventTypeClassifier = 'EventTypeClassifier';
-export function isEventTypeClassifier(item) {
-    return reflection.isInstance(item, EventTypeClassifier);
 }
 export const EveryExpr = 'EveryExpr';
 export function isEveryExpr(item) {
     return reflection.isInstance(item, EveryExpr);
 }
-export const ExistsPred = 'ExistsPred';
-export function isExistsPred(item) {
-    return reflection.isInstance(item, ExistsPred);
+export const ExposedByClause = 'ExposedByClause';
+export function isExposedByClause(item) {
+    return reflection.isInstance(item, ExposedByClause);
+}
+export const ExposesBlock = 'ExposesBlock';
+export function isExposesBlock(item) {
+    return reflection.isInstance(item, ExposesBlock);
 }
 export const ExposesClause = 'ExposesClause';
 export function isExposesClause(item) {
     return reflection.isInstance(item, ExposesClause);
-}
-export const ExprServiceCall = 'ExprServiceCall';
-export function isExprServiceCall(item) {
-    return reflection.isInstance(item, ExprServiceCall);
 }
 export const ExternalEventDef = 'ExternalEventDef';
 export function isExternalEventDef(item) {
@@ -431,25 +347,13 @@ export const FieldType = 'FieldType';
 export function isFieldType(item) {
     return reflection.isInstance(item, FieldType);
 }
-export const FieldTypeOpt = 'FieldTypeOpt';
-export function isFieldTypeOpt(item) {
-    return reflection.isInstance(item, FieldTypeOpt);
-}
-export const FinalState = 'FinalState';
-export function isFinalState(item) {
-    return reflection.isInstance(item, FinalState);
-}
 export const ForeachClause = 'ForeachClause';
 export function isForeachClause(item) {
     return reflection.isInstance(item, ForeachClause);
 }
-export const FunctionCallExpr = 'FunctionCallExpr';
-export function isFunctionCallExpr(item) {
-    return reflection.isInstance(item, FunctionCallExpr);
-}
-export const GuardClause = 'GuardClause';
-export function isGuardClause(item) {
-    return reflection.isInstance(item, GuardClause);
+export const GuardBlock = 'GuardBlock';
+export function isGuardBlock(item) {
+    return reflection.isInstance(item, GuardBlock);
 }
 export const IdentityDecl = 'IdentityDecl';
 export function isIdentityDecl(item) {
@@ -466,14 +370,6 @@ export function isInExpr(item) {
 export const InfrastructureServiceDef = 'InfrastructureServiceDef';
 export function isInfrastructureServiceDef(item) {
     return reflection.isInstance(item, InfrastructureServiceDef);
-}
-export const InlineEnumBlock = 'InlineEnumBlock';
-export function isInlineEnumBlock(item) {
-    return reflection.isInstance(item, InlineEnumBlock);
-}
-export const InlineInvariant = 'InlineInvariant';
-export function isInlineInvariant(item) {
-    return reflection.isInstance(item, InlineInvariant);
 }
 export const InterfaceDef = 'InterfaceDef';
 export function isInterfaceDef(item) {
@@ -523,10 +419,6 @@ export const MetadataEntry = 'MetadataEntry';
 export function isMetadataEntry(item) {
     return reflection.isInstance(item, MetadataEntry);
 }
-export const ModuleBody = 'ModuleBody';
-export function isModuleBody(item) {
-    return reflection.isInstance(item, ModuleBody);
-}
 export const ModuleDef = 'ModuleDef';
 export function isModuleDef(item) {
     return reflection.isInstance(item, ModuleDef);
@@ -542,22 +434,6 @@ export function isNamedArg(item) {
 export const NamedArgList = 'NamedArgList';
 export function isNamedArgList(item) {
     return reflection.isInstance(item, NamedArgList);
-}
-export const NamedOperationDef = 'NamedOperationDef';
-export function isNamedOperationDef(item) {
-    return reflection.isInstance(item, NamedOperationDef);
-}
-export const NamedPostcondition = 'NamedPostcondition';
-export function isNamedPostcondition(item) {
-    return reflection.isInstance(item, NamedPostcondition);
-}
-export const NamedPrecondition = 'NamedPrecondition';
-export function isNamedPrecondition(item) {
-    return reflection.isInstance(item, NamedPrecondition);
-}
-export const NoFieldContainsExpr = 'NoFieldContainsExpr';
-export function isNoFieldContainsExpr(item) {
-    return reflection.isInstance(item, NoFieldContainsExpr);
 }
 export const NotInExpr = 'NotInExpr';
 export function isNotInExpr(item) {
@@ -575,13 +451,17 @@ export const NumberLiteralExpr = 'NumberLiteralExpr';
 export function isNumberLiteralExpr(item) {
     return reflection.isInstance(item, NumberLiteralExpr);
 }
-export const OnClause = 'OnClause';
-export function isOnClause(item) {
-    return reflection.isInstance(item, OnClause);
+export const OperationBody = 'OperationBody';
+export function isOperationBody(item) {
+    return reflection.isInstance(item, OperationBody);
 }
 export const OperationsBlock = 'OperationsBlock';
 export function isOperationsBlock(item) {
     return reflection.isInstance(item, OperationsBlock);
+}
+export const OperationSignature = 'OperationSignature';
+export function isOperationSignature(item) {
+    return reflection.isInstance(item, OperationSignature);
 }
 export const OrganizationDef = 'OrganizationDef';
 export function isOrganizationDef(item) {
@@ -590,10 +470,6 @@ export function isOrganizationDef(item) {
 export const ParamDecl = 'ParamDecl';
 export function isParamDecl(item) {
     return reflection.isInstance(item, ParamDecl);
-}
-export const ParamDeclOpt = 'ParamDeclOpt';
-export function isParamDeclOpt(item) {
-    return reflection.isInstance(item, ParamDeclOpt);
 }
 export const ParamList = 'ParamList';
 export function isParamList(item) {
@@ -615,10 +491,6 @@ export const PostconditionClause = 'PostconditionClause';
 export function isPostconditionClause(item) {
     return reflection.isInstance(item, PostconditionClause);
 }
-export const PrdSourceDecl = 'PrdSourceDecl';
-export function isPrdSourceDecl(item) {
-    return reflection.isInstance(item, PrdSourceDecl);
-}
 export const PreconditionClause = 'PreconditionClause';
 export function isPreconditionClause(item) {
     return reflection.isInstance(item, PreconditionClause);
@@ -627,25 +499,29 @@ export const PredicateBlock = 'PredicateBlock';
 export function isPredicateBlock(item) {
     return reflection.isInstance(item, PredicateBlock);
 }
-export const PredicateExpr = 'PredicateExpr';
-export function isPredicateExpr(item) {
-    return reflection.isInstance(item, PredicateExpr);
+export const ProjectedByClause = 'ProjectedByClause';
+export function isProjectedByClause(item) {
+    return reflection.isInstance(item, ProjectedByClause);
+}
+export const QuantifierExpr = 'QuantifierExpr';
+export function isQuantifierExpr(item) {
+    return reflection.isInstance(item, QuantifierExpr);
 }
 export const QueryDef = 'QueryDef';
 export function isQueryDef(item) {
     return reflection.isInstance(item, QueryDef);
 }
-export const ReactionCallClause = 'ReactionCallClause';
-export function isReactionCallClause(item) {
-    return reflection.isInstance(item, ReactionCallClause);
-}
 export const ReactionDef = 'ReactionDef';
 export function isReactionDef(item) {
     return reflection.isInstance(item, ReactionDef);
 }
-export const ReactionsBlock = 'ReactionsBlock';
-export function isReactionsBlock(item) {
-    return reflection.isInstance(item, ReactionsBlock);
+export const ReadOnlyEntityDef = 'ReadOnlyEntityDef';
+export function isReadOnlyEntityDef(item) {
+    return reflection.isInstance(item, ReadOnlyEntityDef);
+}
+export const ReadsFromClause = 'ReadsFromClause';
+export function isReadsFromClause(item) {
+    return reflection.isInstance(item, ReadsFromClause);
 }
 export const ReconciliationDef = 'ReconciliationDef';
 export function isReconciliationDef(item) {
@@ -655,13 +531,9 @@ export const ReconciliationTrigger = 'ReconciliationTrigger';
 export function isReconciliationTrigger(item) {
     return reflection.isInstance(item, ReconciliationTrigger);
 }
-export const ReconciliationTriggerClause = 'ReconciliationTriggerClause';
-export function isReconciliationTriggerClause(item) {
-    return reflection.isInstance(item, ReconciliationTriggerClause);
-}
-export const RecurringTemporalEvent = 'RecurringTemporalEvent';
-export function isRecurringTemporalEvent(item) {
-    return reflection.isInstance(item, RecurringTemporalEvent);
+export const RecurringAnchor = 'RecurringAnchor';
+export function isRecurringAnchor(item) {
+    return reflection.isInstance(item, RecurringAnchor);
 }
 export const ReferenceDecl = 'ReferenceDecl';
 export function isReferenceDecl(item) {
@@ -671,13 +543,21 @@ export const ReferencesBlock = 'ReferencesBlock';
 export function isReferencesBlock(item) {
     return reflection.isInstance(item, ReferencesBlock);
 }
-export const RelativeTemporalEvent = 'RelativeTemporalEvent';
-export function isRelativeTemporalEvent(item) {
-    return reflection.isInstance(item, RelativeTemporalEvent);
+export const RelativeAnchor = 'RelativeAnchor';
+export function isRelativeAnchor(item) {
+    return reflection.isInstance(item, RelativeAnchor);
+}
+export const RepositoryDef = 'RepositoryDef';
+export function isRepositoryDef(item) {
+    return reflection.isInstance(item, RepositoryDef);
 }
 export const RequirementsSourceDecl = 'RequirementsSourceDecl';
 export function isRequirementsSourceDecl(item) {
     return reflection.isInstance(item, RequirementsSourceDecl);
+}
+export const RequiresBlock = 'RequiresBlock';
+export function isRequiresBlock(item) {
+    return reflection.isInstance(item, RequiresBlock);
 }
 export const ResolvesClause = 'ResolvesClause';
 export function isResolvesClause(item) {
@@ -687,9 +567,17 @@ export const ReturnsClause = 'ReturnsClause';
 export function isReturnsClause(item) {
     return reflection.isInstance(item, ReturnsClause);
 }
-export const ReturnsDecl = 'ReturnsDecl';
-export function isReturnsDecl(item) {
-    return reflection.isInstance(item, ReturnsDecl);
+export const SafeForeachClause = 'SafeForeachClause';
+export function isSafeForeachClause(item) {
+    return reflection.isInstance(item, SafeForeachClause);
+}
+export const SafeOpDef = 'SafeOpDef';
+export function isSafeOpDef(item) {
+    return reflection.isInstance(item, SafeOpDef);
+}
+export const SafeOperationsBlock = 'SafeOperationsBlock';
+export function isSafeOperationsBlock(item) {
+    return reflection.isInstance(item, SafeOperationsBlock);
 }
 export const SatisfiesDecl = 'SatisfiesDecl';
 export function isSatisfiesDecl(item) {
@@ -703,10 +591,6 @@ export const ServiceCallClause = 'ServiceCallClause';
 export function isServiceCallClause(item) {
     return reflection.isInstance(item, ServiceCallClause);
 }
-export const ServiceDef = 'ServiceDef';
-export function isServiceDef(item) {
-    return reflection.isInstance(item, ServiceDef);
-}
 export const SetsClause = 'SetsClause';
 export function isSetsClause(item) {
     return reflection.isInstance(item, SetsClause);
@@ -715,29 +599,21 @@ export const Shortname = 'Shortname';
 export function isShortname(item) {
     return reflection.isInstance(item, Shortname);
 }
-export const SomeExpr = 'SomeExpr';
-export function isSomeExpr(item) {
-    return reflection.isInstance(item, SomeExpr);
+export const SignatureOperationsBlock = 'SignatureOperationsBlock';
+export function isSignatureOperationsBlock(item) {
+    return reflection.isInstance(item, SignatureOperationsBlock);
+}
+export const SourcedFromClause = 'SourcedFromClause';
+export function isSourcedFromClause(item) {
+    return reflection.isInstance(item, SourcedFromClause);
 }
 export const StateDef = 'StateDef';
 export function isStateDef(item) {
     return reflection.isInstance(item, StateDef);
 }
-export const StateInvariantDef = 'StateInvariantDef';
-export function isStateInvariantDef(item) {
-    return reflection.isInstance(item, StateInvariantDef);
-}
-export const StatemachineDef = 'StatemachineDef';
-export function isStatemachineDef(item) {
-    return reflection.isInstance(item, StatemachineDef);
-}
 export const StateMachineDef = 'StateMachineDef';
 export function isStateMachineDef(item) {
     return reflection.isInstance(item, StateMachineDef);
-}
-export const StatemachineStart = 'StatemachineStart';
-export function isStatemachineStart(item) {
-    return reflection.isInstance(item, StatemachineStart);
 }
 export const StatesBlock = 'StatesBlock';
 export function isStatesBlock(item) {
@@ -755,17 +631,17 @@ export const SymmetricRelation = 'SymmetricRelation';
 export function isSymmetricRelation(item) {
     return reflection.isInstance(item, SymmetricRelation);
 }
-export const TransitionInline = 'TransitionInline';
-export function isTransitionInline(item) {
-    return reflection.isInstance(item, TransitionInline);
+export const SyncedViaClause = 'SyncedViaClause';
+export function isSyncedViaClause(item) {
+    return reflection.isInstance(item, SyncedViaClause);
 }
-export const TransitionsBlock = 'TransitionsBlock';
-export function isTransitionsBlock(item) {
-    return reflection.isInstance(item, TransitionsBlock);
+export const TemporalEventDef = 'TemporalEventDef';
+export function isTemporalEventDef(item) {
+    return reflection.isInstance(item, TemporalEventDef);
 }
-export const TriggerClause = 'TriggerClause';
-export function isTriggerClause(item) {
-    return reflection.isInstance(item, TriggerClause);
+export const TransitionDef = 'TransitionDef';
+export function isTransitionDef(item) {
+    return reflection.isInstance(item, TransitionDef);
 }
 export const TriggeredByClause = 'TriggeredByClause';
 export function isTriggeredByClause(item) {
@@ -778,10 +654,6 @@ export function isUnaryExpr(item) {
 export const UpstreamRelation = 'UpstreamRelation';
 export function isUpstreamRelation(item) {
     return reflection.isInstance(item, UpstreamRelation);
-}
-export const UsesDecl = 'UsesDecl';
-export function isUsesDecl(item) {
-    return reflection.isInstance(item, UsesDecl);
 }
 export const ValueDef = 'ValueDef';
 export function isValueDef(item) {
@@ -811,30 +683,16 @@ export const PrimitiveType = 'PrimitiveType';
 export function isPrimitiveType(item) {
     return reflection.isInstance(item, PrimitiveType);
 }
-export const ForallPred = 'ForallPred';
-export function isForallPred(item) {
-    return reflection.isInstance(item, ForallPred);
-}
 export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
     getAllTypes() {
-        return [AbsoluteTemporalEvent, AcceptsClause, AggregateBodyItem, AggregateContainsDecl, AggregateDef, AggregateEntitiesDecl, AggregateRootDecl, AgreementDef, AgreementItem, ApplicationServiceDef, ArgList, ArrayIndex, ArrayLiteral, AssignmentClause, BinaryExpr, BooleanLiteral, BooleanLiteralExpr, ClassicStateDef, ClassicTransitionDef, CollectionType, CommandDef, CommandTriggeredOp, CompensationClause, ConditionalExpr, Constraint, ContainsExpr, ContextDef, ContextMapBlock, ContextRelation, CoordinationClause, CreatesClause, Definition, DependsBlock, Description, DetectionClause, DomainFile, DomainServiceDef, DotPath, DotPathExpr, DownstreamRelation, DuplicateDetection, DurationLiteral, EffectClause, EffectsClause, EmitsClause, EnforcementStrategy, EntityBodyItem, EntityDef, EntityTransition, EnumDef, EnumValue, ErrorEventDef, EscalationAction, EscalationActionClause, EscalationChainDef, EscalationCondition, EscalationMaxAttempts, EscalationStep, EscalationStepItem, EscalationThen, EscalationWhen, EventBodyItem, EventDef, EventGuard, EventInstant, EventSchedule, EventTriggeredOp, EventTypeClassifier, EveryExpr, ExistsPred, ExposesClause, ExprServiceCall, Expression, ExternalEventDef, FieldDecl, FieldType, FieldTypeOpt, FieldsBlock, FinalState, ForallPred, ForeachClause, FunctionCallExpr, GenericType, GuardClause, IdentityDecl, IfExpr, InExpr, InfrastructureServiceDef, InlineEnumBlock, InlineInvariant, InterfaceDef, InternalOp, InvariantDef, InvariantsBlock, IsDefinedExpr, IsNotDefinedExpr, IsNotNullExpr, IsNullExpr, LiteralValue, MatchPattern, MatchesExpr, MetadataBlock, MetadataEntry, ModuleBody, ModuleDef, MustBlock, NamedArg, NamedArgList, NamedOpItem, NamedOperationDef, NamedPostcondition, NamedPrecondition, NoFieldContainsExpr, NotInExpr, NullLiteralExpr, NumberLiteral, NumberLiteralExpr, OnClause, OperationClause, OperationDef, OperationsBlock, OrganizationDef, ParamDecl, ParamDeclOpt, ParamList, ParenExpr, ParticipantsClause, PathSegment, PostconditionClause, PrdSourceDecl, PreconditionClause, PredicateBlock, PredicateExpr, PrimitiveType, QueryBodyItem, QueryDef, ReactionCallClause, ReactionDef, ReactionItem, ReactionsBlock, ReconciliationDef, ReconciliationItem, ReconciliationTrigger, ReconciliationTriggerClause, RecordBodyItem, RecurringTemporalEvent, ReferenceDecl, ReferencesBlock, RelativeTemporalEvent, RequirementsSourceDecl, ResolvesClause, ReturnsClause, ReturnsDecl, SatisfiesDecl, ScopedInvariantDef, ServiceBodyItem, ServiceCallClause, ServiceDef, SetsClause, Shortname, SomeExpr, SourceDecl, StateDef, StateInvariantDef, StateMachineDef, StatemachineDef, StatemachineItem, StatemachineStart, StatesBlock, StringLiteral, StringLiteralExpr, SymmetricRelation, TemporalEventDef, TopLevelElement, TransitionInline, TransitionsBlock, TriggerClause, TriggeredByClause, UnaryExpr, UpstreamRelation, UsesDecl, ValueBodyItem, ValueDef, ValueExpr, ValueList, ValueOpDef, ValueOperationsBlock];
+        return [AboutClause, AbsoluteAnchor, AggregateDef, AggregateEntitiesDecl, AgreementDef, ApplicationServiceDef, ArgList, ArrayIndex, ArrayLiteral, AssignmentClause, BinaryExpr, BooleanLiteral, BooleanLiteralExpr, CallExpr, CallsBlock, CausedByClause, CollectionType, CommandDef, CommandTriggeredOp, CompensationClause, ConditionClause, ConditionalExpr, Constraint, ContainsExpr, ContextDef, ContextMapBlock, ContextRelation, CreatesClause, Definition, DependsBlock, DescribedByClause, DescribesClause, Description, DomainFile, DomainServiceDef, DotPath, DotPathExpr, DownstreamRelation, DuplicateDetection, DurationLiteral, EffectsClause, EmitsClause, EnforcementStrategy, EntityDef, EnumDef, EnumValue, ErrorEventDef, EscalationAction, EscalationChainDef, EscalationStep, EventDef, EveryExpr, ExposedByClause, ExposesBlock, ExposesClause, Expression, ExternalEventDef, FieldDecl, FieldType, FieldsBlock, ForeachClause, GenericType, GuardBlock, IdentityDecl, IfExpr, InExpr, InfrastructureServiceDef, InterfaceDef, InterfaceMember, InternalOp, InvariantDef, InvariantsBlock, IsDefinedExpr, IsNotDefinedExpr, IsNotNullExpr, IsNullExpr, LiteralValue, MatchPattern, MatchesExpr, MetadataBlock, MetadataEntry, ModuleDef, MustBlock, NamedArg, NamedArgList, NotInExpr, NullLiteralExpr, NumberLiteral, NumberLiteralExpr, OperationBody, OperationClause, OperationDef, OperationSignature, OperationsBlock, OrganizationDef, ParamDecl, ParamList, ParenExpr, ParticipantsClause, PathSegment, PostconditionClause, PreconditionClause, PredicateBlock, PrimitiveType, ProjectedByClause, QuantifierExpr, QueryDef, ReactionDef, ReadOnlyEntityDef, ReadsFromClause, ReconciliationDef, ReconciliationTrigger, RecurringAnchor, ReferenceDecl, ReferencesBlock, RelativeAnchor, RepositoryDef, RequirementsSourceDecl, RequiresBlock, ResolvesClause, ReturnsClause, SafeForeachClause, SafeOpDef, SafeOperationClause, SafeOperationsBlock, SatisfiesDecl, ScopedInvariantDef, ServiceCallClause, SetsClause, Shortname, SignatureOperationsBlock, SourcedFromClause, StateDef, StateMachineDef, StatesBlock, StringLiteral, StringLiteralExpr, SymmetricRelation, SyncedViaClause, TemporalAnchor, TemporalEventDef, TopLevelElement, TransitionDef, TriggeredByClause, UnaryExpr, UpstreamRelation, ValueDef, ValueExpr, ValueList, ValueOpDef, ValueOperationsBlock];
     }
     computeIsSubtype(subtype, supertype) {
         switch (subtype) {
-            case AbsoluteTemporalEvent:
-            case RecurringTemporalEvent:
-            case RelativeTemporalEvent: {
-                return this.isSubtype(TemporalEventDef, supertype);
-            }
-            case AcceptsClause:
-            case NamedPostcondition:
-            case NamedPrecondition: {
-                return this.isSubtype(NamedOpItem, supertype);
-            }
-            case AggregateContainsDecl:
-            case AggregateEntitiesDecl:
-            case AggregateRootDecl: {
-                return this.isSubtype(AggregateBodyItem, supertype);
+            case AbsoluteAnchor:
+            case RecurringAnchor:
+            case RelativeAnchor: {
+                return this.isSubtype(TemporalAnchor, supertype);
             }
             case AggregateDef:
             case AgreementDef:
@@ -847,11 +705,12 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
             case EventDef:
             case ExternalEventDef:
             case InfrastructureServiceDef:
+            case InterfaceDef:
             case InvariantDef:
             case QueryDef:
             case ReactionDef:
-            case ServiceDef:
-            case StatemachineDef:
+            case ReadOnlyEntityDef:
+            case RepositoryDef:
             case TemporalEventDef:
             case ValueDef: {
                 return this.isSubtype(Definition, supertype);
@@ -862,13 +721,12 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
             }
             case BinaryExpr:
             case BooleanLiteralExpr:
+            case CallExpr:
             case ConditionalExpr:
             case ContainsExpr:
             case DotPathExpr:
             case DurationLiteral:
             case EveryExpr:
-            case ExprServiceCall:
-            case FunctionCallExpr:
             case IfExpr:
             case InExpr:
             case IsDefinedExpr:
@@ -876,12 +734,11 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
             case IsNotNullExpr:
             case IsNullExpr:
             case MatchesExpr:
-            case NoFieldContainsExpr:
             case NotInExpr:
             case NullLiteralExpr:
             case NumberLiteralExpr:
             case ParenExpr:
-            case SomeExpr:
+            case QuantifierExpr:
             case StringLiteralExpr:
             case UnaryExpr: {
                 return this.isSubtype(Expression, supertype);
@@ -897,16 +754,8 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                 return this.isSubtype(FieldType, supertype);
             }
             case CommandTriggeredOp:
-            case EventTriggeredOp:
             case InternalOp: {
                 return this.isSubtype(OperationDef, supertype);
-            }
-            case CompensationClause:
-            case CoordinationClause:
-            case DetectionClause:
-            case EscalationChainDef:
-            case ReconciliationTriggerClause: {
-                return this.isSubtype(ReconciliationItem, supertype);
             }
             case ContextDef:
             case Definition:
@@ -915,104 +764,32 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                 return this.isSubtype(TopLevelElement, supertype);
             }
             case CreatesClause:
+            case EmitsClause:
             case ForeachClause:
-            case PostconditionClause:
-            case PreconditionClause:
-            case ReactionCallClause:
-            case ResolvesClause:
-            case ReturnsClause:
-            case ServiceCallClause:
             case SetsClause: {
                 return this.isSubtype(OperationClause, supertype);
             }
-            case Description: {
-                return this.isSubtype(AggregateBodyItem, supertype) || this.isSubtype(AgreementItem, supertype) || this.isSubtype(EntityBodyItem, supertype) || this.isSubtype(EventBodyItem, supertype) || this.isSubtype(NamedOpItem, supertype) || this.isSubtype(QueryBodyItem, supertype) || this.isSubtype(ReactionItem, supertype) || this.isSubtype(RecordBodyItem, supertype) || this.isSubtype(ServiceBodyItem, supertype) || this.isSubtype(ValueBodyItem, supertype);
+            case DescribesClause:
+            case ExposesClause:
+            case OperationSignature: {
+                return this.isSubtype(InterfaceMember, supertype);
             }
             case DownstreamRelation:
             case SymmetricRelation:
             case UpstreamRelation: {
                 return this.isSubtype(ContextRelation, supertype);
             }
-            case DuplicateDetection:
-            case IdentityDecl:
-            case ReferencesBlock:
-            case StatesBlock:
-            case TransitionsBlock: {
-                return this.isSubtype(AggregateBodyItem, supertype) || this.isSubtype(EntityBodyItem, supertype);
+            case PostconditionClause:
+            case PreconditionClause: {
+                return this.isSubtype(ConditionClause, supertype) || this.isSubtype(OperationClause, supertype) || this.isSubtype(SafeOperationClause, supertype);
             }
-            case EffectClause:
-            case EffectsClause:
-            case GuardClause:
-            case TriggerClause:
-            case TriggeredByClause: {
-                return this.isSubtype(ReactionItem, supertype);
+            case ResolvesClause:
+            case ReturnsClause:
+            case ServiceCallClause: {
+                return this.isSubtype(OperationClause, supertype) || this.isSubtype(SafeOperationClause, supertype);
             }
-            case EmitsClause: {
-                return this.isSubtype(NamedOpItem, supertype) || this.isSubtype(OperationClause, supertype);
-            }
-            case EscalationActionClause:
-            case EscalationCondition:
-            case EscalationMaxAttempts:
-            case EscalationThen:
-            case EscalationWhen: {
-                return this.isSubtype(EscalationStepItem, supertype);
-            }
-            case EventGuard:
-            case EventInstant:
-            case EventSchedule:
-            case EventTypeClassifier: {
-                return this.isSubtype(EventBodyItem, supertype);
-            }
-            case FieldDecl:
-            case FieldsBlock: {
-                return this.isSubtype(AggregateBodyItem, supertype) || this.isSubtype(EntityBodyItem, supertype) || this.isSubtype(EventBodyItem, supertype) || this.isSubtype(QueryBodyItem, supertype) || this.isSubtype(RecordBodyItem, supertype) || this.isSubtype(ValueBodyItem, supertype);
-            }
-            case FinalState:
-            case StateDef:
-            case StatemachineStart:
-            case TransitionInline: {
-                return this.isSubtype(StatemachineItem, supertype);
-            }
-            case ForallPred: {
-                return this.isSubtype(PredicateExpr, supertype);
-            }
-            case InlineEnumBlock:
-            case ValueOperationsBlock: {
-                return this.isSubtype(ValueBodyItem, supertype);
-            }
-            case InlineInvariant: {
-                return this.isSubtype(EntityBodyItem, supertype) || this.isSubtype(ValueBodyItem, supertype);
-            }
-            case InterfaceDef: {
-                return this.isSubtype(ServiceBodyItem, supertype);
-            }
-            case InvariantsBlock: {
-                return this.isSubtype(AggregateBodyItem, supertype) || this.isSubtype(EntityBodyItem, supertype) || this.isSubtype(ServiceBodyItem, supertype) || this.isSubtype(ValueBodyItem, supertype);
-            }
-            case NamedOperationDef: {
-                return this.isSubtype(EntityBodyItem, supertype) || this.isSubtype(ServiceBodyItem, supertype);
-            }
-            case OnClause: {
-                return this.isSubtype(NamedOpItem, supertype) || this.isSubtype(StatemachineItem, supertype);
-            }
-            case OperationsBlock:
-            case ReactionsBlock: {
-                return this.isSubtype(AggregateBodyItem, supertype) || this.isSubtype(EntityBodyItem, supertype) || this.isSubtype(ServiceBodyItem, supertype);
-            }
-            case ParticipantsClause:
-            case PredicateBlock:
-            case ReconciliationDef: {
-                return this.isSubtype(AgreementItem, supertype);
-            }
-            case PrdSourceDecl:
-            case RequirementsSourceDecl: {
-                return this.isSubtype(SourceDecl, supertype);
-            }
-            case ReturnsDecl: {
-                return this.isSubtype(NamedOpItem, supertype) || this.isSubtype(QueryBodyItem, supertype);
-            }
-            case SatisfiesDecl: {
-                return this.isSubtype(AggregateBodyItem, supertype) || this.isSubtype(AgreementItem, supertype) || this.isSubtype(EntityBodyItem, supertype) || this.isSubtype(EventBodyItem, supertype) || this.isSubtype(NamedOpItem, supertype) || this.isSubtype(QueryBodyItem, supertype) || this.isSubtype(RecordBodyItem, supertype) || this.isSubtype(ServiceBodyItem, supertype) || this.isSubtype(ValueBodyItem, supertype);
+            case SafeForeachClause: {
+                return this.isSubtype(SafeOperationClause, supertype);
             }
             default: {
                 return false;
@@ -1029,35 +806,19 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
     }
     getTypeMetaData(type) {
         switch (type) {
-            case AbsoluteTemporalEvent: {
+            case AboutClause: {
                 return {
-                    name: AbsoluteTemporalEvent,
+                    name: AboutClause,
                     properties: [
-                        { name: 'description' },
-                        { name: 'fields' },
-                        { name: 'guard' },
-                        { name: 'instant' },
-                        { name: 'metadata' },
-                        { name: 'name' },
-                        { name: 'satisfies' }
+                        { name: 'entity' }
                     ]
                 };
             }
-            case AcceptsClause: {
+            case AbsoluteAnchor: {
                 return {
-                    name: AcceptsClause,
+                    name: AbsoluteAnchor,
                     properties: [
-                        { name: 'first' },
-                        { name: 'more', defaultValue: [] }
-                    ]
-                };
-            }
-            case AggregateContainsDecl: {
-                return {
-                    name: AggregateContainsDecl,
-                    properties: [
-                        { name: 'first' },
-                        { name: 'more', defaultValue: [] }
+                        { name: 'instant' }
                     ]
                 };
             }
@@ -1065,10 +826,18 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                 return {
                     name: AggregateDef,
                     properties: [
-                        { name: 'bodyItems', defaultValue: [] },
                         { name: 'description' },
+                        { name: 'duplicateDetection' },
+                        { name: 'entities' },
+                        { name: 'fields' },
+                        { name: 'identity' },
+                        { name: 'invariants' },
                         { name: 'metadata' },
-                        { name: 'name' }
+                        { name: 'name' },
+                        { name: 'operations' },
+                        { name: 'references' },
+                        { name: 'satisfies' },
+                        { name: 'states' }
                     ]
                 };
             }
@@ -1080,22 +849,17 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     ]
                 };
             }
-            case AggregateRootDecl: {
-                return {
-                    name: AggregateRootDecl,
-                    properties: [
-                        { name: 'root' }
-                    ]
-                };
-            }
             case AgreementDef: {
                 return {
                     name: AgreementDef,
                     properties: [
                         { name: 'description' },
-                        { name: 'items', defaultValue: [] },
                         { name: 'metadata' },
-                        { name: 'name' }
+                        { name: 'name' },
+                        { name: 'participants' },
+                        { name: 'predicate' },
+                        { name: 'reconciliation' },
+                        { name: 'satisfies' }
                     ]
                 };
             }
@@ -1103,10 +867,12 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                 return {
                     name: ApplicationServiceDef,
                     properties: [
-                        { name: 'bodyItems', defaultValue: [] },
                         { name: 'description' },
+                        { name: 'exposedBy' },
                         { name: 'metadata' },
-                        { name: 'name' }
+                        { name: 'name' },
+                        { name: 'operations' },
+                        { name: 'satisfies' }
                     ]
                 };
             }
@@ -1171,27 +937,28 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     ]
                 };
             }
-            case ClassicStateDef: {
+            case CallExpr: {
                 return {
-                    name: ClassicStateDef,
+                    name: CallExpr,
                     properties: [
-                        { name: 'description' },
-                        { name: 'invariants', defaultValue: [] },
-                        { name: 'kind' },
-                        { name: 'metadata' },
-                        { name: 'name' }
+                        { name: 'args' },
+                        { name: 'path' }
                     ]
                 };
             }
-            case ClassicTransitionDef: {
+            case CallsBlock: {
                 return {
-                    name: ClassicTransitionDef,
+                    name: CallsBlock,
                     properties: [
-                        { name: 'action' },
-                        { name: 'guard' },
-                        { name: 'source' },
-                        { name: 'target' },
-                        { name: 'trigger' }
+                        { name: 'services', defaultValue: [] }
+                    ]
+                };
+            }
+            case CausedByClause: {
+                return {
+                    name: CausedByClause,
+                    properties: [
+                        { name: 'cause' }
                     ]
                 };
             }
@@ -1199,10 +966,12 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                 return {
                     name: CommandDef,
                     properties: [
-                        { name: 'bodyItems', defaultValue: [] },
                         { name: 'description' },
+                        { name: 'fields' },
+                        { name: 'identity' },
                         { name: 'metadata' },
-                        { name: 'name' }
+                        { name: 'name' },
+                        { name: 'satisfies' }
                     ]
                 };
             }
@@ -1210,12 +979,11 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                 return {
                     name: CommandTriggeredOp,
                     properties: [
-                        { name: 'clauses', defaultValue: [] },
+                        { name: 'body' },
                         { name: 'command' },
                         { name: 'description' },
                         { name: 'label' },
-                        { name: 'metadata' },
-                        { name: 'satisfies' }
+                        { name: 'metadata' }
                     ]
                 };
             }
@@ -1223,7 +991,7 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                 return {
                     name: CompensationClause,
                     properties: [
-                        { name: 'types', defaultValue: [] }
+                        { name: 'commands', defaultValue: [] }
                     ]
                 };
             }
@@ -1268,8 +1036,9 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                         { name: 'members', defaultValue: [] },
                         { name: 'metadata' },
                         { name: 'name' },
-                        { name: 'shortname' },
-                        { name: 'sources', defaultValue: [] }
+                        { name: 'requirementsSource' },
+                        { name: 'satisfies' },
+                        { name: 'shortname' }
                     ]
                 };
             }
@@ -1278,14 +1047,6 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     name: ContextMapBlock,
                     properties: [
                         { name: 'relations', defaultValue: [] }
-                    ]
-                };
-            }
-            case CoordinationClause: {
-                return {
-                    name: CoordinationClause,
-                    properties: [
-                        { name: 'style' }
                     ]
                 };
             }
@@ -1302,7 +1063,23 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                 return {
                     name: DependsBlock,
                     properties: [
-                        { name: 'deps', defaultValue: [] }
+                        { name: 'modules', defaultValue: [] }
+                    ]
+                };
+            }
+            case DescribedByClause: {
+                return {
+                    name: DescribedByClause,
+                    properties: [
+                        { name: 'interface' }
+                    ]
+                };
+            }
+            case DescribesClause: {
+                return {
+                    name: DescribesClause,
+                    properties: [
+                        { name: 'provider' }
                     ]
                 };
             }
@@ -1311,14 +1088,6 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     name: Description,
                     properties: [
                         { name: 'text' }
-                    ]
-                };
-            }
-            case DetectionClause: {
-                return {
-                    name: DetectionClause,
-                    properties: [
-                        { name: 'strategy' }
                     ]
                 };
             }
@@ -1334,10 +1103,12 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                 return {
                     name: DomainServiceDef,
                     properties: [
-                        { name: 'bodyItems', defaultValue: [] },
+                        { name: 'calls' },
                         { name: 'description' },
                         { name: 'metadata' },
-                        { name: 'name' }
+                        { name: 'name' },
+                        { name: 'operations' },
+                        { name: 'satisfies' }
                     ]
                 };
             }
@@ -1383,14 +1154,6 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     ]
                 };
             }
-            case EffectClause: {
-                return {
-                    name: EffectClause,
-                    properties: [
-                        { name: 'command' }
-                    ]
-                };
-            }
             case EffectsClause: {
                 return {
                     name: EffectsClause,
@@ -1421,20 +1184,17 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                 return {
                     name: EntityDef,
                     properties: [
-                        { name: 'bodyItems', defaultValue: [] },
                         { name: 'description' },
+                        { name: 'duplicateDetection' },
+                        { name: 'fields' },
+                        { name: 'identity' },
+                        { name: 'invariants' },
                         { name: 'metadata' },
-                        { name: 'name' }
-                    ]
-                };
-            }
-            case EntityTransition: {
-                return {
-                    name: EntityTransition,
-                    properties: [
-                        { name: 'source' },
-                        { name: 'target' },
-                        { name: 'triggers', defaultValue: [] }
+                        { name: 'name' },
+                        { name: 'operations' },
+                        { name: 'references' },
+                        { name: 'satisfies' },
+                        { name: 'states' }
                     ]
                 };
             }
@@ -1446,7 +1206,8 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                         { name: 'metadata' },
                         { name: 'name' },
                         { name: 'satisfies' },
-                        { name: 'values', defaultValue: [] }
+                        { name: 'values', defaultValue: [] },
+                        { name: 'valueType' }
                     ]
                 };
             }
@@ -1454,6 +1215,8 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                 return {
                     name: EnumValue,
                     properties: [
+                        { name: 'description' },
+                        { name: 'name' },
                         { name: 'value' }
                     ]
                 };
@@ -1462,10 +1225,13 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                 return {
                     name: ErrorEventDef,
                     properties: [
-                        { name: 'bodyItems', defaultValue: [] },
+                        { name: 'about' },
+                        { name: 'causedBy' },
                         { name: 'description' },
+                        { name: 'fields' },
                         { name: 'metadata' },
-                        { name: 'name' }
+                        { name: 'name' },
+                        { name: 'satisfies' }
                     ]
                 };
             }
@@ -1473,19 +1239,10 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                 return {
                     name: EscalationAction,
                     properties: [
+                        { name: 'commands', defaultValue: [] },
                         { name: 'count' },
                         { name: 'kind' },
-                        { name: 'message' },
-                        { name: 'type' },
-                        { name: 'types', defaultValue: [] }
-                    ]
-                };
-            }
-            case EscalationActionClause: {
-                return {
-                    name: EscalationActionClause,
-                    properties: [
-                        { name: 'action' }
+                        { name: 'message' }
                     ]
                 };
             }
@@ -1495,23 +1252,8 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     properties: [
                         { name: 'description' },
                         { name: 'metadata' },
+                        { name: 'satisfies' },
                         { name: 'steps', defaultValue: [] }
-                    ]
-                };
-            }
-            case EscalationCondition: {
-                return {
-                    name: EscalationCondition,
-                    properties: [
-                        { name: 'message' }
-                    ]
-                };
-            }
-            case EscalationMaxAttempts: {
-                return {
-                    name: EscalationMaxAttempts,
-                    properties: [
-                        { name: 'count' }
                     ]
                 };
             }
@@ -1519,26 +1261,12 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                 return {
                     name: EscalationStep,
                     properties: [
+                        { name: 'action' },
                         { name: 'description' },
-                        { name: 'items', defaultValue: [] },
                         { name: 'metadata' },
-                        { name: 'name' }
-                    ]
-                };
-            }
-            case EscalationThen: {
-                return {
-                    name: EscalationThen,
-                    properties: [
-                        { name: 'expr' }
-                    ]
-                };
-            }
-            case EscalationWhen: {
-                return {
-                    name: EscalationWhen,
-                    properties: [
-                        { name: 'expr' }
+                        { name: 'name' },
+                        { name: 'satisfies' },
+                        { name: 'when' }
                     ]
                 };
             }
@@ -1546,56 +1274,13 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                 return {
                     name: EventDef,
                     properties: [
-                        { name: 'bodyItems', defaultValue: [] },
+                        { name: 'about' },
+                        { name: 'causedBy' },
                         { name: 'description' },
+                        { name: 'fields' },
                         { name: 'metadata' },
-                        { name: 'name' }
-                    ]
-                };
-            }
-            case EventGuard: {
-                return {
-                    name: EventGuard,
-                    properties: [
-                        { name: 'expr' }
-                    ]
-                };
-            }
-            case EventInstant: {
-                return {
-                    name: EventInstant,
-                    properties: [
-                        { name: 'path' }
-                    ]
-                };
-            }
-            case EventSchedule: {
-                return {
-                    name: EventSchedule,
-                    properties: [
-                        { name: 'expr' }
-                    ]
-                };
-            }
-            case EventTriggeredOp: {
-                return {
-                    name: EventTriggeredOp,
-                    properties: [
-                        { name: 'clauses', defaultValue: [] },
-                        { name: 'command' },
-                        { name: 'description' },
-                        { name: 'event' },
-                        { name: 'label' },
-                        { name: 'metadata' },
+                        { name: 'name' },
                         { name: 'satisfies' }
-                    ]
-                };
-            }
-            case EventTypeClassifier: {
-                return {
-                    name: EventTypeClassifier,
-                    properties: [
-                        { name: 'classifier' }
                     ]
                 };
             }
@@ -1605,16 +1290,23 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     properties: [
                         { name: 'body' },
                         { name: 'collection' },
-                        { name: 'type' }
+                        { name: 'variable' }
                     ]
                 };
             }
-            case ExistsPred: {
+            case ExposedByClause: {
                 return {
-                    name: ExistsPred,
+                    name: ExposedByClause,
                     properties: [
-                        { name: 'type' },
-                        { name: 'where' }
+                        { name: 'interface' }
+                    ]
+                };
+            }
+            case ExposesBlock: {
+                return {
+                    name: ExposesBlock,
+                    properties: [
+                        { name: 'interfaces', defaultValue: [] }
                     ]
                 };
             }
@@ -1626,26 +1318,17 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     ]
                 };
             }
-            case ExprServiceCall: {
-                return {
-                    name: ExprServiceCall,
-                    properties: [
-                        { name: 'args' },
-                        { name: 'path' }
-                    ]
-                };
-            }
             case ExternalEventDef: {
                 return {
                     name: ExternalEventDef,
                     properties: [
+                        { name: 'about' },
                         { name: 'description' },
-                        { name: 'first' },
-                        { name: 'from' },
+                        { name: 'fields' },
                         { name: 'metadata' },
-                        { name: 'more', defaultValue: [] },
                         { name: 'name' },
-                        { name: 'satisfies' }
+                        { name: 'satisfies' },
+                        { name: 'source' }
                     ]
                 };
             }
@@ -1654,8 +1337,10 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     name: FieldDecl,
                     properties: [
                         { name: 'constraints', defaultValue: [] },
+                        { name: 'description' },
                         { name: 'name' },
                         { name: 'optional', defaultValue: false },
+                        { name: 'satisfies' },
                         { name: 'type' }
                     ]
                 };
@@ -1676,23 +1361,6 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     ]
                 };
             }
-            case FieldTypeOpt: {
-                return {
-                    name: FieldTypeOpt,
-                    properties: [
-                        { name: 'optional', defaultValue: false },
-                        { name: 'type' }
-                    ]
-                };
-            }
-            case FinalState: {
-                return {
-                    name: FinalState,
-                    properties: [
-                        { name: 'state' }
-                    ]
-                };
-            }
             case ForeachClause: {
                 return {
                     name: ForeachClause,
@@ -1703,18 +1371,9 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     ]
                 };
             }
-            case FunctionCallExpr: {
+            case GuardBlock: {
                 return {
-                    name: FunctionCallExpr,
-                    properties: [
-                        { name: 'args' },
-                        { name: 'name' }
-                    ]
-                };
-            }
-            case GuardClause: {
-                return {
-                    name: GuardClause,
+                    name: GuardBlock,
                     properties: [
                         { name: 'expr' }
                     ]
@@ -1734,7 +1393,9 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     name: IfExpr,
                     properties: [
                         { name: 'body' },
-                        { name: 'condition' }
+                        { name: 'condition' },
+                        { name: 'whenFalse' },
+                        { name: 'whenTrue' }
                     ]
                 };
             }
@@ -1751,32 +1412,11 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                 return {
                     name: InfrastructureServiceDef,
                     properties: [
-                        { name: 'bodyItems', defaultValue: [] },
+                        { name: 'describedBy' },
                         { name: 'description' },
                         { name: 'metadata' },
-                        { name: 'name' }
-                    ]
-                };
-            }
-            case InlineEnumBlock: {
-                return {
-                    name: InlineEnumBlock,
-                    properties: [
-                        { name: 'first' },
-                        { name: 'more', defaultValue: [] }
-                    ]
-                };
-            }
-            case InlineInvariant: {
-                return {
-                    name: InlineInvariant,
-                    properties: [
-                        { name: 'description' },
-                        { name: 'enforcement' },
-                        { name: 'message' },
-                        { name: 'must' },
                         { name: 'name' },
-                        { name: 'on' },
+                        { name: 'operations' },
                         { name: 'satisfies' }
                     ]
                 };
@@ -1788,7 +1428,9 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                         { name: 'description' },
                         { name: 'members', defaultValue: [] },
                         { name: 'metadata' },
-                        { name: 'name' }
+                        { name: 'name' },
+                        { name: 'role' },
+                        { name: 'satisfies' }
                     ]
                 };
             }
@@ -1796,13 +1438,12 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                 return {
                     name: InternalOp,
                     properties: [
-                        { name: 'clauses', defaultValue: [] },
+                        { name: 'body' },
                         { name: 'description' },
                         { name: 'metadata' },
                         { name: 'name' },
                         { name: 'params' },
-                        { name: 'returnType' },
-                        { name: 'satisfies' }
+                        { name: 'returnType' }
                     ]
                 };
             }
@@ -1812,14 +1453,11 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     properties: [
                         { name: 'description' },
                         { name: 'enforcement' },
-                        { name: 'enforcementStrategy' },
-                        { name: 'innerDescription' },
-                        { name: 'message' },
                         { name: 'metadata' },
                         { name: 'must' },
                         { name: 'name' },
-                        { name: 'on' },
-                        { name: 'satisfies' }
+                        { name: 'satisfies' },
+                        { name: 'scope' }
                     ]
                 };
             }
@@ -1897,25 +1535,19 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     ]
                 };
             }
-            case ModuleBody: {
-                return {
-                    name: ModuleBody,
-                    properties: [
-                        { name: 'dependsBlock' },
-                        { name: 'members', defaultValue: [] }
-                    ]
-                };
-            }
             case ModuleDef: {
                 return {
                     name: ModuleDef,
                     properties: [
-                        { name: 'body' },
+                        { name: 'dependsOn' },
                         { name: 'description' },
+                        { name: 'exposes' },
+                        { name: 'members', defaultValue: [] },
                         { name: 'metadata' },
                         { name: 'name' },
-                        { name: 'reqSources', defaultValue: [] },
-                        { name: 'usesDecls', defaultValue: [] }
+                        { name: 'requirementsSource' },
+                        { name: 'requires' },
+                        { name: 'satisfies' }
                     ]
                 };
             }
@@ -1941,42 +1573,6 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     name: NamedArgList,
                     properties: [
                         { name: 'args', defaultValue: [] }
-                    ]
-                };
-            }
-            case NamedOperationDef: {
-                return {
-                    name: NamedOperationDef,
-                    properties: [
-                        { name: 'items', defaultValue: [] },
-                        { name: 'name' }
-                    ]
-                };
-            }
-            case NamedPostcondition: {
-                return {
-                    name: NamedPostcondition,
-                    properties: [
-                        { name: 'expr' },
-                        { name: 'name' }
-                    ]
-                };
-            }
-            case NamedPrecondition: {
-                return {
-                    name: NamedPrecondition,
-                    properties: [
-                        { name: 'expr' },
-                        { name: 'message' },
-                        { name: 'name' }
-                    ]
-                };
-            }
-            case NoFieldContainsExpr: {
-                return {
-                    name: NoFieldContainsExpr,
-                    properties: [
-                        { name: 'target' }
                     ]
                 };
             }
@@ -2013,11 +1609,14 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     ]
                 };
             }
-            case OnClause: {
+            case OperationBody: {
                 return {
-                    name: OnClause,
+                    name: OperationBody,
                     properties: [
-                        { name: 'type' }
+                        { name: 'clauses', defaultValue: [] },
+                        { name: 'idempotent', defaultValue: false },
+                        { name: 'safety' },
+                        { name: 'satisfies' }
                     ]
                 };
             }
@@ -2029,6 +1628,20 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     ]
                 };
             }
+            case OperationSignature: {
+                return {
+                    name: OperationSignature,
+                    properties: [
+                        { name: 'conditions', defaultValue: [] },
+                        { name: 'description' },
+                        { name: 'metadata' },
+                        { name: 'name' },
+                        { name: 'params' },
+                        { name: 'returnType' },
+                        { name: 'satisfies' }
+                    ]
+                };
+            }
             case OrganizationDef: {
                 return {
                     name: OrganizationDef,
@@ -2037,22 +1650,14 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                         { name: 'description' },
                         { name: 'metadata' },
                         { name: 'name' },
-                        { name: 'sources', defaultValue: [] }
+                        { name: 'requirementsSource' },
+                        { name: 'satisfies' }
                     ]
                 };
             }
             case ParamDecl: {
                 return {
                     name: ParamDecl,
-                    properties: [
-                        { name: 'name' },
-                        { name: 'type' }
-                    ]
-                };
-            }
-            case ParamDeclOpt: {
-                return {
-                    name: ParamDeclOpt,
                     properties: [
                         { name: 'name' },
                         { name: 'optional', defaultValue: false },
@@ -2080,8 +1685,7 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                 return {
                     name: ParticipantsClause,
                     properties: [
-                        { name: 'first' },
-                        { name: 'more', defaultValue: [] }
+                        { name: 'participants', defaultValue: [] }
                     ]
                 };
             }
@@ -2099,17 +1703,10 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     name: PostconditionClause,
                     properties: [
                         { name: 'description' },
-                        { name: 'expr' },
+                        { name: 'exprs', defaultValue: [] },
                         { name: 'metadata' },
-                        { name: 'name' }
-                    ]
-                };
-            }
-            case PrdSourceDecl: {
-                return {
-                    name: PrdSourceDecl,
-                    properties: [
-                        { name: 'path' }
+                        { name: 'name' },
+                        { name: 'satisfies' }
                     ]
                 };
             }
@@ -2118,10 +1715,11 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     name: PreconditionClause,
                     properties: [
                         { name: 'description' },
-                        { name: 'expr' },
-                        { name: 'message' },
+                        { name: 'exprs', defaultValue: [] },
                         { name: 'metadata' },
-                        { name: 'name' }
+                        { name: 'name' },
+                        { name: 'reason' },
+                        { name: 'satisfies' }
                     ]
                 };
             }
@@ -2133,11 +1731,22 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     ]
                 };
             }
-            case PredicateExpr: {
+            case ProjectedByClause: {
                 return {
-                    name: PredicateExpr,
+                    name: ProjectedByClause,
                     properties: [
-                        { name: 'expression' }
+                        { name: 'adapter' }
+                    ]
+                };
+            }
+            case QuantifierExpr: {
+                return {
+                    name: QuantifierExpr,
+                    properties: [
+                        { name: 'collection' },
+                        { name: 'kind' },
+                        { name: 'predicate' },
+                        { name: 'variable' }
                     ]
                 };
             }
@@ -2145,22 +1754,12 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                 return {
                     name: QueryDef,
                     properties: [
-                        { name: 'bodyItems', defaultValue: [] },
                         { name: 'description' },
-                        { name: 'metadata' },
-                        { name: 'name' }
-                    ]
-                };
-            }
-            case ReactionCallClause: {
-                return {
-                    name: ReactionCallClause,
-                    properties: [
-                        { name: 'args' },
-                        { name: 'description' },
-                        { name: 'expr' },
+                        { name: 'fields' },
                         { name: 'metadata' },
                         { name: 'name' },
+                        { name: 'readsFrom' },
+                        { name: 'returnType' },
                         { name: 'satisfies' }
                     ]
                 };
@@ -2170,20 +1769,39 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     name: ReactionDef,
                     properties: [
                         { name: 'description' },
+                        { name: 'effects' },
                         { name: 'guard' },
-                        { name: 'items', defaultValue: [] },
                         { name: 'metadata' },
                         { name: 'name' },
-                        { name: 'params' },
-                        { name: 'satisfies' }
+                        { name: 'satisfies' },
+                        { name: 'triggeredBy' }
                     ]
                 };
             }
-            case ReactionsBlock: {
+            case ReadOnlyEntityDef: {
                 return {
-                    name: ReactionsBlock,
+                    name: ReadOnlyEntityDef,
                     properties: [
-                        { name: 'reactions', defaultValue: [] }
+                        { name: 'description' },
+                        { name: 'fields' },
+                        { name: 'identity' },
+                        { name: 'invariants' },
+                        { name: 'metadata' },
+                        { name: 'name' },
+                        { name: 'operations' },
+                        { name: 'projectedBy' },
+                        { name: 'references' },
+                        { name: 'satisfies' },
+                        { name: 'sourcedFrom' },
+                        { name: 'syncedVia' }
+                    ]
+                };
+            }
+            case ReadsFromClause: {
+                return {
+                    name: ReadsFromClause,
+                    properties: [
+                        { name: 'repository' }
                     ]
                 };
             }
@@ -2191,10 +1809,15 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                 return {
                     name: ReconciliationDef,
                     properties: [
+                        { name: 'compensation' },
+                        { name: 'coordination' },
                         { name: 'description' },
-                        { name: 'items', defaultValue: [] },
+                        { name: 'detection' },
+                        { name: 'escalation' },
                         { name: 'metadata' },
-                        { name: 'name' }
+                        { name: 'name' },
+                        { name: 'satisfies' },
+                        { name: 'trigger' }
                     ]
                 };
             }
@@ -2207,24 +1830,10 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     ]
                 };
             }
-            case ReconciliationTriggerClause: {
+            case RecurringAnchor: {
                 return {
-                    name: ReconciliationTriggerClause,
+                    name: RecurringAnchor,
                     properties: [
-                        { name: 'trigger' }
-                    ]
-                };
-            }
-            case RecurringTemporalEvent: {
-                return {
-                    name: RecurringTemporalEvent,
-                    properties: [
-                        { name: 'description' },
-                        { name: 'fields' },
-                        { name: 'guard' },
-                        { name: 'metadata' },
-                        { name: 'name' },
-                        { name: 'satisfies' },
                         { name: 'schedule' }
                     ]
                 };
@@ -2234,6 +1843,7 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     name: ReferenceDecl,
                     properties: [
                         { name: 'cardinality' },
+                        { name: 'description' },
                         { name: 'name' },
                         { name: 'target' }
                     ]
@@ -2247,17 +1857,26 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     ]
                 };
             }
-            case RelativeTemporalEvent: {
+            case RelativeAnchor: {
                 return {
-                    name: RelativeTemporalEvent,
+                    name: RelativeAnchor,
                     properties: [
+                        { name: 'event' },
+                        { name: 'offset' }
+                    ]
+                };
+            }
+            case RepositoryDef: {
+                return {
+                    name: RepositoryDef,
+                    properties: [
+                        { name: 'describedBy' },
                         { name: 'description' },
-                        { name: 'fields' },
-                        { name: 'guard' },
+                        { name: 'entity' },
                         { name: 'metadata' },
                         { name: 'name' },
-                        { name: 'offset' },
-                        { name: 'reference' },
+                        { name: 'ops', defaultValue: [] },
+                        { name: 'readOnly', defaultValue: false },
                         { name: 'satisfies' }
                     ]
                 };
@@ -2267,6 +1886,14 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     name: RequirementsSourceDecl,
                     properties: [
                         { name: 'path' }
+                    ]
+                };
+            }
+            case RequiresBlock: {
+                return {
+                    name: RequiresBlock,
+                    properties: [
+                        { name: 'interfaces', defaultValue: [] }
                     ]
                 };
             }
@@ -2283,17 +1910,40 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                 return {
                     name: ReturnsClause,
                     properties: [
-                        { name: 'returnName' },
-                        { name: 'returnType' },
                         { name: 'value' }
                     ]
                 };
             }
-            case ReturnsDecl: {
+            case SafeForeachClause: {
                 return {
-                    name: ReturnsDecl,
+                    name: SafeForeachClause,
                     properties: [
-                        { name: 'type' }
+                        { name: 'body', defaultValue: [] },
+                        { name: 'collection' },
+                        { name: 'variable' }
+                    ]
+                };
+            }
+            case SafeOpDef: {
+                return {
+                    name: SafeOpDef,
+                    properties: [
+                        { name: 'clauses', defaultValue: [] },
+                        { name: 'description' },
+                        { name: 'metadata' },
+                        { name: 'name' },
+                        { name: 'params' },
+                        { name: 'returnType' },
+                        { name: 'safe', defaultValue: false },
+                        { name: 'satisfies' }
+                    ]
+                };
+            }
+            case SafeOperationsBlock: {
+                return {
+                    name: SafeOperationsBlock,
+                    properties: [
+                        { name: 'ops', defaultValue: [] }
                     ]
                 };
             }
@@ -2310,6 +1960,7 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     name: ScopedInvariantDef,
                     properties: [
                         { name: 'description' },
+                        { name: 'enforcement' },
                         { name: 'expr' },
                         { name: 'metadata' },
                         { name: 'name' },
@@ -2325,17 +1976,6 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                         { name: 'args' },
                         { name: 'description' },
                         { name: 'path' }
-                    ]
-                };
-            }
-            case ServiceDef: {
-                return {
-                    name: ServiceDef,
-                    properties: [
-                        { name: 'bodyItems', defaultValue: [] },
-                        { name: 'description' },
-                        { name: 'metadata' },
-                        { name: 'name' }
                     ]
                 };
             }
@@ -2356,13 +1996,19 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     ]
                 };
             }
-            case SomeExpr: {
+            case SignatureOperationsBlock: {
                 return {
-                    name: SomeExpr,
+                    name: SignatureOperationsBlock,
                     properties: [
-                        { name: 'body' },
-                        { name: 'collection' },
-                        { name: 'variable' }
+                        { name: 'ops', defaultValue: [] }
+                    ]
+                };
+            }
+            case SourcedFromClause: {
+                return {
+                    name: SourcedFromClause,
+                    properties: [
+                        { name: 'source' }
                     ]
                 };
             }
@@ -2370,28 +2016,12 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                 return {
                     name: StateDef,
                     properties: [
-                        { name: 'invariants', defaultValue: [] },
-                        { name: 'name' }
-                    ]
-                };
-            }
-            case StateInvariantDef: {
-                return {
-                    name: StateInvariantDef,
-                    properties: [
                         { name: 'description' },
-                        { name: 'expr' },
+                        { name: 'invariants' },
+                        { name: 'kind' },
                         { name: 'metadata' },
-                        { name: 'name' }
-                    ]
-                };
-            }
-            case StatemachineDef: {
-                return {
-                    name: StatemachineDef,
-                    properties: [
-                        { name: 'items', defaultValue: [] },
-                        { name: 'name' }
+                        { name: 'name' },
+                        { name: 'satisfies' }
                     ]
                 };
             }
@@ -2402,15 +2032,8 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                         { name: 'description' },
                         { name: 'members', defaultValue: [] },
                         { name: 'metadata' },
-                        { name: 'name' }
-                    ]
-                };
-            }
-            case StatemachineStart: {
-                return {
-                    name: StatemachineStart,
-                    properties: [
-                        { name: 'state' }
+                        { name: 'name' },
+                        { name: 'satisfies' }
                     ]
                 };
             }
@@ -2447,30 +2070,40 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     ]
                 };
             }
-            case TransitionInline: {
+            case SyncedViaClause: {
                 return {
-                    name: TransitionInline,
+                    name: SyncedViaClause,
                     properties: [
-                        { name: 'from' },
-                        { name: 'to' },
+                        { name: 'pattern' }
+                    ]
+                };
+            }
+            case TemporalEventDef: {
+                return {
+                    name: TemporalEventDef,
+                    properties: [
+                        { name: 'about' },
+                        { name: 'anchor' },
+                        { name: 'description' },
+                        { name: 'fields' },
+                        { name: 'guard' },
+                        { name: 'metadata' },
+                        { name: 'name' },
+                        { name: 'satisfies' }
+                    ]
+                };
+            }
+            case TransitionDef: {
+                return {
+                    name: TransitionDef,
+                    properties: [
+                        { name: 'conditions', defaultValue: [] },
+                        { name: 'description' },
+                        { name: 'metadata' },
+                        { name: 'satisfies' },
+                        { name: 'source' },
+                        { name: 'target' },
                         { name: 'trigger' }
-                    ]
-                };
-            }
-            case TransitionsBlock: {
-                return {
-                    name: TransitionsBlock,
-                    properties: [
-                        { name: 'transitions', defaultValue: [] }
-                    ]
-                };
-            }
-            case TriggerClause: {
-                return {
-                    name: TriggerClause,
-                    properties: [
-                        { name: 'event' },
-                        { name: 'more', defaultValue: [] }
                     ]
                 };
             }
@@ -2478,7 +2111,7 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                 return {
                     name: TriggeredByClause,
                     properties: [
-                        { name: 'event' }
+                        { name: 'events', defaultValue: [] }
                     ]
                 };
             }
@@ -2500,22 +2133,17 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     ]
                 };
             }
-            case UsesDecl: {
-                return {
-                    name: UsesDecl,
-                    properties: [
-                        { name: 'module' }
-                    ]
-                };
-            }
             case ValueDef: {
                 return {
                     name: ValueDef,
                     properties: [
-                        { name: 'bodyItems', defaultValue: [] },
                         { name: 'description' },
+                        { name: 'fields' },
+                        { name: 'invariants' },
                         { name: 'metadata' },
-                        { name: 'name' }
+                        { name: 'name' },
+                        { name: 'operations' },
+                        { name: 'satisfies' }
                     ]
                 };
             }
@@ -2531,6 +2159,7 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                 return {
                     name: ValueOpDef,
                     properties: [
+                        { name: 'body' },
                         { name: 'description' },
                         { name: 'metadata' },
                         { name: 'name' },
@@ -2574,18 +2203,6 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     properties: [
                         { name: 'typeName' },
                         { name: 'value' }
-                    ]
-                };
-            }
-            case ForallPred: {
-                return {
-                    name: ForallPred,
-                    properties: [
-                        { name: 'body' },
-                        { name: 'exists' },
-                        { name: 'expression' },
-                        { name: 'type' },
-                        { name: 'where' }
                     ]
                 };
             }

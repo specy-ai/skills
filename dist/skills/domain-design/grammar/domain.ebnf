@@ -1,39 +1,58 @@
 // =============================================================================
 // Specy — Domain Model Grammar (.domain)
-// Full metamodel DSL covering all DDD concepts
+//
+// Normative concrete syntax for the domain metamodel.
+// Every production here has a counterpart in src/metamodels/DOMAIN-METAMODEL.md;
+// section references are given as (metamodel: <Section>).
+//
 // EBNF (ISO 14977 style)
 // =============================================================================
 
 // -----------------------------------------------------------------------------
 // Top-level structure
+//
+// The outer containers (organization > context > module) may be ELIDED: a file
+// may start at a context, a module, or a bare definition. An elided container is
+// implicit, not absent — a definition still belongs to exactly one module, which
+// belongs to exactly one context, which belongs to one organization.
 // -----------------------------------------------------------------------------
 
-domainFile       = { comment | organizationDef } ;
+domainFile       = { comment | topLevelElement } ;
+
+topLevelElement  = organizationDef
+                 | boundedContextDef
+                 | moduleDef
+                 | definition ;
 
 // -----------------------------------------------------------------------------
-// Organization
+// Organization  (metamodel: Organization)
 // -----------------------------------------------------------------------------
 
 organizationDef  = "organization" , typeName , [ description ] , [ metadataBlock ] , "{"
-                 , { comment | boundedContextDef }
+                 , [ satisfiesDecl ]
+                 , [ requirementsSourceDecl ]
+                 , boundedContextDef , { comment | boundedContextDef }
                  , "}" ;
 
+// requirements-source may sit on the organization OR on a bounded context.
+requirementsSourceDecl = "requirements-source" , stringLiteral ;
+
 // -----------------------------------------------------------------------------
-// Bounded Context
+// Bounded Context  (metamodel: Bounded Context)
 // -----------------------------------------------------------------------------
 
 boundedContextDef = "context" , typeName , [ shortname ] , [ description ] , [ metadataBlock ] , "{"
-                  , { requirementsSourceDecl }
+                  , [ satisfiesDecl ]
+                  , [ requirementsSourceDecl ]
                   , [ contextMapBlock ]
-                  , { comment | moduleDef }
+                  , { comment | moduleDef | definition }
                   , "}" ;
-
-requirementsSourceDecl = "requirements-source" , stringLiteral ;
 
 shortname        = "(" , identifier , ")" ;
 
 // -----------------------------------------------------------------------------
 // Context Map — relations between bounded contexts
+// (metamodel: Context map patterns)
 // -----------------------------------------------------------------------------
 
 contextMapBlock  = "map" , "{" , { comment | contextRelation } , "}" ;
@@ -42,38 +61,40 @@ contextRelation  = upstreamRelation
                  | downstreamRelation
                  | symmetricRelation ;
 
-upstreamRelation    = "upstream" , typeName , ":" , upstreamPattern ;
+upstreamRelation   = "upstream"   , typeName , ":" , upstreamPattern ;
+downstreamRelation = "downstream" , typeName , ":" , downstreamPattern ;
+symmetricRelation  = "symmetric"  , typeName , ":" , symmetricPattern ;
 
-downstreamRelation  = "downstream" , typeName , ":" , downstreamPattern ;
-
-symmetricRelation   = "symmetric" , typeName , ":" , symmetricPattern ;
-
-upstreamPattern  = "OHS" ;
+upstreamPattern   = "OHS" ;
 
 downstreamPattern = "CS" | "Conformist" | "ACL" ;
 
-symmetricPattern = "SharedKernel" | "PublishedLanguage" | "Partnership" | "SeparateWays" ;
+symmetricPattern  = "SharedKernel" | "PublishedLanguage" | "Partnership" | "SeparateWays" ;
 
 // -----------------------------------------------------------------------------
-// Module
+// Module  (metamodel: Module)
+//
+// A module's two interface relations are NOT symmetric and are declared apart:
+//   exposes    { ApiName }     — the module's public surface (API interfaces)
+//   requires   { SpiName }     — the capabilities it needs (SPI interfaces)
+//   depends on { ModuleName }  — other modules it depends on
 // -----------------------------------------------------------------------------
 
 moduleDef        = "module" , typeName , [ description ] , [ metadataBlock ] , "{"
+                 , [ satisfiesDecl ]
+                 , [ requirementsSourceDecl ]   (* when the outer containers are elided,
+                                                   the module IS the top level *)
+                 , [ exposesBlock ]
+                 , [ requiresBlock ]
                  , [ dependsBlock ]
-                 , { comment | interfaceDef | definition }
+                 , { comment | definition }
                  , "}" ;
 
-dependsBlock     = "depends" , "on" , "{" , { typeName } , "}" ;
+exposesBlock     = "exposes"  , "{" , typeName , { typeName } , "}" ;
 
-// -----------------------------------------------------------------------------
-// Interface
-// -----------------------------------------------------------------------------
+requiresBlock    = "requires" , "{" , typeName , { typeName } , "}" ;
 
-interfaceDef     = "interface" , typeName , [ description ] , [ metadataBlock ] , "{"
-                 , { comment | exposesClause }
-                 , "}" ;
-
-exposesClause    = "exposes" , dotPath ;
+dependsBlock     = "depends" , "on" , "{" , typeName , { typeName } , "}" ;
 
 // -----------------------------------------------------------------------------
 // Definitions — all domain concepts within a module
@@ -82,6 +103,7 @@ exposesClause    = "exposes" , dotPath ;
 definition       = enumDef
                  | valueDef
                  | entityDef
+                 | readOnlyEntityDef
                  | aggregateDef
                  | commandDef
                  | queryDef
@@ -93,21 +115,50 @@ definition       = enumDef
                  | applicationServiceDef
                  | infrastructureServiceDef
                  | repositoryDef
+                 | interfaceDef
                  | reactionDef
                  | invariantDef
                  | agreementDef ;
 
 // -----------------------------------------------------------------------------
-// Enum
+// Interface — a port  (metamodel: Interface)
+//
+// Every interface declares its role.
+//   api interface — DRIVING port (inbound). It SELECTS operations that already
+//                   exist on entities, aggregates, domain or application services
+//                   and publishes exactly that subset. `exposes` names them.
+//   spi interface — DRIVEN port (outbound). It DEFINES the operations the domain
+//                   needs from an external capability. `describes` names the
+//                   infrastructure service or repository that fulfils the contract.
 // -----------------------------------------------------------------------------
 
-enumDef          = "enum" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
-                 , enumValue , { enumValue }
+interfaceDef     = interfaceRole , "interface" , typeName
+                 , [ description ] , [ metadataBlock ] , "{"
+                 , [ satisfiesDecl ]
+                 , { comment | interfaceMember }
                  , "}" ;
+
+interfaceRole    = "api" | "spi" ;
+
+interfaceMember  = exposesClause          (* api only *)
+                 | describesClause        (* spi only *)
+                 | operationSignature ;   (* spi: the contract; api: optional restatement *)
+
+exposesClause    = "exposes" , dotPath ;
+
+describesClause  = "describes" , typeName ;
+
+// A signature with no body. Preconditions on an interface operation reference
+// arguments only (metamodel: Precondition).
+operationSignature = identifier , "(" , [ paramList ] , ")" , [ ":" , fieldType ]
+                   , [ description ] , [ metadataBlock ]
+                   , [ "{" , [ satisfiesDecl ] , { conditionClause | comment } , "}" ] ;
 
 // -----------------------------------------------------------------------------
 // Satisfies — traceability link to system requirements
-// Links a domain element to the requirement(s) it realizes.
+// (metamodel: Convention, Requirement Traceability)
+//
+// Placement is uniform: ALWAYS the first element inside the body braces.
 // -----------------------------------------------------------------------------
 
 satisfiesDecl    = "satisfies" , "[" , requirementId , { "," , requirementId } , "]" ;
@@ -118,210 +169,368 @@ idSegment        = upperLetter , { upperLetter | digit | "-" } ;
 
 idNumber         = digit , digit , digit ;
 
-enumValue        = identifier ;
+// -----------------------------------------------------------------------------
+// Enum (Referential)  (metamodel: Enums)
+//
+// Values are either primitive labels, primitive literals, or — with `of` — the
+// instances of a value type, which must then declare a `code` field.
+// -----------------------------------------------------------------------------
+
+enumDef          = "enum" , typeName , [ "of" , typeName ]
+                 , [ description ] , [ metadataBlock ] , "{"
+                 , [ satisfiesDecl ]
+                 , enumValue , { [ "," ] , enumValue }
+                 , "}" ;
+
+enumValue        = identifier , [ "=" , literalValue ] , [ description ] ;
 
 // -----------------------------------------------------------------------------
-// Value Type
+// Value Type  (metamodel: Value Type)
 // -----------------------------------------------------------------------------
 
-valueDef         = "value" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
-                 ,   "fields" , "{" , { comment | fieldDecl } , "}"
+valueDef         = "value" , typeName , [ description ] , [ metadataBlock ] , "{"
+                 , [ satisfiesDecl ]
+                 ,   fieldsBlock
                  , [ "operations" , "{" , { comment | valueOpDef } , "}" ]
-                 , [ "invariants" , "{" , { scopedInvariantDef } , "}" ]
+                 , [ invariantsBlock ]
                  , "}" ;
 
+// A value operation returns a new value. Its body may carry the preconditions of
+// the "transactional constructor" (metamodel: Value Type).
 valueOpDef       = identifier , "(" , [ paramList ] , ")" , ":" , fieldType
-                 , [ description ] , [ metadataBlock ] ;
+                 , [ description ] , [ metadataBlock ]
+                 , [ "{" , operationBody , "}" ] ;
 
 // -----------------------------------------------------------------------------
-// Entity
+// Entity  (metamodel: Entity)
 // -----------------------------------------------------------------------------
 
-entityDef        = "entity" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
-                 ,   "identity" , fieldName , ":" , fieldType
-                 , [ "duplicate" , "detection" , "{" , expression , "}" ]
-                 ,   "fields" , "{" , { comment | fieldDecl } , "}"
-                 , [ "references" , "{" , { referenceDecl } , "}" ]
-                 , [ "operations" , "{" , { comment | operationDef } , "}" ]
-                 , [ "states" , "{" , { stateMachineDef } , "}" ]
-                 , [ "invariants" , "{" , { scopedInvariantDef } , "}" ]
+entityDef        = "entity" , typeName , [ description ] , [ metadataBlock ] , "{"
+                 , [ satisfiesDecl ]
+                 ,   identityDecl
+                 , [ duplicateDetectionBlock ]
+                 ,   fieldsBlock
+                 , [ referencesBlock ]
+                 , [ operationsBlock ]
+                 , [ statesBlock ]
+                 , [ invariantsBlock ]
                  , "}" ;
 
+identityDecl            = "identity" , fieldName , ":" , fieldType ;
+
+duplicateDetectionBlock = "duplicate" , "detection" , "{" , expression , "}" ;
+
+fieldsBlock             = "fields" , "{" , { comment | fieldDecl } , "}" ;
+
+referencesBlock         = "references" , "{" , { comment | referenceDecl } , "}" ;
+
+operationsBlock         = "operations" , "{" , { comment | operationDef } , "}" ;
+
+statesBlock             = "states" , "{" , { comment | stateMachineDef } , "}" ;
+
+invariantsBlock         = "invariants" , "{" , { comment | scopedInvariantDef } , "}" ;
+
 // -----------------------------------------------------------------------------
-// Aggregate
+// Read-only Entity (Master Data)  (metamodel: Read-only Entity)
+//
+// State owned by an upstream context or external system: observable here, not
+// mutable here. The operations block admits only SAFE clauses — there is no
+// `sets`, `creates` or `emits` — so the "no unsafe operations" rule is enforced
+// by the grammar, not by a validator.
+//
+// The projection write path lives OUTSIDE the domain layer, in the adapter named
+// by `projected-by`. It is therefore not modelled as an operation or a reaction.
 // -----------------------------------------------------------------------------
 
-aggregateDef     = "aggregate" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
-                 ,   "root" , typeName
-                 ,   "entities" , "{" , { typeName } , "}"
-                 ,   "identity" , fieldName , ":" , fieldType
-                 , [ "duplicate" , "detection" , "{" , expression , "}" ]
-                 ,   "fields" , "{" , { comment | fieldDecl } , "}"
-                 , [ "references" , "{" , { referenceDecl } , "}" ]
-                 , [ "operations" , "{" , { comment | operationDef } , "}" ]
-                 , [ "states" , "{" , { stateMachineDef } , "}" ]
-                 , [ "invariants" , "{" , { scopedInvariantDef } , "}" ]
+readOnlyEntityDef = "read-only" , "entity" , typeName
+                  , [ description ] , [ metadataBlock ] , "{"
+                  , [ satisfiesDecl ]
+                  ,   sourcedFromClause
+                  , [ syncedViaClause ]
+                  , [ projectedByClause ]
+                  ,   identityDecl
+                  ,   fieldsBlock
+                  , [ referencesBlock ]
+                  , [ safeOperationsBlock ]
+                  , [ invariantsBlock ]
+                  , "}" ;
+
+sourcedFromClause = "sourced-from" , ( typeName | stringLiteral ) ;
+
+syncedViaClause   = "synced-via" , syncPattern ;
+
+syncPattern       = "synchronous-query" | "asynchronous-projection" ;
+
+// The infrastructure service (an ACL adapter) that refreshes the local read-model.
+// Meaningful only with `synced-via asynchronous-projection`.
+projectedByClause = "projected-by" , typeName ;
+
+safeOperationsBlock = "operations" , "{" , { comment | safeOpDef } , "}" ;
+
+safeOpDef         = identifier , "(" , [ paramList ] , ")" , [ ":" , fieldType ]
+                  , [ description ] , [ metadataBlock ] , "{"
+                  , [ satisfiesDecl ] , [ "safe" ]
+                  , { safeOperationClause }
+                  , "}" ;
+
+safeOperationClause = preconditionClause
+                    | postconditionClause
+                    | resolvesClause
+                    | serviceCallClause
+                    | safeForeachClause
+                    | returnsClause
+                    | comment ;
+
+safeForeachClause = "foreach" , dotPath , "as" , identifier , "{"
+                  , { safeOperationClause }
+                  , "}" ;
+
+// -----------------------------------------------------------------------------
+// Aggregate  (metamodel: Aggregate)
+//
+// An aggregate IS its root entity — it carries the identity, fields, operations,
+// states and invariants of the root directly. There is no separate `root` clause:
+// `entities { }` lists the NON-ROOT children of the cluster, which are reachable
+// only by navigating from the aggregate and derive no repository of their own.
+// -----------------------------------------------------------------------------
+
+aggregateDef     = "aggregate" , typeName , [ description ] , [ metadataBlock ] , "{"
+                 , [ satisfiesDecl ]
+                 ,   identityDecl
+                 , [ duplicateDetectionBlock ]
+                 ,   fieldsBlock
+                 ,   "entities" , "{" , typeName , { typeName } , "}"
+                 , [ referencesBlock ]
+                 , [ operationsBlock ]
+                 , [ statesBlock ]
+                 , [ invariantsBlock ]
                  , "}" ;
 
 // -----------------------------------------------------------------------------
 // References and cardinality
 // -----------------------------------------------------------------------------
 
-referenceDecl    = fieldName , ":" , typeName , cardinality ;
+referenceDecl    = fieldName , ":" , typeName , cardinality , [ description ] ;
 
-cardinality      = number , ".." , ( number | "N" ) ;
+cardinality      = unsignedInteger , ".." , ( unsignedInteger | "n" | "N" ) ;
 
 // -----------------------------------------------------------------------------
-// State Machine
+// State Machine  (metamodel: State machine)
 // -----------------------------------------------------------------------------
 
 stateMachineDef  = "machine" , typeName , [ description ] , [ metadataBlock ] , "{"
+                 , [ satisfiesDecl ]
                  , { comment | stateDef | transitionDef }
                  , "}" ;
 
-stateDef         = ( "state" | "final" ) , identifier , [ description ] , [ metadataBlock ]
-                 , [ "{" , { stateInvariantDef } , "}" ] ;
+// A state carries its own invariants (which must hold while the entity occupies it).
+stateDef         = ( "state" | "final" ) , stateName , [ description ] , [ metadataBlock ]
+                 , [ "{" , [ satisfiesDecl ] , [ invariantsBlock ] , "}" ] ;
 
-stateInvariantDef = "invariant" , identifier , [ description ] , [ metadataBlock ] , "{"
-                  , expression
-                  , "}" ;
-
-transitionDef    = transitionSource , "-->" , identifier
-                 , "on" , identifier
-                 , [ "when" , "{" , expression , "}" ]
-                 , [ "then" , "{" , expression , "}" ] ;
-
-transitionSource = "[*]" | identifier ;
-
-// -----------------------------------------------------------------------------
-// Operations (entity / aggregate owned)
+// A transition is triggered by an entity operation, so `on` must be able to name
+// EITHER form of operation: an internal one (identifier) or a command-triggered
+// one (its "Label" string).
 //
-// Three forms:
+// Conditions on a transition are named and 0..n — a precondition declares its
+// violation reason, exactly as on an operation (metamodel: Condition).
+transitionDef    = transitionSource , "-->" , stateName , "on" , operationRef
+                 , [ description ] , [ metadataBlock ]
+                 , [ "{" , [ satisfiesDecl ] , { conditionClause | comment } , "}" ] ;
+
+transitionSource = "[*]" | stateName ;
+
+stateName        = identifier ;
+
+operationRef     = identifier | stringLiteral ;
+
+// -----------------------------------------------------------------------------
+// Operations  (metamodel: Operation)
+//
+// Two forms:
 //   Command-triggered:  "Label" on CommandType { ... }
-//   Event-triggered:    "Label" when EventType then CommandType { ... }
 //   Internal:           name(params) : ReturnType { ... }
+//
+// An operation is owned by exactly one artefact. The SAME body serves entity,
+// aggregate, value-type, domain-service and application-service operations — a
+// command may target a domain service, so a service operation must be able to
+// take a command and emit events just like an entity operation.
+//
+// There is NO event-triggered operation form: an event reaches a command only
+// through a `reaction` (metamodel: Reaction).
 // -----------------------------------------------------------------------------
 
-operationDef     = commandTriggeredOp
-                 | eventTriggeredOp
-                 | internalOp ;
+operationDef     = commandTriggeredOp | internalOp ;
 
 commandTriggeredOp = stringLiteral , "on" , typeName
                    , [ description ] , [ metadataBlock ] , "{"
-                   , { operationClause }
-                   , "}" ;
-
-eventTriggeredOp   = stringLiteral , "when" , typeName , "then" , typeName
-                   , [ description ] , [ metadataBlock ] , "{"
-                   , { operationClause }
+                   , operationBody
                    , "}" ;
 
 internalOp         = identifier , "(" , [ paramList ] , ")" , [ ":" , fieldType ]
                    , [ description ] , [ metadataBlock ] , "{"
-                   , { operationClause }
+                   , operationBody
                    , "}" ;
 
-// -----------------------------------------------------------------------------
-// Operation clauses — statements inside an operation body
-// -----------------------------------------------------------------------------
+operationBody    = [ satisfiesDecl ] , [ safetyDecl ] , [ "idempotent" ]
+                 , { operationClause } ;
+
+// safe   = no mutation, read-only.  unsafe = mutates domain state.
+safetyDecl       = "safe" | "unsafe" ;
 
 operationClause  = preconditionClause
                  | postconditionClause
                  | resolvesClause
-                 | reactionCallClause
                  | createsClause
                  | setsClause
                  | emitsClause
                  | serviceCallClause
                  | foreachClause
+                 | returnsClause
                  | comment ;
 
 // -----------------------------------------------------------------------------
-// Precondition and Postcondition
+// Conditions — precondition and postcondition
+// (metamodel: Condition (precondition and postcondition))
+//
+// A condition is scoped to a BEHAVIOR: an operation or a single transition.
+//
+// A precondition's enforcement is implicit and always rejection, so it declares
+// no strategy — but it MUST declare a violation reason (`rejects`).
+// A postcondition has neither: its failure is a defect, not a domain outcome.
 // -----------------------------------------------------------------------------
 
-preconditionClause  = "precondition" , identifier , [ description ] , [ metadataBlock ] , "{"
+conditionClause  = preconditionClause | postconditionClause ;
+
+preconditionClause  = "precondition" , conditionName
+                    , [ description ] , [ metadataBlock ] , "{"
+                    , [ satisfiesDecl ]
                     , expression
                     , "}" , "rejects" , stringLiteral ;
 
-postconditionClause = "postcondition" , identifier , [ description ] , [ metadataBlock ] , "{"
-                    , postconditionExpr
+postconditionClause = "postcondition" , conditionName
+                    , [ description ] , [ metadataBlock ] , "{"
+                    , [ satisfiesDecl ]
+                    , expression      (* may reference state_before, state_after and arguments *)
                     , "}" ;
 
-// Postcondition can reference state_before, state_after, and arguments
-postconditionExpr   = expression ;
+conditionName    = identifier | stringLiteral ;
 
 // -----------------------------------------------------------------------------
 // Operation body clauses
 // -----------------------------------------------------------------------------
 
-resolvesClause   = "resolves" , typeName , "from" , dotPath ;
+resolvesClause    = "resolves" , typeName , "from" , dotPath ;
 
-reactionCallClause = "reaction" , identifier , "(" , [ argList ] , ")" ;
+createsClause     = "creates" , typeName , "{" , { assignmentClause } , "}" ;
 
-createsClause    = "creates" , typeName , "{" , { assignmentClause } , "}" ;
+setsClause        = "sets" , typeName , "{" , { assignmentClause } , "}" ;
 
-setsClause       = "sets" , typeName , "{" , { assignmentClause } , "}" ;
+// `emits` is the concrete syntax of the event's 1..1 "raised by" relation.
+emitsClause       = "emits" , typeName , [ "{" , { assignmentClause } , "}" ] ;
 
-emitsClause      = "emits" , typeName , "{" , { assignmentClause } , "}" ;
-
-assignmentClause = fieldName , "=" , valueExpr ;
+assignmentClause  = fieldName , "=" , valueExpr ;
 
 serviceCallClause = dotPath , "(" , [ argList ] , ")" , [ description ] ;
 
-foreachClause    = "foreach" , dotPath , "as" , identifier , "{"
-                 , { resolvesClause | setsClause | emitsClause
-                   | serviceCallClause | reactionCallClause }
+returnsClause     = "returns" , valueExpr ;
+
+foreachClause     = "foreach" , dotPath , "as" , identifier , "{"
+                  , { operationClause }
+                  , "}" ;
+
+// -----------------------------------------------------------------------------
+// Command  (metamodel: Command)
+//
+// A command MUST carry an identifier: it is the correlation id of the causality
+// chain it opens. Its target and the operation it triggers are declared by the
+// inverse edge — the `"Label" on CommandType` operation of the owning artefact.
+// -----------------------------------------------------------------------------
+
+commandDef       = "command" , typeName , [ description ] , [ metadataBlock ] , "{"
+                 , [ satisfiesDecl ]
+                 ,   identityDecl
+                 ,   fieldsBlock
                  , "}" ;
 
 // -----------------------------------------------------------------------------
-// Command
+// Query  (metamodel: Query)
+//
+// A query is safe and idempotent by definition, and reads current state through
+// the read surface of a repository.
 // -----------------------------------------------------------------------------
 
-commandDef       = "command" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
-                 ,   "fields" , "{" , { comment | fieldDecl } , "}"
-                 , "}" ;
-
-// -----------------------------------------------------------------------------
-// Query
-// -----------------------------------------------------------------------------
-
-queryDef         = "query" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
-                 ,   "fields" , "{" , { comment | fieldDecl } , "}"
+queryDef         = "query" , typeName , [ description ] , [ metadataBlock ] , "{"
+                 , [ satisfiesDecl ]
+                 ,   "reads-from" , typeName
+                 ,   fieldsBlock
                  ,   "returns" , fieldType
                  , "}" ;
 
 // -----------------------------------------------------------------------------
-// Event (internal — raised within our bounded context)
+// Event (internal — raised by an operation within our bounded context)
+// (metamodel: Event, Internal Event)
+//
+//   about     — the entity this event is a fact about; the event's fields must
+//               then carry that entity's identifier.
+//   caused-by — the command or query that originated it (the causation link).
 // -----------------------------------------------------------------------------
 
-eventDef         = "event" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
-                 ,   "fields" , "{" , { comment | fieldDecl } , "}"
+eventDef         = "event" , typeName , [ description ] , [ metadataBlock ] , "{"
+                 , [ satisfiesDecl ]
+                 , [ aboutClause ]
+                 , [ causedByClause ]
+                 ,   fieldsBlock
+                 , "}" ;
+
+aboutClause      = "about" , typeName ;
+
+causedByClause   = "caused-by" , typeName ;
+
+// -----------------------------------------------------------------------------
+// External Event  (metamodel: External Event)
+//
+// Consumed from an upstream bounded context or external system. It is consumed
+// THROUGH A REACTION, exactly like an internal event — there is no `triggers`
+// clause naming commands directly, because that would skip the reaction's guard,
+// which is what lets this context decide whether the upstream fact still matters
+// to it.
+//
+// An upstream event consumed only to refresh a read-model is NOT an external
+// event: it belongs to the projection adapter (see Read-only Entity).
+// -----------------------------------------------------------------------------
+
+externalEventDef = "external" , "event" , typeName
+                 , [ description ] , [ metadataBlock ] , "{"
+                 , [ satisfiesDecl ]
+                 ,   "from" , ( typeName | stringLiteral )
+                 , [ aboutClause ]
+                 ,   fieldsBlock      (* must carry an id — the correlation id *)
                  , "}" ;
 
 // -----------------------------------------------------------------------------
-// External Event (consumed from upstream bounded context)
+// Error Event — raised by an operation on failure  (metamodel: Error Event)
 // -----------------------------------------------------------------------------
 
-externalEventDef = "external" , "event" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
-                 ,   "from" , typeName
-                 ,   "triggers" , "{" , typeName , { "," , typeName } , "}"
+errorEventDef    = "error" , "event" , typeName
+                 , [ description ] , [ metadataBlock ] , "{"
+                 , [ satisfiesDecl ]
+                 , [ aboutClause ]
+                 , [ causedByClause ]
+                 ,   fieldsBlock
                  , "}" ;
 
 // -----------------------------------------------------------------------------
-// Error Event — raised by an operation on failure
-// -----------------------------------------------------------------------------
-
-errorEventDef    = "error" , "event" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
-                 ,   "fields" , "{" , { comment | fieldDecl } , "}"
-                 , "}" ;
-
-// -----------------------------------------------------------------------------
-// Temporal Event — domain fact caused by the passage of time
+// Temporal Event — a domain fact caused by the passage of time
+// (metamodel: Temporal Event)
+//
+// Time alone is never the cause: every temporal event is anchored to a domain
+// reference — an event, an entity instant field, or a standing schedule.
+//
+// `about` binds the entity whose state the guard reads.
 //
 // Three flavors:
-//   relative: fires after a duration from a reference event
-//   absolute: fires at an instant described by an entity field
+//   relative:  fires after a duration from a reference event
+//   absolute:  fires at an instant described by an entity field
 //   recurring: fires on each occurrence of a schedule expression
 // -----------------------------------------------------------------------------
 
@@ -329,128 +538,176 @@ temporalEventDef = relativeTemporalEvent
                  | absoluteTemporalEvent
                  | recurringTemporalEvent ;
 
-relativeTemporalEvent = "temporal" , "event" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
+relativeTemporalEvent = "temporal" , "event" , typeName
+                      , [ description ] , [ metadataBlock ] , "{"
+                      , [ satisfiesDecl ]
+                      , [ aboutClause ]
                       ,   "reference" , typeName
-                      ,   "offset" , valueExpr
-                      , [ "guard" , "{" , expression , "}" ]
-                      ,   "fields" , "{" , { comment | fieldDecl } , "}"
+                      ,   "offset" , valueExpr      (* e.g. ride.estimatedArrival + 5 minutes *)
+                      , [ guardBlock ]
+                      ,   fieldsBlock
                       , "}" ;
 
-absoluteTemporalEvent = "temporal" , "event" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
+absoluteTemporalEvent = "temporal" , "event" , typeName
+                      , [ description ] , [ metadataBlock ] , "{"
+                      , [ satisfiesDecl ]
+                      , [ aboutClause ]
                       ,   "instant" , dotPath
-                      , [ "guard" , "{" , expression , "}" ]
-                      ,   "fields" , "{" , { comment | fieldDecl } , "}"
+                      , [ guardBlock ]
+                      ,   fieldsBlock
                       , "}" ;
 
-recurringTemporalEvent = "temporal" , "event" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
+recurringTemporalEvent = "temporal" , "event" , typeName
+                       , [ description ] , [ metadataBlock ] , "{"
+                       , [ satisfiesDecl ]
+                       , [ aboutClause ]
                        ,   "schedule" , stringLiteral
-                       , [ "guard" , "{" , expression , "}" ]
-                       ,   "fields" , "{" , { comment | fieldDecl } , "}"
+                       , [ guardBlock ]
+                       ,   fieldsBlock
                        , "}" ;
 
+// Evaluated at firing time. If false, the event is silently suppressed — no fact
+// is recorded and no reaction triggers. This is what absorbs cancellation.
+guardBlock       = "guard" , "{" , expression , "}" ;
+
 // -----------------------------------------------------------------------------
-// Domain Service
+// Domain Service  (metamodel: Domain Service)
+//
+// Operations spanning several entities or aggregates. It may be targeted by a
+// command and may change entity state, so it uses the full operation form.
 // -----------------------------------------------------------------------------
 
-domainServiceDef = "domain" , "service" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
-                 ,   "operations" , "{" , { comment | serviceOpDef } , "}"
-                 , "}" ;
-
-serviceOpDef     = identifier , "(" , [ paramList ] , ")" , [ ":" , fieldType ]
+domainServiceDef = "domain" , "service" , typeName
                  , [ description ] , [ metadataBlock ] , "{"
-                 , { serviceClause }
+                 , [ satisfiesDecl ]
+                 , [ callsBlock ]
+                 ,   operationsBlock
                  , "}" ;
 
-serviceClause    = foreachClause
-                 | resolvesClause
-                 | serviceCallClause
-                 | returnsClause
-                 | preconditionClause
-                 | postconditionClause
-                 | comment ;
-
-returnsClause    = "returns" , valueExpr ;
+// The infrastructure services this service depends on (through their SPIs).
+callsBlock       = "calls" , "{" , typeName , { typeName } , "}" ;
 
 // -----------------------------------------------------------------------------
-// Application Service
+// Application Service  (metamodel: Application Service)
+//
+// Orchestrates use cases; contains no domain logic. It is reached through an API
+// interface — the driving port.
 // -----------------------------------------------------------------------------
 
-applicationServiceDef = "application" , "service" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
-                      ,   "operations" , "{" , { comment | serviceOpDef } , "}"
+applicationServiceDef = "application" , "service" , typeName
+                      , [ description ] , [ metadataBlock ] , "{"
+                      , [ satisfiesDecl ]
+                      , [ exposedByClause ]
+                      ,   operationsBlock
                       , "}" ;
 
+exposedByClause  = "exposed-by" , typeName ;
+
 // -----------------------------------------------------------------------------
-// Infrastructure Service
+// Infrastructure Service  (metamodel: Infrastructure Service)
+//
+// An adapter fulfilling an SPI contract. The domain model records the SIGNATURES
+// it provides, never an adapter body — the implementation lives outside the model.
+// The Anti-Corruption Layer is an infrastructure service.
 // -----------------------------------------------------------------------------
 
-infrastructureServiceDef = "infrastructure" , "service" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
-                         ,   "operations" , "{" , { comment | serviceOpDef } , "}"
+infrastructureServiceDef = "infrastructure" , "service" , typeName
+                         , [ description ] , [ metadataBlock ] , "{"
+                         , [ satisfiesDecl ]
+                         , [ describedByClause ]
+                         ,   "operations" , "{" , { comment | operationSignature } , "}"
                          , "}" ;
 
-// -----------------------------------------------------------------------------
-// Repository — collection-like persistence port derived from an entity or
-// aggregate root. A repository is a kind of infrastructure service; its
-// operations are signatures only (store/getById/remove/search + findByField).
-// The "for" clause names the entity or aggregate root it persists.
-// -----------------------------------------------------------------------------
-
-repositoryDef    = "repository" , typeName , "for" , typeName , [ description ] , [ metadataBlock ] , "{"
-                 ,   [ satisfiesDecl ] , { comment | repositoryOpDef }
-                 , "}" ;
-
-repositoryOpDef  = identifier , "(" , [ paramList ] , ")" , [ ":" , fieldType ] ;
+describedByClause = "described-by" , typeName ;
 
 // -----------------------------------------------------------------------------
-// Reaction — reactive rule triggered by an internal event
+// Repository  (metamodel: Repository)
+//
+// A collection-like persistence port DERIVED from an entity or aggregate — never
+// hand-authored. It is a kind of infrastructure service, so it too is described
+// by an SPI, and its operations are signatures only.
+//
+// A repository derived from a read-only entity is itself `read-only`: it exposes
+// getById / findByField / search, never store or remove.
 // -----------------------------------------------------------------------------
 
-reactionDef        = "reaction" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
-                 ,   "trigger" , typeName , { "," , typeName }
-                 , [ "guard" , "{" , expression , "}" ]
-                 ,   "effect" , typeName
-                 , "}" ;
-
-// Scoped reaction inside an entity/aggregate reactions { } block
-scopedReactionDef  = identifier , [ description ] , [ metadataBlock ] , "{"
-                 ,   "trigger" , typeName , { "," , typeName }
-                 , [ "guard" , "{" , expression , "}" ]
-                 ,   "effect" , typeName
+repositoryDef    = [ "read-only" ] , "repository" , typeName , "for" , typeName
+                 , [ description ] , [ metadataBlock ] , "{"
+                 , [ satisfiesDecl ]
+                 , [ describedByClause ]
+                 , { comment | operationSignature }
                  , "}" ;
 
 // -----------------------------------------------------------------------------
-// Invariant — property that must hold at every observable point
+// Reaction  (metamodel: Reaction)
+//
+// THE ONLY WAY AN EVENT CAUSES A COMMAND. Uniform across all four event types —
+// internal, external, error and temporal. An event never reaches a command
+// directly.
+//
+// The guard is a predicate over domain state, evaluated when the event arrives.
+// A reaction with no guard fires on every occurrence of its trigger.
 // -----------------------------------------------------------------------------
 
-invariantDef     = "invariant" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
-                 ,   "on" , typeName
+reactionDef      = "reaction" , typeName , [ description ] , [ metadataBlock ] , "{"
+                 , [ satisfiesDecl ]
+                 ,   "triggered-by" , typeName , { "," , typeName }
+                 , [ guardBlock ]
+                 ,   "effects" , typeName
+                 , "}" ;
+
+// -----------------------------------------------------------------------------
+// Invariant  (metamodel: Invariant)
+//
+// A named boolean expression over state that must hold at every observable point
+// of its consistency boundary. EVERY invariant declares its enforcement strategy.
+//
+// Top-level form: scoped by `on`, which takes a dot-path so an invariant can be
+// scoped to an entity (`on Order`) or to one of its states (`on Order.paid`).
+// -----------------------------------------------------------------------------
+
+invariantDef     = "invariant" , typeName , [ description ] , [ metadataBlock ] , "{"
+                 , [ satisfiesDecl ]
+                 ,   "on" , dotPath
                  ,   "must" , "{" , expression , "}"
                  ,   "enforcement" , enforcementStrategy
                  , "}" ;
 
-enforcementStrategy = "rejection"
-                    | "compensation" , typeName
-                    | "alert" ;
+enforcementStrategy = "rejection"                  (* refuse the operation; no state change *)
+                    | "compensation" , typeName    (* accept, then issue a corrective command *)
+                    | "alert" ;                    (* record the violation for review *)
 
-// Scoped invariant inside invariants { } block (no keyword repetition)
-scopedInvariantDef = identifier , [ description ] , [ metadataBlock ] , "{"
-                   , expression
+// Scoped form: inside an `invariants { }` block, the owner is the enclosing
+// entity, aggregate, value type or state, so no `on` clause is needed.
+scopedInvariantDef = identifier , [ "(" , [ paramList ] , ")" ]
+                   , [ description ] , [ metadataBlock ] , "{"
+                   , [ satisfiesDecl ]
+                   ,   expression
+                   ,   "enforcement" , enforcementStrategy
                    , "}" ;
 
 // -----------------------------------------------------------------------------
-// Agreement — cross-aggregate consistency property
+// Agreement — a property spanning several aggregates  (metamodel: Agreement)
+//
+// No single transaction can verify it, so it is maintained by coordination
+// (a reconciliation) rather than enforced atomically. Bilateral (2) or
+// multilateral (n) — never unilateral.
 // -----------------------------------------------------------------------------
 
-agreementDef     = "agreement" , typeName , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , "{"
-                 ,   "participants" , "{" , typeName , { "," , typeName } , "}"
+agreementDef     = "agreement" , typeName , [ description ] , [ metadataBlock ] , "{"
+                 , [ satisfiesDecl ]
+                 ,   "participants" , "{" , typeName , "," , typeName , { "," , typeName } , "}"
                  ,   "predicate" , "{" , expression , "}"
                  ,   reconciliationDef
                  , "}" ;
 
 // -----------------------------------------------------------------------------
-// Reconciliation — enforcement mechanism for an agreement
+// Reconciliation — the enforcement counterpart of an agreement
+// (metamodel: Reconciliation)
 // -----------------------------------------------------------------------------
 
 reconciliationDef = "reconciliation" , typeName , [ description ] , [ metadataBlock ] , "{"
+                  , [ satisfiesDecl ]
                   ,   "trigger" , reconciliationTrigger
                   ,   "detection" , detectionStrategy
                   ,   "compensation" , "{" , typeName , { "," , typeName } , "}"
@@ -458,31 +715,45 @@ reconciliationDef = "reconciliation" , typeName , [ description ] , [ metadataBl
                   , [ escalationChainDef ]
                   , "}" ;
 
-reconciliationTrigger = "event" , typeName , { "," , typeName }
-                      | "schedule" , stringLiteral ;
+reconciliationTrigger = "event" , typeName , { "," , typeName }   (* reactive *)
+                      | "schedule" , stringLiteral ;              (* periodic *)
 
-detectionStrategy     = "query" | "event-sourced" ;
+detectionStrategy = "query" | "event-sourced" ;
 
-coordinationStyle     = "choreography" | "orchestration" ;
+coordinationStyle = "choreography" | "orchestration" ;
 
 // -----------------------------------------------------------------------------
 // Escalation Chain — ordered recovery steps when compensation fails
+// (metamodel: Escalation chain)
+//
+// An escalation chain MUST TERMINATE. The rule is encoded structurally rather
+// than left to a validator: the chain is zero or more non-terminal steps followed
+// by exactly one terminal step. `retry` and `compensate` can themselves fail, so
+// they cannot end the chain; `alert`, `suspend` and `manual` are end states.
 // -----------------------------------------------------------------------------
 
 escalationChainDef = "escalation" , [ description ] , [ metadataBlock ] , "{"
-                   , escalationStep , { escalationStep }
+                   , [ satisfiesDecl ]
+                   , { nonTerminalStep }
+                   , terminalStep
                    , "}" ;
 
-escalationStep   = "step" , identifier , [ description ] , [ metadataBlock ] , "{"
+nonTerminalStep  = "step" , identifier , [ description ] , [ metadataBlock ] , "{"
+                 , [ satisfiesDecl ]
                  ,   "when" , "{" , expression , "}"
-                 ,   "action" , escalationAction
+                 ,   "action" , nonTerminalAction
                  , "}" ;
 
-// Terminal actions: alert, suspend, manual
-// Non-terminal actions: retry, compensate (must not be final step)
-escalationAction = "retry" , "(" , integer , ")"
-                 | "compensate" , "{" , typeName , { "," , typeName } , "}"
-                 | "alert" , stringLiteral
+terminalStep     = "step" , identifier , [ description ] , [ metadataBlock ] , "{"
+                 , [ satisfiesDecl ]
+                 ,   "when" , "{" , expression , "}"
+                 ,   "action" , terminalAction
+                 , "}" ;
+
+nonTerminalAction = "retry" , "(" , unsignedInteger , ")"   (* max attempts *)
+                  | "compensate" , "{" , typeName , { "," , typeName } , "}" ;
+
+terminalAction   = "alert" , stringLiteral
                  | "suspend"
                  | "manual" , stringLiteral ;
 
@@ -490,7 +761,8 @@ escalationAction = "retry" , "(" , integer , ")"
 // Fields
 // -----------------------------------------------------------------------------
 
-fieldDecl        = fieldName , ":" , fieldType , { constraint } ;
+fieldDecl        = fieldName , ":" , fieldType , { constraint }
+                 , [ description ] , [ satisfiesDecl ] ;
 
 fieldName        = identifier ;
 
@@ -507,12 +779,16 @@ primitiveType    = "string"
                  | "datetime"
                  | "time"
                  | "duration"
-                 | "uuid" ;
+                 | "uuid"
+                 | "void" ;   (* an operation that returns nothing *)
 
 collectionType   = ( "list" | "set" | "map" ) , "<" , fieldType , [ "," , fieldType ] , ">" ;
 
 // -----------------------------------------------------------------------------
 // Constraints
+//
+// `code` marks the field by which an enum's value-type instances are referenced
+// (metamodel: Enums — "the value type must declare a code field").
 // -----------------------------------------------------------------------------
 
 constraint       = "required"
@@ -520,12 +796,13 @@ constraint       = "required"
                  | "unique"
                  | "immutable"
                  | "ordered"
+                 | "code"
                  | "default" , "(" , literalValue , ")"
                  | "min" , "(" , number , ")"
                  | "max" , "(" , number , ")"
                  | "range" , "(" , number , "," , number , ")"
-                 | "minLength" , "(" , integer , ")"
-                 | "maxLength" , "(" , integer , ")"
+                 | "minLength" , "(" , unsignedInteger , ")"
+                 | "maxLength" , "(" , unsignedInteger , ")"
                  | "pattern" , "(" , stringLiteral , ")"
                  | "past"
                  | "future"
@@ -533,7 +810,7 @@ constraint       = "required"
                  | "futureOrPresent" ;
 
 // -----------------------------------------------------------------------------
-// Parameters
+// Parameters and arguments
 // -----------------------------------------------------------------------------
 
 paramList        = paramDecl , { "," , paramDecl } ;
@@ -556,7 +833,6 @@ description      = "::" , stringLiteral ;
 
 // -----------------------------------------------------------------------------
 // Metadata — arbitrary key/value annotations
-// Attaches domain or tooling metadata to any construct.
 // -----------------------------------------------------------------------------
 
 metadataBlock    = "meta" , "{" , { metadataEntry } , "}" ;
@@ -565,9 +841,19 @@ metadataEntry    = identifier , "=" , literalValue ;
 
 // -----------------------------------------------------------------------------
 // Expressions
+//
+// The expression language is orthogonal to the metamodel: the metamodel only ever
+// says "a predicate expression" or "a value expression". What follows is therefore
+// descriptive of the language, not derived from a metamodel concept.
+//
+// Precedence, loosest to tightest:
+//   ?:  <  or  <  and  <  not  <  comparison  <  + -  <  * /  <  unary
 // -----------------------------------------------------------------------------
 
-expression       = orExpr ;
+expression       = coalesceExpr ;
+
+// Elvis / null-coalescing: `a ?: b` is `b` when `a` is null.
+coalesceExpr     = orExpr , { "?:" , orExpr } ;
 
 orExpr           = andExpr , { "or" , andExpr } ;
 
@@ -575,7 +861,15 @@ andExpr          = notExpr , { "and" , notExpr } ;
 
 notExpr          = [ "not" ] , comparison ;
 
-comparison       = addExpr , [ compOp , addExpr ] ;
+// A comparison may be followed by a ternary tail: `cond ? whenTrue : whenFalse`.
+comparison       = addExpr , [ compTail ] , [ ternaryTail ] ;
+
+compTail         = compOp , addExpr
+                 | "matches" , ( stringLiteral | regexLiteral )
+                 | "contains" , dotPath
+                 | "does" , "not" , "contain" , dotPath ;
+
+ternaryTail      = "?" , valueExpr , ":" , valueExpr ;
 
 compOp           = "=" | "!=" | ">" | "<" | ">=" | "<=" ;
 
@@ -585,69 +879,102 @@ mulExpr          = unaryExpr , { ( "*" | "/" ) , unaryExpr } ;
 
 unaryExpr        = ifExpr
                  | everyExpr
+                 | quantifierExpr
                  | dotPath , "is" , "defined"
                  | dotPath , "is" , "not" , "defined"
+                 | dotPath , "is" , "null"
+                 | dotPath , "is" , "not" , "null"
                  | dotPath , "in" , "{" , valueList , "}"
                  | dotPath , "not" , "in" , "{" , valueList , "}"
-                 | functionCall
+                 | durationLiteral
+                 | callExpr
                  | dotPath
                  | literal
                  | "(" , expression , ")" ;
 
-// if — logical implication (if A then B ≡ not A or B)
-// Used in reactions/invariants for conditional validation.
-ifExpr           = "if" , expression , "{" , expression , "}" ;
+// if — logical implication (if A then B ≡ not A or B).
+ifExpr           = "if" , expression , "{" , expression , "}"
+                 | "if" , expression , "then" , expression , "else" , expression ;
 
-// every — universal quantifier over a collection
-everyExpr        = "every" , typeName , "in" , dotPath , "{" , expression , "}" ;
+// every — universal quantifier over a collection. The binder is an identifier,
+// matching `foreach ... as <identifier>`.
+everyExpr        = "every" , identifier , "in" , dotPath , "{" , expression , "}" ;
+
+// exists / forall — quantifiers with an optional filter.
+quantifierExpr   = ( "exists" | "forall" ) , identifier , "in" , dotPath
+                 , [ "where" , expression ] ;
+
+// A duration value. Needed by a relative temporal event's offset, e.g.
+//   offset ride.estimatedDriverArrivalTime + 5 minutes
+// Spaced form: `5 minutes`. Compact form: `5min`, `24h`, `2businessDays` — the
+// unit must be adjacent to the number (no whitespace).
+durationLiteral  = unsignedInteger , durationUnit
+                 | unsignedInteger , compactDurationUnit ;   (* no space allowed *)
+
+durationUnit     = "seconds" | "minutes" | "hours" | "days"
+                 | "weeks" | "months" | "years" ;
+
+compactDurationUnit = "ms" | "s" | "min" | "h" | "d" | "w" | "y"
+                    | "businessDay" | "businessDays" ;
+
+// A call. One production covers both a built-in function and a service call —
+// they are indistinguishable syntactically, and resolving which is which needs a
+// symbol table, not the grammar.
+//
+// Built-ins: count, sum, min, max, avg, abs, size, isEmpty, isNotEmpty, append,
+//            now, today.
+callExpr         = dotPath , "(" , [ argList ] , ")" ;
 
 // -----------------------------------------------------------------------------
 // Dot-path: references to fields across the model
+//
+// `?.` is safe navigation: it yields null instead of failing on a null receiver.
+// `[ expr ]` subscripts a collection.
 // -----------------------------------------------------------------------------
 
-dotPath          = identifier , { "." , identifier } ;
+dotPath          = pathSegment , { ( "." | "?." ) , pathSegment } ;
+
+pathSegment      = identifier , [ "[" , expression , "]" ] ;
 
 // -----------------------------------------------------------------------------
-// Value expressions (right-hand side of assignments, comparisons, etc.)
+// Value expressions (right-hand side of assignments, offsets, arguments)
 // -----------------------------------------------------------------------------
 
-valueExpr        = expression
-                 | serviceCallExpr ;
+valueExpr        = arrayLiteral | expression ;
 
-serviceCallExpr  = dotPath , "(" , [ argList ] , ")" ;
+arrayLiteral     = "[" , valueExpr , { "," , valueExpr } , "]" ;
 
 valueList        = valueExpr , { "," , valueExpr } ;
-
-// -----------------------------------------------------------------------------
-// Built-in functions
-// -----------------------------------------------------------------------------
-
-functionCall     = functionName , "(" , [ argList ] , ")" ;
-
-functionName     = "count"
-                 | "sum"
-                 | "now"
-                 | "today"
-                 | "size"
-                 | "isEmpty"
-                 | "isNotEmpty" ;
 
 // -----------------------------------------------------------------------------
 // Literals and identifiers
 // -----------------------------------------------------------------------------
 
-literalValue     = stringLiteral | number | "true" | "false" ;
+literalValue     = stringLiteral | number | "true" | "false" | "null" ;
 
 literal          = literalValue ;
+
+// A bracketed regex used by `matches`, e.g. [a-zA-Z0-9-]+
+regexLiteral     = "[" , { character } , "]" , [ "*" | "+" | "?" ] ;
 
 stringLiteral    = '"' , { character } , '"' ;
 
 number           = [ "-" ] , digit , { digit } , [ "." , digit , { digit } ] ;
 
-integer          = [ "-" ] , digit , { digit } ;
+unsignedInteger  = digit , { digit } ;
 
 typeName         = pascalCaseId ;
 
+// An identifier may be either case. Convention (and the DSL style guide) is
+// camelCase for field names, enum values and operation names; PascalCase is
+// reserved for type names.
+//
+// IMPLEMENTATION NOTE: the Langium parser lexes PascalCase as TYPE_NAME before it
+// tries ID, so in the positions where only an identifier is legal — enum values, a
+// context shortname, internal-operation names, condition/invariant/step names — it
+// accepts camelCase ONLY. The tree-sitter (GLR) parser accepts both. Write these in
+// camelCase and both parsers agree. Quantifier binders (`every X in …`) are exempt:
+// both parsers accept either case there.
 identifier       = camelCaseId | pascalCaseId ;
 
 pascalCaseId     = upperLetter , { letter | digit } ;
@@ -682,3 +1009,29 @@ character        = letter | digit | " " | "!" | "@" | "#" | "$" | "%" | "^"
                  | "." | "<" | ">" | "/" | "?" | "~" | "`" ;
 
 newline          = "\n" ;
+
+// =============================================================================
+// Semantic rules — TRUE of the metamodel, NOT expressible in a context-free
+// grammar. These belong to the validator (src/langium/specy-domain/src/language/
+// specy-domain-validator.ts), not here.
+//
+//  1. An event declared `about E` must carry a field referencing E's identifier.
+//  2. An internal or error event is raised by exactly ONE operation (1..1
+//     "raised by"): no two operations may `emits` the same event type.
+//  3. A command produces at least one event (1..n): the operation it triggers
+//     must contain at least one `emits`.
+//  4. A command is targeted by exactly ONE operation (1..1): no two artefacts may
+//     both declare `"..." on C` for the same command C.
+//  5. A non-root child entity listed in an aggregate's `entities { }` must NOT
+//     have a repository derived for it.
+//  6. A state machine has exactly one start state (one `[*] --> s` transition).
+//  7. Multiple state machines on one entity must govern DISJOINT aspects of state.
+//  8. `projected-by` is meaningful only with `synced-via asynchronous-projection`.
+//  9. An `spi interface` must have exactly one `describes`; an `api interface`
+//     must have none, and its `exposes` dot-paths must resolve to operations owned
+//     by an entity, aggregate, domain service or application service of its module.
+// 10. An enum declared `of V` requires V to have exactly one `code` field.
+// 11. Recomputation heuristic: when a temporal event's `offset` or `instant`
+//     depends on a mutable value, some reaction must re-arm it when that value
+//     changes. Absence is a modeling gap, detectable by audit.
+// =============================================================================

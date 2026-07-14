@@ -40,10 +40,14 @@ function renderContext(w, ctx, level) {
 function renderModule(w, mod, level) {
     w.heading(level, `Module: ${mod.name}`);
     renderMeta(w, mod.description, undefined, mod.metadata);
+    // The two interface relations are not symmetric: `exposes` is the module's
+    // public surface; `requires` is what it must be given.
+    if (mod.exposes?.length)
+        w.line(`**Exposes (API):** ${mod.exposes.join(', ')}`).blank();
+    if (mod.requires?.length)
+        w.line(`**Requires (SPI):** ${mod.requires.join(', ')}`).blank();
     if (mod.dependencies?.length)
         w.line(`**Depends on:** ${mod.dependencies.join(', ')}`).blank();
-    for (const sub of mod.modules ?? [])
-        renderModule(w, sub, level + 1);
     if (mod.definitions)
         renderGroups(w, mod.definitions, level + 1);
 }
@@ -158,10 +162,13 @@ function renderConstruct(w, c, level) {
 }
 function renderOperation(w, op) {
     const parts = [`\`"${op.name}"\``];
+    // An operation is never triggered by an event — only a reaction consumes events.
     if (op.trigger?.command)
         parts.push(`on command ${op.trigger.command}`);
-    if (op.trigger?.event)
-        parts.push(`on event ${op.trigger.event}`);
+    if (op.safety)
+        parts.push(op.safety);
+    if (op.idempotent)
+        parts.push('idempotent');
     if (op.accepts?.length)
         parts.push(`accepts ${op.accepts.join(', ')}`);
     if (op.returns)

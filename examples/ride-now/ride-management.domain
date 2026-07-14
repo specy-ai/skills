@@ -16,8 +16,20 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
     // Value types
     // -----------------------------------------------------------------
 
-    value Location { fields { latitude: decimal; longitude: decimal } }
-    value Route { fields { waypoints: list<Location>; distance: Distance; duration: Duration } }
+    value Location {
+        fields {
+            latitude : decimal
+            longitude : decimal
+        }
+    }
+
+    value Route {
+        fields {
+            waypoints : list<Location>
+            distance : Distance
+            duration : Duration
+        }
+    }
 
     value FareEstimate :: "Committed fare shown at confirm" {
         satisfies [REQ-RIDE-003, REQ-RIDE-004, REQ-RIDE-005, REQ-RIDE-NFR-002]
@@ -63,18 +75,48 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
         }
     }
 
-    value PhoneNumber { fields { countryCode: string; number: string } }
+    value PhoneNumber {
+        fields {
+            countryCode : string
+            number : string
+        }
+    }
+
+    // The star rating (and optional comment) exchanged at the end of a ride. The
+    // previous model typed these `any`, which the grammar has no counterpart for.
+    value RideRating :: "A rating given at the end of a ride" {
+        fields {
+            score : int min(1) max(5)
+            comment : string optional
+        }
+    }
+
+    // Search filters, referenced by the repositories below.
+    value RideRequestSearchCriteria :: "Search filter over ride requests" {
+        fields {
+            riderId : uuid optional
+            status : RideRequestStatus optional
+        }
+    }
+
+    value RideSearchCriteria :: "Search filter over rides" {
+        fields {
+            riderId : uuid optional
+            driverId : uuid optional
+            status : RideStatus optional
+        }
+    }
 
     // -----------------------------------------------------------------
-    // Entities
+    // Entities (non-root children of the two aggregates below)
     // -----------------------------------------------------------------
 
     entity RideOffer :: "Offer of a ride to a single driver" {
         satisfies [REQ-RIDE-021, REQ-RIDE-022, REQ-RIDE-023]
-        identifier offerId : UUID
+        identity offerId : uuid
         fields {
-            rideRequestId : UUID
-            driverId : UUID
+            rideRequestId : uuid
+            driverId : uuid
             status : RideOfferStatus default("pending")
             offeredAt : datetime
             respondedAt : datetime optional
@@ -84,11 +126,11 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
 
     entity EmergencyEvent {
         satisfies [REQ-RIDE-081, REQ-RIDE-082, REQ-RIDE-083]
-        identifier emergencyId : UUID
+        identity emergencyId : uuid
         fields {
-            rideId : UUID
+            rideId : uuid
             type : EmergencyEventType
-            triggeredBy : UUID
+            triggeredBy : uuid
             triggeredAt : datetime
             location : Location
             acknowledgedAt : datetime optional
@@ -98,10 +140,10 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
 
     entity SafetyReport {
         satisfies [REQ-RIDE-085, REQ-RIDE-086]
-        identifier reportId : UUID
+        identity reportId : uuid
         fields {
-            rideId : UUID
-            reportedBy : UUID
+            rideId : uuid
+            reportedBy : uuid
             severity : SafetyReportSeverity
             description : string maxLength(4000)
             reportedAt : datetime
@@ -111,45 +153,51 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
         }
     }
 
-    entity RideRequest :: "Rider intent — destination, fare, matching state" {
+    // -----------------------------------------------------------------
+    // Aggregates
+    // -----------------------------------------------------------------
+    //
+    // The previous model paired `entity RideRequest` / `entity Ride` with separate
+    // `aggregate ...Aggregate root ... { contains [...] }` declarations. An aggregate
+    // now IS its root: `entities { }` lists only the non-root children.
+
+    aggregate RideRequest :: "Rider intent — destination, fare, matching state" {
         satisfies [REQ-RIDE-001, REQ-RIDE-002, REQ-RIDE-003, REQ-RIDE-004, REQ-RIDE-005, REQ-RIDE-006,
                    REQ-RIDE-007, REQ-RIDE-008, REQ-RIDE-009, REQ-RIDE-020, REQ-RIDE-024, REQ-RIDE-025,
                    REQ-RIDE-060, REQ-RIDE-NFR-001, REQ-RIDE-NFR-002]
 
-        identifier requestId : UUID
+        identity requestId : uuid
         fields {
-            riderId : UUID
+            riderId : uuid
             status : RideRequestStatus default("searching")
             scheduleType : RideScheduleType default("immediate")
             scheduledPickupTime : datetime optional
             pickupLocation : Location
             dropoffLocation : Location
             committedFare : FareEstimate
-            matchedDriverId : UUID optional
+            matchedDriverId : uuid optional
             matchedAt : datetime optional
             cancellation : CancellationDetail optional
             createdAt : datetime
             updatedAt : datetime
         }
 
-        invariants {
-            scheduledHasFutureTime :: "Scheduled rides have a future pickup time" enforcement reject {
-                if scheduleType = scheduled { scheduledPickupTime > now() }
-            }
-            matchedHasDriver :: "Matched requests have a driver" enforcement reject {
-                if status = matched { matchedDriverId is defined }
-            }
-            cancelledHasReason :: "Cancelled requests record a reason" enforcement reject {
-                if status = cancelled { cancellation is defined }
-            }
-        }
+        entities { RideOffer }
 
         operations {
             "Request a ride" on RequestRide {
                 satisfies [REQ-RIDE-001, REQ-RIDE-002, REQ-RIDE-003, REQ-RIDE-004, REQ-RIDE-005]
+                unsafe
+
                 precondition riderReadyToRide { requestRide.riderReadyToRide = true }
+                    rejects "The rider is not ready to ride — their phone is unverified or they have no active payment method"
+
                 precondition committedFareProvided { requestRide.committedFare is defined }
+                    rejects "A ride cannot be requested without a fare committed up front"
+
                 precondition paymentMethodValid { requestRide.paymentMethodValid = true }
+                    rejects "The rider's payment method is not valid"
+
                 sets RideRequest {
                     riderId = requestRide.riderId
                     pickupLocation = requestRide.pickupLocation
@@ -174,7 +222,11 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
 
             "Match driver" on AcceptRideOffer {
                 satisfies [REQ-RIDE-021, REQ-RIDE-025]
+                unsafe
+
                 precondition stillSearching { RideRequest.status = searching }
+                    rejects "This request is no longer searching for a driver"
+
                 sets RideRequest {
                     status = matched
                     matchedDriverId = acceptRideOffer.driverId
@@ -189,7 +241,11 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
 
             "Cancel request before assignment" on CancelRequestByRider {
                 satisfies [REQ-RIDE-006, REQ-RIDE-060]
+                unsafe
+
                 precondition stillSearching { RideRequest.status = searching }
+                    rejects "A driver has already been assigned, so this request can no longer be cancelled free of charge"
+
                 sets RideRequest {
                     status = cancelled
                     cancellation = CancellationDetail(
@@ -208,7 +264,11 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
 
             "Cancel request — no driver available" on CancelRequestNoDriver {
                 satisfies [REQ-RIDE-024]
+                unsafe
+
                 precondition searchExhausted { cancelRequestNoDriver.searchExhausted = true }
+                    rejects "The search for a driver has not been exhausted yet"
+
                 sets RideRequest {
                     status = cancelled
                     cancellation = CancellationDetail(
@@ -225,19 +285,61 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
                 }
             }
         }
+
+        states {
+            machine RideRequestLifecycle :: "From filing a request to matching or cancellation" {
+                state searching
+                final matched {
+                    invariants {
+                        hasDriver {
+                            RideRequest.matchedDriverId is defined
+                            enforcement rejection
+                        }
+                    }
+                }
+                final cancelled {
+                    invariants {
+                        hasCancellation {
+                            RideRequest.cancellation is defined
+                            enforcement rejection
+                        }
+                    }
+                }
+
+                [*]       --> searching on "Request a ride"
+                searching --> matched   on "Match driver"
+                searching --> cancelled on "Cancel request before assignment"
+                searching --> cancelled on "Cancel request — no driver available"
+            }
+        }
+
+        invariants {
+            scheduledHasFutureTime :: "Scheduled rides have a future pickup time" {
+                if scheduleType = scheduled { scheduledPickupTime > now() }
+                enforcement rejection
+            }
+            matchedHasDriver :: "Matched requests have a driver" {
+                if status = matched { matchedDriverId is defined }
+                enforcement rejection
+            }
+            cancelledHasReason :: "Cancelled requests record a reason" {
+                if status = cancelled { cancellation is defined }
+                enforcement rejection
+            }
+        }
     }
 
-    entity Ride :: "Ride from match through completion or cancellation" {
+    aggregate Ride :: "Ride from match through completion or cancellation" {
         satisfies [REQ-RIDE-040, REQ-RIDE-041, REQ-RIDE-042, REQ-RIDE-043, REQ-RIDE-044, REQ-RIDE-045,
                    REQ-RIDE-046, REQ-RIDE-047, REQ-RIDE-048, REQ-RIDE-049, REQ-RIDE-050,
                    REQ-RIDE-061, REQ-RIDE-063, REQ-RIDE-065, REQ-RIDE-067,
                    REQ-RIDE-080, REQ-RIDE-081, REQ-RIDE-082, REQ-RIDE-084, REQ-RIDE-085]
 
-        identifier rideId : UUID
+        identity rideId : uuid
         fields {
-            rideRequestId : UUID
-            riderId : UUID
-            driverId : UUID
+            rideRequestId : uuid
+            riderId : uuid
+            driverId : uuid
             status : RideStatus default("driverAssigned")
             pickupLocation : Location
             dropoffLocation : Location
@@ -255,22 +357,12 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
             updatedAt : datetime
         }
 
-        invariants {
-            completedHasActuals :: "Completed rides have actual times and final fare" enforcement reject {
-                if status = completed {
-                    actualPickupTime is defined
-                    and actualDropoffTime is defined
-                    and finalFare is defined
-                }
-            }
-            cancelledHasReason :: "Cancelled rides record a reason" enforcement reject {
-                if status = cancelled { cancellation is defined }
-            }
-        }
+        entities { EmergencyEvent SafetyReport }
 
         operations {
             "Create ride from matched request" on CreateRide {
                 satisfies [REQ-RIDE-025]
+                unsafe
                 sets Ride {
                     rideRequestId = createRide.requestId
                     riderId = createRide.riderId
@@ -295,8 +387,14 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
 
             "Driver arrives at pickup" on SignalDriverArrival {
                 satisfies [REQ-RIDE-042]
+                unsafe
+
                 precondition isAssigned { Ride.status = driverAssigned }
+                    rejects "The driver is not currently assigned to this ride"
+
                 precondition near100m { signalDriverArrival.distance.meters <= 100 }
+                    rejects "The driver is more than 100 metres from the pickup point, so arrival cannot be signalled"
+
                 sets Ride { status = driverArrived }
                 emits DriverArrived {
                     rideId = Ride.rideId
@@ -308,7 +406,11 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
 
             "Start ride" on StartRide {
                 satisfies [REQ-RIDE-044]
+                unsafe
+
                 precondition driverArrived { Ride.status = driverArrived }
+                    rejects "The ride cannot start before the driver has arrived at the pickup point"
+
                 sets Ride {
                     status = inProgress
                     actualPickupLocation = startRide.pickupLocation
@@ -323,7 +425,11 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
 
             "Update route during trip" on UpdateRideTracking {
                 satisfies [REQ-RIDE-045, REQ-RIDE-046]
+                unsafe
+
                 precondition inProgress { Ride.status = inProgress }
+                    rejects "The ride is not under way, so its route cannot be updated"
+
                 sets Ride { currentRoute = updateRideTracking.route }
                 emits RideLocationUpdated {
                     rideId = Ride.rideId
@@ -334,7 +440,11 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
 
             "Complete ride" on CompleteRide {
                 satisfies [REQ-RIDE-047, REQ-RIDE-048, REQ-RIDE-049, REQ-RIDE-050]
+                unsafe
+
                 precondition inProgress { Ride.status = inProgress }
+                    rejects "Only a ride that is under way can be completed"
+
                 sets Ride {
                     status = completed
                     actualDropoffLocation = completeRide.dropoffLocation
@@ -352,9 +462,12 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
 
             "Rider cancels after assignment" on CancelRideByRider {
                 satisfies [REQ-RIDE-061]
+                unsafe
+
                 precondition assignedOrArrived {
                     Ride.status = driverAssigned or Ride.status = driverArrived
-                }
+                } rejects "The ride is already under way or finished, so the rider can no longer cancel it"
+
                 sets Ride {
                     status = cancelled
                     cancellation = CancellationDetail(
@@ -375,7 +488,11 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
 
             "Driver cancels assignment" on CancelRideByDriver {
                 satisfies [REQ-RIDE-063]
+                unsafe
+
                 precondition isAssigned { Ride.status = driverAssigned }
+                    rejects "The driver is not currently assigned to this ride"
+
                 sets Ride {
                     status = cancelled
                     cancellation = CancellationDetail(
@@ -395,10 +512,15 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
 
             "Cancel due to rider no-show" on CancelRideRiderNoShow {
                 satisfies [REQ-RIDE-043]
+                unsafe
+
                 precondition driverArrived { Ride.status = driverArrived }
+                    rejects "The driver has not arrived yet, so the rider cannot be recorded as a no-show"
+
                 precondition fiveMinutesElapsedSinceArrival {
                     now() - cancelRideRiderNoShow.arrivedAt > 5min
-                }
+                } rejects "The rider still has time to board — five minutes have not passed since the driver arrived"
+
                 sets Ride {
                     status = cancelled
                     cancellation = CancellationDetail(
@@ -419,10 +541,15 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
 
             "Cancel due to driver no-show" on CancelRideDriverNoShow {
                 satisfies [REQ-RIDE-065, REQ-RIDE-067]
+                unsafe
+
                 precondition isAssigned { Ride.status = driverAssigned }
+                    rejects "The driver is not currently assigned to this ride"
+
                 precondition pastEtaPlusFive {
                     now() > Ride.estimatedDriverArrivalTime + 5min
-                }
+                } rejects "The driver is not late yet — the estimated arrival time plus five minutes has not passed"
+
                 sets Ride {
                     status = cancelled
                     cancellation = CancellationDetail(
@@ -438,15 +565,27 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
                     driverId = Ride.driverId
                     cancelledAt = now()
                 }
+                // The old model published this fact from a reaction
+                // (`effect publish DriverNoShowRecorded(...)`). Publication is not a
+                // reaction's effect any more, so the fact is raised where it happens; the
+                // Driver Management context consumes it as an external event.
+                emits DriverNoShowRecorded {
+                    driverId = Ride.driverId
+                    rideId = Ride.rideId
+                    recordedAt = now()
+                }
             }
 
             "Activate trip sharing" on ActivateTripSharing {
                 satisfies [REQ-RIDE-080]
+                unsafe
+
                 precondition isLive {
                     Ride.status = driverAssigned
                     or Ride.status = driverArrived
                     or Ride.status = inProgress
-                }
+                } rejects "Trip sharing can only be turned on while the ride is live"
+
                 sets Ride { tripSharingLinks = Ride.tripSharingLinks + activateTripSharing.link }
                 emits TripSharingActivated {
                     rideId = Ride.rideId
@@ -457,6 +596,7 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
 
             "Trigger emergency" on TriggerEmergency {
                 satisfies [REQ-RIDE-081, REQ-RIDE-082, REQ-RIDE-NFR-004]
+                unsafe
                 emits EmergencyTriggered {
                     rideId = Ride.rideId
                     riderId = Ride.riderId
@@ -469,11 +609,16 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
 
             "Detect unusual stop" on DetectUnusualStop {
                 satisfies [REQ-RIDE-084]
+                unsafe
+
                 precondition inProgress { Ride.status = inProgress }
+                    rejects "Only a ride that is under way can have an unusual stop"
+
                 precondition stoppedFiveMinutesOffRoute {
                     detectUnusualStop.stoppedSeconds > 300
                     and detectUnusualStop.offRoute = true
-                }
+                } rejects "The vehicle has not been stopped off-route for five minutes"
+
                 emits UnusualStopDetected {
                     rideId = Ride.rideId
                     location = detectUnusualStop.location
@@ -484,7 +629,11 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
 
             "File post-ride safety report" on FileSafetyReport {
                 satisfies [REQ-RIDE-085, REQ-RIDE-086]
+                unsafe
+
                 precondition rideCompleted { Ride.status = completed }
+                    rejects "A safety report can only be filed once the ride has completed"
+
                 emits SafetyReportFiled {
                     rideId = Ride.rideId
                     reportedBy = fileSafetyReport.reportedBy
@@ -495,10 +644,63 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
                 }
             }
         }
-    }
 
-    aggregate RideRequestAggregate root RideRequest { contains [RideOffer] }
-    aggregate RideAggregate root Ride { contains [EmergencyEvent, SafetyReport] }
+        states {
+            machine RideLifecycle :: "From driver assignment to completion or cancellation" {
+                state driverAssigned
+                state driverArrived
+                state inProgress {
+                    invariants {
+                        hasPickupTime {
+                            Ride.actualPickupTime is defined
+                            enforcement rejection
+                        }
+                    }
+                }
+                final completed {
+                    invariants {
+                        hasFinalFare {
+                            Ride.finalFare is defined
+                            enforcement rejection
+                        }
+                    }
+                }
+                final cancelled {
+                    invariants {
+                        hasCancellation {
+                            Ride.cancellation is defined
+                            enforcement rejection
+                        }
+                    }
+                }
+
+                [*]            --> driverAssigned on "Create ride from matched request"
+                driverAssigned --> driverArrived  on "Driver arrives at pickup"
+                driverArrived  --> inProgress     on "Start ride"
+                inProgress     --> completed      on "Complete ride"
+                driverAssigned --> cancelled      on "Rider cancels after assignment"
+                driverAssigned --> cancelled      on "Driver cancels assignment"
+                driverAssigned --> cancelled      on "Cancel due to driver no-show"
+                driverArrived  --> cancelled      on "Rider cancels after assignment"
+                driverArrived  --> cancelled      on "Cancel due to rider no-show"
+            }
+        }
+
+        invariants {
+            completedHasActuals :: "Completed rides have actual times and final fare" {
+                if status = completed {
+                    actualPickupTime is defined
+                    and actualDropoffTime is defined
+                    and finalFare is defined
+                }
+                enforcement rejection
+            }
+            cancelledHasReason :: "Cancelled rides record a reason" {
+                if status = cancelled { cancellation is defined }
+                enforcement rejection
+            }
+        }
+    }
 
     // --- Repositories (persistence ports for the aggregate roots) ---
 
@@ -506,74 +708,49 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
         :: "Persists and retrieves ride requests" {
         satisfies [REQ-RIDE-001]
         store(rideRequest: RideRequest)
-        getById(id: UUID): RideRequest
-        remove(id: UUID)
-        search(criteria: RideRequestSearchCriteria): list<RideRequest>
-        findByRiderId(riderId: UUID): list<RideRequest>
-        findByStatus(status: RideRequestStatus): list<RideRequest>
+        getById(id: uuid) : RideRequest
+        remove(id: uuid)
+        search(criteria: RideRequestSearchCriteria) : list<RideRequest>
+        findByRiderId(riderId: uuid) : list<RideRequest>
+        findByStatus(status: RideRequestStatus) : list<RideRequest>
     }
 
     repository RideRepository for Ride
         :: "Persists and retrieves rides" {
         store(ride: Ride)
-        getById(id: UUID): Ride
-        remove(id: UUID)
-        search(criteria: RideSearchCriteria): list<Ride>
-        findByRiderId(riderId: UUID): list<Ride>
-        findByDriverId(driverId: UUID): list<Ride>
-    }
-
-    statemachine RideRequestLifecycle on RideRequest {
-        start searching
-        state searching {}
-        state matched {
-            invariant hasDriver { RideRequest.matchedDriverId is defined }
-        }
-        state cancelled {
-            invariant hasCancellation { RideRequest.cancellation is defined }
-        }
-        transition searching -> matched on AcceptRideOffer
-        transition searching -> cancelled on CancelRequestByRider
-        transition searching -> cancelled on CancelRequestNoDriver
-        final matched
-        final cancelled
-    }
-
-    statemachine RideLifecycle on Ride {
-        start driverAssigned
-        state driverAssigned {}
-        state driverArrived {}
-        state inProgress {
-            invariant hasPickupTime { Ride.actualPickupTime is defined }
-        }
-        state completed {
-            invariant hasFinalFare { Ride.finalFare is defined }
-        }
-        state cancelled {
-            invariant hasCancellation { Ride.cancellation is defined }
-        }
-        transition driverAssigned -> driverArrived on SignalDriverArrival
-        transition driverArrived -> inProgress on StartRide
-        transition inProgress -> completed on CompleteRide
-        transition driverAssigned -> cancelled on CancelRideByRider
-        transition driverAssigned -> cancelled on CancelRideByDriver
-        transition driverAssigned -> cancelled on CancelRideDriverNoShow
-        transition driverArrived -> cancelled on CancelRideByRider
-        transition driverArrived -> cancelled on CancelRideRiderNoShow
-        final completed
-        final cancelled
+        getById(id: uuid) : Ride
+        remove(id: uuid)
+        search(criteria: RideSearchCriteria) : list<Ride>
+        findByRiderId(riderId: uuid) : list<Ride>
+        findByDriverId(driverId: uuid) : list<Ride>
     }
 
     // -----------------------------------------------------------------
     // Domain services
     // -----------------------------------------------------------------
 
-    service MatchingService :: "Match a request to the closest eligible driver" {
+    domain service MatchingService :: "Match a request to the closest eligible driver" {
         satisfies [REQ-RIDE-020, REQ-RIDE-021, REQ-RIDE-023, REQ-RIDE-024, REQ-RIDE-026, REQ-RIDE-NFR-001]
+        calls { GeolocationGateway }
         operations {
-            findAndOfferDriver(rideRequest: RideRequest) : void
-            handleOfferTimeout(offerId: uuid) : void
-            getDriverAcceptanceRate(driverId: uuid) : decimal
+            "Find and offer a driver" on FindAndOfferDriver
+                :: "Offer the ride to the closest eligible driver, then roll on to the next" {
+                satisfies [REQ-RIDE-020, REQ-RIDE-021, REQ-RIDE-NFR-001]
+                unsafe
+                resolves RideRequest from findAndOfferDriver.requestId
+            }
+
+            "Handle offer timeout" on HandleOfferTimeout
+                :: "Retract the expired offer and roll on to the next driver" {
+                satisfies [REQ-RIDE-023, REQ-RIDE-024]
+                unsafe
+                resolves RideOffer from handleOfferTimeout.offerId
+            }
+
+            getDriverAcceptanceRate(driverId: uuid) : decimal {
+                satisfies [REQ-RIDE-026]
+                safe
+            }
         }
     }
 
@@ -581,10 +758,11 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
     // Infrastructure services (anti-corruption boundaries)
     // -----------------------------------------------------------------
 
-    infrastructure-service GeolocationGateway :: "ACL to GeolocationRouting" {
+    infrastructure service GeolocationGateway :: "ACL to GeolocationRouting" {
         satisfies [REQ-RIDE-020, REQ-RIDE-040, REQ-RIDE-045, REQ-RIDE-046]
         operations {
-            findNearbyEligibleDrivers(pickup: Location, radius: Distance) : list<DriverRef>
+            // NOTE: `list<DriverRef>` had no counterpart type; the gateway returns driver ids.
+            findNearbyEligibleDrivers(pickup: Location, radius: Distance) : list<uuid>
             estimateDriverArrival(driverId: uuid, pickup: Location) : datetime
             getCurrentLocation(rideId: uuid) : Location
             getCurrentRoute(rideId: uuid) : Route
@@ -592,7 +770,7 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
         }
     }
 
-    infrastructure-service PaymentGateway :: "ACL to Payment" {
+    infrastructure service PaymentGateway :: "ACL to Payment" {
         satisfies [REQ-RIDE-003, REQ-RIDE-048, REQ-RIDE-049, REQ-RIDE-061]
         operations {
             computeFareEstimate(pickup: Location, dropoff: Location) : FareEstimate
@@ -605,14 +783,14 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
         }
     }
 
-    infrastructure-service RiderManagementGateway :: "ACL to RiderManagement" {
+    infrastructure service RiderManagementGateway :: "ACL to RiderManagement" {
         satisfies [REQ-RIDE-002]
         operations {
             isReadyToRide(riderId: uuid) : boolean
         }
     }
 
-    infrastructure-service DriverManagementGateway :: "ACL to DriverManagement" {
+    infrastructure service DriverManagementGateway :: "ACL to DriverManagement" {
         satisfies [REQ-RIDE-064, REQ-RIDE-066]
         operations {
             requestTemporarySuspension(driverId: uuid, duration: Duration, reason: string) : void
@@ -621,7 +799,7 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
         }
     }
 
-    infrastructure-service RideNotificationService {
+    infrastructure service RideNotificationService {
         satisfies [REQ-RIDE-024, REQ-RIDE-042, REQ-RIDE-067, REQ-RIDE-080, REQ-RIDE-082, REQ-RIDE-084]
         operations {
             notifyRider(riderId: uuid, message: string) : void
@@ -637,198 +815,364 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
     // Commands
     // -----------------------------------------------------------------
 
-    command RequestRide { fields { riderId: uuid; pickupLocation: Location; dropoffLocation: Location; committedFare: FareEstimate; scheduleType: RideScheduleType; scheduledPickupTime: datetime optional; riderReadyToRide: boolean; paymentMethodValid: boolean; correlationId: uuid } }
-    command AcceptRideOffer { fields { offerId: uuid; requestId: uuid; driverId: uuid; correlationId: uuid } }
-    command CancelRequestByRider { fields { requestId: uuid; riderId: uuid; correlationId: uuid } }
-    command CancelRequestNoDriver { fields { requestId: uuid; searchExhausted: boolean; correlationId: uuid } }
-    command CreateRide { fields { requestId: uuid; riderId: uuid; driverId: uuid; pickupLocation: Location; dropoffLocation: Location; committedFare: FareEstimate; estimatedDriverArrivalTime: datetime; correlationId: uuid } }
-    command SignalDriverArrival { fields { rideId: uuid; distance: Distance; correlationId: uuid } }
-    command StartRide { fields { rideId: uuid; pickupLocation: Location; correlationId: uuid } }
-    command UpdateRideTracking { fields { rideId: uuid; route: Route; correlationId: uuid } }
-    command CompleteRide { fields { rideId: uuid; dropoffLocation: Location; actualDistance: Distance; actualDuration: Duration; correlationId: uuid } }
-    command CancelRideByRider { fields { rideId: uuid; feeAmount: Amount; correlationId: uuid } }
-    command CancelRideByDriver { fields { rideId: uuid; correlationId: uuid } }
-    command CancelRideRiderNoShow { fields { rideId: uuid; arrivedAt: datetime; feeAmount: Amount; correlationId: uuid } }
-    command CancelRideDriverNoShow { fields { rideId: uuid; correlationId: uuid } }
-    command ActivateTripSharing { fields { rideId: uuid; link: TripSharingLink; correlationId: uuid } }
-    command TriggerEmergency { fields { rideId: uuid; type: EmergencyEventType; location: Location; correlationId: uuid } }
-    command DetectUnusualStop { fields { rideId: uuid; location: Location; stoppedSeconds: int; offRoute: boolean; correlationId: uuid } }
-    command FileSafetyReport { fields { rideId: uuid; reportedBy: uuid; severity: SafetyReportSeverity; description: string; correlationId: uuid } }
-    command HandleOfferTimeout { fields { offerId: uuid; correlationId: uuid } }
+    command RequestRide { identity correlationId : uuid  fields { riderId : uuid  pickupLocation : Location  dropoffLocation : Location  committedFare : FareEstimate  scheduleType : RideScheduleType  scheduledPickupTime : datetime optional  riderReadyToRide : boolean  paymentMethodValid : boolean } }
+    command AcceptRideOffer { identity correlationId : uuid  fields { offerId : uuid  requestId : uuid  driverId : uuid } }
+    command CancelRequestByRider { identity correlationId : uuid  fields { requestId : uuid  riderId : uuid } }
+    command CancelRequestNoDriver { identity correlationId : uuid  fields { requestId : uuid  searchExhausted : boolean } }
+    command CreateRide { identity correlationId : uuid  fields { requestId : uuid  riderId : uuid  driverId : uuid  pickupLocation : Location  dropoffLocation : Location  committedFare : FareEstimate  estimatedDriverArrivalTime : datetime } }
+    command SignalDriverArrival { identity correlationId : uuid  fields { rideId : uuid  distance : Distance } }
+    command StartRide { identity correlationId : uuid  fields { rideId : uuid  pickupLocation : Location } }
+    command UpdateRideTracking { identity correlationId : uuid  fields { rideId : uuid  route : Route } }
+    command CompleteRide { identity correlationId : uuid  fields { rideId : uuid  dropoffLocation : Location  actualDistance : Distance  actualDuration : Duration } }
+    command CancelRideByRider { identity correlationId : uuid  fields { rideId : uuid  feeAmount : Amount } }
+    command CancelRideByDriver { identity correlationId : uuid  fields { rideId : uuid } }
+    command CancelRideRiderNoShow { identity correlationId : uuid  fields { rideId : uuid  arrivedAt : datetime  feeAmount : Amount } }
+    command CancelRideDriverNoShow { identity correlationId : uuid  fields { rideId : uuid } }
+    command ActivateTripSharing { identity correlationId : uuid  fields { rideId : uuid  link : TripSharingLink } }
+    command TriggerEmergency { identity correlationId : uuid  fields { rideId : uuid  type : EmergencyEventType  location : Location } }
+    command DetectUnusualStop { identity correlationId : uuid  fields { rideId : uuid  location : Location  stoppedSeconds : int  offRoute : boolean } }
+    command FileSafetyReport { identity correlationId : uuid  fields { rideId : uuid  reportedBy : uuid  severity : SafetyReportSeverity  description : string } }
+    command HandleOfferTimeout { identity correlationId : uuid  fields { offerId : uuid } }
+
+    // A reaction's only legal effect is a command. The old model let a reaction call a
+    // domain or infrastructure service directly; those calls become commands here.
+    command FindAndOfferDriver :: "Start (or continue) matching this request to a driver" {
+        identity correlationId : uuid
+        fields { requestId : uuid }
+    }
+
+    // UNCLEAR: no operation targets the four commands below — the work is carried out by
+    // the DriverManagementGateway and RideNotificationService adapters, whose bodies live
+    // outside the domain model. The argument bindings the old service calls carried are
+    // not expressible on a reaction and are recorded in each reaction's description.
+    command RequestTemporaryDriverSuspension :: "Ask Driver Management to suspend a driver temporarily" {
+        identity correlationId : uuid
+        fields {
+            driverId : uuid
+            duration : Duration
+            reason : string
+        }
+    }
+
+    command NotifySafetyTeam :: "Raise an emergency with the safety team" {
+        identity correlationId : uuid
+        fields {
+            rideId : uuid
+            eventType : EmergencyEventType
+        }
+    }
+
+    command ShareLocationWithEmergencyServices :: "Share the ride's live location with local emergency services" {
+        identity correlationId : uuid
+        fields {
+            rideId : uuid
+            location : Location
+        }
+    }
+
+    command SendSafetyCheck :: "Ping the rider to check they are safe" {
+        identity correlationId : uuid
+        fields {
+            riderId : uuid
+            rideId : uuid
+            stop : Location
+        }
+    }
+
+    command NotifyRider :: "Send the rider a message" {
+        identity correlationId : uuid
+        fields {
+            riderId : uuid
+            message : string
+        }
+    }
 
     // -----------------------------------------------------------------
     // Events
     // -----------------------------------------------------------------
 
-    event RideRequested { satisfies [REQ-RIDE-001] fields { requestId: uuid; riderId: uuid; pickupLocation: Location; dropoffLocation: Location; committedFare: FareEstimate; scheduleType: RideScheduleType; requestedAt: datetime } }
-    event RideRequestMatched { satisfies [REQ-RIDE-021, REQ-RIDE-025, REQ-RIDE-NFR-001] fields { requestId: uuid; driverId: uuid; matchedAt: datetime } }
-    event RideRequestCancelledByRider { satisfies [REQ-RIDE-006, REQ-RIDE-060] fields { requestId: uuid; riderId: uuid; cancelledAt: datetime } }
-    event NoDriverAvailable { satisfies [REQ-RIDE-024] fields { requestId: uuid; riderId: uuid; cancelledAt: datetime } }
-    event RideCreated { satisfies [REQ-RIDE-025] fields { rideId: uuid; requestId: uuid; riderId: uuid; driverId: uuid; estimatedArrival: datetime; createdAt: datetime } }
-    event DriverArrived { satisfies [REQ-RIDE-042] fields { rideId: uuid; riderId: uuid; driverId: uuid; arrivedAt: datetime } }
-    event RideStarted { satisfies [REQ-RIDE-044] fields { rideId: uuid; pickupLocation: Location; startedAt: datetime } }
-    event RideLocationUpdated { satisfies [REQ-RIDE-045, REQ-RIDE-046] fields { rideId: uuid; route: Route; updatedAt: datetime } }
-    event RideCompleted { satisfies [REQ-RIDE-047, REQ-RIDE-048] fields { rideId: uuid; riderId: uuid; driverId: uuid; actualDistance: Distance; actualDuration: Duration; riderRating: any optional; driverRating: any optional; completedAt: datetime } }
-    event RideCancelledByRider { satisfies [REQ-RIDE-061] fields { rideId: uuid; riderId: uuid; feeAmount: Amount; cancelledAt: datetime } }
-    event RideCancelledByDriver { satisfies [REQ-RIDE-063] fields { rideId: uuid; riderId: uuid; driverId: uuid; cancelledAt: datetime } }
-    event RideCancelledRiderNoShow { satisfies [REQ-RIDE-043] fields { rideId: uuid; riderId: uuid; feeAmount: Amount; cancelledAt: datetime } }
-    event RideCancelledDriverNoShow { satisfies [REQ-RIDE-065, REQ-RIDE-067] fields { rideId: uuid; riderId: uuid; driverId: uuid; cancelledAt: datetime } }
-    event TripSharingActivated { satisfies [REQ-RIDE-080] fields { rideId: uuid; link: TripSharingLink; activatedAt: datetime } }
-    event EmergencyTriggered { satisfies [REQ-RIDE-081, REQ-RIDE-082] fields { rideId: uuid; riderId: uuid; driverId: uuid; type: EmergencyEventType; location: Location; triggeredAt: datetime } }
-    event UnusualStopDetected { satisfies [REQ-RIDE-084] fields { rideId: uuid; location: Location; stoppedSeconds: int; detectedAt: datetime } }
-    event SafetyReportFiled { satisfies [REQ-RIDE-085, REQ-RIDE-086] fields { rideId: uuid; reportedBy: uuid; severity: SafetyReportSeverity; description: string; withinWindow: boolean; filedAt: datetime } }
-    event DriverNoShowRecorded { satisfies [REQ-RIDE-067] fields { driverId: uuid; rideId: uuid; recordedAt: datetime } }
+    event RideRequested {
+        satisfies [REQ-RIDE-001]
+        about RideRequest
+        caused-by RequestRide
+        fields { requestId : uuid  riderId : uuid  pickupLocation : Location  dropoffLocation : Location  committedFare : FareEstimate  scheduleType : RideScheduleType  requestedAt : datetime }
+    }
+    event RideRequestMatched {
+        satisfies [REQ-RIDE-021, REQ-RIDE-025, REQ-RIDE-NFR-001]
+        about RideRequest
+        caused-by AcceptRideOffer
+        fields { requestId : uuid  driverId : uuid  matchedAt : datetime }
+    }
+    event RideRequestCancelledByRider {
+        satisfies [REQ-RIDE-006, REQ-RIDE-060]
+        about RideRequest
+        caused-by CancelRequestByRider
+        fields { requestId : uuid  riderId : uuid  cancelledAt : datetime }
+    }
+    event NoDriverAvailable {
+        satisfies [REQ-RIDE-024]
+        about RideRequest
+        caused-by CancelRequestNoDriver
+        fields { requestId : uuid  riderId : uuid  cancelledAt : datetime }
+    }
+    event RideCreated {
+        satisfies [REQ-RIDE-025]
+        about Ride
+        caused-by CreateRide
+        fields { rideId : uuid  requestId : uuid  riderId : uuid  driverId : uuid  estimatedArrival : datetime  createdAt : datetime }
+    }
+    event DriverArrived {
+        satisfies [REQ-RIDE-042]
+        about Ride
+        caused-by SignalDriverArrival
+        fields { rideId : uuid  riderId : uuid  driverId : uuid  arrivedAt : datetime }
+    }
+    event RideStarted {
+        satisfies [REQ-RIDE-044]
+        about Ride
+        caused-by StartRide
+        fields { rideId : uuid  pickupLocation : Location  startedAt : datetime }
+    }
+    event RideLocationUpdated {
+        satisfies [REQ-RIDE-045, REQ-RIDE-046]
+        about Ride
+        caused-by UpdateRideTracking
+        fields { rideId : uuid  route : Route  updatedAt : datetime }
+    }
+    event RideCompleted {
+        satisfies [REQ-RIDE-047, REQ-RIDE-048]
+        about Ride
+        caused-by CompleteRide
+        fields { rideId : uuid  riderId : uuid  driverId : uuid  actualDistance : Distance  actualDuration : Duration  riderRating : RideRating optional  driverRating : RideRating optional  completedAt : datetime }
+    }
+    event RideCancelledByRider {
+        satisfies [REQ-RIDE-061]
+        about Ride
+        caused-by CancelRideByRider
+        fields { rideId : uuid  riderId : uuid  feeAmount : Amount  cancelledAt : datetime }
+    }
+    event RideCancelledByDriver {
+        satisfies [REQ-RIDE-063]
+        about Ride
+        caused-by CancelRideByDriver
+        fields { rideId : uuid  riderId : uuid  driverId : uuid  cancelledAt : datetime }
+    }
+    event RideCancelledRiderNoShow {
+        satisfies [REQ-RIDE-043]
+        about Ride
+        caused-by CancelRideRiderNoShow
+        fields { rideId : uuid  riderId : uuid  feeAmount : Amount  cancelledAt : datetime }
+    }
+    event RideCancelledDriverNoShow {
+        satisfies [REQ-RIDE-065, REQ-RIDE-067]
+        about Ride
+        caused-by CancelRideDriverNoShow
+        fields { rideId : uuid  riderId : uuid  driverId : uuid  cancelledAt : datetime }
+    }
+    event TripSharingActivated {
+        satisfies [REQ-RIDE-080]
+        about Ride
+        caused-by ActivateTripSharing
+        fields { rideId : uuid  link : TripSharingLink  activatedAt : datetime }
+    }
+    event EmergencyTriggered {
+        satisfies [REQ-RIDE-081, REQ-RIDE-082]
+        about Ride
+        caused-by TriggerEmergency
+        fields { rideId : uuid  riderId : uuid  driverId : uuid  type : EmergencyEventType  location : Location  triggeredAt : datetime }
+    }
+    event UnusualStopDetected {
+        satisfies [REQ-RIDE-084]
+        about Ride
+        caused-by DetectUnusualStop
+        fields { rideId : uuid  location : Location  stoppedSeconds : int  detectedAt : datetime }
+    }
+    event SafetyReportFiled {
+        satisfies [REQ-RIDE-085, REQ-RIDE-086]
+        about Ride
+        caused-by FileSafetyReport
+        fields { rideId : uuid  reportedBy : uuid  severity : SafetyReportSeverity  description : string  withinWindow : boolean  filedAt : datetime }
+    }
+    event DriverNoShowRecorded {
+        satisfies [REQ-RIDE-067]
+        about Ride
+        caused-by CancelRideDriverNoShow
+        fields { driverId : uuid  rideId : uuid  recordedAt : datetime }
+    }
 
     // -----------------------------------------------------------------
     // Temporal events
     // -----------------------------------------------------------------
 
-    temporal-event RideOfferDeadlineElapsed :: "Offer auto-retracts after 15 seconds" {
+    // UNCLEAR: the anchor was `relative-to RideOffer.offeredAt offset 15s`. A relative
+    // temporal event's `reference` must name an EVENT, and no "offer made" event is
+    // modelled (offers are created inside MatchingService), so the deadline is anchored
+    // on RideRequested and the offer's own timestamp is carried in the offset.
+    temporal event RideOfferDeadlineElapsed :: "Offer auto-retracts after 15 seconds" {
         satisfies [REQ-RIDE-023]
-        relative-to RideOffer.offeredAt offset 15s
-        guard RideOffer.status = pending
+        about RideOffer
+        reference RideRequested
+        offset RideOffer.offeredAt + 15 seconds
+        guard { RideOffer.status = pending }
+        fields {
+            offerId : uuid
+            rideRequestId : uuid
+        }
     }
 
-    temporal-event RiderBoardingDeadlineElapsed :: "Rider must board within 5 min of arrival" {
+    temporal event RiderBoardingDeadlineElapsed :: "Rider must board within 5 min of arrival" {
         satisfies [REQ-RIDE-043]
-        relative-to DriverArrived offset 5min
-        guard Ride.status = driverArrived
+        about Ride
+        reference DriverArrived
+        offset 5 minutes
+        guard { Ride.status = driverArrived }
+        fields {
+            rideId : uuid
+            arrivedAt : datetime
+        }
     }
 
-    temporal-event DriverArrivalDeadlineElapsed :: "Driver no-show after ETA + 5 min" {
+    temporal event DriverArrivalDeadlineElapsed :: "Driver no-show after ETA + 5 min" {
         satisfies [REQ-RIDE-065]
-        relative-to (Ride.estimatedDriverArrivalTime + 5min)
-        guard Ride.status = driverAssigned
+        about Ride
+        reference RideCreated
+        offset Ride.estimatedDriverArrivalTime + 5 minutes
+        guard { Ride.status = driverAssigned }
+        fields {
+            rideId : uuid
+        }
     }
 
-    temporal-event ScheduledRideMatchingDue :: "Begin matching 15 min before scheduled pickup" {
+    temporal event ScheduledRideMatchingDue :: "Begin matching 15 min before scheduled pickup" {
         satisfies [REQ-RIDE-008]
-        relative-to (RideRequest.scheduledPickupTime - 15min)
-        guard RideRequest.scheduleType = scheduled and RideRequest.status = searching
+        about RideRequest
+        reference RideRequested
+        offset RideRequest.scheduledPickupTime - 15 minutes
+        guard { RideRequest.scheduleType = scheduled and RideRequest.status = searching }
+        fields {
+            requestId : uuid
+        }
     }
 
-    temporal-event ScheduledRideReminderDue :: "Remind rider 30 min before scheduled pickup" {
+    temporal event ScheduledRideReminderDue :: "Remind rider 30 min before scheduled pickup" {
         satisfies [REQ-RIDE-009]
-        relative-to (RideRequest.scheduledPickupTime - 30min)
-        guard RideRequest.scheduleType = scheduled
+        about RideRequest
+        reference RideRequested
+        offset RideRequest.scheduledPickupTime - 30 minutes
+        guard { RideRequest.scheduleType = scheduled }
+        fields {
+            requestId : uuid
+            riderId : uuid
+        }
     }
 
     // -----------------------------------------------------------------
     // External events
     // -----------------------------------------------------------------
 
-    external-event PaymentCaptured from Payment
-    external-event ETAVarianceDetected from GeolocationRouting
+    external event PaymentCaptured :: "Payment captured the fare of a completed ride" {
+        from Payment
+        fields {
+            paymentId : uuid required
+            rideId : uuid
+            riderId : uuid
+            capturedAt : datetime
+        }
+    }
+
+    external event ETAVarianceDetected :: "Geolocation saw the remaining ETA grow unusually" {
+        from GeolocationRouting
+        fields {
+            rideId : uuid required
+            growthSeconds : int
+            detectedAt : datetime
+        }
+    }
 
     // -----------------------------------------------------------------
     // Reactions
     // -----------------------------------------------------------------
 
-    reaction startMatchingOnRequest :: "Trigger matching as soon as the request is filed" {
+    reaction StartMatchingOnRequest :: "Trigger matching as soon as the request is filed" {
         satisfies [REQ-RIDE-020]
-        trigger RideRequested
-        guard event.scheduleType = immediate
-        effect MatchingService.findAndOfferDriver(rideRequest = resolve(event.requestId))
+        triggered-by RideRequested
+        guard { event.scheduleType = immediate }
+        effects FindAndOfferDriver
     }
 
-    reaction startMatchingOnScheduledLeadTime :: "Begin matching scheduled rides 15 minutes early" {
+    reaction StartMatchingOnScheduledLeadTime :: "Begin matching scheduled rides 15 minutes early" {
         satisfies [REQ-RIDE-008]
-        trigger ScheduledRideMatchingDue
-        effect MatchingService.findAndOfferDriver(rideRequest = resolve(event.requestId))
+        triggered-by ScheduledRideMatchingDue
+        effects FindAndOfferDriver
     }
 
-    reaction createRideOnMatch :: "Materialize a Ride when a driver accepts" {
+    reaction CreateRideOnMatch :: "Materialize a Ride when a driver accepts; the ETA comes from GeolocationGateway.estimateDriverArrival" {
         satisfies [REQ-RIDE-025]
-        trigger RideRequestMatched
-        effect CreateRide(
-            requestId = event.requestId,
-            riderId = resolve(event.requestId).riderId,
-            driverId = event.driverId,
-            pickupLocation = resolve(event.requestId).pickupLocation,
-            dropoffLocation = resolve(event.requestId).dropoffLocation,
-            committedFare = resolve(event.requestId).committedFare,
-            estimatedDriverArrivalTime = GeolocationGateway.estimateDriverArrival(event.driverId, resolve(event.requestId).pickupLocation)
-        )
+        triggered-by RideRequestMatched
+        effects CreateRide
     }
 
-    reaction retractExpiredOffer :: "Retract pending offer at deadline and roll to next driver" {
+    reaction RetractExpiredOffer :: "Retract pending offer at deadline and roll to next driver" {
         satisfies [REQ-RIDE-023]
-        trigger RideOfferDeadlineElapsed
-        effect HandleOfferTimeout(offerId = event.offerId)
+        triggered-by RideOfferDeadlineElapsed
+        effects HandleOfferTimeout
     }
 
-    reaction cancelOnRiderNoShow :: "Cancel ride if rider has not boarded 5 min after driver arrival" {
+    reaction CancelOnRiderNoShow :: "Cancel ride if rider has not boarded 5 min after driver arrival" {
         satisfies [REQ-RIDE-043]
-        trigger RiderBoardingDeadlineElapsed
-        effect CancelRideRiderNoShow(rideId = event.rideId, arrivedAt = event.referenceTime, feeAmount = computeNoShowFee())
+        triggered-by RiderBoardingDeadlineElapsed
+        effects CancelRideRiderNoShow
     }
 
-    reaction cancelOnDriverNoShow :: "Cancel ride and rematch when driver fails to arrive" {
+    reaction CancelOnDriverNoShow :: "Cancel ride and rematch when driver fails to arrive" {
         satisfies [REQ-RIDE-065, REQ-RIDE-067]
-        trigger DriverArrivalDeadlineElapsed
-        effect CancelRideDriverNoShow(rideId = event.rideId)
+        triggered-by DriverArrivalDeadlineElapsed
+        effects CancelRideDriverNoShow
     }
 
-    reaction rematchAfterDriverFault :: "Re-enter matching after driver cancellation or no-show" {
+    reaction RematchAfterDriverFault :: "Re-enter matching after driver cancellation or no-show — a clone of the original request" {
         satisfies [REQ-RIDE-067]
-        trigger RideCancelledDriverNoShow
-        effect RequestRide(/* clone of original request */)
+        triggered-by RideCancelledDriverNoShow
+        effects RequestRide
     }
 
-    reaction suspendOnExcessiveDriverCancellations :: "Suspend driver for 30 min after >3 cancellations in 24h" {
+    reaction SuspendOnExcessiveDriverCancellations :: "Suspend driver for 30 min after >3 cancellations in 24h" {
         satisfies [REQ-RIDE-064]
-        trigger RideCancelledByDriver
-        guard DriverManagementGateway.getCancellationCount(event.driverId, 24) > 3
-        effect DriverManagementGateway.requestTemporarySuspension(
-            driverId = event.driverId,
-            duration = Duration(seconds = 1800),
-            reason = "Excessive cancellations in 24h"
-        )
+        triggered-by RideCancelledByDriver
+        guard { DriverManagementGateway.getCancellationCount(event.driverId, 24) > 3 }
+        effects RequestTemporaryDriverSuspension
     }
 
-    reaction suspendOnExcessiveDriverNoShows :: "Suspend driver for 1 hour after >2 no-shows in 24h" {
+    reaction SuspendOnExcessiveDriverNoShows :: "Suspend driver for 1 hour after >2 no-shows in 24h" {
         satisfies [REQ-RIDE-066]
-        trigger RideCancelledDriverNoShow
-        guard DriverManagementGateway.getNoShowCount(event.driverId, 24) > 2
-        effect DriverManagementGateway.requestTemporarySuspension(
-            driverId = event.driverId,
-            duration = Duration(seconds = 3600),
-            reason = "Excessive no-shows in 24h"
-        )
+        triggered-by RideCancelledDriverNoShow
+        guard { DriverManagementGateway.getNoShowCount(event.driverId, 24) > 2 }
+        effects RequestTemporaryDriverSuspension
     }
 
-    reaction publishDriverNoShowForReliability :: "Publish DriverNoShowRecorded for Driver Management reliability score" {
-        satisfies [REQ-RIDE-067]
-        trigger RideCancelledDriverNoShow
-        effect publish DriverNoShowRecorded(driverId = event.driverId, rideId = event.rideId, recordedAt = now())
-    }
-
-    reaction notifySafetyTeamOnEmergency :: "Notify safety team within 60s of emergency button press" {
+    reaction NotifySafetyTeamOnEmergency :: "Notify safety team within 60s of emergency button press" {
         satisfies [REQ-RIDE-082]
-        trigger EmergencyTriggered
-        effect RideNotificationService.notifySafetyTeam(rideId = event.rideId, eventType = event.type)
+        triggered-by EmergencyTriggered
+        effects NotifySafetyTeam
     }
 
-    reaction shareWithEmergencyServicesIfConfigured :: "Share location with local emergency services where integrated" {
+    reaction ShareWithEmergencyServicesIfConfigured :: "Share location with local emergency services where integrated" {
         satisfies [REQ-RIDE-083]
-        trigger EmergencyTriggered
-        guard marketSupportsEmergencyIntegration(event.rideId)
-        effect RideNotificationService.shareLocationWithEmergencyServices(rideId = event.rideId, location = event.location)
+        triggered-by EmergencyTriggered
+        guard { marketSupportsEmergencyIntegration(event.rideId) }
+        effects ShareLocationWithEmergencyServices
     }
 
-    reaction safetyCheckOnUnusualStop :: "Send safety check ping to rider on unusual stop" {
+    reaction SafetyCheckOnUnusualStop :: "Send safety check ping to rider on unusual stop" {
         satisfies [REQ-RIDE-084]
-        trigger UnusualStopDetected
-        effect RideNotificationService.sendSafetyCheck(riderId = resolve(event.rideId).riderId, rideId = event.rideId, stop = event.location)
+        triggered-by UnusualStopDetected
+        effects SendSafetyCheck
     }
 
-    reaction notifyRiderOnDriverNoShow :: "Tell rider a new driver is being found" {
+    reaction NotifyRiderOnDriverNoShow :: "Tell rider 'Your driver did not arrive — we are finding a new driver'" {
         satisfies [REQ-RIDE-067]
-        trigger RideCancelledDriverNoShow
-        effect RideNotificationService.notifyRider(
-            riderId = event.riderId,
-            message = "Your driver did not arrive — we are finding a new driver"
-        )
+        triggered-by RideCancelledDriverNoShow
+        effects NotifyRider
     }
 
     // -----------------------------------------------------------------
@@ -837,11 +1181,28 @@ context RideManagement :: "Ride lifecycle — upfront fare, matching, pickup-to-
 
     agreement RideRequestRideConsistency :: "RideRequest.matched ↔ Ride exists for that request" {
         satisfies [REQ-RIDE-025]
-        participants [RideRequest, Ride]
-        reconciliation orphanRideOrUnmaterializedMatch :: "Detect requests in matched status without a Ride" {
-            detection "RideRequest.status = matched and not exists Ride where rideRequestId = RideRequest.requestId for > 60s"
-            response alert
-            escalation [operatorReviewQueue, engineeringOnCall]
+        participants { RideRequest, Ride }
+        // UNCLEAR: the original stated the property as prose — "RideRequest.status = matched
+        // and not exists Ride where rideRequestId = RideRequest.requestId for > 60s". The
+        // closest checkable expression is a count equality between matched requests and the
+        // rides materialized from them; the 60-second grace period cannot be expressed in a
+        // predicate and lives in the reconciliation instead.
+        predicate { count(RideRequest.matched) = count(Ride.rideRequestId) }
+        reconciliation OrphanRideOrUnmaterializedMatch :: "Detect requests in matched status without a Ride" {
+            trigger event RideRequestMatched
+            detection query
+            compensation { CreateRide }
+            coordination orchestration
+            escalation :: "Operator review first, then engineering on-call" {
+                step operatorReviewQueue {
+                    when { true }
+                    action compensate { CreateRide }
+                }
+                step engineeringOnCall {
+                    when { true }
+                    action manual "Engineering on-call reconciles the orphaned match by hand"
+                }
+            }
         }
     }
 }

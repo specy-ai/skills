@@ -9,6 +9,8 @@ import * as ast from '../generated/ast.js';
  * kind (entities, values, events, ...) under their owning context/module so the
  * result reads as a tidy domain tree for JSON, YAML, and Markdown emitters.
  *
+ * The grammar gives every definition TYPED SLOTS (identity=, fields=, operations=)
+ * rather than one polymorphic bodyItems array, so each kind is projected directly.
  * Where a node has no dedicated handling it falls back to `cleanNode`, so no
  * information silently disappears.
  */
@@ -22,19 +24,24 @@ export interface FieldModel {
     type: string;
     optional?: boolean;
     constraints?: string[];
+    description?: string;
+    satisfies?: string[];
 }
 
 export interface OperationModel {
     name: string;
     description?: string;
     satisfies?: string[];
-    /** Triggering command/event for command/event-triggered operations. */
+    /** Triggering command for command-triggered operations. */
     on?: string;
-    trigger?: { command?: string; event?: string };
+    trigger?: { command?: string };
     accepts?: string[];
     returns?: string;
+    /** safe = no mutation; unsafe = mutates domain state. */
+    safety?: string;
+    idempotent?: boolean;
     emits?: string[];
-    /** Full cleaned clauses/items, so nothing is lost for JSON/YAML. */
+    /** Full cleaned clauses, so nothing is lost for JSON/YAML. */
     detail?: unknown[];
 }
 
@@ -61,8 +68,12 @@ export interface ModuleModel {
     name: string;
     description?: string;
     metadata?: Record<string, unknown>;
+    /** API interfaces — the module's public surface. */
+    exposes?: string[];
+    /** SPI interfaces — the capabilities the module needs from outside. */
+    requires?: string[];
+    /** Other modules this one depends on. */
     dependencies?: string[];
-    modules?: ModuleModel[];
     definitions?: DefinitionGroups;
 }
 
@@ -71,6 +82,7 @@ export interface ContextModel {
     shortname?: string;
     description?: string;
     metadata?: Record<string, unknown>;
+    requirementsSource?: string;
     contextMap?: RelationModel[];
     modules?: ModuleModel[];
     definitions?: DefinitionGroups;
@@ -80,6 +92,7 @@ export interface OrganizationModel {
     name: string;
     description?: string;
     metadata?: Record<string, unknown>;
+    requirementsSource?: string;
     contexts?: ContextModel[];
 }
 
@@ -157,7 +170,7 @@ function typeToString(ft: ast.FieldType | undefined): string {
     if (ast.isPrimitiveType(ft)) return ft.value;
     if (ast.isCollectionType(ft)) {
         if (ft.kind === 'map' && ft.valueType) {
-            return `Map<${typeToString(ft.elementType)}, ${typeToString(ft.valueType)}>`;
+            return `map<${typeToString(ft.elementType)}, ${typeToString(ft.valueType)}>`;
         }
         return `${ft.kind}<${typeToString(ft.elementType)}>`;
     }
@@ -172,10 +185,7 @@ function typeToString(ft: ast.FieldType | undefined): string {
 
 function dotPathToString(dp: ast.DotPath | undefined): string {
     return (dp?.segments ?? [])
-        .map(seg => {
-            const s = seg as unknown as Record<string, unknown>;
-            return (s.name ?? s.segment ?? '') as string;
-        })
+        .map(seg => seg.value)
         .filter(Boolean)
         .join('.');
 }
@@ -200,6 +210,10 @@ function metaOf(m?: ast.MetadataBlock): Record<string, unknown> | undefined {
     return out;
 }
 
+function satisfiesOf(s?: ast.SatisfiesDecl): string[] | undefined {
+    return s && s.ids.length > 0 ? s.ids : undefined;
+}
+
 /** Drop undefined-valued keys so emitted JSON/YAML stays tidy. */
 function compact<T extends object>(obj: T): T {
     const rec = obj as Record<string, unknown>;
@@ -209,8 +223,12 @@ function compact<T extends object>(obj: T): T {
     return obj;
 }
 
+function nonEmpty<T>(arr: T[]): T[] | undefined {
+    return arr.length > 0 ? arr : undefined;
+}
+
 // ---------------------------------------------------------------------------
-// Fields and constraints
+// Fields, references, constraints
 // ---------------------------------------------------------------------------
 
 function constraintToString(c: ast.Constraint): string {
@@ -228,15 +246,45 @@ function fieldOf(f: ast.FieldDecl): FieldModel {
         name: nameOf(f.name),
         type: typeToString(f.type),
         optional: f.optional || undefined,
-        constraints: f.constraints.length > 0 ? f.constraints.map(constraintToString) : undefined,
+        constraints: nonEmpty(f.constraints.map(constraintToString)),
+        description: descOf(f.description),
+        satisfies: satisfiesOf(f.satisfies),
     });
+}
+
+function fieldsOf(block?: ast.FieldsBlock): FieldModel[] | undefined {
+    return block ? nonEmpty(block.fields.map(fieldOf)) : undefined;
+}
+
+function referencesOf(block?: ast.ReferencesBlock) {
+    if (!block) return undefined;
+    return nonEmpty(
+        block.refs.map(r =>
+            compact({
+                name: nameOf(r.name),
+                target: nameOf(r.target),
+                cardinality: r.cardinality,
+                description: descOf(r.description),
+            }),
+        ),
+    );
+}
+
+function identityOf(id?: ast.IdentityDecl) {
+    return id ? { name: nameOf(id.name), type: typeToString(id.type) } : undefined;
+}
+
+function paramsOf(list?: ast.ParamList): string[] | undefined {
+    if (!list) return undefined;
+    return nonEmpty(list.params.map(p => `${nameOf(p.name)} : ${typeToString(p.type)}${p.optional ? '?' : ''}`));
 }
 
 // ---------------------------------------------------------------------------
 // Operations
 // ---------------------------------------------------------------------------
 
-function collectEmits(clauses: AstNode[]): string[] {
+/** `emits` is the concrete syntax of an event's 1..1 "raised by" relation. */
+function collectEmits(clauses: ast.OperationClause[]): string[] {
     const emits: string[] = [];
     for (const c of clauses) {
         if (ast.isEmitsClause(c)) emits.push(nameOf(c.event));
@@ -245,174 +293,163 @@ function collectEmits(clauses: AstNode[]): string[] {
     return emits;
 }
 
-function summarizeOperation(op: AstNode): OperationModel {
-    const o = op as unknown as Record<string, unknown>;
+function bodyToModel(body: ast.OperationBody | undefined, model: OperationModel): void {
+    if (!body) return;
+    model.satisfies = satisfiesOf(body.satisfies);
+    model.safety = body.safety ?? undefined;
+    model.idempotent = body.idempotent || undefined;
+    model.emits = nonEmpty(collectEmits(body.clauses));
+    model.detail = nonEmpty(body.clauses.map(cleanValue).filter(v => v !== undefined));
+}
+
+function summarizeOperation(op: ast.OperationDef): OperationModel {
     const model: OperationModel = { name: '' };
 
     if (ast.isCommandTriggeredOp(op)) {
         model.name = op.label;
+        model.on = nameOf(op.command);
         model.trigger = { command: nameOf(op.command) };
-        model.emits = collectEmits(op.clauses);
         model.description = descOf(op.description);
-        model.satisfies = op.satisfies?.ids;
-        model.detail = op.clauses.map(cleanValue).filter(v => v !== undefined);
-    } else if (ast.isEventTriggeredOp(op)) {
-        model.name = op.label;
-        model.trigger = { event: nameOf(op.event), command: nameOf(op.command) };
-        model.emits = collectEmits(op.clauses);
-        model.description = descOf(op.description);
-        model.satisfies = op.satisfies?.ids;
-        model.detail = op.clauses.map(cleanValue).filter(v => v !== undefined);
-    } else if (ast.isInternalOp(op)) {
-        model.name = nameOf(op.name);
-        model.returns = op.returnType ? typeToString(op.returnType) : undefined;
-        model.emits = collectEmits(op.clauses);
-        model.description = descOf(op.description);
-        model.satisfies = op.satisfies?.ids;
-        model.detail = op.clauses.map(cleanValue).filter(v => v !== undefined);
-    } else if (ast.isNamedOperationDef(op)) {
-        model.name = op.name;
-        const emits: string[] = [];
-        const accepts: string[] = [];
-        for (const item of op.items) {
-            if (ast.isEmitsClause(item)) emits.push(nameOf(item.event));
-            else if (ast.isAcceptsClause(item)) {
-                const params = [item.first, ...item.more];
-                for (const p of params) accepts.push(`${nameOf(p.name)} : ${typeToString(p.type)}`);
-            } else if (ast.isReturnsDecl(item)) {
-                model.returns = typeToString(item.type.type);
-            } else if (ast.isOnClause(item)) {
-                model.on = nameOf(item.type);
-            } else if (ast.isDescription(item)) {
-                model.description = item.text;
-            } else if (ast.isSatisfiesDecl(item)) {
-                model.satisfies = item.ids;
-            }
-        }
-        if (emits.length) model.emits = emits;
-        if (accepts.length) model.accepts = accepts;
+        bodyToModel(op.body, model);
     } else {
-        // Unknown operation shape — keep it whole.
-        model.name = (o.label as string) ?? (o.name as string) ?? 'operation';
-        model.detail = [cleanNode(op)];
+        model.name = nameOf(op.name);
+        model.accepts = paramsOf(op.params);
+        model.returns = op.returnType ? typeToString(op.returnType) : undefined;
+        model.description = descOf(op.description);
+        bodyToModel(op.body, model);
     }
 
-    if (model.emits && model.emits.length === 0) model.emits = undefined;
-    if (model.detail && model.detail.length === 0) model.detail = undefined;
     return compact(model);
 }
 
-// ---------------------------------------------------------------------------
-// Body walker — buckets the polymorphic bodyItems/items arrays
-// ---------------------------------------------------------------------------
-
-interface BodyBuckets {
-    satisfies?: string[];
-    fields?: FieldModel[];
-    identity?: { name: string; type: string };
-    references?: { name: string; target: string; cardinality: string }[];
-    operations?: OperationModel[];
-    invariants?: unknown[];
-    reactions?: unknown[];
-    stateMachines?: unknown[];
-    transitions?: unknown[];
-    interfaces?: ConstructModel[];
-    exposes?: string[];
-    returns?: string;
-    eventKind?: string;
-    schedule?: string;
-    guard?: unknown;
-    other?: unknown[];
+function operationsOf(block?: ast.OperationsBlock): OperationModel[] | undefined {
+    return block ? nonEmpty(block.ops.map(summarizeOperation)) : undefined;
 }
 
-function walkBody(items: AstNode[]): BodyBuckets {
-    const b: BodyBuckets = {};
-    const satisfies: string[] = [];
-    const fields: FieldModel[] = [];
-    const references: { name: string; target: string; cardinality: string }[] = [];
-    const operations: OperationModel[] = [];
-    const invariants: unknown[] = [];
-    const reactions: unknown[] = [];
-    const stateMachines: unknown[] = [];
-    const transitions: unknown[] = [];
-    const interfaces: ConstructModel[] = [];
-    const exposes: string[] = [];
-    const other: unknown[] = [];
-
-    for (const item of items) {
-        if (ast.isSatisfiesDecl(item)) {
-            satisfies.push(...item.ids);
-        } else if (ast.isFieldDecl(item)) {
-            fields.push(fieldOf(item));
-        } else if (ast.isFieldsBlock(item)) {
-            for (const f of item.fields) fields.push(fieldOf(f));
-        } else if (ast.isIdentityDecl(item)) {
-            b.identity = { name: nameOf(item.name), type: typeToString(item.type) };
-        } else if (ast.isReferencesBlock(item)) {
-            for (const r of item.refs) {
-                references.push({ name: nameOf(r.name), target: nameOf(r.target), cardinality: r.cardinality });
-            }
-        } else if (ast.isOperationsBlock(item)) {
-            for (const op of item.ops) operations.push(summarizeOperation(op));
-        } else if (ast.isNamedOperationDef(item)) {
-            operations.push(summarizeOperation(item));
-        } else if (ast.isInvariantsBlock(item)) {
-            for (const inv of item.invariants) invariants.push(cleanNode(inv));
-        } else if (ast.isInlineInvariant(item)) {
-            invariants.push(cleanNode(item));
-        } else if (ast.isReactionsBlock(item)) {
-            for (const p of item.reactions) reactions.push(cleanNode(p));
-        } else if (ast.isStatesBlock(item)) {
-            for (const m of item.machines) stateMachines.push(cleanNode(m));
-        } else if (ast.isTransitionsBlock(item)) {
-            for (const t of item.transitions) transitions.push(cleanNode(t));
-        } else if (ast.isInterfaceDef(item)) {
-            interfaces.push(normalizeInterface(item));
-        } else if (ast.isExposesClause(item)) {
-            exposes.push(dotPathToString(item.path));
-        } else if (ast.isReturnsDecl(item)) {
-            b.returns = typeToString(item.type.type);
-        } else if (ast.isEventTypeClassifier(item)) {
-            b.eventKind = item.classifier;
-        } else if (ast.isEventSchedule(item)) {
-            b.schedule = item.expr;
-        } else if (ast.isEventGuard(item)) {
-            b.guard = cleanValue(item.expr);
-        } else if (ast.isDescription(item) || ast.isMetadataBlock(item)) {
-            // handled at the definition level — skip
-        } else {
-            other.push(cleanNode(item));
-        }
-    }
-
-    if (satisfies.length) b.satisfies = satisfies;
-    if (fields.length) b.fields = fields;
-    if (references.length) b.references = references;
-    if (operations.length) b.operations = operations;
-    if (invariants.length) b.invariants = invariants;
-    if (reactions.length) b.reactions = reactions;
-    if (stateMachines.length) b.stateMachines = stateMachines;
-    if (transitions.length) b.transitions = transitions;
-    if (interfaces.length) b.interfaces = interfaces;
-    if (exposes.length) b.exposes = exposes;
-    if (other.length) b.other = other;
-    return b;
+/** A signature-only operation: interface members, infra services, repositories. */
+function summarizeSignature(op: ast.OperationSignature): OperationModel {
+    return compact({
+        name: nameOf(op.name),
+        accepts: paramsOf(op.params),
+        returns: op.returnType ? typeToString(op.returnType) : undefined,
+        description: descOf(op.description),
+        satisfies: satisfiesOf(op.satisfies),
+        detail: nonEmpty(op.conditions.map(cleanValue).filter(v => v !== undefined)),
+    });
 }
+
+function summarizeValueOp(op: ast.ValueOpDef): OperationModel {
+    const model: OperationModel = {
+        name: nameOf(op.name),
+        accepts: paramsOf(op.params),
+        returns: typeToString(op.returnType),
+        description: descOf(op.description),
+    };
+    bodyToModel(op.body, model);
+    return compact(model);
+}
+
+/** Read-only entities admit only safe operations — no sets / creates / emits. */
+function summarizeSafeOp(op: ast.SafeOpDef): OperationModel {
+    return compact({
+        name: nameOf(op.name),
+        accepts: paramsOf(op.params),
+        returns: op.returnType ? typeToString(op.returnType) : undefined,
+        description: descOf(op.description),
+        satisfies: satisfiesOf(op.satisfies),
+        safety: op.safe ? 'safe' : undefined,
+        detail: nonEmpty(op.clauses.map(cleanValue).filter(v => v !== undefined)),
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Invariants, states
+// ---------------------------------------------------------------------------
+
+function enforcementToString(e?: ast.EnforcementStrategy): string | undefined {
+    if (!e) return undefined;
+    return e.kind === 'compensation' && e.type ? `compensation(${nameOf(e.type)})` : e.kind;
+}
+
+function invariantsOf(block?: ast.InvariantsBlock) {
+    if (!block) return undefined;
+    return nonEmpty(
+        block.invariants.map(inv =>
+            compact({
+                name: nameOf(inv.name),
+                description: descOf(inv.description),
+                satisfies: satisfiesOf(inv.satisfies),
+                params: paramsOf(inv.params),
+                expression: cleanValue(inv.expr),
+                enforcement: enforcementToString(inv.enforcement),
+            }),
+        ),
+    );
+}
+
+function statesOf(block?: ast.StatesBlock) {
+    if (!block) return undefined;
+    return nonEmpty(
+        block.machines.map(m =>
+            compact({
+                name: nameOf(m.name),
+                description: descOf(m.description),
+                satisfies: satisfiesOf(m.satisfies),
+                states: nonEmpty(
+                    m.members.filter(ast.isStateDef).map(s =>
+                        compact({
+                            name: nameOf(s.name),
+                            kind: s.kind,
+                            description: descOf(s.description),
+                            invariants: invariantsOf(s.invariants),
+                        }),
+                    ),
+                ),
+                transitions: nonEmpty(
+                    m.members.filter(ast.isTransitionDef).map(t =>
+                        compact({
+                            from: nameOf(t.source),
+                            to: nameOf(t.target),
+                            on: nameOf(t.trigger),
+                            description: descOf(t.description),
+                            satisfies: satisfiesOf(t.satisfies),
+                            conditions: nonEmpty(t.conditions.map(cleanValue).filter(v => v !== undefined)),
+                        }),
+                    ),
+                ),
+            }),
+        ),
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Interface — a port. The role is the discriminator.
+// ---------------------------------------------------------------------------
 
 function normalizeInterface(def: ast.InterfaceDef): ConstructModel {
-    const operations: OperationModel[] = [];
     const exposes: string[] = [];
+    const operations: OperationModel[] = [];
+    let describes: string | undefined;
+
     for (const m of def.members) {
-        if (ast.isNamedOperationDef(m)) operations.push(summarizeOperation(m));
-        else if (ast.isExposesClause(m)) exposes.push(dotPathToString(m.path));
+        if (ast.isExposesClause(m)) exposes.push(dotPathToString(m.path));
+        else if (ast.isDescribesClause(m)) describes = nameOf(m.provider);
+        else operations.push(summarizeSignature(m));
     }
+
     return compact({
         kind: 'interface',
+        // api = driving port (the domain is called); spi = driven port (the domain calls out).
+        role: def.role,
         name: nameOf(def.name),
         description: descOf(def.description),
         metadata: metaOf(def.metadata),
-        operations: operations.length ? operations : undefined,
-        exposes: exposes.length ? exposes : undefined,
+        satisfies: satisfiesOf(def.satisfies),
+        // API selects operations that already exist; SPI defines the contract a
+        // provider must fulfil.
+        exposes: nonEmpty(exposes),
+        describes,
+        operations: nonEmpty(operations),
     }) as ConstructModel;
 }
 
@@ -427,26 +464,27 @@ interface KindSpec {
 
 const KIND_BY_TYPE: Record<string, KindSpec> = {
     EntityDef: { kind: 'entity', group: 'entities' },
+    ReadOnlyEntityDef: { kind: 'read-only-entity', group: 'entities' },
     AggregateDef: { kind: 'aggregate', group: 'aggregates' },
     ValueDef: { kind: 'value', group: 'values' },
     EnumDef: { kind: 'enum', group: 'enums' },
     CommandDef: { kind: 'command', group: 'commands' },
     QueryDef: { kind: 'query', group: 'queries' },
     EventDef: { kind: 'event', group: 'events' },
-    ExternalEventDef: { kind: 'event', group: 'events' },
-    ErrorEventDef: { kind: 'event', group: 'events' },
-    TemporalEventDef: { kind: 'event', group: 'events' },
+    ExternalEventDef: { kind: 'external-event', group: 'events' },
+    ErrorEventDef: { kind: 'error-event', group: 'events' },
+    TemporalEventDef: { kind: 'temporal-event', group: 'events' },
     DomainServiceDef: { kind: 'domain-service', group: 'services' },
     ApplicationServiceDef: { kind: 'application-service', group: 'services' },
     InfrastructureServiceDef: { kind: 'infrastructure-service', group: 'services' },
-    ServiceDef: { kind: 'service', group: 'services' },
+    RepositoryDef: { kind: 'repository', group: 'repositories' },
+    InterfaceDef: { kind: 'interface', group: 'interfaces' },
     ReactionDef: { kind: 'reaction', group: 'reactions' },
     InvariantDef: { kind: 'invariant', group: 'invariants' },
     AgreementDef: { kind: 'agreement', group: 'agreements' },
-    StatemachineDef: { kind: 'statemachine', group: 'statemachines' },
 };
 
-function normalizeDefinition(def: AstNode): { group: string; construct: ConstructModel } {
+function normalizeDefinition(def: ast.Definition): { group: string; construct: ConstructModel } {
     const spec = KIND_BY_TYPE[def.$type] ?? { kind: def.$type, group: 'other' };
     const d = def as unknown as Record<string, unknown>;
 
@@ -455,66 +493,147 @@ function normalizeDefinition(def: AstNode): { group: string; construct: Construc
         name: nameOf(d.name),
         description: descOf(d.description as ast.Description | undefined),
         metadata: metaOf(d.metadata as ast.MetadataBlock | undefined),
+        satisfies: satisfiesOf(d.satisfies as ast.SatisfiesDecl | undefined),
     };
-    // satisfies as a direct property (enum/reaction/external-event/invariant/...)
-    if (d.satisfies && ast.isSatisfiesDecl(d.satisfies as AstNode)) {
-        base.satisfies = (d.satisfies as ast.SatisfiesDecl).ids;
-    }
 
-    // Body-bearing definitions: satisfies lives inside bodyItems instead.
-    const bodyItems = (d.bodyItems ?? d.items) as AstNode[] | undefined;
-    if (Array.isArray(bodyItems)) {
-        const buckets = walkBody(bodyItems);
-        const inheritedSatisfies = buckets.satisfies;
-        delete buckets.satisfies;
-        Object.assign(base, buckets);
-        base.satisfies ??= inheritedSatisfies;
-    }
-
-    // Per-kind extras not covered by the generic body walk
     if (ast.isEnumDef(def)) {
-        base.values = def.values.map(v => nameOf(v.value));
+        // `of ValueType` — the enum holds instances of a value type, which must
+        // then declare a `code` field.
+        base.valueType = def.valueType ? nameOf(def.valueType) : undefined;
+        base.values = def.values.map(v =>
+            compact({
+                name: nameOf(v.name),
+                value: v.value ? literalScalar(v.value) : undefined,
+                description: descOf(v.description),
+            }),
+        );
+    } else if (ast.isValueDef(def)) {
+        base.fields = fieldsOf(def.fields);
+        base.operations = nonEmpty((def.operations?.ops ?? []).map(summarizeValueOp));
+        base.invariants = invariantsOf(def.invariants);
+    } else if (ast.isEntityDef(def)) {
+        base.identity = identityOf(def.identity);
+        base.duplicateDetection = def.duplicateDetection ? cleanValue(def.duplicateDetection.expr) : undefined;
+        base.fields = fieldsOf(def.fields);
+        base.references = referencesOf(def.references);
+        base.operations = operationsOf(def.operations);
+        base.stateMachines = statesOf(def.states);
+        base.invariants = invariantsOf(def.invariants);
+    } else if (ast.isReadOnlyEntityDef(def)) {
+        // Master data: state owned upstream. Observable here, not mutable here.
+        base.sourcedFrom = nameOf(def.sourcedFrom.source);
+        base.syncedVia = def.syncedVia?.pattern;
+        base.projectedBy = def.projectedBy ? nameOf(def.projectedBy.adapter) : undefined;
+        base.identity = identityOf(def.identity);
+        base.fields = fieldsOf(def.fields);
+        base.references = referencesOf(def.references);
+        base.operations = nonEmpty((def.operations?.ops ?? []).map(summarizeSafeOp));
+        base.invariants = invariantsOf(def.invariants);
     } else if (ast.isAggregateDef(def)) {
-        for (const it of def.bodyItems) {
-            if (ast.isAggregateRootDecl(it)) base.root = nameOf(it.root);
-            else if (ast.isAggregateEntitiesDecl(it)) base.entities = it.entities.map(nameOf);
-            else if (ast.isAggregateContainsDecl(it)) base.contains = [nameOf(it.first), ...it.more.map(nameOf)];
-        }
+        // The aggregate IS its root; `entities` lists the non-root children.
+        base.identity = identityOf(def.identity);
+        base.duplicateDetection = def.duplicateDetection ? cleanValue(def.duplicateDetection.expr) : undefined;
+        base.fields = fieldsOf(def.fields);
+        base.entities = def.entities.entities.map(nameOf);
+        base.references = referencesOf(def.references);
+        base.operations = operationsOf(def.operations);
+        base.stateMachines = statesOf(def.states);
+        base.invariants = invariantsOf(def.invariants);
+    } else if (ast.isCommandDef(def)) {
+        // A command always carries an identifier — the correlation id.
+        base.identity = identityOf(def.identity);
+        base.fields = fieldsOf(def.fields);
+    } else if (ast.isQueryDef(def)) {
+        base.readsFrom = nameOf(def.readsFrom.repository);
+        base.fields = fieldsOf(def.fields);
+        base.returns = typeToString(def.returnType);
+    } else if (ast.isEventDef(def) || ast.isErrorEventDef(def)) {
+        base.about = def.about ? nameOf(def.about.entity) : undefined;
+        base.causedBy = def.causedBy ? nameOf(def.causedBy.cause) : undefined;
+        base.fields = fieldsOf(def.fields);
     } else if (ast.isExternalEventDef(def)) {
-        base.eventKind = 'external';
-        base.from = nameOf(def.from);
-        base.consumes = [nameOf(def.first), ...def.more.map(nameOf)];
-    } else if (ast.isErrorEventDef(def)) {
-        base.eventKind = base.eventKind ?? 'error';
-    } else if (ast.isInvariantDef(def)) {
-        base.enforcement = def.enforcement ?? undefined;
-        base.message = def.message ?? undefined;
-        base.on = def.on ? nameOf(def.on.type) : undefined;
-        base.must = def.must ? cleanValue(def.must.expr) : undefined;
-    } else if (ast.isStatemachineDef(def)) {
-        base.states = def.items.map(cleanValue).filter(v => v !== undefined);
+        // Consumed through a reaction, never straight into a command.
+        base.from = nameOf(def.source);
+        base.about = def.about ? nameOf(def.about.entity) : undefined;
+        base.fields = fieldsOf(def.fields);
+    } else if (ast.isTemporalEventDef(def)) {
+        base.about = def.about ? nameOf(def.about.entity) : undefined;
+        base.anchor = anchorOf(def.anchor);
+        base.guard = def.guard ? cleanValue(def.guard.expr) : undefined;
+        base.fields = fieldsOf(def.fields);
+    } else if (ast.isDomainServiceDef(def)) {
+        base.calls = def.calls ? def.calls.services.map(nameOf) : undefined;
+        base.operations = operationsOf(def.operations);
+    } else if (ast.isApplicationServiceDef(def)) {
+        base.exposedBy = def.exposedBy ? nameOf(def.exposedBy.interface) : undefined;
+        base.operations = operationsOf(def.operations);
+    } else if (ast.isInfrastructureServiceDef(def)) {
+        base.describedBy = def.describedBy ? nameOf(def.describedBy.interface) : undefined;
+        base.operations = nonEmpty(def.operations.ops.map(summarizeSignature));
+    } else if (ast.isRepositoryDef(def)) {
+        base.for = nameOf(def.entity);
+        base.readOnly = def.readOnly || undefined;
+        base.describedBy = def.describedBy ? nameOf(def.describedBy.interface) : undefined;
+        base.operations = nonEmpty(def.ops.map(summarizeSignature));
+    } else if (ast.isInterfaceDef(def)) {
+        return { group: spec.group, construct: normalizeInterface(def) };
     } else if (ast.isReactionDef(def)) {
-        const triggers: string[] = [];
-        const effects: string[] = [];
-        let guard: unknown;
-        for (const it of def.items) {
-            if (ast.isTriggeredByClause(it)) triggers.push(nameOf(it.event));
-            else if (ast.isTriggerClause(it)) triggers.push(nameOf(it.event), ...it.more.map(nameOf));
-            else if (ast.isEffectsClause(it)) effects.push(nameOf(it.command));
-            else if (ast.isEffectClause(it)) effects.push(nameOf(it.command));
-            else if (ast.isGuardClause(it)) guard = cleanValue(it.expr);
-        }
-        if (def.guard) guard = cleanValue(def.guard);
-        if (triggers.length) base.triggers = triggers;
-        if (effects.length) base.effects = effects;
-        if (guard !== undefined) base.guard = guard;
-        delete (base as Record<string, unknown>).other;
+        // The sole event -> command edge, uniform across all four event types.
+        base.triggeredBy = def.triggeredBy.events.map(nameOf);
+        base.guard = def.guard ? cleanValue(def.guard.expr) : undefined;
+        base.effects = nameOf(def.effects.command);
+    } else if (ast.isInvariantDef(def)) {
+        base.on = dotPathToString(def.scope);
+        base.must = cleanValue(def.must.expr);
+        base.enforcement = enforcementToString(def.enforcement);
+    } else if (ast.isAgreementDef(def)) {
+        base.participants = def.participants.participants.map(nameOf);
+        base.predicate = cleanValue(def.predicate.expr);
+        base.reconciliation = reconciliationOf(def.reconciliation);
     }
 
     return { group: spec.group, construct: compact(base) as ConstructModel };
 }
 
-function groupDefinitions(defs: AstNode[]): DefinitionGroups | undefined {
+function anchorOf(a: ast.TemporalAnchor): Record<string, unknown> {
+    if (ast.isRelativeAnchor(a)) {
+        return compact({ kind: 'relative', reference: nameOf(a.event), offset: cleanValue(a.offset) });
+    }
+    if (ast.isAbsoluteAnchor(a)) {
+        return { kind: 'absolute', instant: dotPathToString(a.instant) };
+    }
+    return { kind: 'recurring', schedule: a.schedule };
+}
+
+function reconciliationOf(r: ast.ReconciliationDef): Record<string, unknown> {
+    const trigger = r.trigger.schedule
+        ? { schedule: r.trigger.schedule }
+        : { events: r.trigger.events.map(nameOf) };
+    return compact({
+        name: nameOf(r.name),
+        description: descOf(r.description),
+        satisfies: satisfiesOf(r.satisfies),
+        trigger,
+        detection: r.detection,
+        compensation: r.compensation.commands.map(nameOf),
+        coordination: r.coordination ?? undefined,
+        // The chain must terminate: the final action is alert / suspend / manual.
+        escalation: r.escalation
+            ? nonEmpty(
+                  r.escalation.steps.map(s =>
+                      compact({
+                          name: nameOf(s.name),
+                          description: descOf(s.description),
+                          when: cleanValue(s.when),
+                          action: cleanValue(s.action),
+                      }),
+                  ),
+              )
+            : undefined,
+    });
+}
+
+function groupDefinitions(defs: ast.Definition[]): DefinitionGroups | undefined {
     const groups: DefinitionGroups = {};
     for (const def of defs) {
         if (!def || typeof def.$type !== 'string') continue;
@@ -540,21 +659,18 @@ function groupDefinitions(defs: AstNode[]): DefinitionGroups | undefined {
 // ---------------------------------------------------------------------------
 
 function normalizeModule(mod: ast.ModuleDef): ModuleModel {
-    const members = mod.body?.members ?? [];
-    const subModules = members.filter(ast.isModuleDef);
-    const defs = members.filter((m): m is ast.Definition | ast.InterfaceDef => !ast.isModuleDef(m));
-    const dependencies = [
-        ...mod.usesDecls.map(u => nameOf(u.module)),
-        ...(mod.body?.dependsBlock?.deps.map(nameOf) ?? []),
-    ];
     return compact({
         name: nameOf(mod.name),
         description: descOf(mod.description),
         metadata: metaOf(mod.metadata),
-        dependencies: dependencies.length ? dependencies : undefined,
-        modules: subModules.length ? subModules.map(normalizeModule) : undefined,
-        definitions: groupDefinitions(defs),
-    });
+        satisfies: satisfiesOf(mod.satisfies),
+        // The two interface relations are NOT symmetric: `exposes` is the public
+        // surface; `requires` is what the module needs given to it.
+        exposes: mod.exposes ? nonEmpty(mod.exposes.interfaces.map(nameOf)) : undefined,
+        requires: mod.requires ? nonEmpty(mod.requires.interfaces.map(nameOf)) : undefined,
+        dependencies: mod.dependsOn ? nonEmpty(mod.dependsOn.modules.map(nameOf)) : undefined,
+        definitions: groupDefinitions(mod.members),
+    }) as ModuleModel;
 }
 
 function normalizeRelations(map?: ast.ContextMapBlock): RelationModel[] | undefined {
@@ -577,10 +693,12 @@ function normalizeContext(ctx: ast.ContextDef): ContextModel {
         shortname: ctx.shortname ? nameOf(ctx.shortname.value) : undefined,
         description: descOf(ctx.description),
         metadata: metaOf(ctx.metadata),
+        satisfies: satisfiesOf(ctx.satisfies),
+        requirementsSource: ctx.requirementsSource?.path,
         contextMap: normalizeRelations(ctx.contextMap),
-        modules: modules.length ? modules.map(normalizeModule) : undefined,
+        modules: nonEmpty(modules.map(normalizeModule)),
         definitions: groupDefinitions(defs),
-    });
+    }) as ContextModel;
 }
 
 function normalizeOrganization(org: ast.OrganizationDef): OrganizationModel {
@@ -588,8 +706,10 @@ function normalizeOrganization(org: ast.OrganizationDef): OrganizationModel {
         name: nameOf(org.name),
         description: descOf(org.description),
         metadata: metaOf(org.metadata),
-        contexts: org.contexts.length ? org.contexts.map(normalizeContext) : undefined,
-    });
+        satisfies: satisfiesOf(org.satisfies),
+        requirementsSource: org.requirementsSource?.path,
+        contexts: nonEmpty(org.contexts.map(normalizeContext)),
+    }) as OrganizationModel;
 }
 
 // ---------------------------------------------------------------------------
@@ -600,7 +720,7 @@ export function normalizeDomain(file: ast.DomainFile): DomainModel {
     const organizations: OrganizationModel[] = [];
     const contexts: ContextModel[] = [];
     const modules: ModuleModel[] = [];
-    const looseDefs: AstNode[] = [];
+    const looseDefs: ast.Definition[] = [];
 
     for (const el of file.elements) {
         if (ast.isOrganizationDef(el)) organizations.push(normalizeOrganization(el));
@@ -610,9 +730,9 @@ export function normalizeDomain(file: ast.DomainFile): DomainModel {
     }
 
     return compact({
-        organizations: organizations.length ? organizations : undefined,
-        contexts: contexts.length ? contexts : undefined,
-        modules: modules.length ? modules : undefined,
+        organizations: nonEmpty(organizations),
+        contexts: nonEmpty(contexts),
+        modules: nonEmpty(modules),
         definitions: groupDefinitions(looseDefs),
     });
 }

@@ -1,622 +1,741 @@
-module Order
-uses module Shipping
+module Orders :: "Order and payment lifecycle" {
 
-// =============================================================================
-// Enums
-// =============================================================================
+    requires { NotificationPort }
+    depends on { Shipping }
 
-enum OrderStatus {
-  draft
-  confirmed
-  shipped
-  delivered
-  cancelled
-}
+    // =============================================================================
+    // Enums
+    // =============================================================================
 
-enum PaymentStatus {
-  pending
-  captured
-  failed
-  refunded
-}
-
-enum PaymentMethod {
-  creditCard
-  bankTransfer
-  paypal
-}
-
-enum CustomerStatus {
-  active
-  suspended
-  closed
-}
-
-// =============================================================================
-// Value Objects
-// =============================================================================
-
-value Address {
-    fields {
-        street : string
-        city : string
-        zipCode : string maxLength(10)
-        country : string
-    }
-}
-
-value Money {
-    fields {
-        amount : decimal min(0)
-        currency : string default("EUR") maxLength(3)
-    }
-}
-
-value EmailAddress {
-    fields {
-        value : string pattern("^[^@]+@[^@]+\\.[^@]+$")
-    }
-}
-
-value OrderLine {
-    fields {
-        productId : uuid
-        quantity : int required min(1) max(1000)
-        productPrice : Money
-        total : Money
+    enum OrderStatus {
+        draft
+        confirmed
+        shipped
+        delivered
+        cancelled
     }
 
-    invariants {
-        positiveQuantity :: "Order line quantity must be greater than zero" {
-            quantity > 0
-        }
-        lineTotalConsistency :: "Line total must equal unit price multiplied by quantity" {
-            total.amount = productPrice.amount * quantity
+    enum PaymentStatus {
+        pending
+        captured
+        failed
+        refunded
+    }
+
+    enum PaymentMethod {
+        creditCard
+        bankTransfer
+        paypal
+    }
+
+    enum CustomerStatus {
+        active
+        suspended
+        closed
+    }
+
+    // =============================================================================
+    // Value Objects
+    // =============================================================================
+
+    value Address {
+        fields {
+            street : string
+            city : string
+            zipCode : string maxLength(10)
+            country : string
         }
     }
-}
 
-// =============================================================================
-// Services
-// =============================================================================
-service PricingCalculator {
-    operations {
-        computeTotal(lines: list<OrderLine>) :: "Compute total from order lines" {
-            returns sum(lines.total)
+    value Money {
+        fields {
+            amount : decimal min(0)
+            currency : string default("EUR") maxLength(3)
         }
     }
-}
 
-service NotificationService {
-    operations {
-        notifyCustomer(customerId: uuid, message: string) :: "Send a notification to a customer" {
+    value EmailAddress {
+        fields {
+            value : string pattern("^[^@]+@[^@]+\\.[^@]+$")
         }
     }
-}
 
-service StockService {
-    operations {
-        restock(lines: list<OrderLine>): void :: "Restore stock for each cancelled order line" {
-            foreach lines as line {
-                resolves Product from line.productId
-                Product.increase(line.quantity)
+    value OrderLine {
+        fields {
+            productId : uuid
+            quantity : int required min(1) max(1000)
+            productPrice : Money
+            total : Money
+        }
+
+        invariants {
+            positiveQuantity :: "Order line quantity must be greater than zero" {
+                quantity > 0
+                enforcement rejection
+            }
+            lineTotalConsistency :: "Line total must equal unit price multiplied by quantity" {
+                total.amount = productPrice.amount * quantity
+                enforcement rejection
             }
         }
     }
-}
 
-// =============================================================================
-// File-level reactions (cross-entity)
-// =============================================================================
+    // =============================================================================
+    // Interfaces (ports)
+    // =============================================================================
 
-reaction customerMustBeActive(customer: Customer) :: "Customer should be active" {
-    customer.status = active
-}
-
-reaction maxOrderAmount(order: Order) :: "Orders above 10000 require manual approval" {
-    order.totalAmount.amount <= 10000
-}
-
-reaction minimumOrderAmount(order: Order) :: "Orders must have a total amount of at least 1" {
-    order.totalAmount.amount >= 1
-}
-
-reaction deliveryOnTime(order: Order) :: "Orders past their estimated delivery date require attention" {
-    if order.estimatedDelivery is defined {
-        order.estimatedDelivery > today()
-    }
-}
-
-reaction bankTransferMinimum(order: Order, payment: Payment) :: "Bank transfers require a minimum of 50" {
-    if payment.method = bankTransfer {
-        order.totalAmount.amount >= 50
-    }
-}
-
-// =============================================================================
-// Entities
-// =============================================================================
-
-entity Customer :: "A customer who places orders" {
-    identifier id: UUID
-    fields {
-        name : string minLength(1) maxLength(100)
-        email : EmailAddress unique
-        status : CustomerStatus default("active")
-        birthDate : date optional past
-        shippingAddress : Address optional
-        createdAt : datetime immutable pastOrPresent
-    }
-}
-
-entity Product :: "A product available for purchase" {
-    identifier id: UUID
-    fields {
-        name : string minLength(1) maxLength(200)
-        description : string optional maxLength(2000)
-        price : Money
-        tags : set<string> optional
-        rating : int optional range(1, 5)
-        available : boolean default("true")
-        stockQuantity : int min(0)
+    spi interface NotificationPort :: "What the domain needs in order to reach a customer" {
+        describes NotificationService
+        notifyCustomer(customerId: uuid, message: string) :: "Send a notification to a customer"
     }
 
-    operations {
-        increase(quantity: int) :: "Restore stock for a product" {
-            sets Product {
-                stockQuantity = stockQuantity + quantity
+    // =============================================================================
+    // Services
+    // =============================================================================
+
+    domain service PricingCalculator :: "Prices an order from its lines" {
+        operations {
+            computeTotal(lines: list<OrderLine>) : Money :: "Compute total from order lines" {
+                safe
+                returns sum(lines.total)
             }
         }
     }
-}
 
-entity Order :: "A customer order" {
-    identifier id: UUID
-    fields {
-        status : OrderStatus default("draft")
-        totalAmount : Money
-        shippingAddress : Address
-        estimatedDelivery : date optional futureOrPresent
-        requiredDeliveryBy : date optional future
-        placedAt : datetime optional pastOrPresent
-        confirmedAt : datetime optional pastOrPresent
-        shippedAt : datetime optional pastOrPresent
-        deliveredAt : datetime optional pastOrPresent
-        cancelledAt : datetime optional pastOrPresent
-        createdAt : datetime immutable pastOrPresent
-    }
-    references {
-        customer : Customer 1..1
-        lines : OrderLine 1..N
+    infrastructure service NotificationService :: "Adapter reaching the customer through the notification channel" {
+        described-by NotificationPort
+        operations {
+            notifyCustomer(customerId: uuid, message: string) :: "Send a notification to a customer"
+        }
     }
 
-    reactions {
-        orderMustContainsLines(lines: list<OrderLine>) :: "Order must contain order lines" {
-            isNotEmpty(lines)
+    domain service StockService :: "Returns stock to the catalogue when an order is undone" {
+        operations {
+            restock(lines: list<OrderLine>) :: "Restore stock for each cancelled order line" {
+                unsafe
+                foreach lines as line {
+                    resolves Product from line.productId
+                    Product.increase(line.quantity)
+                }
+            }
+        }
+    }
+
+    // =============================================================================
+    // Entities
+    // =============================================================================
+
+    entity Customer :: "A customer who places orders" {
+        identity id : uuid
+        fields {
+            name : string minLength(1) maxLength(100)
+            email : EmailAddress unique
+            status : CustomerStatus default("active")
+            birthDate : date optional past
+            shippingAddress : Address optional
+            createdAt : datetime immutable pastOrPresent
+        }
+    }
+
+    entity Product :: "A product available for purchase" {
+        identity id : uuid
+        fields {
+            name : string minLength(1) maxLength(200)
+            description : string optional maxLength(2000)
+            price : Money
+            tags : set<string> optional
+            rating : int optional range(1, 5)
+            available : boolean default(true)
+            stockQuantity : int min(0)
         }
 
-        productMustBeAvailable(lines: list<OrderLine>) :: "Every order line must be available" {
-            every Product in lines {
-                Product.available = true
+        operations {
+            increase(quantity: int) :: "Restore stock for a product" {
+                unsafe
+                sets Product {
+                    stockQuantity = stockQuantity + quantity
+                }
+            }
+        }
+    }
+
+    entity Order :: "A customer order" {
+        identity id : uuid
+        fields {
+            status : OrderStatus default("draft")
+            totalAmount : Money
+            shippingAddress : Address
+            estimatedDelivery : date optional futureOrPresent
+            requiredDeliveryBy : date optional future
+            placedAt : datetime optional pastOrPresent
+            confirmedAt : datetime optional pastOrPresent
+            shippedAt : datetime optional pastOrPresent
+            deliveredAt : datetime optional pastOrPresent
+            cancelledAt : datetime optional pastOrPresent
+            createdAt : datetime immutable pastOrPresent
+        }
+        references {
+            customer : Customer 1..1
+            lines : OrderLine 1..N
+        }
+
+        operations {
+            "Place a new order" on PlaceOrder {
+                unsafe
+                resolves Customer from placeOrder.customerId
+
+                precondition customerMustBeActive :: "Customer should be active" {
+                    Customer.status = active
+                } rejects "A suspended or closed customer may not place an order"
+
+                creates Order {
+                    status = draft
+                    customer = Customer
+                    shippingAddress = placeOrder.shippingAddress
+                    lines = placeOrder.lines
+                    placedAt = now()
+                    totalAmount = PricingCalculator.computeTotal(placeOrder.lines)
+                }
+
+                emits OrderPlaced {
+                    orderId = Order.id
+                    totalAmount = Order.totalAmount
+                    placedAt = Order.placedAt
+                    customerId = Customer.id
+                }
+            }
+
+            "Confirm an order after payment" on ConfirmOrder {
+                unsafe
+                resolves Order from confirmOrder.orderId
+                resolves Payment from Order
+
+                precondition orderMustBePlaced :: "Order must have been placed" {
+                    Order.placedAt is defined
+                } rejects "An order that was never placed cannot be confirmed"
+
+                precondition paymentMustBeCaptured :: "Payment must be captured" {
+                    Payment.status = captured
+                } rejects "An order is only confirmed once its payment has been captured"
+
+                sets Order {
+                    status = confirmed
+                    confirmedAt = now()
+                }
+
+                emits OrderConfirmed {
+                    orderId = Order.id
+                    confirmedAt = Order.confirmedAt
+                }
+            }
+
+            "Cancel an order" on CancelOrder {
+                unsafe
+                resolves Order from cancelOrder.orderId
+
+                sets Order {
+                    status = cancelled
+                    cancelledAt = now()
+                }
+
+                StockService.restock(Order.lines)
+
+                emits OrderCancelled {
+                    orderId = Order.id
+                    lines = Order.lines
+                    reason = cancelOrder.reason
+                    cancelledAt = Order.cancelledAt
+                }
+            }
+
+            "Ship a confirmed order" on ShipOrder {
+                unsafe
+                resolves Order from shipOrder.orderId
+                resolves Payment from Order
+
+                precondition paymentMustBeCaptured :: "Payment must be captured" {
+                    Payment.status = captured
+                } rejects "An order cannot leave the warehouse before its payment has been captured"
+
+                sets Order {
+                    status = shipped
+                    shippedAt = now()
+                }
+
+                emits OrderShipped {
+                    orderId = Order.id
+                    shippedAt = Order.shippedAt
+                    trackingNumber = shipOrder.trackingNumber
+                }
+            }
+
+            "Deliver a shipped order" on DeliverOrder {
+                unsafe
+                resolves Order from deliverOrder.orderId
+
+                sets Order {
+                    status = delivered
+                    deliveredAt = now()
+                }
+
+                emits OrderDelivered {
+                    orderId = Order.id
+                    deliveredAt = Order.deliveredAt
+                }
+            }
+
+            "Cancel an order on payment failure" on CancelAfterPaymentFailure {
+                unsafe
+                resolves Order from cancelAfterPaymentFailure.orderId
+
+                sets Order {
+                    status = cancelled
+                    cancelledAt = now()
+                }
+
+                StockService.restock(Order.lines)
+
+                emits OrderCancelled {
+                    orderId = Order.id
+                    lines = Order.lines
+                    reason = "Order cancelled due to payment failure"
+                    cancelledAt = Order.cancelledAt
+                }
+
+                NotificationService.notifyCustomer(Order.customer.id, "Your payment has failed and the order has been cancelled")
+            }
+
+            "Notify customer when order is confirmed" on NotifyOrderConfirmation {
+                unsafe
+                resolves Order from notifyOrderConfirmation.orderId
+
+                NotificationService.notifyCustomer(Order.customer.id, "Your order has been confirmed")
+
+                Shipping.PrepareShipment(orderId = Order.id) :: "Launch shipping process"
+
+                emits OrderConfirmationNotified {
+                    orderId = Order.id
+                }
+            }
+
+            "Notify customer of delivery" on NotifyOrderDelivery {
+                unsafe
+                resolves Order from notifyOrderDelivery.orderId
+
+                NotificationService.notifyCustomer(Order.customer.id, "Your order has been delivered")
+
+                emits OrderDeliveryNotified {
+                    orderId = Order.id
+                }
             }
         }
 
-        maxOrderLines(lines: list<OrderLine>) :: "Orders with more than 20 lines require manual review" {
-            count(lines) <= 20
-        }
+        states {
+            machine OrderLifecycle :: "Order lifecycle" {
+                state draft
+                state confirmed
+                state shipped
+                final delivered
+                final cancelled
 
-        orderMustBeDraft(order: Order) :: "Order must be in draft status" {
-            order.status = draft
-        }
-
-        orderMustBePlaced(order: Order) :: "Order must have been placed" {
-            order.placedAt is defined
-        }
-
-        shippingAddressMustExist(order: Order) :: "Shipping address is required" {
-            order.shippingAddress is defined
-        }
-    }
-
-    invariants {
-        orderContainsLines :: "An order must contain at least one line" {
-            isNotEmpty(lines)
-        }
-        orderTotalPositive :: "Order total amount must not be negative" {
-            totalAmount.amount >= 0
-        }
-    }
-
-    operations {
-        // alternative create(placeOrder: PlaceOrder)
-        // alternative when ... then ... :: "..." {
-        // alternative on PlaceOrder :: "..." {
-        "Place a new order" on PlaceOrder {
-            resolves Customer from placeOrder.customerId
-
-            reaction customerMustBeActive(Customer)
-            reaction orderMustContainsLines(placeOrder.lines)
-            reaction productMustBeAvailable(placeOrder.lines)
-            reaction maxOrderLines(placeOrder.lines)
-
-            creates Order {
-                status = draft
-                customer = Customer
-                shippingAddress = placeOrder.shippingAddress
-                lines = placeOrder.lines
-                placedAt = now()
-                totalAmount = PricingCalculator.computeTotal(placeOrder.lines)
-            }
-
-            reaction minimumOrderAmount(Order)
-            reaction maxOrderAmount(Order)
-
-            emits OrderPlaced {
-                orderId = Order.id
-                totalAmount = Order.totalAmount
-                placedAt = Order.placedAt
-                customerId = Customer.id
+                [*] --> draft on "Place a new order"
+                draft --> confirmed on "Confirm an order after payment"
+                draft --> cancelled on "Cancel an order"
+                draft --> cancelled on "Cancel an order on payment failure"
+                confirmed --> shipped on "Ship a confirmed order"
+                confirmed --> cancelled on "Cancel an order"
+                confirmed --> cancelled on "Cancel an order on payment failure"
+                shipped --> delivered on "Deliver a shipped order"
             }
         }
 
-        "Confirm an order after payment" on ConfirmOrder {
-            resolves Order from confirmOrder.orderId
-            resolves Payment from Order
+        invariants {
+            orderContainsLines :: "An order must contain at least one line" {
+                isNotEmpty(lines)
+                enforcement rejection
+            }
+            orderTotalPositive :: "Order total amount must not be negative" {
+                totalAmount.amount >= 0
+                enforcement rejection
+            }
+            // UNCLEAR: the binder ranges over order lines but reads a product attribute
+            // (`available`). OrderLine carries only productId, so the join to Product is
+            // implicit — as it already was in the source model.
+            productMustBeAvailable(lines: list<OrderLine>) :: "Every order line must be available" {
+                every product in lines {
+                    product.available = true
+                }
+                enforcement rejection
+            }
+            maxOrderLines(lines: list<OrderLine>) :: "Orders with more than 20 lines require manual review" {
+                count(lines) <= 20
+                enforcement alert
+            }
+            shippingAddressMustExist(order: Order) :: "Shipping address is required" {
+                order.shippingAddress is defined
+                enforcement rejection
+            }
+            minimumOrderAmount(order: Order) :: "Orders must have a total amount of at least 1" {
+                order.totalAmount.amount >= 1
+                enforcement rejection
+            }
+            maxOrderAmount(order: Order) :: "Orders above 10000 require manual approval" {
+                order.totalAmount.amount <= 10000
+                enforcement alert
+            }
+            deliveryOnTime(order: Order) :: "Orders past their estimated delivery date require attention" {
+                if order.estimatedDelivery is defined {
+                    order.estimatedDelivery > today()
+                }
+                enforcement alert
+            }
+        }
+    }
 
-            reaction orderMustBePlaced(Order)
-            reaction paymentMustBeCaptured(Payment)
+    entity Payment :: "A payment associated with an order" {
+        identity id : uuid
+        fields {
+            amount : Money
+            method : PaymentMethod
+            status : PaymentStatus default("pending")
+            processedAt : datetime optional pastOrPresent
+            failureReason : string optional maxLength(500)
+            createdAt : datetime immutable pastOrPresent
+        }
+        references {
+            order : Order 1..1
+        }
 
-            sets Order {
-                status = confirmed
-                confirmedAt = now()
+        operations {
+            "Process payment for an order" on ProcessPayment {
+                unsafe
+                resolves Order from processPayment.orderId
+
+                precondition orderMustBeDraft :: "Order must be in draft status" {
+                    Order.status = draft
+                } rejects "Payment may only be taken for an order that is still a draft"
+
+                creates Payment {
+                    order = Order
+                    status = captured
+                    processedAt = now()
+                    method = processPayment.method
+                    amount = Order.totalAmount
+                }
+
+                emits PaymentProcessed {
+                    paymentId = Payment.id
+                    orderId = Order.id
+                    amount = Payment.amount
+                    method = Payment.method
+                    processedAt = Payment.processedAt
+                }
             }
 
-            emits OrderConfirmed {
-                orderId = Order.id
-                confirmedAt = Order.confirmedAt
+            "Refund a captured payment" on RefundPayment {
+                unsafe
+                resolves Payment from refundPayment.paymentId
+
+                precondition orderCancelledForRefund :: "Order must be cancelled to refund" {
+                    Payment.order.status = cancelled
+                } rejects "Only the payment of a cancelled order may be refunded"
+
+                sets Payment {
+                    status = refunded
+                }
+
+                emits PaymentRefunded {
+                    paymentId = Payment.id
+                    orderId = Payment.order.id
+                    amount = Payment.amount
+                    reason = refundPayment.reason
+                    refundedAt = now()
+                }
+            }
+
+            "Handle payment failure" on HandlePaymentFailure {
+                unsafe
+                resolves Payment from handlePaymentFailure.paymentId
+
+                sets Payment {
+                    status = failed
+                }
+                // NOTE: retry mechanism (infrastructure)
+
+                NotificationService.notifyCustomer(Payment.order.customer.id, "Your payment has failed")
+
+                emits PaymentFailureHandled {
+                    paymentId = Payment.id
+                }
+            }
+
+            "Notify customer of refund" on NotifyPaymentRefund {
+                unsafe
+                resolves Payment from notifyPaymentRefund.paymentId
+
+                NotificationService.notifyCustomer(Payment.order.customer.id, "Your refund has been processed")
+
+                emits PaymentRefundNotified {
+                    paymentId = Payment.id
+                }
             }
         }
 
-        "Cancel an order" on CancelOrder {
-            resolves Order from cancelOrder.orderId
+        states {
+            machine PaymentLifecycle :: "Payment lifecycle" {
+                state pending
+                state captured
+                final failed
+                final refunded
 
-            sets Order {
-                status = cancelled
-                cancelledAt = now()
-            }
-
-            StockService.restock(Order.lines)
-
-            emits OrderCancelled {
-                orderId = Order.id
-                lines = Order.lines
-                reason = cancelOrder.reason
-                cancelledAt = Order.cancelledAt
+                [*] --> pending on "Process payment for an order"
+                pending --> captured on "Process payment for an order"
+                pending --> failed on "Handle payment failure"
+                // NotifyPaymentRefund ne provoque pas de transition
+                captured --> refunded on "Refund a captured payment"
             }
         }
 
-        "Ship a confirmed order" on ShipOrder {
-            resolves Order from shipOrder.orderId
-            resolves Payment from Order
-
-            reaction shippingAddressMustExist(Order)
-            reaction paymentMustBeCaptured(Payment)
-            reaction deliveryOnTime(Order)
-
-            sets Order {
-                status = shipped
-                shippedAt = now()
+        invariants {
+            paymentMatchesOrder :: "Payment amount must equal the order total" {
+                amount.amount = order.totalAmount.amount
+                enforcement rejection
             }
-
-            emits OrderShipped {
-                orderId = Order.id
-                shippedAt = Order.shippedAt
-                trackingNumber = shipOrder.trackingNumber
+            bankTransferMinimum(order: Order, payment: Payment) :: "Bank transfers require a minimum of 50" {
+                if payment.method = bankTransfer {
+                    order.totalAmount.amount >= 50
+                }
+                enforcement rejection
             }
         }
+    }
 
-        "Deliver a shipped order" on DeliverOrder {
-            resolves Order from deliverOrder.orderId
+    // =============================================================================
+    // Commands
+    // =============================================================================
 
-            reaction deliveryOnTime(Order)
-
-            sets Order {
-                status = delivered
-                deliveredAt = now()
-            }
-
-            emits OrderDelivered {
-                orderId = Order.id
-                deliveredAt = Order.deliveredAt
-            }
-        }
-
-        "Notify customer when order is confirmed" when OrderConfirmed then NotifyOrderConfirmation {
-            NotificationService.notifyCustomer(Order.customer.id, "Your order has been confirmed")
-
-            Shipping.PrepareShipment(orderId = Order.id) :: "Launch shipping process"
-        }
-
-        "Cancel an order on payment failure" when PaymentFailed then CancelAfterPaymentFailure {
-            sets Order {
-                status = cancelled
-                cancelledAt = now()
-            }
-
-            StockService.restock(Order.lines)
-
-            emits OrderCancelled {
-                orderId = Order.id
-                lines = Order.lines
-                reason = "Order cancelled due to payment failure"
-                cancelledAt = Order.cancelledAt
-            }
-
-            NotificationService.notifyCustomer(Order.customer.id, "Your payment has failed and the order has been cancelled")
-        }
-
-        "Notify customer of delivery" when OrderDelivered then NotifyOrderDelivery {
-            NotificationService.notifyCustomer(Order.customer.id, "Your order has been delivered")
+    command PlaceOrder {
+        identity commandId : uuid
+        fields {
+            customerId : uuid
+            lines : list<OrderLine>
+            shippingAddress : Address
         }
     }
 
-    transitions {
-        [*] --> draft on "Place a new order"
-        draft --> confirmed on "Confirm an order after payment"
-        draft --> cancelled on "Cancel an order", "Cancel an order on payment failure"
-        confirmed --> shipped on "Ship a confirmed order"
-        confirmed --> cancelled on "Cancel an order", "Cancel an order on payment failure"
-        shipped --> delivered on "Deliver a shipped order"
-    }
-}
-
-entity Payment :: "A payment associated with an order" {
-    identifier id: UUID
-    fields {
-        amount : Money
-        method : PaymentMethod
-        status : PaymentStatus default("pending")
-        processedAt : datetime optional pastOrPresent
-        failureReason : string optional maxLength(500)
-        createdAt : datetime immutable pastOrPresent
-    }
-    references {
-        order : Order 1..1
+    command ConfirmOrder {
+        identity orderId : uuid
+        fields { }
     }
 
-    reactions {
-        paymentMustBeCaptured(payment: Payment) :: "Payment must be captured" {
-            payment.status = captured
-        }
-        orderCancelledForRefund(order: Order) :: "Order must be cancelled to refund" {
-            order.status = cancelled
+    command CancelOrder {
+        identity orderId : uuid
+        fields {
+            reason : string optional maxLength(500)
         }
     }
 
-    invariants {
-        paymentMatchesOrder :: "Payment amount must equal the order total" {
-            amount.amount = order.totalAmount.amount
+    command ProcessPayment {
+        identity orderId : uuid
+        fields {
+            method : PaymentMethod
         }
     }
 
-    operations {
-        "Process payment for an order" on ProcessPayment {
-            resolves Order from processPayment.orderId
-
-            reaction orderMustBeDraft(Order)
-            reaction bankTransferMinimum(Order, Payment)
-
-            creates Payment {
-                order = Order
-                status = captured
-                processedAt = now()
-                method = processPayment.method
-                amount = Order.totalAmount
-            }
-
-            emits PaymentProcessed {
-                paymentId = Payment.id
-                orderId = Order.id
-                amount = Payment.amount
-                method = Payment.method
-                processedAt = Payment.processedAt
-            }
-        }
-
-        "Refund a captured payment" on RefundPayment {
-            resolves Payment from refundPayment.paymentId
-
-            reaction orderCancelledForRefund(Payment.order)
-
-            sets Payment {
-                status = refunded
-            }
-
-            emits PaymentRefunded {
-                paymentId = Payment.id
-                orderId = Payment.order.id
-                amount = Payment.amount
-                reason = refundPayment.reason
-                refundedAt = now()
-            }
-        }
-
-        "Handle payment failure" when PaymentFailed then HandlePaymentFailure {
-            resolves Payment from handlePaymentFailure.paymentId
-
-            sets Payment {
-                status = failed
-            }
-            // NOTE: retry mechanism (infrastructure)
-
-            NotificationService.notifyCustomer(Payment.order.customer.id, "Your payment has failed")
-        }
-
-        "Notify customer of refund" when PaymentRefunded then NotifyPaymentRefund {
-            NotificationService.notifyCustomer(Payment.order.customer.id, "Your refund has been processed")
+    command RefundPayment {
+        identity paymentId : uuid
+        fields {
+            reason : string optional maxLength(500)
         }
     }
 
-    transitions {
-        [*] --> pending on "Process payment for an order"
-        pending --> captured on "Process payment for an order"
-        pending --> failed on "Handle payment failure"
-        // NotifyPaymentRefund ne provoque pas de transition
-        captured --> refunded on "Refund a captured payment"
+    command ShipOrder {
+        identity orderId : uuid
+        fields {
+            trackingNumber : string optional maxLength(100)
+        }
     }
-}
 
-// =============================================================================
-// Commands
-// =============================================================================
-
-command PlaceOrder {
-    fields {
-        customerId : uuid
-        lines : list<OrderLine>
-        shippingAddress : Address
+    command DeliverOrder {
+        identity orderId : uuid
+        fields { }
     }
-}
 
-command ConfirmOrder {
-    fields {
-        orderId : uuid
+    command CancelAfterPaymentFailure {
+        identity orderId : uuid
+        fields { }
     }
-}
 
-command CancelOrder {
-    fields {
-        orderId : uuid
-        reason : string optional maxLength(500)
+    command NotifyOrderConfirmation {
+        identity orderId : uuid
+        fields { }
     }
-}
 
-command ProcessPayment {
-    fields {
-        orderId : uuid
-        method : PaymentMethod
+    command NotifyOrderDelivery {
+        identity orderId : uuid
+        fields { }
     }
-}
 
-command RefundPayment {
-    fields {
-        paymentId : uuid
-        reason : string optional maxLength(500)
+    command HandlePaymentFailure {
+        identity paymentId : uuid
+        fields { }
     }
-}
 
-command ShipOrder {
-    fields {
-        orderId : uuid
-        trackingNumber : string optional maxLength(100)
+    command NotifyPaymentRefund {
+        identity paymentId : uuid
+        fields { }
     }
-}
 
-command DeliverOrder {
-    fields {
-        orderId : uuid
+    // =============================================================================
+    // Events
+    // =============================================================================
+
+    event OrderPlaced {
+        about Order
+        caused-by PlaceOrder
+        fields {
+            orderId : uuid
+            customerId : uuid
+            totalAmount : Money
+            placedAt : datetime
+        }
     }
-}
 
-command CancelAfterPaymentFailure {
-    fields {
-        orderId : uuid
+    event OrderConfirmed {
+        about Order
+        caused-by ConfirmOrder
+        fields {
+            orderId : uuid
+            confirmedAt : datetime
+        }
     }
-}
 
-command NotifyOrderConfirmation {
-    fields {
-        orderId : uuid
+    // NOTE: raised by both "Cancel an order" and "Cancel an order on payment failure",
+    // so no single originating command can be named with `caused-by`.
+    event OrderCancelled {
+        about Order
+        fields {
+            orderId : uuid
+            lines : list<OrderLine>
+            reason : string optional
+            cancelledAt : datetime
+        }
     }
-}
 
-command NotifyOrderDelivery {
-    fields {
-        orderId : uuid
+    event OrderShipped {
+        about Order
+        caused-by ShipOrder
+        fields {
+            orderId : uuid
+            shippedAt : datetime
+            trackingNumber : string optional
+        }
     }
-}
 
-command HandlePaymentFailure {
-    fields {
-        paymentId : uuid
+    event OrderDelivered {
+        about Order
+        caused-by DeliverOrder
+        fields {
+            orderId : uuid
+            deliveredAt : datetime
+        }
     }
-}
 
-command NotifyPaymentRefund {
-    fields {
-        paymentId : uuid
+    event OrderConfirmationNotified :: "The customer was told their order is confirmed" {
+        about Order
+        caused-by NotifyOrderConfirmation
+        fields {
+            orderId : uuid
+        }
     }
-}
 
-// =============================================================================
-// Events
-// =============================================================================
-
-event OrderPlaced {
-    fields {
-        orderId : uuid
-        customerId : uuid
-        totalAmount : Money
-        placedAt : datetime
+    event OrderDeliveryNotified :: "The customer was told their order was delivered" {
+        about Order
+        caused-by NotifyOrderDelivery
+        fields {
+            orderId : uuid
+        }
     }
-}
 
-event OrderConfirmed {
-    fields {
-        orderId : uuid
-        confirmedAt : datetime
+    event PaymentProcessed {
+        about Payment
+        caused-by ProcessPayment
+        fields {
+            paymentId : uuid
+            orderId : uuid
+            amount : Money
+            method : PaymentMethod
+            processedAt : datetime
+        }
     }
-}
 
-event OrderCancelled {
-    fields {
-        orderId : uuid
-        lines : list<OrderLine>
-        reason : string optional
-        cancelledAt : datetime
+    // UNCLEAR: the source model never emits PaymentFailed from any operation — it only
+    // consumes it. Modeled here as an error event of the payment attempt.
+    error event PaymentFailed {
+        about Payment
+        caused-by ProcessPayment
+        fields {
+            paymentId : uuid
+            orderId : uuid
+            reason : string
+            failedAt : datetime
+        }
     }
-}
 
-event OrderShipped {
-    fields {
-        orderId : uuid
-        shippedAt : datetime
-        trackingNumber : string optional
+    event PaymentFailureHandled :: "The failed payment was recorded and the customer told" {
+        about Payment
+        caused-by HandlePaymentFailure
+        fields {
+            paymentId : uuid
+        }
     }
-}
 
-event OrderDelivered {
-    fields {
-        orderId : uuid
-        deliveredAt : datetime
+    event PaymentRefunded {
+        about Payment
+        caused-by RefundPayment
+        fields {
+            paymentId : uuid
+            orderId : uuid
+            amount : Money
+            reason : string optional
+            refundedAt : datetime
+        }
     }
-}
 
-event PaymentProcessed {
-    fields {
-        paymentId : uuid
-        orderId : uuid
-        amount : Money
-        method : PaymentMethod
-        processedAt : datetime
+    event PaymentRefundNotified :: "The customer was told their refund went through" {
+        about Payment
+        caused-by NotifyPaymentRefund
+        fields {
+            paymentId : uuid
+        }
     }
-}
 
-event PaymentFailed {
-    fields {
-        paymentId : uuid
-        orderId : uuid
-        reason : string
-        failedAt : datetime
+    // =============================================================================
+    // Reactions — the only event -> command edge
+    // =============================================================================
+
+    reaction NotifyCustomerOnOrderConfirmed :: "Notify customer when order is confirmed" {
+        triggered-by OrderConfirmed
+        effects NotifyOrderConfirmation
     }
-}
 
-event PaymentRefunded {
-    fields {
-        paymentId : uuid
-        orderId : uuid
-        amount : Money
-        reason : string optional
-        refundedAt : datetime
+    reaction NotifyCustomerOnOrderDelivered :: "Notify customer of delivery" {
+        triggered-by OrderDelivered
+        effects NotifyOrderDelivery
+    }
+
+    reaction CancelOrderOnPaymentFailed :: "Cancel an order on payment failure" {
+        triggered-by PaymentFailed
+        effects CancelAfterPaymentFailure
+    }
+
+    reaction HandleFailureOnPaymentFailed :: "Handle payment failure" {
+        triggered-by PaymentFailed
+        effects HandlePaymentFailure
+    }
+
+    reaction NotifyCustomerOnPaymentRefunded :: "Notify customer of refund" {
+        triggered-by PaymentRefunded
+        effects NotifyPaymentRefund
     }
 }

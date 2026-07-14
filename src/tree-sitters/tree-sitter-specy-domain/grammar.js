@@ -1,5 +1,8 @@
 // =============================================================================
 // Tree-sitter grammar for Specy Domain Model (.domain)
+//
+// Mirrors src/grammars/domain.ebnf — the normative grammar derived from
+// src/metamodels/DOMAIN-METAMODEL.md. Keep the two in sync.
 // =============================================================================
 
 module.exports = grammar({
@@ -13,13 +16,15 @@ module.exports = grammar({
     [$.named_arg, $._path_segment],
     [$._path_segment, $.literal_value],
     [$.field_decl],
-    [$.function_name, $._path_segment],
   ],
 
   rules: {
 
     // =========================================================================
     // Top-level
+    //
+    // Outer containers (organization > context > module) may be ELIDED: a file
+    // may start at a context, a module, or a bare definition.
     // =========================================================================
 
     source_file: $ => repeat(choice(
@@ -35,14 +40,17 @@ module.exports = grammar({
 
     organization_def: $ => seq(
       'organization',
-      field('name', choice($.type_name, $.string_literal)),
+      field('name', $.type_name),
       optional($.description),
       optional($.metadata_block),
       '{',
-      repeat(choice($.requirements_source_decl, $.prd_source_decl)),
-      repeat($.context_def),
+      optional($.satisfies_decl),
+      optional($.requirements_source_decl),
+      repeat1($.context_def),
       '}',
     ),
+
+    requirements_source_decl: $ => seq('requirements-source', $.string_literal),
 
     // =========================================================================
     // Bounded Context
@@ -50,36 +58,25 @@ module.exports = grammar({
 
     context_def: $ => seq(
       'context',
-      field('name', choice($.type_name, $.string_literal)),
+      field('name', $.type_name),
       optional($.shortname),
       optional($.description),
       optional($.metadata_block),
       '{',
-      repeat(choice($.requirements_source_decl, $.prd_source_decl)),
+      optional($.satisfies_decl),
+      optional($.requirements_source_decl),
       optional($.context_map_block),
       repeat(choice($.module_def, $._definition)),
       '}',
     ),
 
-    shortname: $ => choice(
-      seq('shortname', $.identifier),
-      seq('shortname', '(', $.identifier, ')'),
-      seq('(', $.identifier, ')'),
-    ),
-
-    requirements_source_decl: $ => seq('requirements-source', $.string_literal),
-
-    prd_source_decl: $ => seq('prd-source', $.string_literal),
+    shortname: $ => seq('(', $.identifier, ')'),
 
     // =========================================================================
     // Context Map
     // =========================================================================
 
-    context_map_block: $ => seq(
-      'map', '{',
-      repeat($.context_relation),
-      '}',
-    ),
+    context_map_block: $ => seq('map', '{', repeat($.context_relation), '}'),
 
     context_relation: $ => choice(
       $.upstream_relation,
@@ -97,44 +94,33 @@ module.exports = grammar({
 
     // =========================================================================
     // Module
+    //
+    // The two interface relations are NOT symmetric and are declared apart:
+    //   exposes    { ApiName }     — the public surface
+    //   requires   { SpiName }     — the capabilities needed from outside
+    //   depends on { ModuleName }  — other modules
     // =========================================================================
 
     module_def: $ => seq(
       'module',
-      field('name', choice($.type_name, $.string_literal)),
-      optional($.description),
-      optional($.metadata_block),
-      repeat($.uses_decl),
-      repeat($.requirements_source_decl),
-      optional($.module_body),
-    ),
-
-    module_body: $ => seq(
-      '{',
-      optional($.depends_block),
-      repeat(choice($.module_def, $.interface_def, $._definition)),
-      '}',
-    ),
-
-    uses_decl: $ => seq('uses', 'module', $.type_name),
-
-    depends_block: $ => seq('depends', 'on', '{', repeat(choice($.type_name, $.string_literal)), '}'),
-
-    // =========================================================================
-    // Interface
-    // =========================================================================
-
-    interface_def: $ => seq(
-      'interface',
       field('name', $.type_name),
       optional($.description),
       optional($.metadata_block),
       '{',
-      repeat(choice($.exposes_clause, $.named_operation_def)),
+      optional($.satisfies_decl),
+      // When the outer containers are elided, the module IS the top level, so it
+      // must be able to carry the requirements-source provenance link.
+      optional($.requirements_source_decl),
+      optional($.exposes_block),
+      optional($.requires_block),
+      optional($.depends_block),
+      repeat($._definition),
       '}',
     ),
 
-    exposes_clause: $ => seq('exposes', $.dot_path),
+    exposes_block: $ => seq('exposes', '{', repeat1($.type_name), '}'),
+    requires_block: $ => seq('requires', '{', repeat1($.type_name), '}'),
+    depends_block: $ => seq('depends', 'on', '{', repeat1($.type_name), '}'),
 
     // =========================================================================
     // Definitions
@@ -144,8 +130,8 @@ module.exports = grammar({
       $.enum_def,
       $.value_def,
       $.entity_def,
+      $.read_only_entity_def,
       $.aggregate_def,
-      $.statemachine_def,
       $.command_def,
       $.query_def,
       $.event_def,
@@ -155,42 +141,65 @@ module.exports = grammar({
       $.domain_service_def,
       $.application_service_def,
       $.infrastructure_service_def,
-      $.service_def,
       $.repository_def,
+      $.interface_def,
+      $.reaction_def,
       $.invariant_def,
       $.agreement_def,
-      $.reaction_def,
     ),
 
     // =========================================================================
-    // Enum (top-level named enum)
+    // Interface — a port. Every interface declares its role.
+    //
+    //   api interface — DRIVING port. `exposes` SELECTS operations that already
+    //                   exist on an entity/aggregate/domain or app service.
+    //   spi interface — DRIVEN port. `describes` names the infrastructure service
+    //                   or repository that fulfils the contract it DEFINES.
     // =========================================================================
 
-    enum_def: $ => seq(
-      'enum',
+    interface_def: $ => seq(
+      field('role', $.interface_role),
+      'interface',
       field('name', $.type_name),
       optional($.description),
       optional($.metadata_block),
       '{',
       optional($.satisfies_decl),
-      repeat1($.enum_value),
+      repeat($._interface_member),
       '}',
     ),
 
-    enum_value: $ => seq($.identifier, optional(',')),
+    interface_role: $ => choice('api', 'spi'),
 
-    // Inline enum block (inside value body, no name)
-    inline_enum_block: $ => seq(
-      'enum',
-      '{',
-      $.type_name,
-      repeat(seq(',', $.type_name)),
-      optional(','),
-      '}',
+    _interface_member: $ => choice(
+      $.exposes_clause,
+      $.describes_clause,
+      $.operation_signature,
+    ),
+
+    exposes_clause: $ => seq('exposes', $.dot_path),
+
+    describes_clause: $ => seq('describes', $.type_name),
+
+    // A signature, with an optional body carrying only conditions.
+    operation_signature: $ => seq(
+      field('name', $.identifier),
+      '(',
+      optional($.param_list),
+      ')',
+      optional(seq(':', field('return_type', $.field_type))),
+      optional($.description),
+      optional($.metadata_block),
+      optional(seq(
+        '{',
+        optional($.satisfies_decl),
+        repeat($._condition_clause),
+        '}',
+      )),
     ),
 
     // =========================================================================
-    // Satisfies
+    // Satisfies — always the first element inside the body braces.
     // =========================================================================
 
     satisfies_decl: $ => seq(
@@ -204,7 +213,33 @@ module.exports = grammar({
     requirement_id: $ => token(/REQ-[A-Z][A-Z0-9]*(-[A-Z][A-Z0-9]*)*-\d{3}/),
 
     // =========================================================================
-    // Value Type — flexible body (with or without fields{} wrapper)
+    // Enum (Referential)
+    //
+    // `of ValueType` — the enum holds instances of a value type, which must then
+    // declare a `code` field.
+    // =========================================================================
+
+    enum_def: $ => seq(
+      'enum',
+      field('name', $.type_name),
+      optional(seq('of', field('value_type', $.type_name))),
+      optional($.description),
+      optional($.metadata_block),
+      '{',
+      optional($.satisfies_decl),
+      repeat1($.enum_value),
+      '}',
+    ),
+
+    enum_value: $ => seq(
+      field('name', $.identifier),
+      optional(seq('=', $.literal_value)),
+      optional($.description),
+      optional(','),
+    ),
+
+    // =========================================================================
+    // Value Type
     // =========================================================================
 
     value_def: $ => seq(
@@ -213,40 +248,38 @@ module.exports = grammar({
       optional($.description),
       optional($.metadata_block),
       '{',
-      repeat($._value_body_item),
-      '}',
-    ),
-
-    _value_body_item: $ => choice(
-      $.satisfies_decl,
-      $.description,
-      $.field_decl,
+      optional($.satisfies_decl),
       $.fields_block,
-      $.inline_enum_block,
-      $.inline_invariant,
-      $.invariants_block,
-      $.value_operations_block,
-    ),
-
-    value_operations_block: $ => seq(
-      'operations', '{',
-      repeat($.value_op_def),
+      optional($.value_operations_block),
+      optional($.invariants_block),
       '}',
     ),
 
+    value_operations_block: $ => seq('operations', '{', repeat($.value_op_def), '}'),
+
+    // A value operation returns a new value. Its body may carry the preconditions
+    // of the "transactional constructor".
     value_op_def: $ => seq(
       field('name', $.identifier),
       '(',
       optional($.param_list),
       ')',
       ':',
-      $.field_type,
+      field('return_type', $.field_type),
       optional($.description),
       optional($.metadata_block),
+      optional(seq(
+        '{',
+        optional($.satisfies_decl),
+        optional($.safety_decl),
+        optional($.idempotence_decl),
+        repeat($._operation_clause),
+        '}',
+      )),
     ),
 
     // =========================================================================
-    // Entity — flexible body
+    // Entity
     // =========================================================================
 
     entity_def: $ => seq(
@@ -255,38 +288,99 @@ module.exports = grammar({
       optional($.description),
       optional($.metadata_block),
       '{',
-      repeat($._entity_body_item),
+      optional($.satisfies_decl),
+      $.identity_decl,
+      optional($.duplicate_detection),
+      $.fields_block,
+      optional($.references_block),
+      optional($.operations_block),
+      optional($.states_block),
+      optional($.invariants_block),
       '}',
     ),
 
-    _entity_body_item: $ => choice(
-      $.satisfies_decl,
-      $.description,
-      $.field_decl,
-      $.fields_block,
-      $.identity_decl,
-      $.duplicate_detection,
-      $.named_operation_def,
-      $.operations_block,
-      $.inline_invariant,
-      $.invariants_block,
-      $.reactions_block,
-      $.states_block,
-      $.transitions_block,
-      $.references_block,
-    ),
-
     identity_decl: $ => seq(
-      choice('identity', 'identifier'),
+      'identity',
       field('name', $.identifier),
       ':',
-      $.field_type,
+      field('type', $.field_type),
     ),
 
     duplicate_detection: $ => seq('duplicate', 'detection', '{', $.expression, '}'),
 
     // =========================================================================
-    // Aggregate — flexible body
+    // Read-only Entity (Master Data)
+    //
+    // State owned by an upstream context or external system. The operations block
+    // admits only SAFE clauses — no sets / creates / emits — so "no unsafe
+    // operations on master data" is enforced by the grammar, not a validator.
+    // =========================================================================
+
+    read_only_entity_def: $ => seq(
+      'read-only',
+      'entity',
+      field('name', $.type_name),
+      optional($.description),
+      optional($.metadata_block),
+      '{',
+      optional($.satisfies_decl),
+      $.sourced_from_clause,
+      optional($.synced_via_clause),
+      optional($.projected_by_clause),
+      $.identity_decl,
+      $.fields_block,
+      optional($.references_block),
+      optional($.safe_operations_block),
+      optional($.invariants_block),
+      '}',
+    ),
+
+    sourced_from_clause: $ => seq('sourced-from', choice($.type_name, $.string_literal)),
+
+    synced_via_clause: $ => seq('synced-via', $.sync_pattern),
+
+    sync_pattern: $ => choice('synchronous-query', 'asynchronous-projection'),
+
+    // The ACL adapter that refreshes the local read-model (asynchronous projection).
+    projected_by_clause: $ => seq('projected-by', $.type_name),
+
+    safe_operations_block: $ => seq('operations', '{', repeat($.safe_op_def), '}'),
+
+    safe_op_def: $ => seq(
+      field('name', $.identifier),
+      '(',
+      optional($.param_list),
+      ')',
+      optional(seq(':', field('return_type', $.field_type))),
+      optional($.description),
+      optional($.metadata_block),
+      '{',
+      optional($.satisfies_decl),
+      optional('safe'),
+      repeat($._safe_operation_clause),
+      '}',
+    ),
+
+    _safe_operation_clause: $ => choice(
+      $.precondition_clause,
+      $.postcondition_clause,
+      $.resolves_clause,
+      $.service_call_clause,
+      $.safe_foreach_clause,
+      $.returns_clause,
+    ),
+
+    safe_foreach_clause: $ => seq(
+      'foreach', $.dot_path, 'as', field('var', $._binder),
+      '{', repeat($._safe_operation_clause), '}',
+    ),
+
+    // =========================================================================
+    // Aggregate
+    //
+    // An aggregate IS its root entity: it carries the identity, fields, operations,
+    // states and invariants directly. There is no `root` clause. `entities { }`
+    // lists the NON-ROOT children of the cluster.
     // =========================================================================
 
     aggregate_def: $ => seq(
@@ -294,251 +388,20 @@ module.exports = grammar({
       field('name', $.type_name),
       optional($.description),
       optional($.metadata_block),
-      choice(
-        // long form: aggregate X { root Y; entities { ... }; ... }
-        seq('{', repeat($._aggregate_body_item), '}'),
-        // short form: aggregate X root Y                          (no body)
-        // short form: aggregate X root Y { contains [E1, E2] }    (contains-only body)
-        seq(
-          'root', field('root', $.type_name),
-          optional(seq('{', $.aggregate_contains_decl, '}')),
-        ),
-      ),
-    ),
-
-    _aggregate_body_item: $ => choice(
-      $.satisfies_decl,
-      $.description,
-      $.aggregate_root_decl,
-      $.aggregate_entities_decl,
-      $.aggregate_contains_decl,
+      '{',
+      optional($.satisfies_decl),
       $.identity_decl,
-      $.duplicate_detection,
-      $.field_decl,
+      optional($.duplicate_detection),
       $.fields_block,
-      $.references_block,
-      $.invariants_block,
-      $.reactions_block,
-      $.operations_block,
-      $.states_block,
-      $.transitions_block,
-    ),
-
-    aggregate_root_decl: $ => seq('root', field('root', $.type_name)),
-
-    aggregate_entities_decl: $ => seq('entities', '{', repeat($.type_name), '}'),
-
-    aggregate_contains_decl: $ => choice(
-      // bare comma list: contains E1, E2, E3
-      seq('contains', $.type_name, repeat(seq(',', $.type_name))),
-      // bracketed list: contains [E1, E2, E3]
-      seq('contains', '[', $.type_name, repeat(seq(',', $.type_name)), ']'),
-    ),
-
-    // =========================================================================
-    // Statemachine
-    // =========================================================================
-
-    statemachine_def: $ => seq(
-      'statemachine',
-      field('name', $.type_name),
-      // optional 'on EntityName' header form: `statemachine X on Entity { ... }`
-      optional(seq('on', field('entity', $.type_name))),
-      '{',
-      repeat($._statemachine_item),
+      $.aggregate_entities_decl,
+      optional($.references_block),
+      optional($.operations_block),
+      optional($.states_block),
+      optional($.invariants_block),
       '}',
     ),
 
-    _statemachine_item: $ => choice(
-      $.on_clause,
-      $.statemachine_start,
-      $.state_def_simple,
-      $.transition_inline,
-      $.final_state,
-    ),
-
-    // State names may be PascalCase (canonical) or camelCase (also used).
-    _state_name: $ => choice($.type_name, $.identifier),
-
-    statemachine_start: $ => seq('start', $._state_name),
-
-    state_def_simple: $ => seq(
-      'state',
-      field('name', $._state_name),
-      // optional empty body and empty/identifier-named invariants
-      optional(seq(
-        '{',
-        repeat(choice($.inline_invariant, $.inline_invariant_simple, $.scoped_invariant_def)),
-        '}',
-      )),
-    ),
-
-    // Simple inline invariant: `invariant <ident> { <expression> }`
-    // (Used inside `state { ... }` and elsewhere where a full inline_invariant
-    // with must_block / message / etc. would be heavy.)
-    inline_invariant_simple: $ => seq(
-      'invariant',
-      field('name', $.identifier),
-      optional($.description),
-      optional(seq('enforcement', choice('reject', 'warn', 'rejection', 'compensation', 'alert'))),
-      '{',
-      optional($.satisfies_decl),
-      $.expression,
-      '}',
-    ),
-
-    transition_inline: $ => seq(
-      'transition',
-      field('from', $._state_name),
-      '->',
-      field('to', $._state_name),
-      // accept either `triggered-by "string"` (canonical) or `on CommandOrEvent` (Specy v3 idiom)
-      choice(
-        seq('triggered-by', field('trigger', $.string_literal)),
-        seq('on', field('trigger', $.type_name)),
-      ),
-    ),
-
-    final_state: $ => seq('final', $._state_name),
-
-    // =========================================================================
-    // Reaction
-    // =========================================================================
-
-    reaction_def: $ => seq(
-      'reaction',
-      // url-shortener uses string-literal names; ride-now uses identifier names
-      field('name', choice($.identifier, $.type_name, $.string_literal)),
-      // scoped-guard form (formerly `policy name(params) { expr }`) carries typed params
-      optional(seq('(', optional($.param_list), ')')),
-      optional($.description),
-      optional($.metadata_block),
-      '{',
-      optional($.satisfies_decl),
-      // Either clause items (triggered-by/trigger/effects/effect/guard) or a single
-      // bare guard expression (the scoped-reaction form, formerly `policy name { expr }`).
-      choice(
-        repeat($._reaction_item),
-        $.expression,
-      ),
-      '}',
-    ),
-
-    _reaction_item: $ => choice(
-      $.description,
-      $.triggered_by_clause,
-      $.trigger_clause,
-      $.guard_clause,
-      $.effects_clause,
-      $.effect_clause,
-    ),
-
-    triggered_by_clause: $ => seq('triggered-by', $.type_name),
-    effects_clause: $ => seq('effects', $.type_name),
-
-    // ride-now style: singular `trigger` / `effect` / explicit `guard`
-    trigger_clause: $ => seq('trigger', $.type_name),
-    guard_clause: $ => seq('guard', $.expression),
-    effect_clause: $ => seq(
-      'effect',
-      choice(
-        // effect publish EventName(args) [to OtherContext]
-        seq('publish',
-            $.type_name,
-            optional(seq('(', optional($.arg_list), ')')),
-            optional(seq('to', $.type_name))),
-        $.service_call_expr,
-        $.function_call,
-        $.type_name,
-      ),
-    ),
-
-    // =========================================================================
-    // Named Operation (inline in entity/service/interface bodies)
-    // =========================================================================
-
-    named_operation_def: $ => seq(
-      'operation',
-      field('name', $.string_literal),
-      '{',
-      repeat($._named_op_item),
-      '}',
-    ),
-
-    _named_op_item: $ => choice(
-      $.satisfies_decl,
-      $.description,
-      $.on_clause,
-      $.accepts_clause,
-      $.returns_decl,
-      $.emits_clause,
-      $.named_precondition,
-      $.named_postcondition,
-    ),
-
-    on_clause: $ => seq('on', $.type_name),
-
-    accepts_clause: $ => seq(
-      'accepts',
-      $.param_decl_opt,
-      repeat(seq(',', $.param_decl_opt)),
-    ),
-
-    param_decl_opt: $ => seq(
-      field('name', $.identifier),
-      ':',
-      $.field_type_opt,
-    ),
-
-    field_type_opt: $ => seq($.field_type, optional('?')),
-
-    returns_decl: $ => seq('returns', $.field_type_opt),
-
-    emits_clause: $ => seq(
-      'emits',
-      $.type_name,
-      optional(seq('{', repeat($.assignment_clause), '}')),
-    ),
-
-    named_precondition: $ => seq(
-      'precondition',
-      field('name', $.string_literal),
-      '{',
-      $.expression,
-      optional(seq('violation', $.string_literal)),
-      '}',
-    ),
-
-    named_postcondition: $ => seq(
-      'postcondition',
-      field('name', $.string_literal),
-      '{',
-      $.expression,
-      '}',
-    ),
-
-    // =========================================================================
-    // Inline Invariant (inside value/entity bodies)
-    // =========================================================================
-
-    inline_invariant: $ => seq(
-      'invariant',
-      field('name', $.string_literal),
-      '{',
-      optional($.satisfies_decl),
-      optional($.description),
-      optional($.on_clause),
-      optional($.must_block),
-      optional(seq('message', $.string_literal)),
-      optional(seq('enforcement', choice('reject', 'warn', 'rejection', 'compensation', 'alert'))),
-      '}',
-    ),
-
-    must_block: $ => seq('must', '{', $.expression, '}'),
-
-    // Opaque body for predicate blocks authored as freeform business prose
-    // (GAP-006). Excludes braces so it stops at the closing `}`.
-    text_predicate: $ => token(prec(-1, /[^{}]+/)),
+    aggregate_entities_decl: $ => seq('entities', '{', repeat1($.type_name), '}'),
 
     // =========================================================================
     // Fields & References
@@ -551,17 +414,13 @@ module.exports = grammar({
       ':',
       $.field_type_opt,
       repeat($.constraint),
-      optional(choice(';', ',')),
+      optional($.description),
+      optional($.satisfies_decl),
     ),
 
     _field_name: $ => choice(
       $.identifier,
-      'required',
-      'optional',
-      'value',
-      'type',
-      'status',
-      'id',
+      'required', 'optional', 'value', 'type', 'status', 'id', 'code',
     ),
 
     field_type: $ => choice(
@@ -571,34 +430,31 @@ module.exports = grammar({
       $.type_name,
     ),
 
+    field_type_opt: $ => seq($.field_type, optional('?')),
+
     primitive_type: $ => choice(
-      'string', 'int', 'integer', 'long', 'decimal', 'boolean', 'date', 'datetime', 'time', 'duration',
-      'uuid', 'void', 'bytes', 'any',
+      'string', 'int', 'integer', 'long', 'decimal', 'boolean',
+      'date', 'datetime', 'time', 'duration', 'uuid', 'void',
     ),
 
     collection_type: $ => seq(
       choice('list', 'set', 'map'),
-      '<',
-      $.field_type,
-      optional(seq(',', $.field_type)),
-      '>',
+      '<', $.field_type, optional(seq(',', $.field_type)), '>',
     ),
 
-    // Handles List<T>, Map<K,V>, Set<T> (PascalCase collection names)
     generic_type: $ => seq(
       $.type_name,
-      '<',
-      $.field_type,
-      optional(seq(',', $.field_type)),
-      '>',
+      '<', $.field_type, optional(seq(',', $.field_type)), '>',
     ),
 
+    // `code` marks the field by which an enum's value-type instances are referenced.
     constraint: $ => choice(
       'required',
       'optional',
       'unique',
       'immutable',
       'ordered',
+      'code',
       seq('default', '(', $.literal_value, ')'),
       seq('min', '(', $.number, ')'),
       seq('max', '(', $.number, ')'),
@@ -606,7 +462,6 @@ module.exports = grammar({
       seq('minLength', '(', $.number, ')'),
       seq('maxLength', '(', $.number, ')'),
       seq('pattern', '(', $.string_literal, ')'),
-      seq('format', '(', $.identifier, ')'),
       'past',
       'future',
       'pastOrPresent',
@@ -618,169 +473,15 @@ module.exports = grammar({
     reference_decl: $ => seq(
       field('name', $.identifier),
       ':',
-      $.type_name,
+      field('target', $.type_name),
       $.cardinality,
+      optional($.description),
     ),
 
-    cardinality: $ => token(/\d+\.\.\d+|\d+\.\.N/),
+    cardinality: $ => token(/\d+\.\.(\d+|[nN])/),
 
     // =========================================================================
-    // Operations (classic block-based, for business-loan format)
-    // =========================================================================
-
-    operations_block: $ => seq('operations', '{', repeat($.operation_def), '}'),
-
-    operation_def: $ => choice(
-      $.command_triggered_op,
-      $.event_triggered_op,
-      $.internal_op,
-    ),
-
-    command_triggered_op: $ => seq(
-      field('label', $.string_literal),
-      'on',
-      field('command', $.type_name),
-      optional($.description),
-      optional($.metadata_block),
-      '{',
-      optional($.satisfies_decl),
-      repeat($._operation_clause),
-      '}',
-    ),
-
-    event_triggered_op: $ => seq(
-      field('label', $.string_literal),
-      'when',
-      field('event', $.type_name),
-      'then',
-      field('command', $.type_name),
-      optional($.description),
-      optional($.metadata_block),
-      '{',
-      optional($.satisfies_decl),
-      repeat($._operation_clause),
-      '}',
-    ),
-
-    internal_op: $ => seq(
-      field('name', choice($.identifier, $.string_literal)),
-      '(',
-      optional($.param_list),
-      ')',
-      optional(seq(':', $.field_type)),
-      optional($.description),
-      optional($.metadata_block),
-      optional(seq('{',
-        optional($.satisfies_decl),
-        repeat($._operation_clause),
-      '}')),
-    ),
-
-    _operation_clause: $ => choice(
-      $.precondition_clause,
-      $.postcondition_clause,
-      $.resolves_clause,
-      $.reaction_call_clause,
-      $.reaction_def,
-      $.creates_clause,
-      $.sets_clause,
-      $.emits_clause,
-      $.service_call_clause,
-      $.foreach_clause,
-      $.returns_clause,
-    ),
-
-    // =========================================================================
-    // Operation Clauses
-    // =========================================================================
-
-    precondition_clause: $ => seq(
-      'precondition',
-      field('name', $.identifier),
-      optional($.description),
-      optional($.metadata_block),
-      '{',
-      // multi-line bodies are conjunctions of expressions, implicit `and`
-      $.expression,
-      repeat($.expression),
-      '}',
-      optional(seq('rejects', $.string_literal)),
-    ),
-
-    postcondition_clause: $ => seq(
-      'postcondition',
-      field('name', $.identifier),
-      optional($.description),
-      optional($.metadata_block),
-      '{',
-      // multi-line bodies are conjunctions of expressions, implicit `and` between lines
-      $.expression,
-      repeat($.expression),
-      '}',
-    ),
-
-    resolves_clause: $ => seq('resolves', $.type_name, 'from', $.dot_path),
-
-    reaction_call_clause: $ => seq(
-      'reaction',
-      field('name', $.identifier),
-      '(',
-      optional($.arg_list),
-      ')',
-      optional($.description),
-      optional($.metadata_block),
-    ),
-
-    creates_clause: $ => seq(
-      'creates', $.type_name, '{',
-      repeat($.assignment_clause),
-      '}',
-    ),
-
-    sets_clause: $ => seq(
-      'sets', $.type_name, '{',
-      repeat($.assignment_clause),
-      '}',
-    ),
-
-    assignment_clause: $ => seq(
-      field('field', $.identifier),
-      '=',
-      $._value_expr,
-      optional(choice(';', ',')),
-    ),
-
-    returns_clause: $ => choice(
-      seq('returns', field('name', $.identifier), ':', $.field_type),
-      seq('returns', $._value_expr),
-    ),
-
-    service_call_clause: $ => seq(
-      $.dot_path,
-      '(',
-      optional($.arg_list),
-      ')',
-      optional($.description),
-    ),
-
-    foreach_clause: $ => seq(
-      'foreach',
-      $.dot_path,
-      'as',
-      $.identifier,
-      '{',
-      repeat(choice(
-        $.resolves_clause,
-        $.sets_clause,
-        $.emits_clause,
-        $.service_call_clause,
-        $.reaction_call_clause,
-      )),
-      '}',
-    ),
-
-    // =========================================================================
-    // State Machine (classic block-based)
+    // State Machine
     // =========================================================================
 
     states_block: $ => seq('states', '{', repeat($.state_machine_def), '}'),
@@ -791,42 +492,187 @@ module.exports = grammar({
       optional($.description),
       optional($.metadata_block),
       '{',
+      optional($.satisfies_decl),
       repeat(choice($.state_def, $.transition_def)),
       '}',
     ),
 
+    // A state carries its own invariants (which hold while the entity occupies it).
     state_def: $ => seq(
-      choice('state', 'final'),
+      field('kind', choice('state', 'final')),
       field('name', $.identifier),
       optional($.description),
       optional($.metadata_block),
-      optional(seq('{', repeat($.state_invariant_def), '}')),
+      optional(seq(
+        '{',
+        optional($.satisfies_decl),
+        optional($.invariants_block),
+        '}',
+      )),
     ),
 
-    state_invariant_def: $ => seq(
-      'invariant',
-      field('name', $.identifier),
-      optional($.description),
-      optional($.metadata_block),
-      '{',
-      $.expression,
-      '}',
-    ),
-
+    // `on` must be able to name EITHER operation form: an internal one (identifier)
+    // or a command-triggered one (its "Label" string).
+    //
+    // Conditions on a transition are named and 0..n — a precondition declares its
+    // violation reason, exactly as on an operation.
     transition_def: $ => seq(
-      $.transition_source,
+      field('source', $.transition_source),
       '-->',
       field('target', $.identifier),
       'on',
-      field('trigger', $.identifier),
-      optional(seq('when', '{', $.expression, '}')),
-      optional(seq('then', '{', $.expression, '}')),
+      field('trigger', $.operation_ref),
+      optional($.description),
+      optional($.metadata_block),
+      optional(seq(
+        '{',
+        optional($.satisfies_decl),
+        repeat($._condition_clause),
+        '}',
+      )),
     ),
 
     transition_source: $ => choice('[*]', $.identifier),
 
+    operation_ref: $ => choice($.identifier, $.string_literal),
+
     // =========================================================================
-    // Command — flexible body
+    // Operations
+    //
+    // Two forms only. There is NO event-triggered form: an event reaches a command
+    // only through a `reaction`.
+    // =========================================================================
+
+    operations_block: $ => seq('operations', '{', repeat($.operation_def), '}'),
+
+    operation_def: $ => choice($.command_triggered_op, $.internal_op),
+
+    command_triggered_op: $ => seq(
+      field('label', $.string_literal),
+      'on',
+      field('command', $.type_name),
+      optional($.description),
+      optional($.metadata_block),
+      '{',
+      optional($.satisfies_decl),
+      optional($.safety_decl),
+      optional($.idempotence_decl),
+      repeat($._operation_clause),
+      '}',
+    ),
+
+    internal_op: $ => seq(
+      field('name', $.identifier),
+      '(',
+      optional($.param_list),
+      ')',
+      optional(seq(':', field('return_type', $.field_type))),
+      optional($.description),
+      optional($.metadata_block),
+      '{',
+      optional($.satisfies_decl),
+      optional($.safety_decl),
+      optional($.idempotence_decl),
+      repeat($._operation_clause),
+      '}',
+    ),
+
+    // safe = no mutation, read-only.  unsafe = mutates domain state.
+    safety_decl: $ => choice('safe', 'unsafe'),
+
+    idempotence_decl: $ => 'idempotent',
+
+    _operation_clause: $ => choice(
+      $.precondition_clause,
+      $.postcondition_clause,
+      $.resolves_clause,
+      $.creates_clause,
+      $.sets_clause,
+      $.emits_clause,
+      $.service_call_clause,
+      $.foreach_clause,
+      $.returns_clause,
+    ),
+
+    // =========================================================================
+    // Conditions — precondition and postcondition
+    //
+    // A precondition's enforcement is implicit and always rejection, so it declares
+    // no strategy — but it MUST declare a violation reason (`rejects`).
+    // A postcondition has neither: its failure is a defect, not a domain outcome.
+    // =========================================================================
+
+    _condition_clause: $ => choice($.precondition_clause, $.postcondition_clause),
+
+    precondition_clause: $ => seq(
+      'precondition',
+      field('name', $.condition_name),
+      optional($.description),
+      optional($.metadata_block),
+      '{',
+      optional($.satisfies_decl),
+      $.expression,
+      repeat($.expression),   // multi-line bodies are an implicit conjunction
+      '}',
+      'rejects',
+      field('reason', $.string_literal),
+    ),
+
+    postcondition_clause: $ => seq(
+      'postcondition',
+      field('name', $.condition_name),
+      optional($.description),
+      optional($.metadata_block),
+      '{',
+      optional($.satisfies_decl),
+      $.expression,
+      repeat($.expression),
+      '}',
+    ),
+
+    condition_name: $ => choice($.identifier, $.string_literal),
+
+    // =========================================================================
+    // Operation body clauses
+    // =========================================================================
+
+    resolves_clause: $ => seq('resolves', $.type_name, 'from', $.dot_path),
+
+    creates_clause: $ => seq('creates', $.type_name, '{', repeat($.assignment_clause), '}'),
+
+    sets_clause: $ => seq('sets', $.type_name, '{', repeat($.assignment_clause), '}'),
+
+    // `emits` is the concrete syntax of the event's 1..1 "raised by" relation.
+    emits_clause: $ => seq(
+      'emits',
+      $.type_name,
+      optional(seq('{', repeat($.assignment_clause), '}')),
+    ),
+
+    assignment_clause: $ => seq(
+      field('field', $.identifier),
+      '=',
+      $._value_expr,
+      optional(choice(';', ',')),
+    ),
+
+    service_call_clause: $ => seq(
+      $.dot_path, '(', optional($.arg_list), ')',
+      optional($.description),
+    ),
+
+    returns_clause: $ => seq('returns', $._value_expr),
+
+    foreach_clause: $ => seq(
+      'foreach', $.dot_path, 'as', field('var', $._binder),
+      '{', repeat($._operation_clause), '}',
+    ),
+
+    // =========================================================================
+    // Command
+    //
+    // A command MUST carry an identifier — the correlation id of the causality
+    // chain it opens.
     // =========================================================================
 
     command_def: $ => seq(
@@ -835,19 +681,14 @@ module.exports = grammar({
       optional($.description),
       optional($.metadata_block),
       '{',
-      repeat($._record_body_item),
+      optional($.satisfies_decl),
+      $.identity_decl,
+      $.fields_block,
       '}',
     ),
 
-    _record_body_item: $ => choice(
-      $.satisfies_decl,
-      $.description,
-      $.field_decl,
-      $.fields_block,
-    ),
-
     // =========================================================================
-    // Query — flexible body
+    // Query — safe and idempotent by definition; reads through a repository.
     // =========================================================================
 
     query_def: $ => seq(
@@ -856,20 +697,20 @@ module.exports = grammar({
       optional($.description),
       optional($.metadata_block),
       '{',
-      repeat($._query_body_item),
+      optional($.satisfies_decl),
+      $.reads_from_clause,
+      $.fields_block,
+      seq('returns', field('return_type', $.field_type)),
       '}',
     ),
 
-    _query_body_item: $ => choice(
-      $.satisfies_decl,
-      $.description,
-      $.field_decl,
-      $.fields_block,
-      $.returns_decl,
-    ),
+    reads_from_clause: $ => seq('reads-from', field('repository', $.type_name)),
 
     // =========================================================================
-    // Event — flexible body with type classifier
+    // Event (internal)
+    //
+    //   about     — the entity this event is a fact about
+    //   caused-by — the command or query that originated it
     // =========================================================================
 
     event_def: $ => seq(
@@ -878,54 +719,41 @@ module.exports = grammar({
       optional($.description),
       optional($.metadata_block),
       '{',
-      repeat($._event_body_item),
+      optional($.satisfies_decl),
+      optional($.about_clause),
+      optional($.caused_by_clause),
+      $.fields_block,
       '}',
     ),
 
-    _event_body_item: $ => choice(
-      $.satisfies_decl,
-      $.description,
-      $.event_type_classifier,
-      $.field_decl,
-      $.fields_block,
-      seq('schedule', $.string_literal),
-      seq('instant', $.dot_path),
-      seq('guard', '{', $.expression, '}'),
-    ),
+    about_clause: $ => seq('about', field('entity', $.type_name)),
 
-    event_type_classifier: $ => seq('type', choice('internal', 'external', 'error', 'temporal')),
+    caused_by_clause: $ => seq('caused-by', field('cause', $.type_name)),
 
     // =========================================================================
     // External Event
+    //
+    // Consumed THROUGH A REACTION, exactly like an internal event. There is no
+    // `triggers` clause naming commands directly — that would skip the reaction's
+    // guard, which is what lets this context decide whether the upstream fact
+    // still matters to it.
     // =========================================================================
 
     external_event_def: $ => seq(
-      // accept both `external event` (two tokens) and `external-event` (one token)
-      choice(seq('external', 'event'), 'external-event'),
+      'external', 'event',
       field('name', $.type_name),
-      choice(
-        // long form: [description] { satisfies, from X, triggers { Y, Z } }
-        seq(
-          optional($.description),
-          optional($.metadata_block),
-          '{',
-          optional($.satisfies_decl),
-          'from', $.type_name,
-          optional(seq(
-            'triggers', '{',
-            $.type_name,
-            repeat(seq(',', $.type_name)),
-            '}',
-          )),
-          '}',
-        ),
-        // short form: external-event Name from Context  (no body)
-        seq('from', field('source_context', $.type_name)),
-      ),
+      optional($.description),
+      optional($.metadata_block),
+      '{',
+      optional($.satisfies_decl),
+      seq('from', field('source', choice($.type_name, $.string_literal))),
+      optional($.about_clause),
+      $.fields_block,   // must carry an id — the correlation id
+      '}',
     ),
 
     // =========================================================================
-    // Error Event — flexible body
+    // Error Event — raised by an operation on failure
     // =========================================================================
 
     error_event_def: $ => seq(
@@ -934,138 +762,111 @@ module.exports = grammar({
       optional($.description),
       optional($.metadata_block),
       '{',
-      repeat($._event_body_item),
+      optional($.satisfies_decl),
+      optional($.about_clause),
+      optional($.caused_by_clause),
+      $.fields_block,
       '}',
     ),
 
     // =========================================================================
-    // Temporal Events
+    // Temporal Event — a domain fact caused by the passage of time.
+    //
+    // Time alone is never the cause: every temporal event is anchored to a domain
+    // reference. `about` binds the entity whose state the guard reads.
     // =========================================================================
 
-    // Unified temporal-event — accepts relative, absolute, and recurring kinds
-    // through item-based body, with both legacy and modern keyword spellings.
     temporal_event_def: $ => seq(
-      // accept `temporal event` (two tokens) or `temporal-event` (single token)
-      choice(seq('temporal', 'event'), 'temporal-event'),
+      'temporal', 'event',
       field('name', $.type_name),
       optional($.description),
       optional($.metadata_block),
       '{',
-      repeat($._temporal_event_item),
+      optional($.satisfies_decl),
+      optional($.about_clause),
+      field('anchor', $.temporal_anchor),
+      optional($.guard_block),
+      $.fields_block,
       '}',
     ),
 
-    _temporal_event_item: $ => choice(
-      $.satisfies_decl,
-      $.description,
-      $.relative_to_clause,
-      $.absolute_instant_clause,
-      $.recurring_clause,
-      $.guard_clause,           // un-braced  (also used in reactions)
-      $.guard_clause_braced,    // braced     (legacy)
-      $.fields_block,
+    temporal_anchor: $ => choice(
+      $.relative_anchor,
+      $.absolute_anchor,
+      $.recurring_anchor,
     ),
 
-    // `relative-to <Ref> offset <Duration>` (modern) and
-    // `reference <Ref> offset <Value>` (legacy)
-    // (dot_path subsumes a bare type_name as a single-segment path)
-    relative_to_clause: $ => seq(
-      choice('relative-to', 'reference'),
-      choice($.dot_path, $.paren_expr),
-      optional(seq('offset', $._value_expr)),
+    relative_anchor: $ => seq(
+      'reference', field('event', $.type_name),
+      'offset', field('offset', $._value_expr),
     ),
 
-    absolute_instant_clause: $ => seq('instant', $.dot_path),
+    absolute_anchor: $ => seq('instant', field('instant', $.dot_path)),
 
-    // `recurring "<cron>" [per-market]` (modern) and
-    // `schedule "<cron>"` (legacy)
-    recurring_clause: $ => seq(
-      choice('recurring', 'schedule'),
-      $.string_literal,
-      optional('per-market'),
-    ),
+    recurring_anchor: $ => seq('schedule', field('schedule', $.string_literal)),
 
-    guard_clause_braced: $ => seq('guard', '{', $.expression, '}'),
+    // Evaluated at firing time. If false the event is silently suppressed — no
+    // fact is recorded and no reaction triggers. This absorbs cancellation.
+    guard_block: $ => seq('guard', '{', $.expression, '}'),
 
     // =========================================================================
-    // Services — flexible body
+    // Services
     // =========================================================================
 
     domain_service_def: $ => seq(
-      choice('domain-service', seq('domain', 'service')),
+      'domain', 'service',
       field('name', $.type_name),
       optional($.description),
       optional($.metadata_block),
       '{',
-      repeat($._service_body_item),
+      optional($.satisfies_decl),
+      optional($.calls_block),
+      $.operations_block,
       '}',
     ),
+
+    // The infrastructure services this service depends on (through their SPIs).
+    calls_block: $ => seq('calls', '{', repeat1($.type_name), '}'),
 
     application_service_def: $ => seq(
-      choice('application-service', seq('application', 'service')),
+      'application', 'service',
       field('name', $.type_name),
       optional($.description),
       optional($.metadata_block),
       '{',
-      repeat($._service_body_item),
-      '}',
-    ),
-
-    infrastructure_service_def: $ => seq(
-      choice('infrastructure-service', seq('infrastructure', 'service')),
-      field('name', $.type_name),
-      optional($.description),
-      optional($.metadata_block),
-      '{',
-      repeat($._service_body_item),
-      '}',
-    ),
-
-    service_def: $ => seq(
-      'service',
-      field('name', $.type_name),
-      optional($.description),
-      optional($.metadata_block),
-      '{',
-      repeat($._service_body_item),
-      '}',
-    ),
-
-    _service_body_item: $ => choice(
-      $.satisfies_decl,
-      $.description,
-      $.named_operation_def,
+      optional($.satisfies_decl),
+      optional($.exposed_by_clause),
       $.operations_block,
-      $.interface_def,
-      $.invariants_block,
-      $.reactions_block,
+      '}',
     ),
 
-    service_op_def: $ => seq(
-      field('name', choice($.identifier, $.string_literal)),
-      '(',
-      optional($.param_list),
-      ')',
-      optional(seq(':', $.field_type)),
+    exposed_by_clause: $ => seq('exposed-by', field('interface', $.type_name)),
+
+    // An adapter fulfilling an SPI contract. The model records the SIGNATURES it
+    // provides, never an adapter body.
+    infrastructure_service_def: $ => seq(
+      'infrastructure', 'service',
+      field('name', $.type_name),
       optional($.description),
       optional($.metadata_block),
-      optional(seq('{', optional($.satisfies_decl), repeat($._service_clause), '}')),
+      '{',
+      optional($.satisfies_decl),
+      optional($.described_by_clause),
+      $.signature_operations_block,
+      '}',
     ),
 
-    _service_clause: $ => choice(
-      $.foreach_clause,
-      $.resolves_clause,
-      $.service_call_clause,
-      $.returns_clause,
-      $.precondition_clause,
-      $.postcondition_clause,
-    ),
+    described_by_clause: $ => seq('described-by', field('interface', $.type_name)),
+
+    signature_operations_block: $ => seq('operations', '{', repeat($.operation_signature), '}'),
 
     // =========================================================================
-    // Repository (persistence port derived from an entity / aggregate root)
+    // Repository — a persistence port DERIVED from an entity or aggregate root.
+    // A repository derived from a read-only entity is itself `read-only`.
     // =========================================================================
 
     repository_def: $ => seq(
+      optional('read-only'),
       'repository',
       field('name', $.type_name),
       'for',
@@ -1074,44 +875,56 @@ module.exports = grammar({
       optional($.metadata_block),
       '{',
       optional($.satisfies_decl),
-      repeat($.repository_op_def),
+      optional($.described_by_clause),
+      repeat($.operation_signature),
       '}',
     ),
 
-    // Signature-style operation: `name(params): returnType` (return type optional)
-    repository_op_def: $ => seq(
-      field('name', $.identifier),
-      '(',
-      optional($.param_list),
-      ')',
-      optional(seq(':', field('return_type', $.field_type))),
-      optional($.description),
-      optional($.metadata_block),
-    ),
-
     // =========================================================================
-    // Reaction (reactive rules) are defined by `reaction_def` above; the legacy
-    // `policy` and scoped-`policy` forms were folded into it.
-
-    // =========================================================================
-    // Invariant (top-level)
+    // Reaction — THE ONLY WAY AN EVENT CAUSES A COMMAND.
+    //
+    // Uniform across all four event types: internal, external, error, temporal.
     // =========================================================================
 
-    invariant_def: $ => seq(
-      'invariant',
-      field('name', choice($.type_name, $.string_literal)),
+    reaction_def: $ => seq(
+      'reaction',
+      field('name', $.type_name),
       optional($.description),
       optional($.metadata_block),
       '{',
       optional($.satisfies_decl),
-      optional($.description),
-      optional($.on_clause),
-      optional($.must_block),
-      optional(seq('message', $.string_literal)),
-      optional(seq('enforcement', choice('reject', 'warn', 'rejection', 'compensation', 'alert'))),
-      optional($.enforcement_strategy),
+      $.triggered_by_clause,
+      optional($.guard_block),
+      $.effects_clause,
       '}',
     ),
+
+    triggered_by_clause: $ => seq(
+      'triggered-by',
+      field('event', $.type_name),
+      repeat(seq(',', $.type_name)),
+    ),
+
+    effects_clause: $ => seq('effects', field('command', $.type_name)),
+
+    // =========================================================================
+    // Invariant — EVERY invariant declares its enforcement strategy.
+    // =========================================================================
+
+    invariant_def: $ => seq(
+      'invariant',
+      field('name', $.type_name),
+      optional($.description),
+      optional($.metadata_block),
+      '{',
+      optional($.satisfies_decl),
+      seq('on', field('scope', $.dot_path)),
+      $.must_block,
+      seq('enforcement', field('enforcement', $.enforcement_strategy)),
+      '}',
+    ),
+
+    must_block: $ => seq('must', '{', $.expression, '}'),
 
     enforcement_strategy: $ => choice(
       'rejection',
@@ -1121,108 +934,64 @@ module.exports = grammar({
 
     invariants_block: $ => seq('invariants', '{', repeat($.scoped_invariant_def), '}'),
 
-    reactions_block: $ => seq('reactions', '{', repeat($.scoped_invariant_def), '}'),
-
-    // =========================================================================
-    // Transitions (entity-level shorthand)
-    // =========================================================================
-
-    transitions_block: $ => seq('transitions', '{', repeat($.entity_transition), '}'),
-
-    entity_transition: $ => seq(
-      $.transition_source,
-      '-->',
-      field('target', $.identifier),
-      'on',
-      $.string_literal,
-      repeat(seq(',', $.string_literal)),
-    ),
-
+    // Inside an `invariants { }` block the owner is the enclosing entity,
+    // aggregate, value type or state, so no `on` clause is needed.
     scoped_invariant_def: $ => seq(
       field('name', $.identifier),
       optional(seq('(', optional($.param_list), ')')),
       optional($.description),
-      optional(seq('enforcement', choice('reject', 'warn', 'rejection', 'compensation', 'alert'))),
       optional($.metadata_block),
       '{',
       optional($.satisfies_decl),
       $.expression,
+      seq('enforcement', field('enforcement', $.enforcement_strategy)),
       '}',
     ),
 
     // =========================================================================
-    // Agreement
+    // Agreement — a property spanning several aggregates. Bilateral (2) or
+    // multilateral (n) — never unilateral.
     // =========================================================================
 
     agreement_def: $ => seq(
       'agreement',
-      field('name', choice($.type_name, $.string_literal)),
+      field('name', $.type_name),
       optional($.description),
       optional($.metadata_block),
       '{',
-      repeat($._agreement_item),
-      '}',
-    ),
-
-    _agreement_item: $ => choice(
-      $.satisfies_decl,
-      $.description,
+      optional($.satisfies_decl),
       $.participants_clause,
       $.predicate_block,
       $.reconciliation_def,
-    ),
-
-    participants_clause: $ => seq(
-      'participants',
-      choice(
-        seq($.type_name, repeat(seq(',', $.type_name))),
-        seq('[', $.type_name, repeat(seq(',', $.type_name)), ']'),
-      ),
-    ),
-
-    // Agreement/reconciliation predicates are authored as freeform business
-    // prose (GAP-006); parse the body as an opaque text_predicate and leave
-    // semantic validation to the LSP/checker rather than erroring.
-    predicate_block: $ => seq('predicate', '{', $.text_predicate, '}'),
-
-    predicate_expr: $ => choice(
-      $.forall_pred,
-      $.expression,
-    ),
-
-    forall_pred: $ => seq(
-      'forall',
-      $.type_name,
-      optional(seq('where', $.expression)),
-      ':',
-      choice($.exists_pred, $.expression),
-    ),
-
-    exists_pred: $ => seq(
-      'exists',
-      $.type_name,
-      optional(seq('where', $.expression)),
-    ),
-
-    reconciliation_def: $ => seq(
-      'reconciliation',
-      // identifier-named reconciliations are common in ride-now style
-      field('name', choice($.identifier, $.type_name, $.string_literal)),
-      optional($.description),
-      optional($.metadata_block),
-      '{',
-      repeat($._reconciliation_item),
       '}',
     ),
 
-    _reconciliation_item: $ => choice(
+    participants_clause: $ => seq(
+      'participants', '{',
+      $.type_name, ',', $.type_name,
+      repeat(seq(',', $.type_name)),
+      '}',
+    ),
+
+    predicate_block: $ => seq('predicate', '{', $.expression, '}'),
+
+    // =========================================================================
+    // Reconciliation — the enforcement counterpart of an agreement
+    // =========================================================================
+
+    reconciliation_def: $ => seq(
+      'reconciliation',
+      field('name', $.type_name),
+      optional($.description),
+      optional($.metadata_block),
+      '{',
+      optional($.satisfies_decl),
       seq('trigger', $.reconciliation_trigger),
       seq('detection', $.detection_strategy),
-      seq('response', $.identifier),                                    // new
-      seq('compensation', $.type_name, repeat(seq(',', $.type_name))),
-      seq('coordination', $.coordination_style),
-      $.escalation_chain_def,
-      $.escalation_list,                                                // new
+      $.compensation_clause,
+      optional(seq('coordination', $.coordination_style)),
+      optional($.escalation_chain_def),
+      '}',
     ),
 
     reconciliation_trigger: $ => choice(
@@ -1230,70 +999,81 @@ module.exports = grammar({
       seq('schedule', $.string_literal),
     ),
 
-    // Detection strategy: a closed enum, OR a freeform predicate string.
-    detection_strategy: $ => choice('query', 'event-sourced', 'query-based', $.string_literal),
+    detection_strategy: $ => choice('query', 'event-sourced'),
 
-    // Bracketed escalation list: `escalation [stepA, stepB]`
-    escalation_list: $ => seq(
-      'escalation', '[',
-      $.identifier, repeat(seq(',', $.identifier)),
-      ']',
+    compensation_clause: $ => seq(
+      'compensation', '{',
+      $.type_name, repeat(seq(',', $.type_name)),
+      '}',
     ),
 
     coordination_style: $ => choice('choreography', 'orchestration'),
+
+    // =========================================================================
+    // Escalation Chain — MUST TERMINATE.
+    //
+    // The rule is encoded structurally rather than left to a validator: zero or
+    // more non-terminal steps followed by exactly one terminal step. `retry` and
+    // `compensate` can themselves fail, so they cannot end the chain.
+    // =========================================================================
 
     escalation_chain_def: $ => seq(
       'escalation',
       optional($.description),
       optional($.metadata_block),
       '{',
-      repeat1($.escalation_step),
+      optional($.satisfies_decl),
+      repeat($.non_terminal_step),
+      $.terminal_step,
       '}',
     ),
 
-    escalation_step: $ => seq(
+    non_terminal_step: $ => seq(
       'step',
-      field('name', choice($.identifier, $.number)),
+      field('name', $.identifier),
       optional($.description),
       optional($.metadata_block),
       '{',
-      repeat($._escalation_step_item),
+      optional($.satisfies_decl),
+      seq('when', '{', $.expression, '}'),
+      seq('action', field('action', $.non_terminal_action)),
       '}',
     ),
 
-    _escalation_step_item: $ => choice(
-      seq('condition', $.string_literal),
-      seq('action', $.escalation_action),
-      seq('max-attempts', $.number),
+    terminal_step: $ => seq(
+      'step',
+      field('name', $.identifier),
+      optional($.description),
+      optional($.metadata_block),
+      '{',
+      optional($.satisfies_decl),
       seq('when', '{', $.expression, '}'),
-      seq('then', '{', $.expression, '}'),
+      seq('action', field('action', $.terminal_action)),
+      '}',
     ),
 
-    escalation_action: $ => choice(
-      seq('retry', optional(seq('(', $.number, ')'))),
-      seq('compensate', choice(
-        seq('{', $.type_name, repeat(seq(',', $.type_name)), '}'),
-        $.type_name,
-      )),
-      seq('alert', optional($.string_literal)),
+    non_terminal_action: $ => choice(
+      seq('retry', '(', $.number, ')'),
+      seq('compensate', '{', $.type_name, repeat(seq(',', $.type_name)), '}'),
+    ),
+
+    terminal_action: $ => choice(
+      seq('alert', $.string_literal),
       'suspend',
-      seq('manual', optional($.string_literal)),
-      'manual-intervention',
+      seq('manual', $.string_literal),
     ),
 
     // =========================================================================
     // Parameters & Arguments
     // =========================================================================
 
-    param_list: $ => seq(
-      $.param_decl,
-      repeat(seq(',', $.param_decl)),
-    ),
+    param_list: $ => seq($.param_decl, repeat(seq(',', $.param_decl))),
 
     param_decl: $ => seq(
       field('name', $.identifier),
       ':',
-      $.field_type,
+      field('type', $.field_type),
+      optional('?'),
     ),
 
     arg_list: $ => choice(
@@ -1301,10 +1081,7 @@ module.exports = grammar({
       $.named_arg_list,
     ),
 
-    named_arg_list: $ => seq(
-      $.named_arg,
-      repeat(seq(',', $.named_arg)),
-    ),
+    named_arg_list: $ => seq($.named_arg, repeat(seq(',', $.named_arg))),
 
     named_arg: $ => seq($.identifier, '=', $._value_expr),
 
@@ -1320,16 +1097,16 @@ module.exports = grammar({
 
     // =========================================================================
     // Expressions
+    //
+    // Orthogonal to the metamodel, which only ever says "a predicate expression".
+    // Precedence, loosest to tightest:
+    //   ?:  <  or  <  and  <  not  <  comparison  <  + -  <  * /  <  unary
     // =========================================================================
 
     expression: $ => $.coalesce_expr,
 
-    // Elvis / null-coalescing: `a ?: b` evaluates to `b` when `a` is null.
-    // Lowest binary precedence — binds looser than `or`/`and`/comparison.
-    coalesce_expr: $ => prec.left(0, seq(
-      $.or_expr,
-      repeat(seq('?:', $.or_expr)),
-    )),
+    // Elvis / null-coalescing: `a ?: b` is `b` when `a` is null.
+    coalesce_expr: $ => prec.left(0, seq($.or_expr, repeat(seq('?:', $.or_expr)))),
 
     or_expr: $ => prec.left(1, seq($.and_expr, repeat(seq('or', $.and_expr)))),
 
@@ -1344,7 +1121,7 @@ module.exports = grammar({
       $.add_expr,
       optional(choice(
         seq($.comp_op, $.add_expr),
-        seq('matches', $.regex_literal),
+        seq('matches', choice($.string_literal, $.regex_literal)),
         seq('does', 'not', 'contain', $.dot_path),
         seq('contains', $.dot_path),
       )),
@@ -1353,54 +1130,50 @@ module.exports = grammar({
 
     comp_op: $ => choice('=', '!=', '>', '<', '>=', '<='),
 
-    add_expr: $ => prec.left(5, seq(
-      $.mul_expr,
-      repeat(seq(choice('+', '-'), $.mul_expr)),
-    )),
+    add_expr: $ => prec.left(5, seq($.mul_expr, repeat(seq(choice('+', '-'), $.mul_expr)))),
 
-    mul_expr: $ => prec.left(6, seq(
-      $.unary_expr,
-      repeat(seq(choice('*', '/'), $.unary_expr)),
-    )),
+    mul_expr: $ => prec.left(6, seq($.unary_expr, repeat(seq(choice('*', '/'), $.unary_expr)))),
 
     unary_expr: $ => prec(7, choice(
       $.if_expr,
       $.every_expr,
       $.quantifier_expr,
-      $.no_field_contains_expr,
       $.is_defined_expr,
       $.is_not_defined_expr,
       $.is_null_expr,
       $.is_not_null_expr,
       $.in_expr,
       $.not_in_expr,
-      $.service_call_expr,
-      $.function_call,
+      $.call_expr,
       prec(10, $.duration_literal),
       $.dot_path,
       $.literal,
       $.paren_expr,
     )),
 
-    // Quantifier inside expressions: `exists pm in paymentMethods where pm.isActive`
+    // if — logical implication (if A then B ≡ not A or B).
+    if_expr: $ => choice(
+      seq('if', $.expression, '{', $.expression, '}'),
+      prec.right(seq('if', $.expression, 'then', $.expression, 'else', $.expression)),
+    ),
+
+    // every — universal quantifier. The binder is an identifier, matching
+    // `foreach ... as <identifier>`.
+    //
+    // The binder accepts a type_name as well: the grammar's `identifier` is
+    // camelCase OR PascalCase, so `every Product in lines` must parse even though
+    // `Product` lexes as a type_name.
+    every_expr: $ => seq('every', field('var', $._binder), 'in', $.dot_path, '{', $.expression, '}'),
+
     quantifier_expr: $ => seq(
       choice('exists', 'forall'),
-      field('var', $.identifier),
+      field('var', $._binder),
       'in',
       field('collection', $.dot_path),
       optional(seq('where', field('predicate', $.expression))),
     ),
 
-    no_field_contains_expr: $ => seq('no', 'field', 'contains', $.dot_path),
-
-    if_expr: $ => choice(
-      // braced form: if <cond> { <then-expr> }
-      seq('if', $.expression, '{', $.expression, '}'),
-      // ternary form: if <cond> then <then-expr> else <else-expr>
-      prec.right(seq('if', $.expression, 'then', $.expression, 'else', $.expression)),
-    ),
-
-    every_expr: $ => seq('every', $.type_name, 'in', $.dot_path, '{', $.expression, '}'),
+    _binder: $ => choice($.identifier, $.type_name),
 
     is_defined_expr: $ => prec(8, seq($.dot_path, 'is', 'defined')),
     is_not_defined_expr: $ => prec(8, seq($.dot_path, 'is', 'not', 'defined')),
@@ -1410,70 +1183,45 @@ module.exports = grammar({
     in_expr: $ => prec(8, seq($.dot_path, 'in', '{', $.value_list, '}')),
     not_in_expr: $ => prec(8, seq($.dot_path, 'not', 'in', '{', $.value_list, '}')),
 
-    function_call: $ => seq(
-      field('name', $.function_name),
+    // One production covers both a built-in function and a service call — they are
+    // indistinguishable syntactically, and telling them apart needs a symbol table.
+    //
+    // Built-ins: count, sum, min, max, avg, abs, size, isEmpty, isNotEmpty,
+    //            append, now, today.
+    call_expr: $ => prec(9, seq(
+      $.dot_path,
       '(',
       optional($.arg_list),
       ')',
-      // optional chained member access after the call: f().a, f().a.b, f()?.a
       repeat(seq(choice('.', '?.'), $._path_segment)),
-    ),
-
-    // function_name accepts the canonical built-ins plus any identifier or
-    // type name — the latter covers domain helpers (`recompute`, `lookupX`)
-    // and value-type constructors (`Money`, `AppealResolution`).
-    function_name: $ => choice(
-      'count', 'sum', 'now', 'today', 'size', 'isEmpty', 'isNotEmpty', 'append',
-      $.identifier,
-      $.type_name,
-    ),
+    )),
 
     paren_expr: $ => seq('(', $.expression, ')'),
 
-    // Regex literal for 'matches' expressions: [a-zA-Z0-9-]+
+    // Bracketed regex used by `matches`, e.g. [a-zA-Z0-9-]+
     regex_literal: $ => token(/\[[^\]]*\][*+?]?/),
 
     // =========================================================================
     // Value expressions
     // =========================================================================
 
-    _value_expr: $ => choice(
-      $.service_call_expr,
-      $.array_literal,
-      $.expression,
-    ),
+    _value_expr: $ => choice($.array_literal, $.expression),
 
     array_literal: $ => seq('[', $._value_expr, repeat(seq(',', $._value_expr)), ']'),
-
-    service_call_expr: $ => prec(9, seq(
-      $.dot_path,
-      '(',
-      optional($.arg_list),
-      ')',
-      // optional chained member access: Service.fn(args).result, Service.fn().a.b
-      repeat(seq(choice('.', '?.'), $._path_segment)),
-    )),
 
     value_list: $ => seq($._value_expr, repeat(seq(',', $._value_expr))),
 
     // =========================================================================
-    // Dot-path
+    // Dot-path — `?.` is safe navigation; `[expr]` subscripts a collection.
     // =========================================================================
 
     dot_path: $ => seq(
       $._path_segment,
-      // accept both `.` (regular) and `?.` (safe-navigation) as separators
       repeat(seq(choice('.', '?.'), $._path_segment)),
     ),
 
     _path_segment: $ => seq(
-      choice(
-        $.identifier,
-        $.type_name,
-        $.string_literal,
-        // Allow reserved keywords in dot-paths (e.g. DateTime.now())
-        'now', 'today',
-      ),
+      choice($.identifier, $.type_name, $.string_literal, 'now', 'today'),
       optional($.array_index),
     ),
 
@@ -1498,11 +1246,8 @@ module.exports = grammar({
 
     number: $ => token(/-?\d+(\.\d+)?/),
 
-    // Duration literal:
-    //   - spaced: 24 months, 30 days, 1 year
-    //   - compact: 60s, 5min, 24h, 30days, 1businessDay, 2businessDays
-    //     (compact form uses token.immediate so the unit must be adjacent
-    //      to the number — no whitespace allowed)
+    // Spaced form: `5 minutes`. Compact form: `5min`, `24h`, `2businessDays` —
+    // token.immediate means the unit must be adjacent to the number.
     duration_literal: $ => choice(
       seq($.number, choice('months', 'days', 'years', 'hours', 'minutes', 'seconds', 'weeks')),
       seq(
@@ -1524,7 +1269,6 @@ module.exports = grammar({
     comment: $ => token(choice(
       seq('//', /[^\n]*/),
       seq('#', /[^\n]*/),
-      // C-style block comment — non-nesting
       seq('/*', /([^*]|\*+[^*\/])*\*+\//),
     )),
   },

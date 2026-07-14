@@ -1,0 +1,370 @@
+// =============================================================================
+// Conformance fixture — exercises EVERY construct of the normative grammar
+// (src/grammars/domain.ebnf), which mirrors src/metamodels/DOMAIN-METAMODEL.md.
+//
+// This file is smoke-tested by src/tree-sitters/build.sh and validated by
+// src/langium/specy-domain/build.sh. If you add or change a construct, add it
+// here — a construct that appears in no example is a construct nothing checks.
+//
+// It is deliberately not a realistic domain. It is a checklist.
+// =============================================================================
+
+
+organization Acme :: "Acme Corp" {
+    requirements-source "specy/acme.sysreq"
+
+    context Ordering (ord) :: "Order lifecycle" {
+        map {
+            upstream Catalog : OHS
+            downstream Payments : ACL
+            symmetric Shipping : Partnership
+        }
+
+        module Orders :: "Order handling" {
+            satisfies [REQ-ORD-001]
+
+            exposes { OrderApi }
+            requires { PaymentGateway OrderPersistence }
+            depends on { Shared }
+
+            // --- interfaces: the two port roles ---
+            api interface OrderApi :: "What consumers may call" {
+                satisfies [REQ-ORD-002]
+                exposes Order.placeOrder
+                exposes Order.cancel
+            }
+
+            spi interface PaymentGateway :: "What the domain needs from payments" {
+                describes StripeAdapter
+                charge(amount: Money, ref: uuid) : Receipt :: "Take payment" {
+                    precondition positiveAmount { amount.value > 0 } rejects "Amount must be positive"
+                }
+            }
+
+            // --- enum of a value type, with a code field ---
+            enum Currencies of Currency :: "ISO 4217" {
+                usd :: "US Dollar"
+                eur :: "Euro"
+            }
+
+            enum Severity {
+                low = "low"
+                high = "high"
+            }
+
+            value Currency {
+                fields {
+                    code      : string code maxLength(3)
+                    precision : int min(0) max(4)
+                }
+            }
+
+            value Money :: "An amount in a currency" {
+                fields {
+                    value    : decimal min(0)
+                    currency : Currency
+                }
+                operations {
+                    add(other: Money) : Money {
+                        precondition sameCurrency { currency.code = other.currency.code }
+                            rejects "Cannot add amounts in different currencies"
+                        returns Money(value = value + other.value, currency = currency)
+                    }
+                }
+                invariants {
+                    nonNegative :: "An amount is never negative" {
+                        value >= 0
+                        enforcement rejection
+                    }
+                }
+            }
+
+            // --- read-only entity (master data) ---
+            read-only entity Product :: "Owned by the Catalog context" {
+                satisfies [REQ-ORD-003]
+                sourced-from Catalog
+                synced-via asynchronous-projection
+                projected-by CatalogProjector
+
+                identity sku : string
+                fields {
+                    name  : string required
+                    price : Money
+                }
+                operations {
+                    isAvailable() : boolean {
+                        safe
+                        returns price.value > 0
+                    }
+                }
+            }
+
+            read-only repository ProductRepository for Product {
+                described-by ProductLookup
+                getById(sku: string) : Product
+                findByName(name: string) : list<Product>
+            }
+
+            spi interface ProductLookup {
+                describes ProductRepository
+                getById(sku: string) : Product
+            }
+
+            // --- aggregate: IS the root; entities{} lists non-root children ---
+            aggregate Order :: "The order aggregate" {
+                satisfies [REQ-ORD-004]
+                identity id : uuid
+                duplicate detection { customerId = customerId and total = total }
+                fields {
+                    customerId : uuid required
+                    total      : Money
+                    placedAt   : datetime optional
+                }
+                entities { OrderLine }
+                references {
+                    lines : OrderLine 1..N :: "The line items"
+                }
+
+                operations {
+                    "Place the order" on PlaceOrder :: "Customer submits" {
+                        satisfies [REQ-ORD-004]
+                        unsafe
+                        precondition hasLines { isNotEmpty(lines) }
+                            rejects "An order must contain at least one line"
+                        postcondition totalMatches { total.value = sum(lines.amount) }
+                        sets Order { placedAt = now() }
+                        emits OrderPlaced { orderId = id }
+                    }
+
+                    recomputeTotal() : Money {
+                        safe
+                        returns sum(lines.amount)
+                    }
+                }
+
+                states {
+                    machine Lifecycle :: "Order lifecycle" {
+                        state draft {
+                            invariants {
+                                noPlacedAt { placedAt is not defined
+                                    enforcement rejection }
+                            }
+                        }
+                        state placed
+                        final cancelled
+
+                        [*]     --> draft   on "Place the order"
+                        draft   --> placed  on "Place the order" {
+                            precondition notEmpty { isNotEmpty(lines) }
+                                rejects "Cannot place an empty order"
+                        }
+                        placed  --> cancelled on cancel
+                    }
+                }
+
+                invariants {
+                    totalIsSumOfLines :: "Order total equals the sum of its lines" {
+                        satisfies [REQ-ORD-001]
+                        total.value = sum(lines.amount)
+                        enforcement rejection
+                    }
+                    // Quantifiers. The binder may be camelCase or PascalCase — both
+                    // lex differently, so both are exercised here.
+                    everyLinePositive :: "Every line has a positive quantity" {
+                        every line in lines { line.qty > 0 }
+                        enforcement rejection
+                    }
+                    everyLineHasSku :: "Every line names a product" {
+                        every Line in lines { Line.sku is defined }
+                        enforcement alert
+                    }
+                    someLineIsBillable :: "At least one line carries an amount" {
+                        exists line in lines where line.amount > 0
+                        enforcement alert
+                    }
+                }
+            }
+
+            entity OrderLine {
+                identity id : uuid
+                fields {
+                    sku    : string required
+                    qty    : int min(1)
+                    amount : decimal
+                }
+            }
+
+            repository OrderRepository for Order {
+                described-by OrderPersistence
+                store(order: Order)
+                getById(id: uuid) : Order
+                remove(id: uuid)
+                findByCustomerId(customerId: uuid) : list<Order>
+            }
+
+            spi interface OrderPersistence {
+                describes OrderRepository
+                store(order: Order)
+            }
+
+            // --- messages ---
+            command PlaceOrder :: "Intention to place an order" {
+                satisfies [REQ-ORD-004]
+                identity commandId : uuid
+                fields {
+                    customerId : uuid required
+                }
+            }
+
+            query GetOrder :: "Retrieve one order" {
+                reads-from OrderRepository
+                fields {
+                    orderId : uuid required
+                }
+                returns Order
+            }
+
+            event OrderPlaced :: "An order was placed" {
+                satisfies [REQ-ORD-004]
+                about Order
+                caused-by PlaceOrder
+                fields {
+                    orderId : uuid required
+                    placedAt : datetime
+                }
+            }
+
+            error event OrderRejected :: "The order could not be placed" {
+                about Order
+                caused-by PlaceOrder
+                fields {
+                    orderId : uuid
+                    reason  : string
+                }
+            }
+
+            external event PaymentSettled :: "From the Payments context" {
+                from Payments
+                about Order
+                fields {
+                    correlationId : uuid required
+                    orderId       : uuid
+                }
+            }
+
+            temporal event OrderPaymentDeadlineElapsed :: "Payment window closed" {
+                about Order
+                reference OrderPlaced
+                offset 30 minutes
+                guard { Order.placedAt is defined }
+                fields {
+                    orderId : uuid
+                }
+            }
+
+            temporal event PromoCreditExpired {
+                about Order
+                instant Order.placedAt
+                guard { Order.total.value > 0 }
+                fields { orderId : uuid }
+            }
+
+            temporal event WeeklyPayoutDue {
+                schedule "0 0 * * MON"
+                fields { cycleId : uuid }
+            }
+
+            // --- reaction: the SOLE event -> command edge ---
+            reaction ReleaseOrderOnPayment :: "Release the order once payment settles" {
+                satisfies [REQ-ORD-005]
+                triggered-by PaymentSettled, OrderPaymentDeadlineElapsed
+                guard { Order.placedAt is defined }
+                effects PlaceOrder
+            }
+
+            // --- services ---
+            domain service PricingService :: "Spans Order and Product" {
+                calls { StripeAdapter }
+                operations {
+                    "Reprice the order" on PlaceOrder {
+                        unsafe
+                        resolves Product from Order.lines
+                        sets Order { total = recomputeTotal() }
+                        emits OrderPlaced { orderId = Order.id }
+                    }
+                    quote(sku: string) : Money {
+                        safe
+                        idempotent
+                        returns Money(value = 0, currency = Currencies.usd)
+                    }
+                }
+            }
+
+            application service OrderAppService {
+                exposed-by OrderApi
+                operations {
+                    "Submit an order" on PlaceOrder {
+                        unsafe
+                        PricingService.quote(sku = "x")
+                        emits OrderPlaced { orderId = Order.id }
+                    }
+                }
+            }
+
+            infrastructure service StripeAdapter :: "Payment adapter" {
+                described-by PaymentGateway
+                operations {
+                    charge(amount: Money, ref: uuid) : Receipt
+                    refund(ref: uuid)
+                }
+            }
+
+            infrastructure service CatalogProjector :: "ACL: refreshes the Product read-model" {
+                operations {
+                    refresh(sku: string)
+                }
+            }
+
+            value Receipt {
+                fields { ref : uuid }
+            }
+
+            // --- invariants, agreements ---
+            invariant OrderTotalPositive :: "A placed order has a positive total" {
+                on Order.placed
+                must { total.value > 0 }
+                enforcement rejection
+            }
+
+            agreement StockMatchesOrders :: "Reserved stock equals ordered quantity" {
+                satisfies [REQ-ORD-006]
+                participants { Order, Product }
+                predicate { sum(Order.lines.qty) <= Product.price.value }
+                reconciliation StockReconciliation {
+                    trigger event OrderPlaced, PaymentSettled
+                    detection query
+                    compensation { PlaceOrder }
+                    coordination orchestration
+                    escalation :: "Must terminate" {
+                        step retryOnce {
+                            when { true }
+                            action retry(3)
+                        }
+                        step compensateNext {
+                            when { true }
+                            action compensate { PlaceOrder }
+                        }
+                        step giveUp {
+                            when { true }
+                            action manual "Ops must reconcile stock by hand"
+                        }
+                    }
+                }
+            }
+        }
+
+        module Shared {
+            value Tag { fields { name : string } }
+        }
+    }
+}
