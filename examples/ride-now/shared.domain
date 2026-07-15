@@ -46,11 +46,13 @@ context Shared :: "Cross-cutting value types co-owned by all ride-now bounded co
             defaultFractionDigits : int min(-1) max(4)
         }
         invariants {
-            numericCodeInRange :: "ISO 4217 numeric codes are 3-digit identifiers" enforcement reject {
+            numericCodeInRange :: "ISO 4217 numeric codes are 3-digit identifiers" {
                 numericCode >= 0 and numericCode <= 999
+                enforcement rejection
             }
-            fractionDigitsInRange :: "Minor-unit precision is between 0 and 4 (or -1 for funds/metals with no minor unit)" enforcement reject {
+            fractionDigitsInRange :: "Minor-unit precision is between 0 and 4 (or -1 for funds/metals with no minor unit)" {
                 defaultFractionDigits >= -1 and defaultFractionDigits <= 4
+                enforcement rejection
             }
         }
     }
@@ -61,21 +63,30 @@ context Shared :: "Cross-cutting value types co-owned by all ride-now bounded co
             currency : Currency
         }
         invariants {
-            nonNegative :: "Amount is never negative" enforcement reject { value >= 0 }
+            nonNegative :: "Amount is never negative" {
+                value >= 0
+                enforcement rejection
+            }
         }
     }
 
     value Distance :: "Distance expressed in meters" {
         fields { meters : decimal min(0) }
         invariants {
-            nonNegative :: "Distance is never negative" enforcement reject { meters >= 0 }
+            nonNegative :: "Distance is never negative" {
+                meters >= 0
+                enforcement rejection
+            }
         }
     }
 
     value Duration :: "Duration expressed in seconds" {
         fields { seconds : int min(0) }
         invariants {
-            nonNegative :: "Duration is never negative" enforcement reject { seconds >= 0 }
+            nonNegative :: "Duration is never negative" {
+                seconds >= 0
+                enforcement rejection
+            }
         }
     }
 }

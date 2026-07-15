@@ -76,20 +76,37 @@ Each entry is a common shape in extracted models and its proper DDD treatment. U
 
 - **Anemic or god entity** (data bag with no behaviour, or one entity doing everything) → behaviour-rich
   entities with operations, gathered into a **tight aggregate** whose boundary is justified by a shared
-  invariant. Prefer small aggregates; if one grows past ~4 entities, justify the boundary explicitly
-  (what consistency rule forces them to commit together?) rather than treating the size as a target.
+  invariant. The aggregate **is** its root — it carries the identity, fields, operations and states
+  directly, and `entities { }` lists only its non-root children (a cluster with no children is an
+  `entity`, not an aggregate). Prefer small aggregates; if one grows past ~4 entities, justify the
+  boundary explicitly (what consistency rule forces them to commit together?) rather than treating the
+  size as a target.
 - **Primitive obsession** (raw `decimal`/`string`/flag-`boolean` carrying domain meaning) → **value
   types** with constructor-validated invariants, so an invalid value cannot exist.
 - **Illegal states are representable** (paired mutable flags + their satellite fields, e.g.
   `isApproved` + `approvedBy` + `approvedAt`) → collapse into a **present-or-absent value object**
   (`approval : Approval?`), making the illegal combinations unrepresentable.
 - **Implicit or duplicated branch logic** (the same `if` scattered across operations) → lift into
-  explicit **invariants**, **preconditions**, and a **state machine** with no dead or trap states.
+  explicit **invariants** (each with its `enforcement`), **preconditions** (each with its `rejects`
+  reason), and a **state machine** — a `states { machine ... }` block inside the entity, with no dead or
+  trap states, whose transitions carry *named* preconditions rather than anonymous guards.
 - **Generic "something changed" events** (`OrderUpdated`) → specific, intent-revealing **domain events**
-  (`OrderShipped`, `DeliveryRescheduled`). And give every operation an explicit **error path** — an
-  error event for the ways it can fail.
+  (`OrderShipped`, `DeliveryRescheduled`), bound to what they are a fact about (`about` / `caused-by`).
+  And give every operation an explicit **error path** — an error event for the ways it can fail.
 - **Missing temporal concerns** (deadlines, overdue, expiry handled by cron or buried flags) → surface
   them as **temporal events with guards**.
+- **An event wired straight to a command** (a listener that mutates an aggregate, an event declaring the
+  commands it `triggers`) → a **reaction**: `triggered-by` the event, a `guard` saying when the fact still
+  matters to this context, `effects` the command. That guard is the decision the old shape had nowhere to
+  put. It is the only event → command edge, for every event kind.
+- **Foreign master data modelled as a local mutable entity** (a `Customer`/`Product` table this context
+  writes to but does not own) → a **`read-only entity`** with `sourced-from` the owning context, and a
+  `read-only repository`. If an upstream event only refreshes what we *know*, it belongs to the
+  projection adapter (`projected-by`), not to the domain model; if it changes what we *decide*, it is an
+  `external event` with a reaction.
+- **A leaked adapter interface** (the domain depending on a technical port, or an interface with no
+  declared direction) → an **`spi interface`** owned by the domain (`describes` the provider, which
+  carries the matching `described-by`), and an **`api interface`** for the module's public surface.
 
 ## Ground rules
 

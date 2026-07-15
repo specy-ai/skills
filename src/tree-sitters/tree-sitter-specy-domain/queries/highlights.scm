@@ -1,5 +1,9 @@
 ; =============================================================================
 ; Specy Domain Model — Tree-sitter highlights
+;
+; Mirrors src/tree-sitters/tree-sitter-specy-domain/grammar.js. Every node and
+; field named here must exist in the grammar — `tree-sitter query` runs against
+; every example in build.sh, so a stale name fails the build.
 ; =============================================================================
 
 ; ---------------------------------------------------------------------------
@@ -19,9 +23,16 @@
 "value" @keyword.type
 "enum" @keyword.type
 "command" @keyword.type
+"query" @keyword.type
 "event" @keyword.type
 "aggregate" @keyword.type
 "interface" @keyword.type
+
+; The interface role is the discriminator between a driving and a driven port.
+(interface_role) @keyword.type
+
+(read_only_entity_def "read-only" @keyword.type)
+(read_only_entity_def "entity" @keyword.type)
 
 (domain_service_def "domain" @keyword.type)
 (domain_service_def "service" @keyword.type)
@@ -29,16 +40,17 @@
 (application_service_def "service" @keyword.type)
 (infrastructure_service_def "infrastructure" @keyword.type)
 (infrastructure_service_def "service" @keyword.type)
-(service_def "service" @keyword.type)
+
 (repository_def "repository" @keyword.type)
+(repository_def "read-only" @keyword.type)
 (repository_def "for" @keyword.type)
+
 (external_event_def "external" @keyword.type)
 (external_event_def "event" @keyword.type)
 (error_event_def "error" @keyword.type)
 (error_event_def "event" @keyword.type)
 (temporal_event_def "temporal" @keyword.type)
 (temporal_event_def "event" @keyword.type)
-(temporal_event_def "temporal-event" @keyword.type)
 
 (reaction_def "reaction" @keyword.type)
 (invariant_def "invariant" @keyword.type)
@@ -50,7 +62,6 @@
 
 "fields" @keyword
 "identity" @keyword
-"identifier" @keyword
 "references" @keyword
 "operations" @keyword
 "states" @keyword
@@ -58,7 +69,7 @@
 "map" @keyword
 "depends" @keyword
 "exposes" @keyword
-"root" @keyword
+"requires" @keyword
 "entities" @keyword
 "machine" @keyword
 "participants" @keyword
@@ -71,29 +82,53 @@
 "action" @keyword
 "meta" @keyword
 "duplicate" @keyword
-"offset" @keyword
-"reference" @keyword
-"relative-to" @keyword
-"instant" @keyword
-"schedule" @keyword
-"recurring" @keyword
-"per-market" @keyword
-"compensation" @keyword
+"detection" @keyword
+"of" @keyword
+"calls" @keyword
 
 (state_def "state" @keyword)
 (state_def "final" @keyword)
+
+; ---------------------------------------------------------------------------
+; Hexagonal wiring — the port/adapter relations
+; ---------------------------------------------------------------------------
+
+(describes_clause "describes" @keyword.operator)
+(described_by_clause "described-by" @keyword.operator)
+(exposed_by_clause "exposed-by" @keyword.operator)
+
+; ---------------------------------------------------------------------------
+; Read-only entity (master data) — provenance and sync
+; ---------------------------------------------------------------------------
+
+(sourced_from_clause "sourced-from" @keyword.operator)
+(synced_via_clause "synced-via" @keyword.operator)
+(projected_by_clause "projected-by" @keyword.operator)
+(sync_pattern) @constant
+
+; ---------------------------------------------------------------------------
+; Temporal anchors — time is never the cause; these are the domain anchors
+; ---------------------------------------------------------------------------
+
+(relative_anchor "reference" @keyword)
+(relative_anchor "offset" @keyword)
+(absolute_anchor "instant" @keyword)
+(recurring_anchor "schedule" @keyword)
+(guard_block "guard" @keyword.operator)
 
 ; ---------------------------------------------------------------------------
 ; Operation / behavior keywords
 ; ---------------------------------------------------------------------------
 
 (command_triggered_op "on" @keyword.operator)
-(event_triggered_op "when" @keyword.operator)
-(event_triggered_op "then" @keyword.operator)
 (transition_def "on" @keyword.operator)
-(transition_def "when" @keyword.operator)
-(transition_def "then" @keyword.operator)
-(escalation_step "when" @keyword.operator)
+(invariant_def "on" @keyword.operator)
+(non_terminal_step "when" @keyword.operator)
+(terminal_step "when" @keyword.operator)
+
+; safe / unsafe / idempotent are first-class operation attributes.
+(safety_decl) @keyword.modifier
+(idempotence_decl) @keyword.modifier
 
 "creates" @keyword.operator
 "sets" @keyword.operator
@@ -106,13 +141,16 @@
 "precondition" @keyword.operator
 "postcondition" @keyword.operator
 "rejects" @keyword.operator
-"trigger" @keyword.operator
-"guard" @keyword.operator
-"effect" @keyword.operator
 "must" @keyword.operator
 "enforcement" @keyword.operator
-"triggers" @keyword.operator
 "satisfies" @keyword.operator
+"about" @keyword.operator
+"caused-by" @keyword.operator
+"reads-from" @keyword.operator
+
+; A reaction is the sole event -> command edge.
+(triggered_by_clause "triggered-by" @keyword.operator)
+(effects_clause "effects" @keyword.operator)
 
 ; ---------------------------------------------------------------------------
 ; Control-flow / expression keywords
@@ -121,6 +159,8 @@
 (if_expr "if" @keyword.control)
 (every_expr "every" @keyword.control)
 (every_expr "in" @keyword.control)
+(quantifier_expr "in" @keyword.control)
+(quantifier_expr "where" @keyword.control)
 (in_expr "in" @keyword.control)
 (not_in_expr "not" @keyword.control)
 (not_in_expr "in" @keyword.control)
@@ -129,6 +169,9 @@
 (is_not_defined_expr "is" @keyword.control)
 (is_not_defined_expr "not" @keyword.control)
 (is_not_defined_expr "defined" @keyword.control)
+(is_null_expr "is" @keyword.control)
+(is_not_null_expr "is" @keyword.control)
+(is_not_null_expr "not" @keyword.control)
 
 (or_expr "or" @keyword.control)
 (and_expr "and" @keyword.control)
@@ -139,7 +182,6 @@
 ; ---------------------------------------------------------------------------
 
 (requirements_source_decl "requirements-source" @keyword.import)
-(uses_decl "uses" @keyword.import)
 
 ; ---------------------------------------------------------------------------
 ; Type names in definition positions
@@ -151,6 +193,7 @@
 (enum_def name: (type_name) @type.definition)
 (value_def name: (type_name) @type.definition)
 (entity_def name: (type_name) @type.definition)
+(read_only_entity_def name: (type_name) @type.definition)
 (aggregate_def name: (type_name) @type.definition)
 (command_def name: (type_name) @type.definition)
 (query_def name: (type_name) @type.definition)
@@ -161,7 +204,6 @@
 (domain_service_def name: (type_name) @type.definition)
 (application_service_def name: (type_name) @type.definition)
 (infrastructure_service_def name: (type_name) @type.definition)
-(service_def name: (type_name) @type.definition)
 (repository_def name: (type_name) @type.definition)
 (repository_def entity: (type_name) @type)
 (reaction_def name: (type_name) @type.definition)
@@ -172,12 +214,10 @@
 (reconciliation_def name: (type_name) @type.definition)
 
 ; ---------------------------------------------------------------------------
-; Type references (PascalCase identifiers in type positions)
+; Type references
 ; ---------------------------------------------------------------------------
 
 (field_type (type_name) @type)
-
-; type_name in other positions (command targets, event references, etc.)
 (type_name) @type
 
 ; ---------------------------------------------------------------------------
@@ -205,6 +245,7 @@
 (identity_decl name: (identifier) @variable.member)
 (reference_decl name: (identifier) @variable.member)
 (assignment_clause field: (identifier) @variable.member)
+(metadata_entry (identifier) @variable.member)
 
 ; ---------------------------------------------------------------------------
 ; Parameter names
@@ -218,26 +259,21 @@
 
 (internal_op name: (identifier) @function)
 (value_op_def name: (identifier) @function)
-(named_operation_def name: (string_literal) @function)
+(safe_op_def name: (identifier) @function)
+(operation_signature name: (identifier) @function)
 (scoped_invariant_def name: (identifier) @function)
-(precondition_clause name: (identifier) @function)
-(postcondition_clause name: (identifier) @function)
-(reaction_call_clause name: (identifier) @function)
-(state_invariant_def name: (identifier) @function)
-(escalation_step name: (identifier) @function)
+(precondition_clause name: (condition_name) @function)
+(postcondition_clause name: (condition_name) @function)
+(non_terminal_step name: (identifier) @function)
+(terminal_step name: (identifier) @function)
 
 ; ---------------------------------------------------------------------------
-; Built-in functions
-; ---------------------------------------------------------------------------
-
-(function_name) @function.builtin
-
-; ---------------------------------------------------------------------------
-; Service call targets (dot_path in call position)
+; Calls. A built-in and a service call are syntactically identical — telling
+; them apart needs a symbol table, so both highlight as a call.
 ; ---------------------------------------------------------------------------
 
 (service_call_clause (dot_path) @function.call)
-(service_call_expr (dot_path) @function.call)
+(call_expr (dot_path) @function.call)
 
 ; ---------------------------------------------------------------------------
 ; Constraints / attributes
@@ -248,6 +284,7 @@
 (constraint "unique" @attribute)
 (constraint "immutable" @attribute)
 (constraint "ordered" @attribute)
+(constraint "code" @attribute)
 (constraint "default" @attribute)
 (constraint "min" @attribute)
 (constraint "max" @attribute)
@@ -267,10 +304,10 @@
 (requirement_id) @label
 
 ; ---------------------------------------------------------------------------
-; Constants: enum values, context map patterns, enforcement strategies, etc.
+; Constants
 ; ---------------------------------------------------------------------------
 
-(enum_value) @constant
+(enum_value name: (identifier) @constant)
 
 (upstream_pattern) @constant
 (downstream_pattern) @constant
@@ -283,13 +320,17 @@
 (detection_strategy) @constant
 (coordination_style) @constant
 
-(escalation_action "retry" @constant)
-(escalation_action "compensate" @constant)
-(escalation_action "alert" @constant)
-(escalation_action "suspend" @constant)
-(escalation_action "manual" @constant)
+; An escalation chain must terminate: non-terminal actions can fail, terminal
+; ones are end states.
+(non_terminal_action "retry" @constant)
+(non_terminal_action "compensate" @constant)
+(terminal_action "alert" @constant)
+(terminal_action "suspend" @constant)
+(terminal_action "manual" @constant)
 
 (transition_source "[*]" @constant)
+
+(null_literal) @constant.builtin
 
 ; ---------------------------------------------------------------------------
 ; Strings
@@ -298,14 +339,14 @@
 (string_literal) @string
 (description (string_literal) @string.special)
 (command_triggered_op label: (string_literal) @string.special)
-(event_triggered_op label: (string_literal) @string.special)
 
 ; ---------------------------------------------------------------------------
-; Numbers and cardinality
+; Numbers, durations and cardinality
 ; ---------------------------------------------------------------------------
 
 (number) @number
 (cardinality) @number
+(duration_literal) @number
 
 ; ---------------------------------------------------------------------------
 ; Booleans
@@ -325,6 +366,7 @@
 (add_expr "-" @operator)
 (mul_expr "*" @operator)
 (mul_expr "/" @operator)
+(coalesce_expr "?:" @operator)
 
 ; ---------------------------------------------------------------------------
 ; Punctuation

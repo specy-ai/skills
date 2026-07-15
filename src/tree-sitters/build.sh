@@ -14,7 +14,11 @@ GRAMMARS=(
   "tree-sitter-specy-domain"
 )
 
+# Every .domain file in examples/ is smoke-tested. A file left out of this list is
+# a file whose syntax nothing checks — which is how the grammar and the corpus
+# drifted apart in the first place.
 EXAMPLES=(
+  "examples/conformance/all-constructs.domain"
   "examples/business-loan/business-loan.prd"
   "examples/business-loan/business-loan.sysreq"
   "examples/business-loan/business-loan.domain"
@@ -25,11 +29,14 @@ EXAMPLES=(
   "examples/ride-now/geolocation-routing.sysreq"
   "examples/ride-now/payment.sysreq"
   "examples/ride-now/platform-nfr.sysreq"
+  "examples/ride-now/shared.domain"
   "examples/ride-now/driver-management.domain"
   "examples/ride-now/rider-management.domain"
   "examples/ride-now/ride-management.domain"
   "examples/ride-now/geolocation-routing.domain"
   "examples/ride-now/payment.domain"
+  "examples/url-shortener/url-shortener.domain"
+  "examples/ecommerce/v2/orders.domain"
 )
 
 RED='\033[0;31m'

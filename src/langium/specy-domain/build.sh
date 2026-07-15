@@ -19,9 +19,20 @@ EXAMPLES_DIR="$SCRIPT_DIR/../../../examples"
 PASS=0
 FAIL=0
 
-for f in "$EXAMPLES_DIR"/ecommerce/v2/orders.domain \
-         "$EXAMPLES_DIR"/business-loan/business-loan.domain; do
-    # Guard with a timeout: some inputs currently hang the Langium parser
+# Every .domain file in examples/ is validated. A file left out of this list is a
+# file whose syntax nothing checks — which is how the grammar and the corpus drifted
+# apart in the first place.
+for f in "$EXAMPLES_DIR"/conformance/all-constructs.domain \
+         "$EXAMPLES_DIR"/ecommerce/v2/orders.domain \
+         "$EXAMPLES_DIR"/business-loan/business-loan.domain \
+         "$EXAMPLES_DIR"/url-shortener/url-shortener.domain \
+         "$EXAMPLES_DIR"/ride-now/shared.domain \
+         "$EXAMPLES_DIR"/ride-now/geolocation-routing.domain \
+         "$EXAMPLES_DIR"/ride-now/rider-management.domain \
+         "$EXAMPLES_DIR"/ride-now/driver-management.domain \
+         "$EXAMPLES_DIR"/ride-now/ride-management.domain \
+         "$EXAMPLES_DIR"/ride-now/payment.domain; do
+    # Guard with a timeout: some inputs have hung the Langium parser in the past
     # (e.g. business-loan), and a hang must surface as a failure, not block forever.
     output=$(timeout 90 node out/cli/index.js validate "$f" 2>&1) || rc=$?
     if [ "${rc:-0}" = "124" ]; then
@@ -46,7 +57,9 @@ PARSE_FILE="$EXAMPLES_DIR/ecommerce/v2/orders.domain"
 for fmt in json yaml markdown; do
     out=$(timeout 60 node out/cli/index.js parse "$PARSE_FILE" -f "$fmt" 2>/dev/null || true)
     if [ -n "$out" ]; then
-        echo "  PASS: parse -f $fmt ($(printf '%s' "$out" | wc -l) lines)"
+        # Report bytes, not lines: JSON is emitted on a single line, so a line count
+        # reads as "0" for a perfectly good 24KB document.
+        echo "  PASS: parse -f $fmt ($(printf '%s' "$out" | wc -c) bytes)"
     else
         echo "  FAIL: parse -f $fmt (empty output)"
         FAIL=$((FAIL + 1))

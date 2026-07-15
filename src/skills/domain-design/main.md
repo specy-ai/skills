@@ -84,14 +84,15 @@ For each bounded context, identify the core domain concepts.
 
 Ask:
 - "What are the key nouns in this domain? Which ones have identity and a lifecycle (entities) vs. which are defined purely by their attributes (value types)?"
-- "Which entities form clusters that must be consistent together? What's the root?"
+- "Which entities form clusters that must be consistent together? Which one is the root — the entity the others are reached through?"
+- "Which of these concepts is owned by *another* context and only observed here (master data — customers, products, suppliers)?"
 - "What fields does each entity hold? Which are primitive types, which are value types, which are references to other entities?"
 
 Produce:
-- `entity` blocks with fields (typed as primitives, value types, or entity references)
-- `aggregate` blocks designating roots and contained entities
+- `entity` blocks with `identity`, `fields` (typed as primitives, value types, or entity references), and a `references { }` block carrying explicit cardinality
+- `aggregate` blocks — **the aggregate IS its root**: it carries the root's `identity`, `fields`, `operations` and `states` directly, and lists its non-root children in a non-empty `entities { }`. There is no `root` clause; a cluster with no children is an `entity`, not an aggregate.
+- `read-only entity` blocks for master data owned elsewhere (`sourced-from`, `synced-via`, `projected-by`) — no `sets`, `creates` or `emits` on them
 - `value` blocks for immutable, identity-less concepts
-- Entity relations (`relates to`)
 
 Challenge if:
 - **Entity vs Value Type** — "Does this concept have a lifecycle? Does its identity matter independent of its attributes? If two instances have the same fields, are they the same thing?" If yes to same-fields-same-thing → value type, not entity.
@@ -108,18 +109,18 @@ Ask:
 - "What can go wrong? What error events should be defined?"
 
 Produce:
-- `operation` blocks on entities with arguments, return types, preconditions, postconditions
-- `command` blocks with fields (including correlation ID)
-- `event` blocks (internal, external, error, temporal) with fields
-- `query` blocks for read operations
+- `operations { }` blocks on entities, aggregates and services. **Two forms only:** `"Label" on CommandType { ... }` (command-triggered) and `name(params) : ReturnType { ... }` (internal). Declare `safe` / `unsafe` / `idempotent`. Each `precondition` carries its mandatory `rejects "reason"`; `postcondition`s carry none.
+- `command` blocks with `identity <field> : <type>` (the correlation id) then `fields { }`
+- `event` blocks (`event`, `external event`, `error event`, `temporal event`) — each with a `fields { }` block, and `about` / `caused-by` where they apply
+- `query` blocks with `reads-from <Repository>` and `returns`
 
 For each operation, verify:
 - Does it have a command that triggers it?
 - Does it emit at least one event (success or error)?
 - Does the event include a reference to the entity identifier?
-- Does the command include a correlation ID field?
+- Does the command declare its `identity` (correlation id)?
 
-Challenge if: an operation has no error path (what happens when it fails?), an event has no fields (what fact does it record?), or a command has no correlation ID.
+Challenge if: an operation has no error path (what happens when it fails?), an event has no fields (what fact does it record?), or a command has no correlation id.
 
 ### Phase 4 — State Machines
 
@@ -131,9 +132,9 @@ Ask:
 - "What must be true in each state? (state-scoped invariants)"
 
 Produce:
-- **Standalone `statemachine` blocks** — always emit state machines as their own top-level block with `on <EntityName>`, `start`, `state`, `transition`, and `final` declarations. Never model transitions inline inside entity blocks or as prose descriptions. The `statemachine` block is a first-class metamodel concept with its own structure.
-- State-scoped invariants inside each `state` declaration
-- Transition guards (preconditions on transitions)
+- **A `states { machine Name { ... } }` block inside the entity or aggregate that owns the lifecycle.** There is no top-level `statemachine` and no `transitions { }` block. Declare `state` / `final` states, one initial transition (`[*] --> s on <operation>`), and transitions of the form `source --> target on <operation>` — where `<operation>` is the `"Label"` of a command-triggered operation or the identifier of an internal one. Never model transitions as prose.
+- State-scoped invariants inside each `state` declaration — each with its `enforcement`
+- Transition conditions as **named** `precondition name { expr } rejects "reason"` (and `postcondition`s) inside the transition's braces — never anonymous `when {}` / `then {}`. This is what lets one operation drive transitions out of several states with a different rule for each.
 
 Challenge if: there are dead states (no transition leads to them), trap states (no transition leaves them), states without invariants (what's special about being in this state?), or an entity has a status field but no state machine (formalize the lifecycle).
 
@@ -147,9 +148,9 @@ Ask:
 - "Are there cross-aggregate truths that must be maintained? (agreements)"
 
 Produce:
-- `invariant` blocks scoped to entities, aggregates, or states
-- `reaction` blocks triggered by internal/error events, effecting commands
-- `agreement` blocks with participant aggregates and reconciliation mechanisms
+- `invariant` blocks scoped to entities, aggregates, values or states — **every one declares an `enforcement` strategy** (`rejection`, `compensation CommandType`, or `alert`). Scoped invariants (inside an `invariants { }` block) carry `enforcement` as the last element of the body; file-level ones use `on <dotPath>` + `must { }` + `enforcement`.
+- `reaction` blocks — `triggered-by <Event>`, optional `guard { }`, `effects <Command>`. A reaction is the **only** way an event causes a command, for every event kind (internal, external, error, temporal). No event ever names a command directly.
+- `agreement` blocks with participant aggregates and reconciliation mechanisms (whose escalation chain must terminate in `alert`, `suspend` or `manual`)
 
 Challenge if: an invariant is really a precondition (it gates a specific operation, not all operations), a reaction has no guard (when does it *not* fire?), or an agreement has no reconciliation (how are violations detected and fixed?).
 
@@ -160,14 +161,16 @@ Identify cross-entity behavior and external dependencies.
 Ask:
 - "Are there operations that span multiple entities where ownership is arbitrary? (domain services)"
 - "What external systems does this context depend on? (infrastructure services)"
-- "What interfaces does each module expose?"
+- "What does each module expose to its callers, and what must it be given?"
 
 Produce:
-- `domain-service` blocks with operations
-- `infrastructure-service` blocks with interfaces
-- `application-service` blocks for orchestration
-- `interface` blocks exposing operations from entities and domain services
-- `module` blocks grouping related concepts
+- `domain service` blocks with operations (they may be targeted by a command and change entity state)
+- `application service` blocks for orchestration (`exposed-by` an api interface)
+- `infrastructure service` blocks for external adapters — **operations are signatures only**, no body — each `described-by` the SPI it fulfils
+- `api interface` blocks — the driving ports: `exposes Entity.operation`, selecting operations that already exist
+- `spi interface` blocks — the driven ports: `describes <Provider>` plus the signatures the domain needs. The infrastructure service or repository that fulfils it carries the matching `described-by`.
+- `repository` blocks derived from each persisted entity/aggregate (never hand-authored; signatures only)
+- `module` blocks grouping related concepts, with `exposes { Api }`, `requires { Spi }` and `depends on { Module }`
 
 Challenge if: a domain service could be an operation on an entity (prefer entity ownership), an infrastructure service has domain logic in it (the interface should be domain-language, implementation is infrastructure), or a module has too many dependencies (coupling smell).
 
@@ -222,7 +225,7 @@ Follow the same structure as interactive mode phases 2-6, but derive answers fro
 - Are these entities or value types?
 - Where are the aggregate boundaries?
 - Which operations belong to which entity?
-- What state machines emerge from the state-driven requirements? Every entity with a status/lifecycle needs a standalone `statemachine` block.
+- What state machines emerge from the state-driven requirements? Every entity with a status/lifecycle needs a `states { machine ... }` block inside it.
 - What invariants are implied but not explicitly stated?
 - What error paths are missing?
 
@@ -297,12 +300,16 @@ Before delivering the final `.domain` file, verify:
 |---|---|
 | Every entity has at least one operation | No anemic entities — behavior over structure |
 | Every operation emits at least one event | No silent mutations |
-| Every command has a correlation ID field | Traceability through the causality chain |
-| Every event includes the entity identifier | Events are self-contained facts |
-| Aggregate boundaries are justified | Ask: "Can this entity change independently?" |
-| Every entity with a status field has a `statemachine` block | Standalone block, not inline transitions — with start, states, transitions, and finals |
+| Every command declares an `identity` | The correlation id of the causality chain it opens |
+| Every query declares `reads-from` and `returns` | A query reads through a repository's read surface |
+| Every event includes the entity identifier | Events are self-contained facts; use `about` / `caused-by` to bind them |
+| Every event → command edge goes through a `reaction` | No `triggers { }` on an event, no event-triggered operation |
+| Aggregate boundaries are justified | Ask: "Can this entity change independently?" The aggregate IS its root, and `entities { }` (its non-root children) is non-empty |
+| Every entity with a status field has a `states { machine ... }` block | Inside the entity — with an initial transition, states, finals, and named transition preconditions |
 | State machines have no dead/trap states | Every state is reachable and escapable (except final states) |
-| Invariants have enforcement strategies | `reject`, `compensate`, or `alert` |
+| Every invariant declares an enforcement strategy | `rejection`, `compensation CommandType`, or `alert` |
+| Every precondition declares a `rejects` reason | A failing precondition is a domain outcome, not a bug — say what it rejects |
+| Every interface declares its role | `api` (driving, `exposes`) or `spi` (driven, `describes` + signatures) |
 | Error paths exist for every operation | What happens when it fails? |
 | Value types are truly immutable | No identity, no lifecycle, equality by attributes |
 | `requirements-source` is set | When `.sysreq` files are provided |

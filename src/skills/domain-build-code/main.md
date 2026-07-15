@@ -43,7 +43,8 @@ This skill is the inverse of `domain-extract-from-code`.
 1. Locate the `.domain` file(s). If none exist, stop and delegate to `domain-design`.
 2. Parse the organization → context → module → definitions hierarchy. Build an inventory of every
    building block and its relations (which entity owns which operations, which command triggers which
-   operation, which event triggers which reaction, which entity is an aggregate root).
+   operation, which event a reaction is `triggered-by` and which command it `effects`, which SPI each
+   provider is `described-by`, which entities are aggregates and which are their non-root children).
 3. **Choose the target stack.** If the user named one, use it. Otherwise ask, then load the matching
    heuristic file:
    - `heuristics/java-spring.md` — Java / Spring Boot
@@ -79,21 +80,24 @@ This is the contract every stack heuristic specializes. Read it as "a `.domain` 
 | **Value type** | Immutable value object — a record/`final` class with all-args constructor that validates its `invariant`s at construction (transactional constructor: invalid input ⇒ construction fails). Equality by value. No identity, no setters. |
 | **Enum** | A language `enum`. Enums backed by a value type become an enum holding that value object (carry the code field). |
 | **Entity** | A class with an identity field, mutable state expressed only through its operations (no public setters), and value-typed fields embedded by value. Equality by identity. |
-| **Aggregate** | The root entity is the only entry point; contained entities have no repository and are reached by navigating from the root. All state changes go through the root; every operation evaluates the aggregate's invariants before committing. |
+| **Read-only entity** (`sourced-from`) | Master data owned by another context: a local read-model/projection with **no** mutating methods. `synced-via synchronous-query` ⇒ fetch through the source's port on read; `asynchronous-projection` ⇒ a local store refreshed by the adapter named in `projected-by`. |
+| **Aggregate** | The aggregate **is** its root — one class, carrying the identity, fields, operations and states declared on it. The entities listed in `entities { }` are its non-root children: no repository of their own, reached only by navigating from the aggregate. All state changes go through it; every operation evaluates the aggregate's invariants before committing. |
 | **Identity** | A typed identifier (a small value type wrapping a UUID/string), not a raw primitive. |
-| **Field constraints** (`required`, `unique`, `min/max`, `pattern`, `immutable`, date constraints) | Construction-time validation on the owning value/entity; `immutable` ⇒ no setter / `final`. |
-| **Command** | An immutable input DTO + a handler. The handler resolves the target aggregate from its repository, invokes the entity operation, and persists the result. Must carry the correlation id. |
-| **Query** | An immutable request DTO + a read-side handler that reads from the repository/read model and returns the declared result type. No side effects. |
-| **Event** | An immutable event class (past-tense name) carrying the entity id + payload, published through a domain-event publisher port. `internal`/`external`/`error`/`temporal` classifiers map to how it is published/consumed. |
-| **Operation** | A method on the owning entity/aggregate (or domain service). Inputs = `accepts`; returns the next state; `precondition`s become guard clauses that reject with the declared message; `emits` becomes event publication; `creates`/`sets` become state construction/mutation; `foreach` becomes iteration. |
-| **Precondition / Postcondition** | A guard at the top (precondition) of the operation that throws/returns a rejection with the declared `violation` message; postconditions become assertions/tests. |
-| **Reaction** | An event listener that, on the trigger event (and optional guard), issues the effect command. Wired through the messaging/eventing mechanism of the stack. |
-| **Invariant** | A check evaluated on every mutation within the consistency boundary; enforcement strategy maps to: `reject` ⇒ throw before commit; `compensation` ⇒ accept + issue corrective command; `alert` ⇒ record/notify. State-machine state invariants are checked while in that state. |
-| **State machine** | An explicit state field + a transition table; operations are only permitted from their valid source states; each state carries its own invariants. |
-| **Repository** (derived) | An interface (port) for the aggregate root only: `store`, `getById`, `remove`, `search`, plus `findByField` deduced from queries. Read-only/master-data entities get read-only repositories. A persistence adapter implements it. |
-| **Domain service** | A stateless class holding logic that spans entities; no framework/IO dependencies. |
-| **Application service** | An orchestrator that interprets commands/queries, loads aggregates via repositories, calls domain logic, and commits — no business rules of its own. |
-| **Infrastructure service** | A port (interface) in the domain + an adapter implementation in the infrastructure layer (the ACL pattern). Domain calls the port, never the adapter. |
+| **Field constraints** (`required`, `unique`, `min/max`, `pattern`, `immutable`, `code`, date constraints) | Construction-time validation on the owning value/entity; `immutable` ⇒ no setter / `final`. |
+| **Command** | An immutable input DTO + a handler. The handler resolves the target aggregate from its repository, invokes the entity operation, and persists the result. Its `identity` field is the correlation id and must be carried through. |
+| **Query** | An immutable request DTO + a read-side handler that reads through the repository named by `reads-from` and returns the declared result type. No side effects. |
+| **Event** | An immutable event class (past-participle name) carrying the entity id + payload, published through a domain-event publisher port. `about` / `caused-by` become the correlation/causation metadata. The four kinds — `event`, `external event`, `error event`, `temporal event` — map to how it is published/consumed (in-process bus, inbound adapter from the upstream context, failure channel, scheduler). |
+| **Operation** | A method on the owning entity/aggregate (or domain/application service). Two forms: `"Label" on Command` ⇒ a method taking that command; `name(params) : T` ⇒ a plain method. `safe` ⇒ no mutation; `unsafe` ⇒ mutates; `idempotent` ⇒ safe to retry. `precondition`s become guard clauses that reject with the declared `rejects` message; `emits` becomes event publication; `creates`/`sets` become state construction/mutation; `foreach` becomes iteration. |
+| **Precondition / Postcondition** | A guard at the top (precondition) of the operation that throws/returns a rejection carrying its `rejects` message; postconditions become assertions/tests (a failing one is a defect, not a domain outcome). |
+| **Reaction** | An event listener: on the `triggered-by` event (and optional `guard`), it issues the `effects` command. Wired through the messaging/eventing mechanism of the stack. **This is the only event → command path** — never let a listener mutate an aggregate directly. |
+| **Invariant** | A check evaluated on every mutation within the consistency boundary; enforcement strategy maps to: `rejection` ⇒ throw before commit; `compensation <Cmd>` ⇒ accept + issue the corrective command; `alert` ⇒ record/notify. State-machine state invariants are checked while in that state. |
+| **State machine** (`states { machine ... }`) | An explicit state field + a transition table; a transition's `on` names the operation that drives it, so operations are only permitted from their valid source states, each with that transition's own named preconditions. Each state carries its own invariants. |
+| **Repository** (derived) | An interface (port) for the aggregate/entity only — never for a non-root child: `store`, `getById`, `remove`, `search`, plus `findByField` deduced from queries. `read-only repository` (master data) omits `store`/`remove`. A persistence adapter implements it. |
+| **Domain service** | A stateless class holding logic that spans entities; no framework/IO dependencies. May be targeted by a command like an entity. |
+| **Application service** | An orchestrator that interprets commands/queries, loads aggregates via repositories, calls domain logic, and commits — no business rules of its own. Reached through the api interface named by `exposed-by`. |
+| **`api interface`** | The driving port: a published facade over operations that already exist on entities/aggregates/services (its `exposes` dot-paths). Implemented by the inbound adapter (controller/resolver). |
+| **`spi interface`** | The driven port: an interface **in the domain layer** declaring the signatures the domain needs. The provider it `describes` (an infrastructure service or repository, which carries the matching `described-by`) implements it in the infrastructure layer. The domain calls the port, never the adapter. |
+| **Infrastructure service** | The adapter class implementing its SPI (the ACL pattern). The model declares only signatures — the body is yours to write against the external system. |
 | **Agreement / Reconciliation** | A cross-aggregate consistency mechanism: a saga / process manager that listens to participant events, detects predicate violations, and issues compensating commands through the escalation chain. |
 | **`satisfies [REQ-...]`** | A traceability comment/annotation on the generated artefact (see below). |
 
@@ -107,10 +111,10 @@ Default to a hexagonal layout per bounded context, mirroring the model hierarchy
 <root>/<context>/
   domain/            # pure model — no framework imports
     <module>/
-      <Entity>, <Aggregate>, <ValueType>, <Enum>, <Event>, <Command>, <Query>
+      <Entity>, <ReadOnlyEntity>, <Aggregate>, <ValueType>, <Enum>, <Event>, <Command>, <Query>
       <DomainService>
-      <Repository> (port interface)
-      <InfrastructureService> (port interface)
+      <ApiInterface> (driving port), <SpiInterface> (driven port)
+      <Repository> (port interface, described by its SPI)
   application/        # command/query handlers, application services, reactions
   infrastructure/     # repository + infrastructure-service adapters, event bus wiring
 ```

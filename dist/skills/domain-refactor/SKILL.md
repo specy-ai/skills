@@ -74,20 +74,37 @@ Each entry is a common shape in extracted models and its proper DDD treatment. U
 
 - **Anemic or god entity** (data bag with no behaviour, or one entity doing everything) → behaviour-rich
   entities with operations, gathered into a **tight aggregate** whose boundary is justified by a shared
-  invariant. Prefer small aggregates; if one grows past ~4 entities, justify the boundary explicitly
-  (what consistency rule forces them to commit together?) rather than treating the size as a target.
+  invariant. The aggregate **is** its root — it carries the identity, fields, operations and states
+  directly, and `entities { }` lists only its non-root children (a cluster with no children is an
+  `entity`, not an aggregate). Prefer small aggregates; if one grows past ~4 entities, justify the
+  boundary explicitly (what consistency rule forces them to commit together?) rather than treating the
+  size as a target.
 - **Primitive obsession** (raw `decimal`/`string`/flag-`boolean` carrying domain meaning) → **value
   types** with constructor-validated invariants, so an invalid value cannot exist.
 - **Illegal states are representable** (paired mutable flags + their satellite fields, e.g.
   `isApproved` + `approvedBy` + `approvedAt`) → collapse into a **present-or-absent value object**
   (`approval : Approval?`), making the illegal combinations unrepresentable.
 - **Implicit or duplicated branch logic** (the same `if` scattered across operations) → lift into
-  explicit **invariants**, **preconditions**, and a **state machine** with no dead or trap states.
+  explicit **invariants** (each with its `enforcement`), **preconditions** (each with its `rejects`
+  reason), and a **state machine** — a `states { machine ... }` block inside the entity, with no dead or
+  trap states, whose transitions carry *named* preconditions rather than anonymous guards.
 - **Generic "something changed" events** (`OrderUpdated`) → specific, intent-revealing **domain events**
-  (`OrderShipped`, `DeliveryRescheduled`). And give every operation an explicit **error path** — an
-  error event for the ways it can fail.
+  (`OrderShipped`, `DeliveryRescheduled`), bound to what they are a fact about (`about` / `caused-by`).
+  And give every operation an explicit **error path** — an error event for the ways it can fail.
 - **Missing temporal concerns** (deadlines, overdue, expiry handled by cron or buried flags) → surface
   them as **temporal events with guards**.
+- **An event wired straight to a command** (a listener that mutates an aggregate, an event declaring the
+  commands it `triggers`) → a **reaction**: `triggered-by` the event, a `guard` saying when the fact still
+  matters to this context, `effects` the command. That guard is the decision the old shape had nowhere to
+  put. It is the only event → command edge, for every event kind.
+- **Foreign master data modelled as a local mutable entity** (a `Customer`/`Product` table this context
+  writes to but does not own) → a **`read-only entity`** with `sourced-from` the owning context, and a
+  `read-only repository`. If an upstream event only refreshes what we *know*, it belongs to the
+  projection adapter (`projected-by`), not to the domain model; if it changes what we *decide*, it is an
+  `external event` with a reaction.
+- **A leaked adapter interface** (the domain depending on a technical port, or an interface with no
+  declared direction) → an **`spi interface`** owned by the domain (`describes` the provider, which
+  carries the matching `described-by`), and an **`api interface`** for the module's public surface.
 
 ## Ground rules
 
@@ -120,7 +137,7 @@ Write `specy/<domain>.refactored.domain` using the Specy v3 concrete syntax (ful
 
 ## Concrete syntax
 
-In `.domain` files, the `requirements-source` appears at the bounded context or organization level, and the `satisfies` attribute appears as a list after each element declaration:
+In `.domain` files, the `requirements-source` appears at the bounded context or organization level, and `satisfies` is **always the first element inside the body braces**:
 
 ```
 context OrderContext {
@@ -128,57 +145,77 @@ context OrderContext {
 
   entity Order {
     satisfies [REQ-ORD-002, REQ-ORD-007]
-    ...
+    identity id : uuid
+    fields { ... }
   }
 
-  invariant positiveQuantity {
+  invariant PositiveQuantity {
     satisfies [REQ-ORD-001]
-    ...
+    on Order
+    must { quantity > 0 }
+    enforcement rejection
   }
 
   command PlaceOrder {
     satisfies [REQ-ORD-002]
-    ...
+    identity commandId : uuid
+    fields { ... }
   }
 }
 ```
 
-The `requirements-source` path is relative to the `.domain` file's location. Multiple `requirements-source` declarations are allowed when requirements span several files.
+The `requirements-source` path is relative to the `.domain` file's location.
 
 ## State machine syntax
 
-Model an entity's lifecycle with a top-level `statemachine` block. Prefer this form — it is what the
-examples use and what every Specy parser (tree-sitter **and** the Langium CLI) accepts, so the model
-validates cleanly. Avoid the mermaid-flavoured `states { machine X { [*] --> S } }` block: although the
-canonical grammar allows it, the Langium CLI does not yet parse it, so `specy:domain-build-code` and the
-`parse-domain.sh` tooling will reject it.
+An entity's lifecycle lives **inside** the entity or aggregate, in a `states { machine ... }` block. Both parsers (tree-sitter and the Langium CLI) accept it, so the model validates cleanly.
 
 ```
-statemachine OrderLifecycle {
-  on Order
-  start AwaitingPayment
+entity Order {
+  identity id : uuid
+  fields { ... }
 
-  state AwaitingPayment {
-    invariant "unpaid" {
-      must { payment is not defined }
-      message "An order awaiting payment has no recorded payment"
+  operations {
+    "pay order"        on PayOrder        { ... }
+    "ship order"       on ShipOrder       { ... }
+    "confirm delivery" on ConfirmDelivery { ... }
+    "cancel order"     on CancelOrder     { ... }
+  }
+
+  states {
+    machine OrderLifecycle {
+      state awaitingPayment {
+        invariants {
+          unpaid :: "An order awaiting payment has no recorded payment" {
+            payment is not defined
+            enforcement rejection
+          }
+        }
+      }
+      state paid
+      state shipped
+      final delivered
+      final cancelled
+
+      [*]             --> awaitingPayment on "place order"
+      awaitingPayment --> paid            on "pay order"
+      paid            --> shipped         on "ship order"
+      shipped         --> delivered       on "confirm delivery"
+      awaitingPayment --> cancelled       on "cancel order" {
+        precondition notYetPaid { payment is not defined } rejects "A paid order cannot be cancelled here"
+      }
     }
   }
-  state Paid {}
-  state Shipped {}
-  final Delivered {}
-  final Cancelled {}
-
-  transition AwaitingPayment -> Paid triggered-by "pay order"
-  transition Paid -> Shipped triggered-by "ship order"
-  transition Shipped -> Delivered triggered-by "confirm delivery"
-  transition AwaitingPayment -> Cancelled triggered-by "cancel order"
 }
 ```
 
-Key points: `on <Entity>`; exactly one `start` state; zero or more `final` states; each `state` carries
-its own state-scoped invariants; each `transition A -> B triggered-by "operation label"` names the
-entity operation that drives it (the string must match an operation label on the entity).
+Key points:
+
+- The machine is nested in the entity that owns it — there is no top-level `statemachine`, and no separate `transitions { }` block.
+- Exactly one start transition, written `[*] --> state on <operation>`. Zero or more `final` states.
+- Each `state` may carry its own invariants, and each invariant declares an `enforcement`.
+- `on` names the **entity operation** that drives the transition: the `"Label"` of a command-triggered operation, or the identifier of an internal one.
+- A transition may carry **named** preconditions/postconditions. A precondition declares its violation reason with `rejects`. This is what lets one operation drive transitions out of several states with a *different* rule for each — `cancel` may be legal from `pending` always, but from `paid` only within the refund window.
 
 ## Agent instruction summary
 

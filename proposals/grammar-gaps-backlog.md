@@ -245,3 +245,110 @@ message "API keys must never be stored in plaintext; persist only a one-way hash
 ```
 
 `must {}` therefore stays structured. `url-shortener.domain` now parses with **0 errors**.
+
+---
+
+# Gaps opened by the 2026-07-11 normative-grammar migration
+
+`src/grammars/domain.ebnf` was rewritten to faithfully express `DOMAIN-METAMODEL.md`, and
+the 9-file example corpus was migrated to it. Both parsers are clean on all 9 files, but the
+migration left **27 `// UNCLEAR:` markers**. They are not one-offs — they cluster into nine
+families, each a genuine limitation of the grammar (not of the corpus).
+
+| ID | Severity | Gap | Occurrences |
+|---|---|---|---|
+| GAP-037 | **high** | A command handled by an adapter has no operation to target it | 7 |
+| GAP-038 | **high** | `effects` cannot carry argument bindings | ~12 |
+| GAP-039 | medium | A command-triggered operation cannot declare a return type | 3 |
+| GAP-040 | medium | Invariants scoped to something other than an entity/aggregate/value | 3 |
+| GAP-041 | medium | A reaction cannot effect a *published event* to another context | 3 |
+| GAP-042 | medium | A relative temporal event cannot anchor on an entity timestamp field | 1 |
+| GAP-043 | medium | Predicates cannot express a temporal bound (grace period / window) | 3 |
+| GAP-044 | low | No structural predicate over fields (`no field contains PII`) | 2 |
+| GAP-045 | low | A state machine's start transition must name an operation | 1 |
+
+### GAP-037 — a command handled by an adapter has no operation to target it — **high**
+
+The metamodel says a command `1..1 "triggers"` an operation owned by an entity, aggregate or
+domain service. But `NotifyDriver`, `SendVerificationCode`, `ExportAnalyticsCsv` and friends are
+handled *entirely by an infrastructure adapter* — there is no domain state change, so there is no
+domain operation to own them. Today the modeler must either invent a hollow operation or leave the
+command dangling (which is what all 7 sites do, with an `// UNCLEAR:`).
+
+Desired syntax — let a command name the infrastructure service that handles it:
+
+```
+command NotifyDriver { handled-by NotificationGateway  identity commandId : uuid  fields { … } }
+```
+
+Occurrences: `url-shortener` ×4, `ride-management` ×1 (covering 4 commands), `payment` ×1 (3 commands),
+`rider-management` ×1 (2 commands), `driver-management` ×1.
+
+### GAP-038 — `effects` cannot carry argument bindings — **high**
+
+`reactionDef`'s `effects` names a command type and nothing else, so a reaction cannot say *what*
+command instance it issues. Every reaction that carried real content — a notification's subject and
+body, a suspension's duration — lost it in migration; the ride-now agent had to move that content into
+the reaction's `::` description, where no tool can read it.
+
+Desired syntax (mirroring `emits`):
+
+```
+reaction SuspendDriverOnFraud {
+    triggered-by FraudDetected
+    effects RequestTemporaryDriverSuspension { driverId = FraudDetected.driverId  duration = 7 days }
+}
+```
+
+This is the single highest-value gap: it is the difference between a reaction that a code generator
+can emit and one it cannot.
+
+### GAP-039 — a command-triggered operation cannot declare a return type — medium
+
+`commandTriggeredOp = stringLiteral , "on" , typeName , … ` has no `: ReturnType` slot, so
+`returns netInterest : Money` was lost at 3 sites in `business-loan`. Arguably correct — a command
+produces *events*, not a return value — but the corpus disagrees, and the lost type is real
+information. Either add the slot, or state the prohibition in the metamodel so the modeler knows to
+model the result as an event.
+
+### GAP-040 — invariants scoped to something other than an entity/aggregate/value — medium
+
+The metamodel scopes an invariant to a consistency boundary (entity, aggregate, value, state).
+`business-loan` needed three that belong to *neither*: `EventImmutability` (a property of the event
+store), `ReportConsistencyWithEventStore` (of the reporting pipeline), `RbacPolicy` (an operation-level
+authorisation policy). All three were hoisted to top-level invariants pointed at an arbitrary entity.
+This is a metamodel question before it is a grammar one.
+
+### GAP-041 — a reaction cannot effect a published event — medium
+
+Three reactions in `geolocation-routing` / `ride-management` had `effect publish X to OtherContext`.
+The metamodel is explicit that a reaction's effect is a **command**, so publication had to be re-modelled
+on the consuming side; two reactions were deleted outright (their text preserved in a `// NOTE:`).
+If cross-context publication is a first-class act, the metamodel should say so.
+
+### GAP-042 — a relative temporal event cannot anchor on an entity timestamp field — medium
+
+`relativeTemporalEvent`'s `reference` takes a `typeName` — an **event**. `ride-management` needed
+`relative-to RideOffer.offeredAt offset 15s`, i.e. an offset from an entity *field*. There is no
+"offer made" event to reference, so the anchor was faked. `instant` takes a dot-path but admits no
+offset. Desired: allow `reference <dotPath> offset <duration>`.
+
+### GAP-043 — predicates cannot express a temporal bound — medium
+
+Three agreement/invariant predicates were prose carrying a time window: a 60-second matching grace
+period, a 30-second analytics consistency bound, a 30-day GDPR erasure deadline. The expression
+language has durations but no way to say "within D of event E". The bounds now survive only in
+reconciliation triggers and comments.
+
+### GAP-044 — no structural predicate over fields — low
+
+`url-shortener` has two predicates of the form "no field of this type contains PII". This quantifies
+over *fields*, not values — the expression language has no such quantifier. (The old tree-sitter
+grammar had a `no field contains` production; the normative grammar dropped it as unprincipled. It
+should return as a designed construct or be declared out of scope.)
+
+### GAP-045 — a state machine's start transition must name an operation — low
+
+`transitionDef` requires `on <operationRef>`, including for `[*] --> s`. `SurgeZone` is created by an
+external process, so no operation drives its start transition, and it has none. Either allow the start
+transition to omit `on`, or require every entity to declare its creating operation.

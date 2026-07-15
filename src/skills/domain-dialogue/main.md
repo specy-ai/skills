@@ -35,8 +35,8 @@ At the start of the conversation:
    - `context Name (shortname) {` declarations
    - `module Name {` declarations
    - `map { }` context map relations
-   - Block opening lines: `entity Name {`, `aggregate Name {`, `value Name {`, `enum Name {`, `command Name {`, `query Name {`, `event Name {`, `external event Name {`, `error event Name {`, `temporal event Name {`, `domain service Name {`, `application service Name {`, `infrastructure service Name {`, `interface Name {`, `reaction Name {`, `invariant Name {`, `agreement Name {`
-   - Operation labels inside entities: `"Label" on CommandType`, `"Label" when EventType then CommandType`
+   - Block opening lines: `entity Name {`, `read-only entity Name {`, `aggregate Name {`, `value Name {`, `enum Name {`, `command Name {`, `query Name {`, `event Name {`, `external event Name {`, `error event Name {`, `temporal event Name {`, `domain service Name {`, `application service Name {`, `infrastructure service Name {`, `repository Name for Type {`, `api interface Name {`, `spi interface Name {`, `reaction Name {`, `invariant Name {`, `agreement Name {`
+   - Operation labels inside entities: `"Label" on CommandType` (command-triggered) and `name(params) : Type` (internal) — the only two forms
    - `// UNCLEAR` and `// NOTE` markers
    - Skip field lists, clause bodies, and expression contents.
 3. Display a **behavior-first overview** — what each context *does*, not what it *contains*:
@@ -108,7 +108,7 @@ Organization ── Context ──┬── Module ──┬── Entity/Aggreg
 | | → Structure | Fields, types, constraints, references |
 | | → Invariants | Entity-scoped and state-scoped invariants |
 | **Operation** | → Clause | Specific preconditions, sets, emits, service calls |
-| | → Related operation | Cascade (event-triggered), adjacent behavior |
+| | → Related operation | Cascade: the reactions triggered by the events it emits, adjacent behavior |
 | | → Cross-context | Entity resolved from another context |
 | **Agreement** | → Reconciliation | Detection, compensation, escalation |
 | **Any node** | → Confrontation | "What if we changed X?" — analyze against model |
@@ -136,7 +136,7 @@ Run these 4 tests **in sequence** on every turn before responding.
 |---|---|---|
 | Broad concept — "How does X work?", "Explain Y", "What does this context do?" | **Breadth** | 1 sentence per behavior, grouped by entity pivot. No field lists, no expression syntax. Citations in parentheses only. **5-10 sentences + offers.** |
 | Specific scenario — "What happens if...?", "Can a user...?", "What if payment fails?" | **Detail** | Trace the full path: trigger → resolves → preconditions → sets → emits. Cite expressions inline. Mention services involved. **As long as needed, no longer.** |
-| Lifecycle — "What states does X go through?", "Show me the flow" | **Transverse** | Read the `states { machine ... }` block. Present state names, transitions, guards (`when`), and actions (`then`). If no explicit state machine, derive from enum values + `sets Entity { status = Y }` transitions + precondition guards. Present in business language. |
+| Lifecycle — "What states does X go through?", "Show me the flow" | **Transverse** | Read the `states { machine ... }` block inside the entity/aggregate. Present state names, transitions, the operation each transition runs `on`, and the transition's named preconditions. If no explicit state machine, derive from enum values + `sets Entity { status = Y }` transitions + precondition guards. Present in business language. |
 | Cross-context — "How do Orders and Shipping relate?" | **Transverse** | Trace context map relations (upstream/downstream/symmetric), external events, and cross-context references. Note ownership. Flag implicit dependencies. |
 | Challenge — "A user should be able to...", "We need to allow..." | **Confrontation** | Parse proposition → find contradictions → identify cascade impacts. Use the confrontation format (see below). |
 | Completeness — "What's missing?", "Are there gaps?" | **Audit** | Run the completeness checklist (see below). This is the **only** case that produces an exhaustive report. |
@@ -153,7 +153,7 @@ Run these 4 tests **in sequence** on every turn before responding.
 - **In the model** → assert it. At breadth, everything is implicitly [IN MODEL]. At detail, lead with **[IN MODEL]**.
 - **Not in the model** → say so with **[OUT OF MODEL]**. Explain what the model *does* cover nearby. Never fill gaps with assumptions.
 - **Touches a `// UNCLEAR` or `// NOTE` marker** → surface it with **[UNCERTAIN]** and quote the marker text. This label is reserved for annotated zones only. Model inconsistencies (e.g. a command field with no `sets`) are [OUT OF MODEL], not [UNCERTAIN].
-- **Invariant vs reaction vs precondition** → distinguish them. Invariants are safety properties that must always hold (with enforcement: rejection, compensation, or alert). Reactions are reactive rules (trigger → guard → effect). Preconditions are named guards on specific operations. Never present one as another.
+- **Invariant vs reaction vs precondition** → distinguish them. Invariants are safety properties that must always hold (with enforcement: rejection, compensation, or alert). Reactions are reactive rules (`triggered-by` → `guard` → `effects`) and are the **only** way an event causes a command. Preconditions are named guards on specific operations, each with a `rejects` reason. Never present one as another.
 - **Agreements vs invariants** → agreements span multiple aggregates and cannot be verified atomically. They have reconciliation mechanisms. Invariants are within a single entity/aggregate boundary.
 - **No implementation assumptions** → the models describe *what*, not *how*. No databases, APIs, frameworks.
 
@@ -166,7 +166,7 @@ End every response with **2-3 specific offers**. Choose by priority:
 1. **UNCLEAR zones** in scope — the dialogue has most value where the model is uncertain
 2. **State machine** — if the entity has a `states { machine ... }` block, offer to trace the lifecycle
 3. **Cross-context dependency** — if the answer crossed or approached a context boundary (context map, external events)
-4. **Related operation** — cascade effects (reaction triggers), adjacent behaviors
+4. **Related operation** — cascade effects (the reactions `triggered-by` the events it emits), adjacent behaviors
 5. **Agreements** — if multiple aggregates are involved, offer to explore consistency guarantees
 6. **Temporal events** — if time-dependent behavior exists nearby
 7. **Structure** — fields and types, offered last (available on demand, rarely the most interesting)
@@ -205,24 +205,27 @@ When Test 2 detects an audit request ("What's missing?"), run this checklist. **
 
 | Check | What to look for |
 |---|---|
-| Commands without operation | Commands defined but no entity operation declares `on` this command |
-| Events without consumer | Events emitted but no event-triggered operation and no reaction trigger references them |
+| Commands without operation | Commands defined but no operation declares `on` this command |
+| Commands without identity | Commands missing their `identity` field (the correlation id) |
+| Events without consumer | Events emitted but named by no reaction's `triggered-by` |
 | Entities without operation | Entities that appear in no `resolves`, `creates`, or `sets` clause |
 | Operations without precondition | Operations that have no failure path (no `precondition` clause) |
+| Preconditions without a reason | Preconditions missing their mandatory `rejects "..."` |
 | Operations without `emits` | Operations that produce no event |
 | Operations without postcondition | State-changing operations with no postcondition to verify the effect |
 | Entity with status field but no state machine | Entity has a status enum field but no `states { machine ... }` block |
 | State machine anomalies | Dead states (no transition in), trap states (no transition out), missing final states, orphan transitions |
 | State-scoped invariants missing | States that should have specific invariants but don't |
-| Invariants without enforcement | File-level invariants missing `enforcement` strategy (rejection/compensation/alert) |
-| Reactions without guard | Reactions missing a `guard` condition |
+| Invariants without enforcement | Any invariant — scoped or file-level — missing its `enforcement` strategy (rejection/compensation/alert) |
+| Reactions without guard | Reactions missing a `guard` condition — do they really fire on *every* occurrence? |
 | Agreements without reconciliation | Agreements declared but no reconciliation mechanism defined |
 | Reconciliation without escalation | Reconciliation that has no escalation chain for failure cases |
-| Queries without return type | Queries missing `returns` declaration |
-| External events without trigger mapping | External events with no `triggers` block |
+| Queries without a read surface | Queries missing `reads-from <Repository>` or `returns` |
+| External events without a reaction | External events named by no reaction's `triggered-by` — the upstream fact is declared but never acted on |
 | Domain/application/infrastructure services never called | Services declared but never referenced in any operation |
-| Interfaces exposing non-existent operations | `exposes` pointing to operations that don't exist |
-| Aggregate without root entity | Aggregate missing `root` declaration |
+| Interfaces exposing non-existent operations | `api interface` whose `exposes` points to operations that don't exist |
+| SPI without a provider | `spi interface` with no `describes`, or a provider with no matching `described-by` |
+| Aggregate without children | Aggregate with an empty or missing `entities { }` — with no non-root children it should be an `entity` |
 | Duplicate detection rules missing | Entities with natural keys but no `duplicate detection` block |
 | Temporal events with guard gaps | Temporal events where guard condition may not cover all edge cases |
 | Unresolved `// UNCLEAR` | UNCLEAR markers still present in the models |
@@ -347,9 +350,17 @@ If `specy/.meta.json` exists:
 
 If a question leads to a circular reference in the model (e.g., entity A references entity B which references entity A), trace the cycle explicitly and present it as a finding, not an error.
 
-### V2 Format Detection
+### Outdated Format Detection
 
-If the scanned files use v2 syntax (flat `module`/`uses module` without `organization`/`context` wrapper, `identifier` instead of `identity`, `transitions {}` instead of `states { machine }`), mention that the models appear to use an older format and suggest running `domain-extract-from-code` to upgrade them to v3.
+If the scanned files use an older syntax, mention that the models appear to use an outdated format and suggest running `domain-extract-from-code` to upgrade them. The tell-tale forms:
+
+- flat `module` / `uses module` without an `organization` / `context` wrapper, or `identifier` instead of `identity`
+- a top-level `statemachine`, or a `transitions { }` block inside an entity → now `states { machine ... }`
+- an event-triggered operation `"Label" when EventType then CommandType` → now a `reaction` plus the operation on that command
+- `external event ... triggers { Command }` → now a `fields { }` block plus a `reaction` (the event no longer reaches a command directly)
+- reaction `trigger` / `effect` → now `triggered-by` / `effects`
+- an `aggregate` with a `root` clause → the aggregate now IS its root
+- an `interface` with no `api` / `spi` role, a `command` with no `identity`, a `query` with no `reads-from`, a `precondition` with no `rejects`, or an invariant with no `enforcement`
 
 ---
 

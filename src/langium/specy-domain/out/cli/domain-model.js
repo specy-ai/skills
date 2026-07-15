@@ -67,7 +67,7 @@ function typeToString(ft) {
         return ft.value;
     if (ast.isCollectionType(ft)) {
         if (ft.kind === 'map' && ft.valueType) {
-            return `Map<${typeToString(ft.elementType)}, ${typeToString(ft.valueType)}>`;
+            return `map<${typeToString(ft.elementType)}, ${typeToString(ft.valueType)}>`;
         }
         return `${ft.kind}<${typeToString(ft.elementType)}>`;
     }
@@ -81,10 +81,7 @@ function typeToString(ft) {
 }
 function dotPathToString(dp) {
     return (dp?.segments ?? [])
-        .map(seg => {
-        const s = seg;
-        return (s.name ?? s.segment ?? '');
-    })
+        .map(seg => seg.value)
         .filter(Boolean)
         .join('.');
 }
@@ -109,6 +106,9 @@ function metaOf(m) {
     }
     return out;
 }
+function satisfiesOf(s) {
+    return s && s.ids.length > 0 ? s.ids : undefined;
+}
 /** Drop undefined-valued keys so emitted JSON/YAML stays tidy. */
 function compact(obj) {
     const rec = obj;
@@ -118,8 +118,11 @@ function compact(obj) {
     }
     return obj;
 }
+function nonEmpty(arr) {
+    return arr.length > 0 ? arr : undefined;
+}
 // ---------------------------------------------------------------------------
-// Fields and constraints
+// Fields, references, constraints
 // ---------------------------------------------------------------------------
 function constraintToString(c) {
     const kind = c.kind ?? 'constraint';
@@ -134,12 +137,36 @@ function fieldOf(f) {
         name: nameOf(f.name),
         type: typeToString(f.type),
         optional: f.optional || undefined,
-        constraints: f.constraints.length > 0 ? f.constraints.map(constraintToString) : undefined,
+        constraints: nonEmpty(f.constraints.map(constraintToString)),
+        description: descOf(f.description),
+        satisfies: satisfiesOf(f.satisfies),
     });
+}
+function fieldsOf(block) {
+    return block ? nonEmpty(block.fields.map(fieldOf)) : undefined;
+}
+function referencesOf(block) {
+    if (!block)
+        return undefined;
+    return nonEmpty(block.refs.map(r => compact({
+        name: nameOf(r.name),
+        target: nameOf(r.target),
+        cardinality: r.cardinality,
+        description: descOf(r.description),
+    })));
+}
+function identityOf(id) {
+    return id ? { name: nameOf(id.name), type: typeToString(id.type) } : undefined;
+}
+function paramsOf(list) {
+    if (!list)
+        return undefined;
+    return nonEmpty(list.params.map(p => `${nameOf(p.name)} : ${typeToString(p.type)}${p.optional ? '?' : ''}`));
 }
 // ---------------------------------------------------------------------------
 // Operations
 // ---------------------------------------------------------------------------
+/** `emits` is the concrete syntax of an event's 1..1 "raised by" relation. */
 function collectEmits(clauses) {
     const emits = [];
     for (const c of clauses) {
@@ -150,218 +177,162 @@ function collectEmits(clauses) {
     }
     return emits;
 }
+function bodyToModel(body, model) {
+    if (!body)
+        return;
+    model.satisfies = satisfiesOf(body.satisfies);
+    model.safety = body.safety ?? undefined;
+    model.idempotent = body.idempotent || undefined;
+    model.emits = nonEmpty(collectEmits(body.clauses));
+    model.detail = nonEmpty(body.clauses.map(cleanValue).filter(v => v !== undefined));
+}
 function summarizeOperation(op) {
-    const o = op;
     const model = { name: '' };
     if (ast.isCommandTriggeredOp(op)) {
         model.name = op.label;
+        model.on = nameOf(op.command);
         model.trigger = { command: nameOf(op.command) };
-        model.emits = collectEmits(op.clauses);
         model.description = descOf(op.description);
-        model.satisfies = op.satisfies?.ids;
-        model.detail = op.clauses.map(cleanValue).filter(v => v !== undefined);
-    }
-    else if (ast.isEventTriggeredOp(op)) {
-        model.name = op.label;
-        model.trigger = { event: nameOf(op.event), command: nameOf(op.command) };
-        model.emits = collectEmits(op.clauses);
-        model.description = descOf(op.description);
-        model.satisfies = op.satisfies?.ids;
-        model.detail = op.clauses.map(cleanValue).filter(v => v !== undefined);
-    }
-    else if (ast.isInternalOp(op)) {
-        model.name = nameOf(op.name);
-        model.returns = op.returnType ? typeToString(op.returnType) : undefined;
-        model.emits = collectEmits(op.clauses);
-        model.description = descOf(op.description);
-        model.satisfies = op.satisfies?.ids;
-        model.detail = op.clauses.map(cleanValue).filter(v => v !== undefined);
-    }
-    else if (ast.isNamedOperationDef(op)) {
-        model.name = op.name;
-        const emits = [];
-        const accepts = [];
-        for (const item of op.items) {
-            if (ast.isEmitsClause(item))
-                emits.push(nameOf(item.event));
-            else if (ast.isAcceptsClause(item)) {
-                const params = [item.first, ...item.more];
-                for (const p of params)
-                    accepts.push(`${nameOf(p.name)} : ${typeToString(p.type)}`);
-            }
-            else if (ast.isReturnsDecl(item)) {
-                model.returns = typeToString(item.type.type);
-            }
-            else if (ast.isOnClause(item)) {
-                model.on = nameOf(item.type);
-            }
-            else if (ast.isDescription(item)) {
-                model.description = item.text;
-            }
-            else if (ast.isSatisfiesDecl(item)) {
-                model.satisfies = item.ids;
-            }
-        }
-        if (emits.length)
-            model.emits = emits;
-        if (accepts.length)
-            model.accepts = accepts;
+        bodyToModel(op.body, model);
     }
     else {
-        // Unknown operation shape — keep it whole.
-        model.name = o.label ?? o.name ?? 'operation';
-        model.detail = [cleanNode(op)];
+        model.name = nameOf(op.name);
+        model.accepts = paramsOf(op.params);
+        model.returns = op.returnType ? typeToString(op.returnType) : undefined;
+        model.description = descOf(op.description);
+        bodyToModel(op.body, model);
     }
-    if (model.emits && model.emits.length === 0)
-        model.emits = undefined;
-    if (model.detail && model.detail.length === 0)
-        model.detail = undefined;
     return compact(model);
 }
-function walkBody(items) {
-    const b = {};
-    const satisfies = [];
-    const fields = [];
-    const references = [];
-    const operations = [];
-    const invariants = [];
-    const reactions = [];
-    const stateMachines = [];
-    const transitions = [];
-    const interfaces = [];
-    const exposes = [];
-    const other = [];
-    for (const item of items) {
-        if (ast.isSatisfiesDecl(item)) {
-            satisfies.push(...item.ids);
-        }
-        else if (ast.isFieldDecl(item)) {
-            fields.push(fieldOf(item));
-        }
-        else if (ast.isFieldsBlock(item)) {
-            for (const f of item.fields)
-                fields.push(fieldOf(f));
-        }
-        else if (ast.isIdentityDecl(item)) {
-            b.identity = { name: nameOf(item.name), type: typeToString(item.type) };
-        }
-        else if (ast.isReferencesBlock(item)) {
-            for (const r of item.refs) {
-                references.push({ name: nameOf(r.name), target: nameOf(r.target), cardinality: r.cardinality });
-            }
-        }
-        else if (ast.isOperationsBlock(item)) {
-            for (const op of item.ops)
-                operations.push(summarizeOperation(op));
-        }
-        else if (ast.isNamedOperationDef(item)) {
-            operations.push(summarizeOperation(item));
-        }
-        else if (ast.isInvariantsBlock(item)) {
-            for (const inv of item.invariants)
-                invariants.push(cleanNode(inv));
-        }
-        else if (ast.isInlineInvariant(item)) {
-            invariants.push(cleanNode(item));
-        }
-        else if (ast.isReactionsBlock(item)) {
-            for (const p of item.reactions)
-                reactions.push(cleanNode(p));
-        }
-        else if (ast.isStatesBlock(item)) {
-            for (const m of item.machines)
-                stateMachines.push(cleanNode(m));
-        }
-        else if (ast.isTransitionsBlock(item)) {
-            for (const t of item.transitions)
-                transitions.push(cleanNode(t));
-        }
-        else if (ast.isInterfaceDef(item)) {
-            interfaces.push(normalizeInterface(item));
-        }
-        else if (ast.isExposesClause(item)) {
-            exposes.push(dotPathToString(item.path));
-        }
-        else if (ast.isReturnsDecl(item)) {
-            b.returns = typeToString(item.type.type);
-        }
-        else if (ast.isEventTypeClassifier(item)) {
-            b.eventKind = item.classifier;
-        }
-        else if (ast.isEventSchedule(item)) {
-            b.schedule = item.expr;
-        }
-        else if (ast.isEventGuard(item)) {
-            b.guard = cleanValue(item.expr);
-        }
-        else if (ast.isDescription(item) || ast.isMetadataBlock(item)) {
-            // handled at the definition level — skip
-        }
-        else {
-            other.push(cleanNode(item));
-        }
-    }
-    if (satisfies.length)
-        b.satisfies = satisfies;
-    if (fields.length)
-        b.fields = fields;
-    if (references.length)
-        b.references = references;
-    if (operations.length)
-        b.operations = operations;
-    if (invariants.length)
-        b.invariants = invariants;
-    if (reactions.length)
-        b.reactions = reactions;
-    if (stateMachines.length)
-        b.stateMachines = stateMachines;
-    if (transitions.length)
-        b.transitions = transitions;
-    if (interfaces.length)
-        b.interfaces = interfaces;
-    if (exposes.length)
-        b.exposes = exposes;
-    if (other.length)
-        b.other = other;
-    return b;
+function operationsOf(block) {
+    return block ? nonEmpty(block.ops.map(summarizeOperation)) : undefined;
 }
+/** A signature-only operation: interface members, infra services, repositories. */
+function summarizeSignature(op) {
+    return compact({
+        name: nameOf(op.name),
+        accepts: paramsOf(op.params),
+        returns: op.returnType ? typeToString(op.returnType) : undefined,
+        description: descOf(op.description),
+        satisfies: satisfiesOf(op.satisfies),
+        detail: nonEmpty(op.conditions.map(cleanValue).filter(v => v !== undefined)),
+    });
+}
+function summarizeValueOp(op) {
+    const model = {
+        name: nameOf(op.name),
+        accepts: paramsOf(op.params),
+        returns: typeToString(op.returnType),
+        description: descOf(op.description),
+    };
+    bodyToModel(op.body, model);
+    return compact(model);
+}
+/** Read-only entities admit only safe operations — no sets / creates / emits. */
+function summarizeSafeOp(op) {
+    return compact({
+        name: nameOf(op.name),
+        accepts: paramsOf(op.params),
+        returns: op.returnType ? typeToString(op.returnType) : undefined,
+        description: descOf(op.description),
+        satisfies: satisfiesOf(op.satisfies),
+        safety: op.safe ? 'safe' : undefined,
+        detail: nonEmpty(op.clauses.map(cleanValue).filter(v => v !== undefined)),
+    });
+}
+// ---------------------------------------------------------------------------
+// Invariants, states
+// ---------------------------------------------------------------------------
+function enforcementToString(e) {
+    if (!e)
+        return undefined;
+    return e.kind === 'compensation' && e.type ? `compensation(${nameOf(e.type)})` : e.kind;
+}
+function invariantsOf(block) {
+    if (!block)
+        return undefined;
+    return nonEmpty(block.invariants.map(inv => compact({
+        name: nameOf(inv.name),
+        description: descOf(inv.description),
+        satisfies: satisfiesOf(inv.satisfies),
+        params: paramsOf(inv.params),
+        expression: cleanValue(inv.expr),
+        enforcement: enforcementToString(inv.enforcement),
+    })));
+}
+function statesOf(block) {
+    if (!block)
+        return undefined;
+    return nonEmpty(block.machines.map(m => compact({
+        name: nameOf(m.name),
+        description: descOf(m.description),
+        satisfies: satisfiesOf(m.satisfies),
+        states: nonEmpty(m.members.filter(ast.isStateDef).map(s => compact({
+            name: nameOf(s.name),
+            kind: s.kind,
+            description: descOf(s.description),
+            invariants: invariantsOf(s.invariants),
+        }))),
+        transitions: nonEmpty(m.members.filter(ast.isTransitionDef).map(t => compact({
+            from: nameOf(t.source),
+            to: nameOf(t.target),
+            on: nameOf(t.trigger),
+            description: descOf(t.description),
+            satisfies: satisfiesOf(t.satisfies),
+            conditions: nonEmpty(t.conditions.map(cleanValue).filter(v => v !== undefined)),
+        }))),
+    })));
+}
+// ---------------------------------------------------------------------------
+// Interface — a port. The role is the discriminator.
+// ---------------------------------------------------------------------------
 function normalizeInterface(def) {
-    const operations = [];
     const exposes = [];
+    const operations = [];
+    let describes;
     for (const m of def.members) {
-        if (ast.isNamedOperationDef(m))
-            operations.push(summarizeOperation(m));
-        else if (ast.isExposesClause(m))
+        if (ast.isExposesClause(m))
             exposes.push(dotPathToString(m.path));
+        else if (ast.isDescribesClause(m))
+            describes = nameOf(m.provider);
+        else
+            operations.push(summarizeSignature(m));
     }
     return compact({
         kind: 'interface',
+        // api = driving port (the domain is called); spi = driven port (the domain calls out).
+        role: def.role,
         name: nameOf(def.name),
         description: descOf(def.description),
         metadata: metaOf(def.metadata),
-        operations: operations.length ? operations : undefined,
-        exposes: exposes.length ? exposes : undefined,
+        satisfies: satisfiesOf(def.satisfies),
+        // API selects operations that already exist; SPI defines the contract a
+        // provider must fulfil.
+        exposes: nonEmpty(exposes),
+        describes,
+        operations: nonEmpty(operations),
     });
 }
 const KIND_BY_TYPE = {
     EntityDef: { kind: 'entity', group: 'entities' },
+    ReadOnlyEntityDef: { kind: 'read-only-entity', group: 'entities' },
     AggregateDef: { kind: 'aggregate', group: 'aggregates' },
     ValueDef: { kind: 'value', group: 'values' },
     EnumDef: { kind: 'enum', group: 'enums' },
     CommandDef: { kind: 'command', group: 'commands' },
     QueryDef: { kind: 'query', group: 'queries' },
     EventDef: { kind: 'event', group: 'events' },
-    ExternalEventDef: { kind: 'event', group: 'events' },
-    ErrorEventDef: { kind: 'event', group: 'events' },
-    TemporalEventDef: { kind: 'event', group: 'events' },
+    ExternalEventDef: { kind: 'external-event', group: 'events' },
+    ErrorEventDef: { kind: 'error-event', group: 'events' },
+    TemporalEventDef: { kind: 'temporal-event', group: 'events' },
     DomainServiceDef: { kind: 'domain-service', group: 'services' },
     ApplicationServiceDef: { kind: 'application-service', group: 'services' },
     InfrastructureServiceDef: { kind: 'infrastructure-service', group: 'services' },
-    ServiceDef: { kind: 'service', group: 'services' },
+    RepositoryDef: { kind: 'repository', group: 'repositories' },
+    InterfaceDef: { kind: 'interface', group: 'interfaces' },
     ReactionDef: { kind: 'reaction', group: 'reactions' },
     InvariantDef: { kind: 'invariant', group: 'invariants' },
     AgreementDef: { kind: 'agreement', group: 'agreements' },
-    StatemachineDef: { kind: 'statemachine', group: 'statemachines' },
 };
 function normalizeDefinition(def) {
     const spec = KIND_BY_TYPE[def.$type] ?? { kind: def.$type, group: 'other' };
@@ -371,78 +342,151 @@ function normalizeDefinition(def) {
         name: nameOf(d.name),
         description: descOf(d.description),
         metadata: metaOf(d.metadata),
+        satisfies: satisfiesOf(d.satisfies),
     };
-    // satisfies as a direct property (enum/reaction/external-event/invariant/...)
-    if (d.satisfies && ast.isSatisfiesDecl(d.satisfies)) {
-        base.satisfies = d.satisfies.ids;
-    }
-    // Body-bearing definitions: satisfies lives inside bodyItems instead.
-    const bodyItems = (d.bodyItems ?? d.items);
-    if (Array.isArray(bodyItems)) {
-        const buckets = walkBody(bodyItems);
-        const inheritedSatisfies = buckets.satisfies;
-        delete buckets.satisfies;
-        Object.assign(base, buckets);
-        base.satisfies ??= inheritedSatisfies;
-    }
-    // Per-kind extras not covered by the generic body walk
     if (ast.isEnumDef(def)) {
-        base.values = def.values.map(v => nameOf(v.value));
+        // `of ValueType` — the enum holds instances of a value type, which must
+        // then declare a `code` field.
+        base.valueType = def.valueType ? nameOf(def.valueType) : undefined;
+        base.values = def.values.map(v => compact({
+            name: nameOf(v.name),
+            value: v.value ? literalScalar(v.value) : undefined,
+            description: descOf(v.description),
+        }));
+    }
+    else if (ast.isValueDef(def)) {
+        base.fields = fieldsOf(def.fields);
+        base.operations = nonEmpty((def.operations?.ops ?? []).map(summarizeValueOp));
+        base.invariants = invariantsOf(def.invariants);
+    }
+    else if (ast.isEntityDef(def)) {
+        base.identity = identityOf(def.identity);
+        base.duplicateDetection = def.duplicateDetection ? cleanValue(def.duplicateDetection.expr) : undefined;
+        base.fields = fieldsOf(def.fields);
+        base.references = referencesOf(def.references);
+        base.operations = operationsOf(def.operations);
+        base.stateMachines = statesOf(def.states);
+        base.invariants = invariantsOf(def.invariants);
+    }
+    else if (ast.isReadOnlyEntityDef(def)) {
+        // Master data: state owned upstream. Observable here, not mutable here.
+        base.sourcedFrom = nameOf(def.sourcedFrom.source);
+        base.syncedVia = def.syncedVia?.pattern;
+        base.projectedBy = def.projectedBy ? nameOf(def.projectedBy.adapter) : undefined;
+        base.identity = identityOf(def.identity);
+        base.fields = fieldsOf(def.fields);
+        base.references = referencesOf(def.references);
+        base.operations = nonEmpty((def.operations?.ops ?? []).map(summarizeSafeOp));
+        base.invariants = invariantsOf(def.invariants);
     }
     else if (ast.isAggregateDef(def)) {
-        for (const it of def.bodyItems) {
-            if (ast.isAggregateRootDecl(it))
-                base.root = nameOf(it.root);
-            else if (ast.isAggregateEntitiesDecl(it))
-                base.entities = it.entities.map(nameOf);
-            else if (ast.isAggregateContainsDecl(it))
-                base.contains = [nameOf(it.first), ...it.more.map(nameOf)];
-        }
+        // The aggregate IS its root; `entities` lists the non-root children.
+        base.identity = identityOf(def.identity);
+        base.duplicateDetection = def.duplicateDetection ? cleanValue(def.duplicateDetection.expr) : undefined;
+        base.fields = fieldsOf(def.fields);
+        base.entities = def.entities.entities.map(nameOf);
+        base.references = referencesOf(def.references);
+        base.operations = operationsOf(def.operations);
+        base.stateMachines = statesOf(def.states);
+        base.invariants = invariantsOf(def.invariants);
+    }
+    else if (ast.isCommandDef(def)) {
+        // A command always carries an identifier — the correlation id.
+        base.identity = identityOf(def.identity);
+        base.fields = fieldsOf(def.fields);
+    }
+    else if (ast.isQueryDef(def)) {
+        base.readsFrom = nameOf(def.readsFrom.repository);
+        base.fields = fieldsOf(def.fields);
+        base.returns = typeToString(def.returnType);
+    }
+    else if (ast.isEventDef(def) || ast.isErrorEventDef(def)) {
+        base.about = def.about ? nameOf(def.about.entity) : undefined;
+        base.causedBy = def.causedBy ? nameOf(def.causedBy.cause) : undefined;
+        base.fields = fieldsOf(def.fields);
     }
     else if (ast.isExternalEventDef(def)) {
-        base.eventKind = 'external';
-        base.from = nameOf(def.from);
-        base.consumes = [nameOf(def.first), ...def.more.map(nameOf)];
+        // Consumed through a reaction, never straight into a command.
+        base.from = nameOf(def.source);
+        base.about = def.about ? nameOf(def.about.entity) : undefined;
+        base.fields = fieldsOf(def.fields);
     }
-    else if (ast.isErrorEventDef(def)) {
-        base.eventKind = base.eventKind ?? 'error';
+    else if (ast.isTemporalEventDef(def)) {
+        base.about = def.about ? nameOf(def.about.entity) : undefined;
+        base.anchor = anchorOf(def.anchor);
+        base.guard = def.guard ? cleanValue(def.guard.expr) : undefined;
+        base.fields = fieldsOf(def.fields);
     }
-    else if (ast.isInvariantDef(def)) {
-        base.enforcement = def.enforcement ?? undefined;
-        base.message = def.message ?? undefined;
-        base.on = def.on ? nameOf(def.on.type) : undefined;
-        base.must = def.must ? cleanValue(def.must.expr) : undefined;
+    else if (ast.isDomainServiceDef(def)) {
+        base.calls = def.calls ? def.calls.services.map(nameOf) : undefined;
+        base.operations = operationsOf(def.operations);
     }
-    else if (ast.isStatemachineDef(def)) {
-        base.states = def.items.map(cleanValue).filter(v => v !== undefined);
+    else if (ast.isApplicationServiceDef(def)) {
+        base.exposedBy = def.exposedBy ? nameOf(def.exposedBy.interface) : undefined;
+        base.operations = operationsOf(def.operations);
+    }
+    else if (ast.isInfrastructureServiceDef(def)) {
+        base.describedBy = def.describedBy ? nameOf(def.describedBy.interface) : undefined;
+        base.operations = nonEmpty(def.operations.ops.map(summarizeSignature));
+    }
+    else if (ast.isRepositoryDef(def)) {
+        base.for = nameOf(def.entity);
+        base.readOnly = def.readOnly || undefined;
+        base.describedBy = def.describedBy ? nameOf(def.describedBy.interface) : undefined;
+        base.operations = nonEmpty(def.ops.map(summarizeSignature));
+    }
+    else if (ast.isInterfaceDef(def)) {
+        return { group: spec.group, construct: normalizeInterface(def) };
     }
     else if (ast.isReactionDef(def)) {
-        const triggers = [];
-        const effects = [];
-        let guard;
-        for (const it of def.items) {
-            if (ast.isTriggeredByClause(it))
-                triggers.push(nameOf(it.event));
-            else if (ast.isTriggerClause(it))
-                triggers.push(nameOf(it.event), ...it.more.map(nameOf));
-            else if (ast.isEffectsClause(it))
-                effects.push(nameOf(it.command));
-            else if (ast.isEffectClause(it))
-                effects.push(nameOf(it.command));
-            else if (ast.isGuardClause(it))
-                guard = cleanValue(it.expr);
-        }
-        if (def.guard)
-            guard = cleanValue(def.guard);
-        if (triggers.length)
-            base.triggers = triggers;
-        if (effects.length)
-            base.effects = effects;
-        if (guard !== undefined)
-            base.guard = guard;
-        delete base.other;
+        // The sole event -> command edge, uniform across all four event types.
+        base.triggeredBy = def.triggeredBy.events.map(nameOf);
+        base.guard = def.guard ? cleanValue(def.guard.expr) : undefined;
+        base.effects = nameOf(def.effects.command);
+    }
+    else if (ast.isInvariantDef(def)) {
+        base.on = dotPathToString(def.scope);
+        base.must = cleanValue(def.must.expr);
+        base.enforcement = enforcementToString(def.enforcement);
+    }
+    else if (ast.isAgreementDef(def)) {
+        base.participants = def.participants.participants.map(nameOf);
+        base.predicate = cleanValue(def.predicate.expr);
+        base.reconciliation = reconciliationOf(def.reconciliation);
     }
     return { group: spec.group, construct: compact(base) };
+}
+function anchorOf(a) {
+    if (ast.isRelativeAnchor(a)) {
+        return compact({ kind: 'relative', reference: nameOf(a.event), offset: cleanValue(a.offset) });
+    }
+    if (ast.isAbsoluteAnchor(a)) {
+        return { kind: 'absolute', instant: dotPathToString(a.instant) };
+    }
+    return { kind: 'recurring', schedule: a.schedule };
+}
+function reconciliationOf(r) {
+    const trigger = r.trigger.schedule
+        ? { schedule: r.trigger.schedule }
+        : { events: r.trigger.events.map(nameOf) };
+    return compact({
+        name: nameOf(r.name),
+        description: descOf(r.description),
+        satisfies: satisfiesOf(r.satisfies),
+        trigger,
+        detection: r.detection,
+        compensation: r.compensation.commands.map(nameOf),
+        coordination: r.coordination ?? undefined,
+        // The chain must terminate: the final action is alert / suspend / manual.
+        escalation: r.escalation
+            ? nonEmpty(r.escalation.steps.map(s => compact({
+                name: nameOf(s.name),
+                description: descOf(s.description),
+                when: cleanValue(s.when),
+                action: cleanValue(s.action),
+            })))
+            : undefined,
+    });
 }
 function groupDefinitions(defs) {
     const groups = {};
@@ -470,20 +514,17 @@ function groupDefinitions(defs) {
 // Container normalization (organization / context / module)
 // ---------------------------------------------------------------------------
 function normalizeModule(mod) {
-    const members = mod.body?.members ?? [];
-    const subModules = members.filter(ast.isModuleDef);
-    const defs = members.filter((m) => !ast.isModuleDef(m));
-    const dependencies = [
-        ...mod.usesDecls.map(u => nameOf(u.module)),
-        ...(mod.body?.dependsBlock?.deps.map(nameOf) ?? []),
-    ];
     return compact({
         name: nameOf(mod.name),
         description: descOf(mod.description),
         metadata: metaOf(mod.metadata),
-        dependencies: dependencies.length ? dependencies : undefined,
-        modules: subModules.length ? subModules.map(normalizeModule) : undefined,
-        definitions: groupDefinitions(defs),
+        satisfies: satisfiesOf(mod.satisfies),
+        // The two interface relations are NOT symmetric: `exposes` is the public
+        // surface; `requires` is what the module needs given to it.
+        exposes: mod.exposes ? nonEmpty(mod.exposes.interfaces.map(nameOf)) : undefined,
+        requires: mod.requires ? nonEmpty(mod.requires.interfaces.map(nameOf)) : undefined,
+        dependencies: mod.dependsOn ? nonEmpty(mod.dependsOn.modules.map(nameOf)) : undefined,
+        definitions: groupDefinitions(mod.members),
     });
 }
 function normalizeRelations(map) {
@@ -506,8 +547,10 @@ function normalizeContext(ctx) {
         shortname: ctx.shortname ? nameOf(ctx.shortname.value) : undefined,
         description: descOf(ctx.description),
         metadata: metaOf(ctx.metadata),
+        satisfies: satisfiesOf(ctx.satisfies),
+        requirementsSource: ctx.requirementsSource?.path,
         contextMap: normalizeRelations(ctx.contextMap),
-        modules: modules.length ? modules.map(normalizeModule) : undefined,
+        modules: nonEmpty(modules.map(normalizeModule)),
         definitions: groupDefinitions(defs),
     });
 }
@@ -516,7 +559,9 @@ function normalizeOrganization(org) {
         name: nameOf(org.name),
         description: descOf(org.description),
         metadata: metaOf(org.metadata),
-        contexts: org.contexts.length ? org.contexts.map(normalizeContext) : undefined,
+        satisfies: satisfiesOf(org.satisfies),
+        requirementsSource: org.requirementsSource?.path,
+        contexts: nonEmpty(org.contexts.map(normalizeContext)),
     });
 }
 // ---------------------------------------------------------------------------
@@ -538,9 +583,9 @@ export function normalizeDomain(file) {
             looseDefs.push(el);
     }
     return compact({
-        organizations: organizations.length ? organizations : undefined,
-        contexts: contexts.length ? contexts : undefined,
-        modules: modules.length ? modules : undefined,
+        organizations: nonEmpty(organizations),
+        contexts: nonEmpty(contexts),
+        modules: nonEmpty(modules),
         definitions: groupDefinitions(looseDefs),
     });
 }
