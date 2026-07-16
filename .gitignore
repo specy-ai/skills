@@ -9,5 +9,9 @@ package-lock.json
 *.swp
 # Compiled tree-sitter parsers
 *.so
+# Compiled Langium parser + language server — rebuilt by
+# src/langium/specy-domain/build.sh (which the root build.sh calls, and which
+# parse-domain.sh triggers on first use).
+src/langium/specy-domain/out/
 # Skill-creator eval/optimization scratch output
 src/skills/*/workspace/
