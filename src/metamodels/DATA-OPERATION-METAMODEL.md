@@ -8,7 +8,8 @@
   - [Module](#module)
   - [Data](#data)
     - [Type](#type)
-    - [Schema](#schema)
+    - [Struct](#struct)
+      - [State](#state)
   - [Global Binding](#global-binding)
   - [Operation](#operation)
     - [Error signature](#error-signature)
@@ -23,21 +24,23 @@
 
 # Data & Operation model metamodel
 
-This file defines a foundational representation for describing data structures, operation signatures, and global variable bindings. It is a **description language**, not a programming language: there are no statements, no expressions, no control structures (no branching, no loops). A Data & Operation model describes *what data exists*, *what operations exist over that data*, and *what each operation needs* — other operations, global state — to do its job. How an operation computes its result is deliberately out of scope.
+This file defines a foundational representation for describing data structures, operation signatures, and global variable bindings. It is a **description language**, not a programming language: operations have no bodies — no statements, no control structures (no branching, no loops), no computed expressions. A Data & Operation model describes *what data exists*, *what operations exist over that data*, and *what each operation needs* — other operations, global state — to do its job. How an operation computes its result is deliberately out of scope.
+
+The one place a condition is written is a struct's named [states](#state): boolean predicates over an instance's own data, used to name meaningful conditions of a value (a task "is pending", a price entry "is discounted"). These predicates describe *data*, not computation — no operation ever carries one.
 
 The Data & Operation model is the "how substrate" beneath the domain model (see DOMAIN-METAMODEL.md). Where the domain model captures business intent — entities, aggregates, commands, events — the Data & Operation model captures the structural skeleton of an implementation: concrete data shapes and the dependency graph of the operations that realize domain behavior. The two models are linked through optional, traceable `implements` relations (see [Traceability to the Domain model](#traceability-to-the-domain-model)).
 
-Because the model is purely declarative and its two graphs (schema references and operation dependencies) are required to be acyclic, it is mechanically analyzable: topological ordering, impact analysis, dead-code detection, and effect propagation are all decidable by simple graph traversal.
+Because the model is purely declarative and its two graphs (struct references and operation dependencies) are required to be acyclic, it is mechanically analyzable: topological ordering, impact analysis, dead-code detection, and effect propagation are all decidable by simple graph traversal.
 
 ## Convention
 
 Every concept in this metamodel carries a name, a description, and a metadata map (a set of arbitrary key/value pairs). These attributes are implicit and not repeated in each definition below.
 
-**Naming**: schema names use `PascalCase` (`Money`, `PriceEntry`). Operation names, global binding names, and field names use `camelCase` (`reserveStock`, `exchangeRates`, `unitPrice`). Error signature names use `PascalCase` (`InsufficientStock`), mirroring the domain model's error event naming.
+**Naming**: struct names use `PascalCase` (`Money`, `PriceEntry`). Operation names, global binding names, and field names use `camelCase` (`reserveStock`, `exchangeRates`, `unitPrice`). Error signature names use `PascalCase` (`InsufficientStock`), mirroring the domain model's error event naming. State labels are free-text string literals in business language (`"a pending task"`).
 
 **Implicit implementation by naming**: when a Data & Operation model element and a domain model element share the same name (compared case-insensitively, ignoring case-style differences such as `reserveStock` vs `ReserveStock`) within corresponding modules, the `implements` relation is presumed without being declared. An explicit `implements` declaration is only needed when names diverge — and it always wins over the naming presumption.
 
-Illustrative concrete syntax appears throughout in fenced blocks. It is a **sketch**, not a normative grammar: no `.ebnf` is paired with this metamodel yet, and the sketched notation may evolve when a formal grammar is written.
+Concrete syntax appears throughout in fenced blocks. The normative grammar for it is `src/grammars/data-operation.ebnf`, which pairs with this document section by section: every production there carries a `(metamodel: <Section>)` back-reference to the section below that defines it. Constraints stated here as "shall" but not expressible in a context-free grammar (the two acyclicity rules, the closed-world declaration rule, type conformance of initial values) are listed as semantic rules at the foot of the grammar file. The artifact extension is `.dataop`.
 
 ## Model
 
@@ -49,13 +52,13 @@ Relations:
 
 ## Module
 
-A module is the unit of decomposition, mirroring the domain model's module concept. A module groups schemas, global bindings, and operations that belong together. References that cross a module boundary shall be qualified with the module name (`pricing.Money`).
+A module is the unit of decomposition, mirroring the domain model's module concept. A module groups structs, global bindings, and operations that belong together. References that cross a module boundary shall be qualified with the module name (`pricing.Money`).
 
-A module's dependencies are **derived**, never declared: module A depends on module B when any schema, global binding, or operation of A references an element of B. The derived module dependency graph shall be acyclic — this follows from, and is checked alongside, the acyclicity of the schema reference graph and the operation dependency graph.
+A module's dependencies are **derived**, never declared: module A depends on module B when any struct, global binding, or operation of A references an element of B. The derived module dependency graph shall be acyclic — this follows from, and is checked alongside, the acyclicity of the struct reference graph and the operation dependency graph.
 
 Relations:
 - 1..1 "belongs to" relation with a model
-- 0..n "declares" relation with schemas
+- 0..n "declares" relation with structs
 - 0..n "declares" relation with global bindings
 - 0..n "declares" relation with operations
 - 0..n "depends on" relation with other modules (derived from element references, shall be acyclic)
@@ -74,7 +77,7 @@ A type is one of the following constructors:
 | Scalar | `string`, `number`, `boolean` | The JSON scalar values. `number` covers integers and decimals alike, as in JSON. |
 | Vector | `vector<T>` | An ordered sequence whose elements all conform to the single element type `T`. Vectors are homogeneous — a vector shall not mix element types. |
 | Map | `{ field: T, … }` | A record of named fields, each with its own type. **Every field is required** — there are no optional fields. |
-| Schema reference | `SchemaName` | A reference to a previously defined [schema](#schema), possibly qualified (`pricing.Money`). |
+| Struct reference | `StructName` | A reference to a previously defined [struct](#struct), possibly qualified (`pricing.Money`). |
 | Nullable marker | `T?` | Admits `null` in addition to the values of `T`. `null` is not a standalone type — it exists only through this marker. Applicable to any type. |
 
 Constraints:
@@ -83,39 +86,63 @@ Constraints:
 
 The type language is deliberately closed. Its purpose is to make every data shape in the model fully explicit and structurally comparable — two types are the same exactly when their constructor trees are the same.
 
-### Schema
+### Struct
 
-A schema is a **named type definition**: a name bound to a type, almost always a map type. Schemas are the vocabulary of the model — arguments, returns, error payloads, and global bindings refer to data shapes by schema name rather than repeating structural types.
+A struct is a **named data structure**: the model's unit of vocabulary. Arguments, returns, error payloads, and global bindings refer to data shapes by struct name rather than repeating structural types. A struct groups its data shape and, optionally, the named conditions of an instance:
+
+- a mandatory **`schema` block** — the fields, each a name and a [type](#type). This is the shape (a map type), the same field-list machinery as an inline map, given a name.
+- an optional **`state` block** — zero or more named [states](#state), each a boolean predicate over an instance.
 
 Constraints:
-- A schema shall only reference **previously defined** schemas. There are no forward references and no recursion — a schema shall not reference itself directly or transitively. The schema reference graph is therefore a DAG, and every value described by the model is finite by construction.
-- A schema name shall be unique within its module.
+- A struct's `schema` block shall only reference **previously defined** structs. There are no forward references and no recursion — a struct shall not reference itself directly or transitively. The struct reference graph is therefore a DAG, and every value described by the model is finite by construction.
+- A struct name shall be unique within its module.
 
 **Example.**
 
 ```
-schema Money {
-  amount: number
-  currency: string
+struct Money {
+  schema {
+    amount:   number
+    currency: string
+  }
 }
 
-schema PriceEntry {
-  productId: string
-  unitPrice: Money
-  discountRate: number?
+struct Task {
+  schema {
+    name:   string
+    status: string
+  }
+
+  state {
+    "a pending task"   : _.status = "pending"
+    "a completed task" : _.status = "done"
+  }
 }
 
-schema PriceList {
-  name: string
-  entries: vector<PriceEntry>
+struct PriceList {
+  schema {
+    name:    string
+    entries: vector<PriceEntry>
+  }
 }
 ```
 
 Relations:
 - 1..1 "belongs to" relation with a module
-- 1..1 "is defined by" relation with a type
-- 0..n "references" relation with previously defined schemas (shall form a DAG, no self-reference)
+- 1..1 "is shaped by" relation with a schema block (a map type)
+- 0..n "declares" relation with states
+- 0..n "references" relation with previously defined structs (shall form a DAG, no self-reference)
 - 0..1 "represents" relation with a domain entity, value type, or enum (implicit by naming or explicit)
+
+#### State
+
+A state is a **named, derived condition** of a struct instance: a business-language label bound to a boolean predicate evaluated against the instance's own data. Within a predicate, `_` denotes the instance and `_.field` (a dot-path) reaches its fields. The predicate language is small and total — comparisons (`=`, `!=`, `>`, `<`, `>=`, `<=`), `is null` / `is not null`, membership (`in { … }`), and the boolean connectives `and` / `or` / `not` over field paths and literals. It has no function calls, no arithmetic on state, and no reference to anything outside the instance.
+
+States are **derived, not stored**. A struct has no mutable "current state" field, no transitions, and no start state — a state simply *holds* or *does not hold* for a given instance, computed from its data. Two states may hold at once; they need not partition the instance space. This is the deliberate difference from the domain model's Entity state machine (see DOMAIN-METAMODEL.md, State machine), which models stored, mutually exclusive lifecycle states connected by guarded transitions. Here, states are a read-only vocabulary for talking about data.
+
+Relations:
+- 1..1 "belongs to" relation with a struct
+- 1..1 "is defined by" relation with a boolean predicate over the instance (`_`)
 
 ## Global Binding
 
@@ -187,7 +214,7 @@ operation registerDiscount(productId: string, rate: number)
 
 An error signature declares a named failure mode of an operation, with an optional data payload describing what accompanies the failure. Errors are part of the signature — a caller knows every way an operation can fail by reading its declaration, without any body to inspect.
 
-The payload, when present, is a map of named typed fields (or a schema reference), following the same type language as everything else.
+The payload, when present, is a map of named typed fields (or a struct reference), following the same type language as everything else.
 
 When an operation implements a domain operation, its error signatures correspond to the domain's error events: an error raised by the implementing operation surfaces as the matching Error Event in the domain model (see DOMAIN-METAMODEL.md, Error Event). The correspondence follows the same implicit-by-naming rule as `implements`.
 
@@ -201,7 +228,7 @@ Relations:
 The `depends on` declarations of all operations form the model's dependency graph. This graph shall be **acyclic**: no operation depends on itself, directly or transitively — recursion and mutual recursion are not expressible. Together with the closed-world declaration rule, acyclicity makes the model fully analyzable by topological traversal:
 
 - **Effective reads/writes** of an operation = its declared reads/writes ∪ the effective reads/writes of everything it depends on.
-- **Impact of changing a schema or global** = the reverse reachability set in the graph.
+- **Impact of changing a struct or global** = the reverse reachability set in the graph.
 - **Build/evaluation order** = any topological order of the graph.
 
 Constraints:
@@ -217,7 +244,7 @@ The Data & Operation model is linked to the domain model through optional, per-e
 |---|---|---|---|
 | Model | Bounded context / organization | implements | model name matches context shortname |
 | Module | Module | implements | same module name |
-| Schema | Entity, value type, or enum | represents | same name (`Money` ↔ value `Money`) |
+| Struct | Entity, value type, or enum | represents | same name (`Money` ↔ value `Money`) |
 | Operation | Operation | implements | same name, case-style ignored (`reserveStock` ↔ `ReserveStock`) |
 | Error signature | Error event | corresponds to | same name |
 
@@ -232,20 +259,31 @@ model pricing-engine implements pricing {
 
   module pricing {
 
-    schema Money {
-      amount: number
-      currency: string
+    struct Money {
+      schema {
+        amount:   number
+        currency: string
+      }
     }
 
-    schema PriceEntry {
-      productId: string
-      unitPrice: Money
-      discountRate: number?
+    struct PriceEntry {
+      schema {
+        productId:    string
+        unitPrice:    Money
+        discountRate: number?
+      }
+
+      state {
+        "discounted" : _.discountRate is not null
+        "full price" : _.discountRate is null
+      }
     }
 
-    schema PriceList {
-      name: string
-      entries: vector<PriceEntry>
+    struct PriceList {
+      schema {
+        name:    string
+        entries: vector<PriceEntry>
+      }
     }
 
     global standardPriceList: PriceList = {
