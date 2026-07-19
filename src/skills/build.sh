@@ -169,6 +169,42 @@ copy_runtime_files() {
   cp "$REPO_ROOT/src/metamodels/SYSTEM-REQ-METAMODEL.md" "$domain_refs/SYSTEM-REQ-METAMODEL.md"
   cp "$REPO_ROOT/src/metamodels/PRODUCT-REQ-METAMODEL.md" "$domain_refs/PRODUCT-REQ-METAMODEL.md"
   echo "  domain-design/: 1 grammar + 3 references copied"
+
+  # architecture-design: grammar + references (arch metamodel + domain/sysreq for cross-links)
+  local archd_grammar="$SKILLS_OUT/architecture-design/grammar"
+  local archd_refs="$SKILLS_OUT/architecture-design/references"
+  mkdir -p "$archd_grammar" "$archd_refs"
+  cp "$REPO_ROOT/src/grammars/architecture.ebnf" "$archd_grammar/architecture.ebnf"
+  cp "$REPO_ROOT/src/metamodels/SOFTWARE-ARCHITECTURE-METAMODEL.md" "$archd_refs/SOFTWARE-ARCHITECTURE-METAMODEL.md"
+  cp "$REPO_ROOT/src/metamodels/DOMAIN-METAMODEL.md" "$archd_refs/DOMAIN-METAMODEL.md"
+  cp "$REPO_ROOT/src/metamodels/SYSTEM-REQ-METAMODEL.md" "$archd_refs/SYSTEM-REQ-METAMODEL.md"
+  echo "  architecture-design/: 1 grammar + 3 references copied"
+
+  # architecture-extract-from-code: stack heuristics + arch grammar + metamodel
+  local axc_heuristics="$SKILLS_OUT/architecture-extract-from-code/heuristics"
+  mkdir -p "$axc_heuristics"
+  for f in java-spring.md typescript-nestjs.md clojure.md; do
+    cp "$SCRIPT_DIR/architecture-extract-from-code/heuristics/$f" "$axc_heuristics/$f"
+  done
+  local axc_grammars="$SKILLS_OUT/architecture-extract-from-code/grammars"
+  local axc_refs="$SKILLS_OUT/architecture-extract-from-code/references"
+  mkdir -p "$axc_grammars" "$axc_refs"
+  cp "$REPO_ROOT/src/grammars/architecture.ebnf" "$axc_grammars/architecture.ebnf"
+  cp "$REPO_ROOT/src/metamodels/SOFTWARE-ARCHITECTURE-METAMODEL.md" "$axc_refs/SOFTWARE-ARCHITECTURE-METAMODEL.md"
+  echo "  architecture-extract-from-code/: 3 heuristics + 1 grammar + 1 reference copied"
+
+  # architecture-build-code: stack heuristics + arch grammar + metamodel
+  local abc_heuristics="$SKILLS_OUT/architecture-build-code/heuristics"
+  mkdir -p "$abc_heuristics"
+  for f in java-spring.md typescript-nestjs.md clojure.md; do
+    cp "$SCRIPT_DIR/architecture-build-code/heuristics/$f" "$abc_heuristics/$f"
+  done
+  local abc_grammar="$SKILLS_OUT/architecture-build-code/grammar"
+  local abc_refs="$SKILLS_OUT/architecture-build-code/references"
+  mkdir -p "$abc_grammar" "$abc_refs"
+  cp "$REPO_ROOT/src/grammars/architecture.ebnf" "$abc_grammar/architecture.ebnf"
+  cp "$REPO_ROOT/src/metamodels/SOFTWARE-ARCHITECTURE-METAMODEL.md" "$abc_refs/SOFTWARE-ARCHITECTURE-METAMODEL.md"
+  echo "  architecture-build-code/: 3 heuristics + 1 grammar + 1 reference copied"
 }
 
 # -----------------------------------------------------------------------------
@@ -200,6 +236,9 @@ else
   build_skill domain-build-code
   build_skill domain-extract-from-code
   build_skill domain-refactor
+  build_skill architecture-design
+  build_skill architecture-extract-from-code
+  build_skill architecture-build-code
   # Auxiliary skills
   build_skill domain-dialogue
 fi

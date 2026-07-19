@@ -1,0 +1,18 @@
+{
+  "grammars": [
+    {
+      "name": "specy_architecture",
+      "camelCase": "specyArchitecture",
+      "scope": "source.specy_architecture",
+      "path": ".",
+      "file-types": [
+        "arch"
+      ],
+      "highlights": "queries/highlights.scm"
+    }
+  ],
+  "metadata": {
+    "version": "1.0.0",
+    "links": {}
+  }
+}

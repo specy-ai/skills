@@ -12,6 +12,7 @@ GRAMMARS=(
   "tree-sitter-specy-prd"
   "tree-sitter-specy-sysreq"
   "tree-sitter-specy-domain"
+  "tree-sitter-specy-architecture"
 )
 
 # Every .domain file in examples/ is smoke-tested. A file left out of this list is
@@ -37,6 +38,7 @@ EXAMPLES=(
   "examples/ride-now/payment.domain"
   "examples/url-shortener/url-shortener.domain"
   "examples/ecommerce/v2/orders.domain"
+  "examples/url-shortener/url-shortener.arch"
 )
 
 RED='\033[0;31m'
