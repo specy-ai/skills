@@ -1,0 +1,347 @@
+// =============================================================================
+// Specy — Data & Operation Model Grammar (.dataop)
+//
+// Normative concrete syntax for the Data & Operation metamodel.
+// Every production here has a counterpart in
+// src/metamodels/DATA-OPERATION-METAMODEL.md; section references are given as
+// (metamodel: <Section>).
+//
+// This is a DESCRIPTION language, not a programming language: operations have no
+// bodies — no statements, no control structures, no computed expressions. The two
+// small value/condition syntaxes are strictly scoped to data: the JSON literal
+// that initializes a global binding, and the boolean predicate that names a
+// struct's state over an instance (`_`). Neither appears in an operation.
+//
+// EBNF (ISO 14977 style)
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// Top-level structure
+//
+// The outer containers (model > module) may be ELIDED: a file may start at a
+// module or at a bare declaration. An elided container is implicit, not absent —
+// a declaration still belongs to exactly one module, which belongs to one model.
+// -----------------------------------------------------------------------------
+
+dataOpFile       = { comment | topLevelElement } ;
+
+topLevelElement  = modelDef
+                 | moduleDef
+                 | declaration ;
+
+declaration      = structDef
+                 | globalDef
+                 | operationDef ;
+
+// -----------------------------------------------------------------------------
+// Model  (metamodel: Model)
+//
+// `implements` targets a domain bounded context or organization. It is optional:
+// when omitted, the link is presumed from the model name (metamodel: Convention).
+// -----------------------------------------------------------------------------
+
+modelDef         = "model" , modelName , [ implementsClause ] , [ description ]
+                 , [ metadataBlock ] , "{"
+                 , moduleDef , { comment | moduleDef }
+                 , "}" ;
+
+// -----------------------------------------------------------------------------
+// Module  (metamodel: Module)
+//
+// A module has no `depends on` clause: module dependencies are DERIVED from the
+// references its declarations make, never declared (metamodel: Module).
+// -----------------------------------------------------------------------------
+
+moduleDef        = "module" , identifier , [ implementsClause ] , [ description ]
+                 , [ metadataBlock ] , "{"
+                 , { comment | declaration }
+                 , "}" ;
+
+// -----------------------------------------------------------------------------
+// Struct  (metamodel: Struct)
+//
+// A named data structure: a mandatory `schema` block (its fields) and an optional
+// `state` block (named predicate-states over an instance). `represents` targets a
+// domain entity, value type or enum.
+// -----------------------------------------------------------------------------
+
+structDef        = "struct" , typeName , [ representsClause ] , [ description ]
+                 , [ metadataBlock ] , "{"
+                 , schemaBlock
+                 , [ stateBlock ]
+                 , "}" ;
+
+representsClause = "represents" , qualifiedName ;
+
+// The shape: a named map type. Every field is required — no `optional` constraint.
+schemaBlock      = "schema" , "{" , { comment | fieldDecl } , "}" ;
+
+// -----------------------------------------------------------------------------
+// State  (metamodel: State)
+//
+// A named, DERIVED condition of a struct instance: a business-language label bound
+// to a boolean predicate. `_` denotes the instance; `_.field` reaches its fields.
+// States are computed, not stored: no transitions, no start state — a state simply
+// holds or does not hold, and two states may hold at once.
+// -----------------------------------------------------------------------------
+
+stateBlock       = "state" , "{" , { comment | stateDecl } , "}" ;
+
+stateDecl        = stringLiteral , ":" , predicate ;
+
+// A small, total boolean predicate language over the instance. No function calls,
+// no arithmetic, nothing outside the instance.
+predicate        = orPredicate ;
+
+orPredicate      = andPredicate , { "or" , andPredicate } ;
+
+andPredicate     = notPredicate , { "and" , notPredicate } ;
+
+notPredicate     = [ "not" ] , atomPredicate ;
+
+atomPredicate    = "(" , predicate , ")"
+                 | instancePath , "is" , [ "not" ] , "null"
+                 | instancePath , compOp , literalValue
+                 | instancePath , [ "not" ] , "in" , "{" , literalValue
+                                                 , { "," , literalValue } , "}" ;
+
+compOp           = "=" | "!=" | ">" | "<" | ">=" | "<=" ;
+
+// `_` is the instance; every path is rooted at it.
+instancePath     = "_" , { "." , fieldName } ;
+
+// -----------------------------------------------------------------------------
+// Type  (metamodel: Type)
+//
+// Exactly five constructors: scalar, vector, map, struct reference, and the
+// nullable marker. There is no union type — `?` is the ONLY way a value may be
+// absent, and it applies to any type.
+// -----------------------------------------------------------------------------
+
+type             = baseType , [ "?" ] ;
+
+baseType         = scalarType
+                 | vectorType
+                 | mapType
+                 | structRef ;
+
+scalarType       = "string"
+                 | "number"     (* integers and decimals alike, as in JSON *)
+                 | "boolean" ;
+
+// Homogeneous: one element type, no tuple form.
+vectorType       = "vector" , "<" , type , ">" ;
+
+// An inline anonymous record. The named form is a struct's `schema` block.
+mapType          = "{" , { comment | fieldDecl } , "}" ;
+
+fieldDecl        = fieldName , ":" , type , [ description ] ;
+
+fieldName        = camelCaseId ;
+
+// Qualified when it crosses a module boundary: `pricing.Money`.
+structRef        = qualifiedName ;
+
+// -----------------------------------------------------------------------------
+// Global Binding  (metamodel: Global Binding)
+//
+// The initial value is MANDATORY and shall conform to the declared type.
+// -----------------------------------------------------------------------------
+
+globalDef        = "global" , camelCaseId , ":" , type , "=" , jsonValue
+                 , [ description ] , [ metadataBlock ] ;
+
+// -----------------------------------------------------------------------------
+// Operation  (metamodel: Operation)
+//
+// A signature and nothing else — no body. The clauses declare what the operation
+// needs; they are CLOSED-WORLD (metamodel: Dependency graph): every direct
+// dependency and every global read or written is declared here. Transitive access
+// is derived by graph traversal, never re-declared.
+//
+// Clause order is fixed to keep the parser and the reader in agreement.
+// -----------------------------------------------------------------------------
+
+operationDef     = "operation" , camelCaseId , "(" , [ paramList ] , ")"
+                 , [ ":" , type ]              (* absent = the operation exists for its effects *)
+                 , [ description ]
+                 , [ metadataBlock ]
+                 , [ errorsBlock ]
+                 , [ dependsOnClause ]
+                 , [ readsClause ]
+                 , [ writesClause ]
+                 , [ implementsClause ] ;
+
+paramList        = paramDecl , { "," , paramDecl } ;
+
+paramDecl        = camelCaseId , ":" , type ;
+
+dependsOnClause  = "depends" , "on" , "{" , nameList , "}" ;
+
+readsClause      = "reads" , "{" , nameList , "}" ;
+
+writesClause     = "writes" , "{" , nameList , "}" ;
+
+nameList         = qualifiedName , { "," , qualifiedName } ;
+
+// -----------------------------------------------------------------------------
+// Error signature  (metamodel: Error signature)
+//
+// A named failure mode with an optional payload: either an inline field list or
+// a struct reference. Errors are part of the signature — a caller knows every way
+// an operation can fail without inspecting a body.
+// -----------------------------------------------------------------------------
+
+errorsBlock      = "errors" , "{" , { comment | errorDef } , "}" ;
+
+errorDef         = typeName , [ errorPayload ] , [ correspondsToClause ] , [ description ] ;
+
+errorPayload     = "(" , [ paramList ] , ")"   (* inline payload fields *)
+                 | "of" , structRef ;          (* payload described by a struct *)
+
+correspondsToClause = "corresponds" , "to" , qualifiedName ;
+
+// -----------------------------------------------------------------------------
+// Domain link  (metamodel: Traceability to the Domain model)
+//
+// Always optional. When omitted, the link is presumed by name matching; when
+// present, it overrides the naming presumption.
+// -----------------------------------------------------------------------------
+
+implementsClause = "implements" , qualifiedName ;
+
+// -----------------------------------------------------------------------------
+// JSON values — the initial value of a global binding
+//
+// This is the ONLY value syntax in the language, and it is literal JSON: no
+// expressions, no references, no arithmetic.
+// -----------------------------------------------------------------------------
+
+jsonValue        = jsonObject
+                 | jsonArray
+                 | stringLiteral
+                 | number
+                 | "true"
+                 | "false"
+                 | "null" ;
+
+jsonObject       = "{" , [ jsonMember , { "," , jsonMember } ] , "}" ;
+
+jsonMember       = stringLiteral , ":" , jsonValue ;
+
+jsonArray        = "[" , [ jsonValue , { "," , jsonValue } ] , "]" ;
+
+// -----------------------------------------------------------------------------
+// Description — :: operator
+// Attaches a human-readable description to any construct. Does not change semantics.
+// -----------------------------------------------------------------------------
+
+description      = "::" , stringLiteral ;
+
+// -----------------------------------------------------------------------------
+// Metadata — arbitrary key/value annotations
+// -----------------------------------------------------------------------------
+
+metadataBlock    = "meta" , "{" , { metadataEntry } , "}" ;
+
+metadataEntry    = identifier , "=" , literalValue ;
+
+// -----------------------------------------------------------------------------
+// Names and literals
+//
+// A qualified name reaches into another module (`pricing.Money`) or names a
+// domain element (`pricing.GrantProductDiscount`). Unqualified names resolve
+// within the enclosing module.
+// -----------------------------------------------------------------------------
+
+qualifiedName    = nameSegment , { "." , nameSegment } ;
+
+nameSegment      = identifier ;
+
+literalValue     = stringLiteral | number | "true" | "false" | "null" ;
+
+stringLiteral    = '"' , { character } , '"' ;
+
+number           = [ "-" ] , digit , { digit } , [ "." , digit , { digit } ]
+                 , [ ( "e" | "E" ) , [ "+" | "-" ] , digit , { digit } ] ;
+
+// A model name is kebab-case by convention (`pricing-engine`); a single-word
+// camelCase name is also legal.
+modelName        = camelCaseId , { "-" , camelCaseId } ;
+
+typeName         = pascalCaseId ;
+
+identifier       = camelCaseId | pascalCaseId ;
+
+pascalCaseId     = upperLetter , { letter | digit } ;
+
+camelCaseId      = lowerLetter , { letter | digit } ;
+
+// -----------------------------------------------------------------------------
+// Comments
+// -----------------------------------------------------------------------------
+
+comment          = "//" , { character } , newline ;
+
+// -----------------------------------------------------------------------------
+// Character classes
+// -----------------------------------------------------------------------------
+
+upperLetter      = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I"
+                 | "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R"
+                 | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" ;
+
+lowerLetter      = "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i"
+                 | "j" | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r"
+                 | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" ;
+
+letter           = upperLetter | lowerLetter ;
+
+digit            = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+
+character        = letter | digit | " " | "!" | "@" | "#" | "$" | "%" | "^"
+                 | "&" | "*" | "(" | ")" | "-" | "_" | "=" | "+" | "["
+                 | "]" | "{" | "}" | "|" | "\\" | ":" | ";" | "'" | ","
+                 | "." | "<" | ">" | "/" | "?" | "~" | "`" ;
+
+newline          = "\n" ;
+
+// =============================================================================
+// Semantic rules — TRUE of the metamodel, NOT expressible in a context-free
+// grammar. These belong to a validator, not here.
+//
+//  1. Struct DAG: a struct's `schema` block shall only reference PREVIOUSLY
+//     defined structs. No forward references, no direct or transitive
+//     self-reference (metamodel: Struct). Every value is therefore finite.
+//  2. Operation DAG: the `depends on` graph shall be acyclic — no recursion, no
+//     mutual recursion (metamodel: Dependency graph).
+//  3. Derived module dependency graph shall be acyclic; it follows from rules 1
+//     and 2 plus the module of each referenced element (metamodel: Module).
+//  4. Closed world: an operation shall declare EVERY operation it directly
+//     depends on and EVERY global it directly reads or writes. Undeclared access
+//     is a model defect, not a syntax error.
+//  5. An operation with no return type shall declare at least one `writes` — an
+//     operation with neither a return nor a write does nothing observable
+//     (metamodel: Operation).
+//  6. A global binding's initial value shall conform to its declared type. The
+//     grammar accepts any JSON literal in that position; conformance is checked.
+//  7. A field whose type is not nullable shall not hold `null`, and a map value
+//     always carries ALL declared fields — absence is expressed with `?` only
+//     (metamodel: Type).
+//  8. Names shall be unique within their module, per kind (struct, global,
+//     operation).
+//  9. An unqualified name resolves within the enclosing module; a qualified name
+//     shall resolve to a declared element of the named module, or — for
+//     `implements`, `represents` and `corresponds to` — to an element of the
+//     domain model.
+// 10. Implicit domain links: when no `implements` / `represents` /
+//     `corresponds to` is declared, a link is presumed where names match,
+//     case-style ignored (metamodel: Convention). An explicit declaration always
+//     wins over the presumption.
+// 11. Error correspondence: an error signature of an operation that implements a
+//     domain operation should surface as that domain operation's matching Error
+//     Event. A missing counterpart is a traceability gap, detectable by audit.
+// 12. State scope: every `_.field` path in a state predicate shall resolve to a
+//     field declared in the enclosing struct's `schema` block; a predicate refers
+//     to nothing outside the instance (metamodel: State).
+// =============================================================================
