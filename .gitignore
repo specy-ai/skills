@@ -15,3 +15,7 @@ package-lock.json
 src/langium/specy-domain/out/
 # Skill-creator eval/optimization scratch output
 src/skills/*/workspace/
+
+# Client domain models used by the ui/ navigator prototype — kept local,
+# the repo ships the anonymized equivalents in examples/business-loan/.
+ui/fipro.*

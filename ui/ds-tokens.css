@@ -1,0 +1,180 @@
+/* =============================================================
+   Defsquare / Specy.ai — Color & Type tokens
+   Adapted from the design-system project's colors_and_type.css
+   (claude.ai/design 019e2b0b). Single change: webfonts load from
+   Google Fonts instead of the project's self-hosted TTFs, since
+   this prototype lives outside the design-system repo.
+   Do not hardcode hex values in app CSS — use these variables.
+   ============================================================= */
+
+@import url("https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Fira+Code:wght@400;500;600;700&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Sans+Condensed:wght@400;500;600;700&display=swap");
+
+:root {
+  /* PRIMARY · Bleu */
+  --ds-blue-900: #070f19;
+  --ds-blue-800: #122843;
+  --ds-blue-700: #172741;       /* OFFICIAL primary blue */
+  --ds-blue-600: #1e416e;
+  --ds-blue-500: #2a5a98;
+  --ds-blue-400: #3573c3;
+  --ds-blue-300: #418ced;
+  --ds-blue-200: #9fb1d6;       /* OFFICIAL neutral light-blue */
+  --ds-blue-100: #9eb6e2;
+  --ds-blue-050: #d6dff0;
+
+  /* ACCENT · Rouge */
+  --ds-red-900: #15070a;
+  --ds-red-800: #210d0d;
+  --ds-red-700: #4c1d1d;
+  --ds-red-600: #762d2d;
+  --ds-red-500: #a13e3e;
+  --ds-red-450: #cb4e4e;
+  --ds-red-400: #f65e5e;       /* OFFICIAL accent red */
+  --ds-red-350: #bf3d5e;
+  --ds-red-300: #e94b73;
+  --ds-red-200: #3f141f;
+  --ds-red-150: #6a2234;
+  --ds-red-100: #942f49;
+
+  /* SECONDARY · Beige */
+  --ds-beige-900: #0d0c09;
+  --ds-beige-800: #383227;
+  --ds-beige-700: #625845;
+  --ds-beige-500: #8d7e63;
+  --ds-beige-400: #b7a480;
+  --ds-beige-300: #e2ca9e;     /* OFFICIAL secondary beige */
+  --ds-beige-200: #ede2cf;     /* OFFICIAL cream tint */
+  --ds-beige-100: #f6efe2;
+
+  --ds-mint-500: #3dbf9e;
+
+  /* Backwards-compat aliases */
+  --ds-navy-900: var(--ds-blue-700);
+  --ds-navy-800: var(--ds-blue-600);
+  --ds-navy-700: #2c4252;
+  --ds-navy-600: #3b5468;
+  --ds-coral-500: var(--ds-red-400);
+  --ds-coral-600: #ef4444;
+  --ds-coral-700: #d94745;
+
+  --ds-white: #ffffff;
+  --ds-off-white: #eeeeee;
+  --ds-stone-200: #d9d9d9;
+  --ds-stone-300: #c4c4c4;
+  --ds-ink-900: #1e1e1e;
+
+  --ds-surface-light: #ffffff;
+  --ds-surface-cream: var(--ds-beige-200);
+  --ds-surface-alt: #f6f7f8;
+  --ds-surface-dark: var(--ds-blue-700);
+  --ds-surface-dark-elev: #1f3a55;
+
+  /* SEMANTIC */
+  --fg-default: var(--ds-blue-700);
+  --fg-muted: #4b5d6c;
+  --fg-subtle: #7a8a98;
+  --fg-on-dark: var(--ds-off-white);
+  --fg-on-dark-muted: var(--ds-blue-200);
+  --fg-accent: var(--ds-red-400);
+  --fg-secondary: var(--ds-beige-700);
+
+  --bg-default: var(--ds-surface-light);
+  --bg-cream: var(--ds-surface-cream);
+  --bg-alt: var(--ds-surface-alt);
+  --bg-dark: var(--ds-blue-700);
+  --bg-dark-elev: var(--ds-surface-dark-elev);
+  --bg-accent: var(--ds-red-400);
+  --bg-beige: var(--ds-beige-300);
+
+  --border-default: #e3e6e9;
+  --border-strong: #cdd2d7;
+  --border-on-dark: rgba(255,255,255,0.10);
+  --border-on-cream: rgba(23,39,65,0.12);
+  --border-accent: var(--ds-red-400);
+
+  --color-success: #2ea66f;
+  --color-warning: #e8a23a;
+  --color-danger: var(--ds-red-450);
+  --color-info: var(--ds-blue-400);
+
+  --gradient-brand-dark: linear-gradient(135deg, #172741 0%, #1e416e 100%);
+  --gradient-brand-accent: linear-gradient(135deg, #f65e5e 0%, #bf3d5e 100%);
+  --gradient-brand-warm: linear-gradient(135deg, #ede2cf 0%, #e2ca9e 100%);
+
+  /* TYPE STACKS */
+  --font-sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI",
+               Roboto, Helvetica, Arial, sans-serif;
+  --font-display: "EB Garamond", "Iowan Old Style", "Palatino Linotype",
+                  "Georgia", serif;
+  --font-display-condensed: "IBM Plex Sans Condensed", "IBM Plex Sans",
+                            "Helvetica Neue", sans-serif;
+  --font-wordmark: "Orbitron", "IBM Plex Sans", sans-serif;
+  --font-mono: "Fira Code", "SF Mono", Menlo, Consolas, monospace;
+
+  --fs-xs: 12px;
+  --fs-sm: 14px;
+  --fs-md: 16px;
+  --fs-lg: 18px;
+  --fs-xl: 22px;
+  --fs-2xl: 28px;
+  --fs-3xl: 36px;
+  --fs-4xl: 48px;
+  --fs-5xl: 64px;
+  --fs-6xl: 80px;
+
+  --lh-tight: 1.05;
+  --lh-snug: 1.2;
+  --lh-normal: 1.45;
+  --lh-relaxed: 1.6;
+
+  --tracking-tight: -0.02em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.04em;
+  --tracking-wider: 0.12em;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semi: 600;
+  --weight-bold: 700;
+  --weight-black: 900;
+
+  /* SPACING — 4px base */
+  --sp-0: 0;
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+  --sp-8: 64px;
+  --sp-9: 96px;
+  --sp-10: 128px;
+
+  /* RADIUS — the brand is angular; radii stay small */
+  --r-0: 0;
+  --r-1: 2px;
+  --r-2: 4px;
+  --r-3: 8px;
+  --r-4: 12px;
+  --r-pill: 999px;
+
+  /* SHADOWS */
+  --shadow-xs: 0 1px 2px rgba(26,42,54,0.06);
+  --shadow-sm: 0 2px 6px rgba(26,42,54,0.08);
+  --shadow-md: 0 6px 16px rgba(26,42,54,0.10);
+  --shadow-lg: 0 16px 40px rgba(26,42,54,0.14);
+  --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.04);
+
+  /* LAYOUT */
+  --content-max: 1200px;
+  --content-narrow: 760px;
+  --bezel: 24px;
+
+  /* Motion — fast, no bounce */
+  --ease-standard: cubic-bezier(0.2, 0.6, 0.2, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 120ms;
+  --dur-normal: 200ms;
+  --dur-slow: 320ms;
+}

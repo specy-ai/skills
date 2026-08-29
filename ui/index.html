@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Specy — Domain Navigator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="ds-tokens.css" />
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <span class="logo"><img src="assets/specy-ai-logo-white-orbitron.svg" alt="specy.ai" /></span>
+      <nav class="tabs">
+        <button class="tab active" data-view="domain">Domain Navigator</button>
+        <button class="tab" data-view="req">Requirements Navigator</button>
+      </nav>
+      <span class="spacer"></span>
+      <div class="org-picker">
+        <span class="org-label" id="org-label">Organization</span>
+        <select id="org-select" aria-labelledby="org-label"></select>
+      </div>
+    </header>
+
+    <aside class="tree-panel">
+      <div class="tree-head">
+        <label class="field-label" for="context-select" id="panel-label">Bounded context</label>
+        <select id="context-select" class="context-select"></select>
+        <input id="tree-filter" class="tree-filter" type="search"
+               placeholder="Filter elements by name or kind…" autocomplete="off" />
+      </div>
+      <nav class="tree-scroll"><div id="tree" class="tree"></div></nav>
+    </aside>
+
+    <main id="main" class="main"><div id="detail"></div></main>
+  </div>
+
+  <script src="data.js"></script>
+  <script src="domain-parser.js"></script>
+  <script src="sysreq-parser.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
