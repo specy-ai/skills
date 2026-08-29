@@ -62,7 +62,7 @@
     - [How traceability works](#how-traceability-works)
     - [Traceability by concept type](#traceability-by-concept-type)
     - [Bidirectional traceability](#bidirectional-traceability)
-  - [Software System's Interface](#software-systems-interface)
+  - [Software System's Message Surface](#software-systems-message-surface)
     - [Inbound communication (System is Driven)](#inbound-communication-system-is-driven)
     - [Outbound Communication (System is Driving)](#outbound-communication-system-is-driving)
 
@@ -273,6 +273,7 @@ An operation may declare preconditions and postconditions.
 
 Relations:
 - 1..1 "owned by" relation with entity, aggregate, domain service, application service, infrastructure service, repository or value type (mutually exclusive, an operation has exactly one owner)
+- 0..1 "handles" relation with a command (the operation side owns this edge — in the DSL: `"Label" on CommandType`; the command's `triggers` and `targets` relations are derived from it)
 - 0..n "exposed by" relation with interfaces
 - 0..n "emits" relation with events
 - 0..n "has" relation with preconditions
@@ -294,11 +295,14 @@ An inbound message expressing an intention to change domain state. A command tri
 
 A command succeeds or fails. Success implies at least one state change occurred. Failure produces an error event.
 
+The command's target is **derived, not declared**: it is the owner of the operation that handles the command. In the DSL the link is declared by the inverse edge — the owning artefact's operation names the command it handles (`"Place order" on PlaceOrder`) — so the target and the triggered operation can never disagree. This is also what lets a command reach behavior that spans entities: an intention that targets no single entity — `TransferMoney` between two accounts — is handled by a domain service operation, and the command's target is that domain service.
+
 **Naming**: Commands use a verb in present tense or infinitive followed by a domain noun (the target entity or aggregate type). Example: `PlaceOrder`, `CancelBooking`.
 
 Relations:
-- 1..1 "targets" relation with entity, aggregate or domain service (the domain object whose state will change)
-- 1..1 "triggers" relation with the operation that handles this command
+- 1..1 "belongs to" relation with a module (the module of the operation that handles it)
+- 1..1 "triggers" relation with the operation that handles this command (declared on the operation side — see Operation's "handles" relation)
+- 1..1 "targets" relation with entity, aggregate or domain service — derived: the target is the triggered operation's owner
 - 1..n "produces" relation with events (success events or error events)
 
 ### Reaction
@@ -424,16 +428,20 @@ A query carries either an identifier (to retrieve one entity) or match fields (t
 **Naming**: `get` + noun (identifier-based) or `find` + noun (criteria-based). Example: `getOrder`, `findOverdueInvoices`.
 
 Relations:
+- 1..1 "belongs to" relation with a module (the module of the repository it reads from)
 - 1..1 "reads from" relation with repository (the read surface of the targeted entity or aggregate)
 
 
 ## Event
 
-A recorded fact about something that happened in the domain. An event is raised when an entity reaches a new state after a transition. Events are append-only: they cannot be retracted, only superseded by a subsequent event. An event may reference the command or query identifier that caused it. An event related to an entity must always include a field that reference the entity identifier.
+A recorded fact about something that happened in the domain. Events are append-only: they cannot be retracted, only superseded by a subsequent event. An event may reference the command or query identifier that caused it. An event related to an entity must always include a field that references the entity identifier.
+
+What raises an event depends on its subtype — the base concept deliberately carries no `raised by` relation. An internal or error event is raised by an operation within this context; an external event originates in an upstream bounded context; a temporal event fires when a time condition anchored to a domain reference is met. Each subtype declares its own origin relation below.
 
 **Naming**: Events use a past participle. Example: `OrderPlaced`, `PaymentReceived`.
 
 Relations:
+- 1..1 "belongs to" relation with a module (inherited by all four subtypes: for an internal or error event, the module of the operation that raises it; for an external event, the module that declares and reacts to it; for a temporal event, the module of its temporal anchor)
 - 0..1 "caused by" relation with command or query (the correlation/causation link to the originating message)
 
 ### Internal Event
@@ -742,7 +750,7 @@ When the requirements come from a file, the domain model declares a `requirement
 
 ### Traceability by concept type
 
-The table below maps each domain model concept to the typical satisfaction roles it plays (as defined in SYSTEM-REQ-METAMODEL.md). This guides the modeler — and any agent building a domain model — toward the right traceability links:
+The table below maps each domain model concept to the typical satisfaction roles it plays. The role taxonomy (`structured-by`, `enforced-by`, `implemented-by`, `detected-by`, `reconciled-by`, `quality-constrained-by`, `satisfied-by-infrastructure`) is defined in SYSTEM-REQ-METAMODEL.md under "Satisfaction roles". A role is **descriptive, never written in the model**: the `satisfies` list holds requirement identifiers only, and the role is derived from the kind of element that carries the reference. This table guides the modeler — and any agent building a domain model — toward the right traceability links:
 
 | Domain concept | Typical satisfaction role | Example |
 |---|---|---|
@@ -765,7 +773,7 @@ A domain element with an empty `satisfies` list when requirements are available 
 
 A requirement whose identifier appears in no domain element's `satisfies` list is **unsatisfied** — a gap in the domain model.
 
-## Software System's Interface
+## Software System's Message Surface
 
 A software system communicates with collaborators (other bounded contexts, frontends, end users) through typed messages:
 
@@ -774,6 +782,15 @@ A software system communicates with collaborators (other bounded contexts, front
 | Event   | Past     | Represents a fact. Append-only. |
 | Query   | Now      | Represents current state. |
 | Command | Future   | Represents an intention. Can succeed or fail. |
+
+The message surface is not the [Interface](#interface) construct. An interface is a **port** — a contract of operation signatures at a module boundary, inside the model. The message surface is the message-typed view of the whole system seen from outside — what crosses the system boundary. The two are connected by derivation, not by a separate declaration:
+
+- An inbound **command** is on the surface when the operation that handles it is exposed through an API interface — the command is reachable precisely because its handling operation is published.
+- An inbound **query** is on the surface through its module: a module's declared queries are the read side it offers consumers, reading through its repositories' read surfaces.
+- An inbound **external event** is on the surface by declaration: the consuming module declares it and reacts to it.
+- An outbound **event** is on the surface when an exposed operation emits it.
+
+A command whose handling operation is exposed by no API interface is internal to its module — issuable by reactions, but not by outside collaborators.
 
 ### Inbound communication (System is Driven)
 

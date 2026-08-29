@@ -36,6 +36,8 @@ EXAMPLES=(
   "examples/ride-now/ride-management.domain"
   "examples/ride-now/geolocation-routing.domain"
   "examples/ride-now/payment.domain"
+  "examples/url-shortener/url-shortener.prd"
+  "examples/url-shortener/url-shortener.sysreq"
   "examples/url-shortener/url-shortener.domain"
   "examples/ecommerce/v2/orders.domain"
   "examples/url-shortener/url-shortener.arch"

@@ -1,5 +1,31 @@
 [
   {
+    "type": "acceptance_criterion",
+    "named": true,
+    "fields": {
+      "id": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "acceptance_criterion_id",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "addresses_clause",
     "named": true,
     "fields": {},
@@ -308,6 +334,16 @@
     "type": "feature_def",
     "named": true,
     "fields": {
+      "id": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "feature_id",
+            "named": true
+          }
+        ]
+      },
       "name": {
         "multiple": false,
         "required": true,
@@ -1013,11 +1049,26 @@
   {
     "type": "story_def",
     "named": true,
-    "fields": {},
+    "fields": {
+      "id": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "story_id",
+            "named": true
+          }
+        ]
+      }
+    },
     "children": {
       "multiple": true,
       "required": true,
       "types": [
+        {
+          "type": "acceptance_criterion",
+          "named": true
+        },
         {
           "type": "string_literal",
           "named": true
@@ -1101,6 +1152,10 @@
   {
     "type": "acceptance-criteria",
     "named": false
+  },
+  {
+    "type": "acceptance_criterion_id",
+    "named": true
   },
   {
     "type": "accepted",
@@ -1290,6 +1345,10 @@
   {
     "type": "feature",
     "named": false
+  },
+  {
+    "type": "feature_id",
+    "named": true
   },
   {
     "type": "for",
@@ -1618,6 +1677,10 @@
   {
     "type": "stories",
     "named": false
+  },
+  {
+    "type": "story_id",
+    "named": true
   },
   {
     "type": "string_literal",

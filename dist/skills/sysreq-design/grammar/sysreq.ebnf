@@ -104,14 +104,21 @@ moscowPriority   = "must" | "should" | "could" | "wont" ;
 // -----------------------------------------------------------------------------
 // Source — provenance reference to a PRD element
 //
-// Free-text reference following the convention:
-//   source "Feature: <name>"
-//   source "Feature: <name> — Story: <summary>"
-//   source "Feature: <name> — AC: <criterion>"
+// When the PRD element carries a stable id (features, stories, acceptance
+// criteria), reference the ID — it survives renames; only the leading id is
+// load-bearing, an appended name is readability only:
+//   source "FEAT-001"
+//   source "US-004"
+//   source "AC-004-02"
+//   source "AC-004-02 — No fee before assignment"
+// Elements without ids keep the name convention (rename-fragile — keep the
+// names stable):
 //   source "Job: <name>"
 //   source "Job: <name> — Outcome: <statement>"
 //   source "Constraint: <name>"
 //   source "Goal: <name>"
+// Legacy name-based feature/story/AC references remain parseable:
+//   source "Feature: <name> — Story: <summary> — AC: <criterion>"
 // -----------------------------------------------------------------------------
 
 sourceDecl       = "source" , stringLiteral ;

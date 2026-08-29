@@ -179,9 +179,14 @@ hypothesisStatus = "proposed" | "testing" | "validated" | "invalidated" | "incon
 
 // -----------------------------------------------------------------------------
 // Feature — named capability the product offers
+//
+// The optional leading id (FEAT-001) is the feature's STABLE identifier: it
+// never changes even when the feature is renamed, and it is what a system
+// requirement's `source` field references. Optional in the grammar, mandatory
+// in practice for new PRDs (see PRODUCT-REQ-METAMODEL.md, Convention).
 // -----------------------------------------------------------------------------
 
-featureDef       = "feature" , stringLiteral , "{" ,
+featureDef       = "feature" , [ featureId ] , stringLiteral , "{" ,
                  "summary" , stringLiteral ,
                  "persona" , stringLiteral ,
                  "value-proposition" , stringLiteral ,
@@ -212,15 +217,36 @@ designReference  = stringLiteral , "->" , stringLiteral ;
 
 // -----------------------------------------------------------------------------
 // User Stories — embedded within a feature
+//
+// A story's optional leading id (US-004) and each criterion's optional leading
+// id (AC-004-02 — story number, then sequence within the story) follow the same
+// stability rule as feature ids: never renumbered, never reused. The criterion
+// id is the preferred `source` reference for the EARS requirement that
+// formalizes it.
 // -----------------------------------------------------------------------------
 
 storiesBlock     = "stories" , "{" , storyDef , { storyDef } , "}" ;
 
-storyDef         = stringLiteral , "{" ,
+storyDef         = [ storyId ] , stringLiteral , "{" ,
                  "acceptance-criteria" , "{" ,
-                 stringLiteral , { stringLiteral } ,
+                 acceptanceCriterion , { acceptanceCriterion } ,
                  "}" ,
                  "}" ;
+
+acceptanceCriterion = [ acceptanceCriterionId ] , stringLiteral ;
+
+// -----------------------------------------------------------------------------
+// PRD element identifiers — stable ids for the traceability bridge
+// Format mirrors requirement ids (REQ-ORD-001) on the sysreq side.
+// -----------------------------------------------------------------------------
+
+featureId        = "FEAT" , "-" , idNumber ;
+
+storyId          = "US" , "-" , idNumber ;
+
+acceptanceCriterionId = "AC" , "-" , idNumber , "-" , digit , digit ;
+
+idNumber         = digit , digit , digit ;
 
 // -----------------------------------------------------------------------------
 // User Journey

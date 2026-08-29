@@ -16,6 +16,7 @@
   - [Requirement](#requirement)
   - [Requirement Set](#requirement-set)
   - [Traceability](#traceability)
+    - [Satisfaction roles](#satisfaction-roles)
   - [Integration with verification loops](#integration-with-verification-loops)
   - [Non-functional requirements](#non-functional-requirements)
     - [NFR categories and their domain anchors](#nfr-categories-and-their-domain-anchors)
@@ -176,8 +177,8 @@ A requirement has:
   - `wont` — explicitly excluded from the current scope (documented to prevent scope creep).
 
 Relations:
-- 1..1 "scoped to" relation with bounded context or organization (functional requirements scope to a BC; cross-cutting NFRs scope to the organization)
-- 0..1 "sourced from" relation with external reference (PRD section, user story, business goal, regulatory clause — the product decision or business context that originated this requirement. This is a provenance marker: it answers *who asked for this and why*, enabling impact analysis from product strategy change to affected requirements.)
+- 1..1 "scoped to" relation with bounded context or organization (functional requirements scope to a BC; cross-cutting NFRs scope to the organization. When the requirement belongs to a set, this relation is inherited from the set's scope and is not declared on the requirement itself)
+- 0..1 "sourced from" relation with external reference (PRD element, business goal, regulatory clause — the product decision or business context that originated this requirement. When the PRD element carries a stable identifier — `FEAT-NNN`, `US-NNN`, `AC-NNN-NN`, see PRODUCT-REQ-METAMODEL.md — the reference is that ID, an exact rename-safe match; elements without IDs are referenced by name. This is a provenance marker: it answers *who asked for this and why*, enabling impact analysis from product strategy change to affected requirements.)
 - 0..n "depends on" relation with other requirements (logical prerequisite: requirement B cannot be satisfied unless requirement A is satisfied first)
 - 0..n "conflicts with" relation with other requirements (explicit tension: both requirements cannot be fully satisfied simultaneously — the model must document the resolution strategy)
 - 0..n "decomposed into" relation with other requirements (an organization-level requirement creates derived obligations on context-level requirements that collectively satisfy it)
@@ -193,8 +194,10 @@ A requirement set has:
 
 Relations:
 - 1..n "contains" relation with requirements
-- 0..1 "maps to" relation with a module (the module whose interface realizes this set)
-- 1..1 "scoped to" relation with a bounded context
+- 0..1 "maps to" relation with a module (the module whose interface realizes this set; organization-scoped sets have no module mapping)
+- 1..1 "scoped to" relation with a bounded context or the organization (mirroring Requirement's scoping: a functional set scopes to a bounded context; a set of cross-cutting NFRs scopes to the organization)
+
+**Scope coherence**: a requirement contained in a set inherits the set's scope — in the DSL, `scoped-to` is written once on the set, never on individual requirements. A requirement declares its own scope directly only when it belongs to no set. Consequently an organization-scoped requirement lives in an organization-scoped set (or in none), and mixing organization-scoped and context-scoped requirements in one set is impossible by construction.
 
 
 ## Traceability
@@ -209,6 +212,24 @@ These analyses are defined and executed from the domain model side (see DOMAIN-M
 Additionally, at the requirement level:
 
 - **Conflict detection** — Requirements linked by `conflicts-with` that cannot both be fully satisfied create an unresolved tension. The resolution strategy must be documented (typically through priority, a mediating reaction, or an agreement).
+
+### Satisfaction roles
+
+A `satisfies` reference states *that* a domain element satisfies a requirement. The **satisfaction role** classifies *how* it does so. There are seven roles:
+
+| Role | How the requirement is satisfied | Typical satisfying elements |
+|---|---|---|
+| `structured-by` | By the **shape** of the model — the obligation is met because the structure makes it so | Entity, Aggregate, Value Type, field |
+| `enforced-by` | By a **rule the model actively upholds** — violations are rejected, compensated, or alerted | Invariant, Precondition, compensating Reaction |
+| `implemented-by` | By **behavior** — the element performs the obliged system response | Operation, Command, Event, Domain Service |
+| `detected-by` | By making an **unwanted condition observable** — the failure path of an `unwanted` (If-Then) requirement | Error Event, detecting Reaction |
+| `reconciled-by` | By **coordinated eventual consistency** — the obligation spans aggregates and is maintained, not enforced | Agreement, Reconciliation, Escalation Chain |
+| `quality-constrained-by` | By a domain element whose **declared quality attributes** meet an NFR's bar | Infrastructure Service, Operation (latency, throughput) |
+| `satisfied-by-infrastructure` | **Below the domain layer** — deployment, networking, or operational tooling meets the obligation; no domain element carries a `satisfies` reference (see the honest-boundary rule under cross-cutting NFRs) | — |
+
+**The role is derived, not recorded.** The `satisfies` attribute remains a flat list of requirement identifiers — there is no role slot on it, by design. The role follows mechanically from the kind of domain element that carries the reference: an entity satisfying a requirement is satisfying it structurally, an invariant is enforcing it, an error event is detecting it. Recording the role alongside the identifier would duplicate information the model already states and let the two drift apart. Tools performing coverage analysis may compute and report the role; modelers never write it.
+
+The roles also connect to the EARS patterns: `ubiquitous` requirements are typically `structured-by` or `enforced-by`; `event-driven` requirements are `implemented-by`; `unwanted` requirements are `detected-by` (and often additionally `enforced-by` through the compensating path); NFRs are `quality-constrained-by` or `satisfied-by-infrastructure`. The mapping from domain concept types to roles is tabulated on the domain side (DOMAIN-METAMODEL.md, "Traceability by concept type").
 
 
 ## Integration with verification loops
@@ -297,7 +318,7 @@ These cross-cutting NFRs are handled as follows:
 
 #### Scoping
 
-A requirement's `scoped-to` relation is extended to accept either a bounded context **or** the organization. Cross-cutting NFRs scope to the organization.
+The `scoped-to` relation — on a requirement and on the requirement set that contains it — accepts either a bounded context **or** the organization. Cross-cutting NFRs are grouped into a requirement set scoped to the organization, and each requirement in the set inherits that scope.
 
 ```
 requirements "Platform Reliability" scoped-to RideNowOrganization {
@@ -315,8 +336,8 @@ requirements "Platform Reliability" scoped-to RideNowOrganization {
 A cross-cutting NFR at the organization level creates **derived obligations** on each bounded context it affects. The derivation is explicit: the organization-level requirement depends-on (or is-parent-of) context-level requirements that collectively satisfy it.
 
 ```
+  // inside the organization-scoped set "Platform Reliability"
   REQ-NFR-001 "Platform availability" : ubiquitous
-    scoped-to RideNowOrganization
     priority must
     decomposed-into {
       REQ-RIDE-NFR-001   // Ride Management context availability

@@ -368,7 +368,7 @@ product "Sniplink" {
     predicts "Team plan adoption"
   }
 
-  feature "Link shortening" {
+  feature FEAT-001 "Link shortening" {
     summary "Publisher pastes a long URL and instantly gets a short, shareable link with
              an optional custom slug"
     persona "Publisher"
@@ -382,27 +382,27 @@ product "Sniplink" {
       "QR code generation — deferred to a later release"
     }
     stories {
-      "As a publisher, I want to paste a URL and get a short link in one click,
+      US-001 "As a publisher, I want to paste a URL and get a short link in one click,
        so that I can share it immediately without interrupting my workflow." {
         acceptance-criteria {
-          "Short link is generated within 1 second of pasting the URL"
-          "Short link is copied to clipboard automatically"
-          "Publisher can optionally customize the slug before confirming"
-          "If the custom slug is taken, an alternative is suggested"
+          AC-001-01 "Short link is generated within 1 second of pasting the URL"
+          AC-001-02 "Short link is copied to clipboard automatically"
+          AC-001-03 "Publisher can optionally customize the slug before confirming"
+          AC-001-04 "If the custom slug is taken, an alternative is suggested"
         }
       }
-      "As a publisher, I want to choose a memorable custom slug for my short link,
+      US-002 "As a publisher, I want to choose a memorable custom slug for my short link,
        so that the URL is easy to remember and share verbally." {
         acceptance-criteria {
-          "Custom slugs support alphanumeric characters and hyphens"
-          "Slug availability is checked in real time as the publisher types"
-          "Slug length is limited to 30 characters"
+          AC-002-01 "Custom slugs support alphanumeric characters and hyphens"
+          AC-002-02 "Slug availability is checked in real time as the publisher types"
+          AC-002-03 "Slug length is limited to 30 characters"
         }
       }
     }
   }
 
-  feature "Auto-channel analytics" {
+  feature FEAT-002 "Auto-channel analytics" {
     summary "Every click on a shortened link is automatically attributed to a channel
              (Twitter, LinkedIn, Slack, email, direct, etc.) without requiring UTM tags"
     persona "Publisher"
@@ -418,26 +418,26 @@ product "Sniplink" {
       "Individual click-level user identification — analytics are aggregate, not PII-linked"
     }
     stories {
-      "As a publisher, I want to see a per-channel breakdown of clicks on each link,
+      US-003 "As a publisher, I want to see a per-channel breakdown of clicks on each link,
        so that I can identify which channels drive the most engagement." {
         acceptance-criteria {
-          "Analytics dashboard shows click count per detected channel"
-          "Channels include at minimum: Twitter/X, LinkedIn, Facebook, Slack, Email, Reddit, Direct/Unknown"
-          "Click data updates in near-real-time (within 30 seconds)"
-          "Publisher can filter analytics by date range"
+          AC-003-01 "Analytics dashboard shows click count per detected channel"
+          AC-003-02 "Channels include at minimum: Twitter/X, LinkedIn, Facebook, Slack, Email, Reddit, Direct/Unknown"
+          AC-003-03 "Click data updates in near-real-time (within 30 seconds)"
+          AC-003-04 "Publisher can filter analytics by date range"
         }
       }
-      "As a publisher, I want to see a real-time click counter on my dashboard,
+      US-004 "As a publisher, I want to see a real-time click counter on my dashboard,
        so that I can monitor link performance as I share it." {
         acceptance-criteria {
-          "Total click count updates within 5 seconds of a new click"
-          "Click count is visible on the link list view without opening details"
+          AC-004-01 "Total click count updates within 5 seconds of a new click"
+          AC-004-02 "Click count is visible on the link list view without opening details"
         }
       }
     }
   }
 
-  feature "Bookmark collection" {
+  feature FEAT-003 "Bookmark collection" {
     summary "Every shortened link is automatically saved to a searchable, taggable personal
              collection — turning the shortener into a bookmark manager"
     persona "Publisher"
@@ -453,27 +453,27 @@ product "Sniplink" {
       "Full-text content indexing of destination pages — search is over titles, URLs, and tags"
     }
     stories {
-      "As a publisher, I want every link I shorten to automatically appear in my collection,
+      US-005 "As a publisher, I want every link I shorten to automatically appear in my collection,
        so that I build a bookmark library without extra effort." {
         acceptance-criteria {
-          "Destination page title and meta description are fetched and stored automatically"
-          "A preview thumbnail is generated from the destination's Open Graph image"
-          "Link appears in the collection immediately after shortening"
+          AC-005-01 "Destination page title and meta description are fetched and stored automatically"
+          AC-005-02 "A preview thumbnail is generated from the destination's Open Graph image"
+          AC-005-03 "Link appears in the collection immediately after shortening"
         }
       }
-      "As a publisher, I want to search my collection by keyword or tag,
+      US-006 "As a publisher, I want to search my collection by keyword or tag,
        so that I can find a link I saved weeks ago in seconds." {
         acceptance-criteria {
-          "Full-text search covers link title, URL, tags, and description"
-          "Search results appear within 500ms"
-          "Publisher can add, remove, and filter by tags"
-          "Links can be organized into folders or collections"
+          AC-006-01 "Full-text search covers link title, URL, tags, and description"
+          AC-006-02 "Search results appear within 500ms"
+          AC-006-03 "Publisher can add, remove, and filter by tags"
+          AC-006-04 "Links can be organized into folders or collections"
         }
       }
     }
   }
 
-  feature "Link safety scanning" {
+  feature FEAT-004 "Link safety scanning" {
     summary "Every destination URL is scanned against phishing and malware databases at
              creation time and periodically thereafter, with a verified-safe badge shown
              to consumers"
@@ -490,27 +490,27 @@ product "Sniplink" {
       "Guaranteed 100% detection — we target 99%+ and provide a report mechanism for missed threats"
     }
     stories {
-      "As a consumer, I want to see that a link has been verified safe before I arrive
+      US-007 "As a consumer, I want to see that a link has been verified safe before I arrive
        at the destination, so that I feel confident clicking shortened links." {
         acceptance-criteria {
-          "A brief interstitial (< 500ms) shows the destination domain and a safety badge"
-          "If the destination is flagged as unsafe, the consumer sees a warning page instead of a redirect"
-          "The consumer can choose to proceed to a flagged link at their own risk"
-          "The interstitial does not appear for returning visitors who have opted out"
+          AC-007-01 "A brief interstitial (< 500ms) shows the destination domain and a safety badge"
+          AC-007-02 "If the destination is flagged as unsafe, the consumer sees a warning page instead of a redirect"
+          AC-007-03 "The consumer can choose to proceed to a flagged link at their own risk"
+          AC-007-04 "The interstitial does not appear for returning visitors who have opted out"
         }
       }
-      "As a publisher, I want to be notified if a link I shortened is later flagged as unsafe,
+      US-008 "As a publisher, I want to be notified if a link I shortened is later flagged as unsafe,
        so that I can remove it from circulation." {
         acceptance-criteria {
-          "Publisher receives an email notification within 1 hour of a link being flagged"
-          "Flagged links are visually marked in the publisher's dashboard"
-          "Publisher can delete or deactivate flagged links with one click"
+          AC-008-01 "Publisher receives an email notification within 1 hour of a link being flagged"
+          AC-008-02 "Flagged links are visually marked in the publisher's dashboard"
+          AC-008-03 "Publisher can delete or deactivate flagged links with one click"
         }
       }
     }
   }
 
-  feature "Custom domains" {
+  feature FEAT-005 "Custom domains" {
     summary "Publishers can connect their own domain (e.g., go.acme.com) to use for
              branded short links, with automatic SSL and zero technical friction"
     persona "Publisher"
@@ -525,19 +525,19 @@ product "Sniplink" {
       "Multiple custom domains per account on the free plan — one domain free, more on team plan"
     }
     stories {
-      "As a publisher, I want to connect my own domain for short links,
+      US-009 "As a publisher, I want to connect my own domain for short links,
        so that every link I share reinforces my brand." {
         acceptance-criteria {
-          "Setup requires only adding a single CNAME DNS record"
-          "Domain verification completes within 5 minutes of DNS propagation"
-          "SSL certificate is provisioned automatically — no manual certificate upload"
-          "Custom domain links appear in analytics alongside default domain links"
+          AC-009-01 "Setup requires only adding a single CNAME DNS record"
+          AC-009-02 "Domain verification completes within 5 minutes of DNS propagation"
+          AC-009-03 "SSL certificate is provisioned automatically — no manual certificate upload"
+          AC-009-04 "Custom domain links appear in analytics alongside default domain links"
         }
       }
     }
   }
 
-  feature "Team workspaces" {
+  feature FEAT-006 "Team workspaces" {
     summary "Teams can share link collections, view aggregated analytics, and manage
              members in a shared workspace with a 14-day free trial"
     persona "Team lead"
@@ -554,35 +554,35 @@ product "Sniplink" {
       "Cross-workspace link sharing — teams are isolated workspaces for now"
     }
     stories {
-      "As a team lead, I want to create a workspace and invite members by email,
+      US-010 "As a team lead, I want to create a workspace and invite members by email,
        so that my team can start collaborating on links immediately." {
         acceptance-criteria {
-          "Workspace creation takes fewer than 3 steps"
-          "Invitations are sent by email with a one-click join link"
-          "New members see existing shared collections upon joining"
-          "Team lead can remove members at any time"
+          AC-010-01 "Workspace creation takes fewer than 3 steps"
+          AC-010-02 "Invitations are sent by email with a one-click join link"
+          AC-010-03 "New members see existing shared collections upon joining"
+          AC-010-04 "Team lead can remove members at any time"
         }
       }
-      "As a team lead, I want to see aggregated click analytics across all team links,
+      US-011 "As a team lead, I want to see aggregated click analytics across all team links,
        so that I can measure the team's overall content performance." {
         acceptance-criteria {
-          "Team dashboard shows total clicks, top-performing links, and per-channel breakdown"
-          "Analytics can be filtered by team member, date range, and collection"
-          "Data is exportable as CSV"
+          AC-011-01 "Team dashboard shows total clicks, top-performing links, and per-channel breakdown"
+          AC-011-02 "Analytics can be filtered by team member, date range, and collection"
+          AC-011-03 "Data is exportable as CSV"
         }
       }
-      "As a publisher on a team, I want to save a link to a shared collection,
+      US-012 "As a publisher on a team, I want to save a link to a shared collection,
        so that my teammates can discover and use it." {
         acceptance-criteria {
-          "Publisher can choose between personal and shared collections when shortening a link"
-          "Shared links appear in the team workspace for all members"
-          "The original publisher is credited on shared links"
+          AC-012-01 "Publisher can choose between personal and shared collections when shortening a link"
+          AC-012-02 "Shared links appear in the team workspace for all members"
+          AC-012-03 "The original publisher is credited on shared links"
         }
       }
     }
   }
 
-  feature "API access" {
+  feature FEAT-007 "API access" {
     summary "A RESTful API that lets publishers shorten links, retrieve analytics, and
              manage collections programmatically"
     persona "Publisher"
@@ -597,27 +597,27 @@ product "Sniplink" {
       "Webhook callbacks — polling and REST for v1, webhooks deferred"
     }
     stories {
-      "As a publisher, I want to shorten a link via an API call,
+      US-013 "As a publisher, I want to shorten a link via an API call,
        so that I can integrate link shortening into my publishing workflow." {
         acceptance-criteria {
-          "POST endpoint accepts a URL and optional custom slug, returns the short link"
-          "Authentication via API key in header"
-          "Rate limited to 100 requests per minute on the free plan"
-          "API returns JSON with short URL, slug, and creation timestamp"
+          AC-013-01 "POST endpoint accepts a URL and optional custom slug, returns the short link"
+          AC-013-02 "Authentication via API key in header"
+          AC-013-03 "Rate limited to 100 requests per minute on the free plan"
+          AC-013-04 "API returns JSON with short URL, slug, and creation timestamp"
         }
       }
-      "As a publisher, I want to retrieve click analytics via the API,
+      US-014 "As a publisher, I want to retrieve click analytics via the API,
        so that I can build custom dashboards or feed data into other tools." {
         acceptance-criteria {
-          "GET endpoint returns total clicks, per-channel breakdown, and time series"
-          "Supports date range filtering"
-          "Response includes pagination for large result sets"
+          AC-014-01 "GET endpoint returns total clicks, per-channel breakdown, and time series"
+          AC-014-02 "Supports date range filtering"
+          AC-014-03 "Response includes pagination for large result sets"
         }
       }
     }
   }
 
-  feature "Browser extension" {
+  feature FEAT-008 "Browser extension" {
     summary "A browser extension that lets publishers shorten the current page URL with
              one click and save it to their collection"
     persona "Publisher"
@@ -631,13 +631,13 @@ product "Sniplink" {
       "Full bookmark manager replacement — the extension is a quick-save tool, not a browser-level bookmark sync"
     }
     stories {
-      "As a publisher, I want to click the extension icon and get a short link for the current page,
+      US-015 "As a publisher, I want to click the extension icon and get a short link for the current page,
        so that I can share or save it without leaving the page I am on." {
         acceptance-criteria {
-          "One-click shortening from the extension popup"
-          "Short link is copied to clipboard automatically"
-          "Link is saved to the publisher's default collection"
-          "Publisher can optionally add tags in the extension popup"
+          AC-015-01 "One-click shortening from the extension popup"
+          AC-015-02 "Short link is copied to clipboard automatically"
+          AC-015-03 "Link is saved to the publisher's default collection"
+          AC-015-04 "Publisher can optionally add tags in the extension popup"
         }
       }
     }

@@ -48,6 +48,14 @@ Every concept in this metamodel carries a name, a description, and a metadata ma
 
 This metamodel is upstream of SYSTEM-REQ-METAMODEL.md and independent of DOMAIN-METAMODEL.md. It speaks the language of product management — personas, goals, features, metrics — not the language of domain modeling.
 
+**Stable identifiers.** The three PRD elements that system requirements reference — features, user stories, and acceptance criteria — carry unique, stable identifiers, symmetric with requirement IDs (`REQ-ORD-001`) on the sysreq side:
+
+- **Feature**: `FEAT-NNN` (e.g. `FEAT-001`)
+- **User Story**: `US-NNN` (e.g. `US-004`)
+- **Acceptance Criterion**: `AC-NNN-NN`, where the first number is the containing story's number and the second is the criterion's sequence within it (e.g. `AC-004-02` is the second criterion of `US-004`)
+
+The stability rule is the same as for requirement IDs: **the identifier never changes, even when the element is renamed or its statement revised**. Renaming a feature is routine product work; because downstream `source` references point at the ID, a rename severs nothing. IDs are never reused after deletion. The identifiers are optional in the grammar (a PRD without them still parses) but mandatory in practice: every new PRD MUST assign them, because they are what the `source` field on system requirements references (see "Traceability to system requirements"). Internal PRD cross-references (a release's `includes`, a hypothesis's `proposes`, an assumption's `underpins`) may name an element by its ID instead of its name for the same rename-safety.
+
 
 ## Position in the traceability chain
 
@@ -268,6 +276,7 @@ Example: "If we show fare estimates upfront (intervention), then rider conversio
 A named capability the product offers to its users. A feature is the primary unit of product planning — it is scoped, prioritized, and delivered. A feature is not a system requirement — it describes *what the user gets*, not *what the system shall do*.
 
 A feature has:
+- **id**: a unique, stable identifier (`FEAT-NNN`) — see the identifier convention. This is what system requirements reference in their `source` field; the name is free to change, the id is not.
 - **summary**: a one-sentence description of what the feature does for the user.
 - **persona**: the primary persona this feature serves.
 - **value proposition**: why this feature matters — stated in terms of the persona's goals or frustrations it addresses.
@@ -284,7 +293,7 @@ Relations:
 - 0..1 "tested by" relation with a hypothesis (the causal claim this feature is built on)
 - 0..1 "planned in" relation with a release
 - 1..1 "belongs to" relation with a product
-- 0..n "sourced by" relation with system requirements (the EARS requirements in SYSTEM-REQ-METAMODEL.md whose `source` field references this feature — the traceability bridge)
+- 0..n "sourced by" relation with system requirements (the EARS requirements in SYSTEM-REQ-METAMODEL.md whose `source` field references this feature — the traceability bridge. **Derived, not declared**: it is computed by scanning requirements' `source` fields and is never materialized in the PRD artifact, which keeps the PRD upstream-independent)
 
 
 ## User Story
@@ -296,15 +305,16 @@ As a <persona>, I want <action>, so that <outcome>.
 ```
 
 A user story has:
+- **id**: a unique, stable identifier (`US-NNN`) — see the identifier convention.
 - **persona**: the persona whose perspective this story represents.
 - **action**: what the persona wants to do — stated as a verb from the persona's vocabulary.
 - **outcome**: the benefit the persona expects — stated as a result, not a system behavior.
-- **acceptance criteria**: a set of conditions that must be true for the story to be considered complete. Each criterion is a testable statement — these are the primary candidates for formalization into EARS requirements.
+- **acceptance criteria**: a set of conditions that must be true for the story to be considered complete. Each criterion is a testable statement carrying its own stable identifier (`AC-NNN-NN`, numbered within the story) — these are the primary candidates for formalization into EARS requirements, and the criterion ID is what the resulting requirement's `source` field references.
 
 Relations:
 - 1..1 "belongs to" relation with a feature
 - 1..1 "told from perspective of" relation with a persona
-- 0..n "sourced by" relation with system requirements (the EARS requirements whose `source` field references this story)
+- 0..n "sourced by" relation with system requirements (the EARS requirements whose `source` field references this story. Derived, not declared — computed from requirements' `source` fields, like Feature's)
 
 
 ## User Journey
@@ -430,18 +440,20 @@ Relations:
 The PRD is the upstream source for system requirements. The traceability bridge works through the `source` field defined in SYSTEM-REQ-METAMODEL.md: each EARS requirement optionally declares where it came from — a feature, user story, acceptance criterion, constraint, or goal in the PRD.
 
 ```
-PRD Feature: "Free cancellation before driver assignment"
-  └── User Story: "As a rider, I want to cancel without penalty before a driver accepts,
-       so that I don't feel locked in."
-       └── Acceptance criterion: "Cancellation before driver assignment incurs no fee"
+PRD Feature FEAT-003: "Free cancellation before driver assignment"
+  └── User Story US-007: "As a rider, I want to cancel without penalty before a driver
+       accepts, so that I don't feel locked in."
+       └── Acceptance criterion AC-007-01: "Cancellation before driver assignment incurs no fee"
             ↓ source
        EARS Requirement: REQ-RIDE-020 "Rider cancellation before assignment"
-         source "Feature: Free cancellation — Story: Rider cancel without penalty — AC: No fee before assignment"
+         source "AC-007-01"
             ↓ satisfied-by
        Domain: CancelRequestByRider command, RideRequestCancelledByRider event
 ```
 
-This chain is not enforced mechanically — the `source` field is a free-text reference. But the structure is consistent enough to enable two analyses:
+For features, stories, and acceptance criteria, the `source` reference is the element's **stable ID** — an exact string match, symmetric with how `satisfies` references requirement IDs one layer down. Renaming the feature or rewording the criterion does not touch the link. The reference optionally appends the name for human readability (`source "AC-007-01 — No fee before assignment"`); only the leading ID is load-bearing. Elements without IDs (goals, constraints, jobs) are still referenced by the name convention (`source "Goal: <name>"`, `source "Constraint: <name>"`) and remain rename-fragile — keep their names stable.
+
+The ID-based links enable two mechanical analyses:
 
 
 ### Feature-to-requirement coverage
@@ -459,7 +471,7 @@ Both cases should be explicit.
 
 **Question**: If a feature changes, which system requirements are affected?
 
-Follow the `source` references: every EARS requirement whose `source` field mentions this feature is a candidate for revision. From there, follow satisfaction links to identify affected domain model elements.
+Follow the `source` references: every EARS requirement whose `source` field carries this feature's ID — or the ID of one of its stories (`US-`) or their criteria (`AC-`) — is a candidate for revision. Because the references are stable IDs, this is an exact match, not a fuzzy grep over prose. From there, follow satisfaction links to identify affected domain model elements.
 
 This enables the full change propagation chain:
 ```

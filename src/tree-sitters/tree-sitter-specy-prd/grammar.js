@@ -244,6 +244,7 @@ module.exports = grammar({
 
     feature_def: $ => seq(
       'feature',
+      optional(field('id', $.feature_id)),
       field('name', $.string_literal),
       '{',
       'summary', $.string_literal,
@@ -308,14 +309,31 @@ module.exports = grammar({
     ),
 
     story_def: $ => seq(
+      optional(field('id', $.story_id)),
       $.string_literal,
       '{',
       'acceptance-criteria',
       '{',
-      repeat1($.string_literal),
+      repeat1($.acceptance_criterion),
       '}',
       '}',
     ),
+
+    acceptance_criterion: $ => seq(
+      optional(field('id', $.acceptance_criterion_id)),
+      $.string_literal,
+    ),
+
+    // -------------------------------------------------------------------------
+    // PRD element identifiers — stable ids for the traceability bridge
+    // (format mirrors requirement ids REQ-ORD-001 on the sysreq side)
+    // -------------------------------------------------------------------------
+
+    feature_id: $ => /FEAT-\d{3}/,
+
+    story_id: $ => /US-\d{3}/,
+
+    acceptance_criterion_id: $ => /AC-\d{3}-\d{2}/,
 
     // -------------------------------------------------------------------------
     // Assumption
