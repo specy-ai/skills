@@ -117,12 +117,14 @@ buildIndex();
 
 /* ---- State ---- */
 const state = {
-  view: "domain",            // "domain" | "req"
+  view: "domain",            // "domain" | "diagram" | "req"
   orgId: MODEL.organizations[0].id,
   ctxId: MODEL.organizations[0].contexts[0].id,
   selected: "ctx:" + MODEL.organizations[0].contexts[0].id,
   reqSetId: null,
   reqSelected: null,
+  diagramModId: null,        // module rendered in the diagram view
+  diagramShow: { interfaces: true, entities: true, values: true, services: true },
   expanded: new Set(),
   filter: "",
 };
@@ -217,8 +219,33 @@ function treeRowSel({ id, name, k, depth, hint }) {
   </button>`;
 }
 
+/* Diagram view tree: one row per module of the current context */
+function renderDiagramTree() {
+  const c = ctx();
+  if (!c.modules.some(m => m.id === state.diagramModId))
+    state.diagramModId = c.modules.length ? c.modules[0].id : null;
+  const f = state.filter.trim().toLowerCase();
+  const mods = c.modules.filter(m => !f || m.name.toLowerCase().includes(f));
+  if (!mods.length) {
+    document.getElementById("tree").innerHTML = `<div class="tree-empty">No module matches “${esc(state.filter)}”.</div>`;
+    return;
+  }
+  let html = `<ul><li><div class="tree-group-label" style="--indent:0px">Modules</div></li>`;
+  for (const mod of mods) {
+    const mains = mod.elements.filter(e => SpecyDiagram.MAIN_KINDS.has(e.kind)).length;
+    const sel = state.diagramModId === mod.id ? " selected" : "";
+    html += `<li><button class="tree-row${sel}" data-select="diagmod:${esc(mod.id)}" style="--indent:0px" title="${esc(mod.description || mod.name)}">
+      <span class="caret leaf">▶</span>${badge(KINDS.module)}<span class="row-name">${esc(mod.name)}</span>
+      <span class="row-count">${mains}/${mod.elements.length}</span>
+    </button></li>`;
+  }
+  html += "</ul>";
+  document.getElementById("tree").innerHTML = html;
+}
+
 function renderTree() {
   if (state.view === "req") { renderReqTree(); return; }
+  if (state.view === "diagram") { renderDiagramTree(); return; }
   const c = ctx();
   const f = state.filter.trim().toLowerCase();
   let html = `<ul><li>${treeRow({ id: "ctx:" + c.id, name: c.name + " — context map", k: null, depth: 0, hasChildren: false })}</li>`;
@@ -331,11 +358,18 @@ function relationsCard(rows) {
 }
 
 function stateMachineCards(el) {
-  return (el.stateMachines || []).map(sm => {
+  return (el.stateMachines || []).map((sm, i) => {
     const states = sm.states.map(s =>
       `<span class="state-pill${s.initial ? " initial" : ""}${s.final ? " final" : ""}">${esc(s.name)}</span>` +
-      (s.invariants && s.invariants.length ? ` <span class="rel-note">· holds: ${s.invariants.map(i => `<code class="inline">${esc(i)}</code>`).join(", ")}</span>` : "")
+      (s.description ? ` <span class="rel-note">— ${esc(s.description)}</span>` : "") +
+      (s.invariants && s.invariants.length ? ` <span class="rel-note">· holds: ${s.invariants.map(n => `<code class="inline">${esc(n)}</code>`).join(", ")}</span>` : "")
     ).map(s => `<li>${s}</li>`).join("");
+    const starts = (sm.starts || []).map(t =>
+      `<tr><td><span class="sm-initial-dot" title="initial pseudo-state">●</span></td>
+       <td><span class="sm-arrow">—</span> ${esc(t.operation)} <span class="sm-arrow">→</span></td>
+       <td><span class="state-pill initial">${esc(t.to)}</span></td>
+       <td class="rel-note">${t.guard ? `guard: <code class="inline">${esc(t.guard)}</code>` : ""}</td></tr>`
+    ).join("");
     const trans = sm.transitions.map(t =>
       `<tr><td><span class="state-pill${isInitial(sm, t.from) ? " initial" : ""}">${esc(t.from)}</span></td>
        <td><span class="sm-arrow">—</span> ${esc(t.operation)} <span class="sm-arrow">→</span></td>
@@ -343,8 +377,9 @@ function stateMachineCards(el) {
        <td class="rel-note">${t.guard ? `guard: <code class="inline">${esc(t.guard)}</code>` : ""}</td></tr>`
     ).join("");
     return `<p class="card-caption">State machine · ${esc(sm.name)}</p><div class="card">
+      <div class="sm-flow-host" data-sm-host="${i}"></div>
       <ul class="card-rows">${states}</ul>
-      <table class="sm-table"><tr><th>From</th><th>Transition (entity operation)</th><th>To</th><th></th></tr>${trans}</table>
+      <table class="sm-table"><tr><th>From</th><th>Transition (entity operation)</th><th>To</th><th></th></tr>${starts}${trans}</table>
     </div>`;
   }).join("");
 }
@@ -661,8 +696,38 @@ function renderReqSetDetail(hit) {
 
 /* ================= Render root ================= */
 
+/* Diagram view fills the main panel with a React Flow canvas */
+function renderDiagramView(target) {
+  const c = ctx();
+  const mod = c.modules.find(m => m.id === state.diagramModId) || c.modules[0];
+  if (!mod) {
+    target.innerHTML = `<div class="empty-state"><span class="brackets">[ ]</span>This context has no modules to diagram.</div>`;
+    return;
+  }
+  state.diagramModId = mod.id;
+  const show = state.diagramShow;
+  const shown = SpecyDiagram.countVisible(mod, show);
+  const opts = [["interfaces", "interfaces"], ["entities", "entities / aggregates"], ["values", "values"], ["services", "services"]];
+  target.innerHTML = `<div class="diagram-wrap">
+    <div class="diagram-bar">
+      ${badge(KINDS.module)}<span class="diagram-title">${esc(mod.name)}</span>
+      <span class="diagram-sub">${esc(c.shortname || c.name)} · ${shown} of ${mod.elements.length} elements</span>
+      <span class="spacer"></span>
+      <div class="diagram-opts">${opts.map(([key, label]) =>
+        `<label class="diag-opt"><input type="checkbox" data-diagopt="${key}"${show[key] ? " checked" : ""}/>${esc(label)}</label>`).join("")}
+      </div>
+      <button class="diagram-open" data-goto="mod:${esc(mod.id)}">open module detail ↗</button>
+    </div>
+    <div id="flow" class="flow-host"></div>
+  </div>`;
+  SpecyDiagram.mount(document.getElementById("flow"), mod, c, show);
+}
+
 function renderDetail() {
   const target = document.getElementById("detail");
+  if (typeof SpecyDiagram !== "undefined") SpecyDiagram.unmount();
+  document.getElementById("main").classList.toggle("diagram-mode", state.view === "diagram");
+  if (state.view === "diagram") { renderDiagramView(target); return; }
   const hit = INDEX[state.view === "req" ? state.reqSelected : state.selected];
   let html;
   if (!hit) {
@@ -679,6 +744,8 @@ function renderDetail() {
     html = renderContextDetail(hit.ctx);
   }
   target.innerHTML = `<div class="main-inner">${html}</div>`;
+  if (hit && hit.el && (hit.el.stateMachines || []).length && typeof SpecyDiagram !== "undefined")
+    SpecyDiagram.mountStateMachines(target, hit.el.stateMachines);
   document.getElementById("main").scrollTop = 0;
 }
 
@@ -741,6 +808,9 @@ document.addEventListener("click", e => {
       state.reqSetId = REQSETS[0].id;
       state.reqSelected = "reqset:" + REQSETS[0].id;
     }
+    if (state.view === "diagram" && !ctx().modules.some(m => m.id === state.diagramModId)) {
+      state.diagramModId = ctx().modules.length ? ctx().modules[0].id : null;
+    }
     state.filter = "";
     document.getElementById("tree-filter").value = "";
     renderAll();
@@ -751,6 +821,12 @@ document.addEventListener("click", e => {
   const row = e.target.closest("[data-select]");
   if (row) {
     const id = row.dataset.select;
+    if (id.startsWith("diagmod:")) {
+      state.diagramModId = id.slice("diagmod:".length);
+      renderTree();
+      renderDetail();
+      return;
+    }
     if (state.view === "req") {
       state.reqSelected = id;
     } else {
@@ -772,6 +848,7 @@ document.getElementById("org-select").addEventListener("change", e => {
   state.orgId = e.target.value;
   state.ctxId = org().contexts[0].id;
   state.selected = "ctx:" + state.ctxId;
+  state.diagramModId = null;
   state.expanded.clear();
   state.filter = "";
   document.getElementById("tree-filter").value = "";
@@ -785,6 +862,7 @@ document.getElementById("context-select").addEventListener("change", e => {
   } else {
     state.ctxId = e.target.value;
     state.selected = "ctx:" + state.ctxId;
+    state.diagramModId = null;
     state.expanded.clear();
   }
   renderAll();
@@ -793,6 +871,14 @@ document.getElementById("context-select").addEventListener("change", e => {
 document.getElementById("tree-filter").addEventListener("input", e => {
   state.filter = e.target.value;
   renderTree();
+});
+
+/* Diagram header category toggles */
+document.addEventListener("change", e => {
+  const key = e.target && e.target.dataset ? e.target.dataset.diagopt : null;
+  if (!key) return;
+  state.diagramShow[key] = e.target.checked;
+  renderDetail();
 });
 
 /* ---- Boot: load .domain and .sysreq files, then honor a deep link ---- */

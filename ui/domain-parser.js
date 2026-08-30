@@ -142,7 +142,7 @@ function parseDomain(text, fileStem) {
     for (const mNode of node.children) {
       const mh = descOf(mNode.header).head.match(/^machine\s+(\w+)$/);
       if (!mh) continue;
-      const sm = { name: descOf(mNode.header).desc || mh[1], states: [], transitions: [] };
+      const sm = { name: descOf(mNode.header).desc || mh[1], states: [], transitions: [], starts: [] };
       const ensureState = n => {
         let st = sm.states.find(s => s.name === n);
         if (!st) { st = { name: n }; sm.states.push(st); }
@@ -151,20 +151,36 @@ function parseDomain(text, fileStem) {
       const handleTransition = (line, guard) => {
         const t = line.match(/^(\[\*\]|\w+)\s*-->\s*(\w+)\s+on\s+"([^"]+)"$/);
         if (!t) return false;
-        if (t[1] === "[*]") { ensureState(t[2]).initial = true; return true; }
+        if (t[1] === "[*]") {
+          ensureState(t[2]).initial = true;
+          sm.starts.push({ to: t[2], operation: t[3], guard });
+          return true;
+        }
         ensureState(t[1]); ensureState(t[2]);
         sm.transitions.push({ from: t[1], to: t[2], operation: t[3], guard });
         return true;
       };
+      const handleState = (head, desc) => {
+        const st = head.match(/^(state|final)\s+(\w+)$/);
+        if (!st) return null;
+        const x = ensureState(st[2]);
+        if (st[1] === "final") x.final = true;
+        if (desc) x.description = desc;
+        return x;
+      };
       for (const s of mNode.statements) {
         const { head, desc } = descOf(s);
-        let st = head.match(/^state\s+(\w+)$/);
-        if (st) { const x = ensureState(st[1]); if (desc) x.invariants = [desc]; continue; }
-        st = head.match(/^final\s+(\w+)$/);
-        if (st) { const x = ensureState(st[1]); x.final = true; if (desc) x.invariants = [desc]; continue; }
-        handleTransition(head);
+        if (!handleState(head, desc)) handleTransition(head);
       }
       for (const c of mNode.children) {
+        const ch = descOf(c.header);
+        // state with an invariants block
+        const x = handleState(ch.head, ch.desc);
+        if (x) {
+          const invBlock = c.children.find(b => descOf(b.header).head === "invariants");
+          if (invBlock) x.invariants = invBlock.children.map(i => descOf(i.header).head).filter(Boolean);
+          continue;
+        }
         // transition with a guard precondition block
         const pre = c.children[0];
         let guard;
@@ -172,7 +188,7 @@ function parseDomain(text, fileStem) {
           const ph = descOf(pre.header);
           guard = ph.desc || blockText(pre);
         }
-        handleTransition(descOf(c.header).head, guard);
+        handleTransition(ch.head, guard);
       }
       machines.push(sm);
     }

@@ -5,6 +5,7 @@
   <title>Specy — Domain Navigator</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="ds-tokens.css" />
+  <link rel="stylesheet" href="vendor/reactflow.css" />
   <link rel="stylesheet" href="app.css" />
 </head>
 <body>
@@ -13,6 +14,7 @@
       <span class="logo"><img src="assets/specy-ai-logo-white-orbitron.svg" alt="specy.ai" /></span>
       <nav class="tabs">
         <button class="tab active" data-view="domain">Domain Navigator</button>
+        <button class="tab" data-view="diagram">Domain Diagram</button>
         <button class="tab" data-view="req">Requirements Navigator</button>
       </nav>
       <span class="spacer"></span>
@@ -35,9 +37,14 @@
     <main id="main" class="main"><div id="detail"></div></main>
   </div>
 
+  <script src="vendor/react.production.min.js"></script>
+  <script src="vendor/react-dom.production.min.js"></script>
+  <script src="vendor/reactflow.umd.js"></script>
+  <script src="vendor/dagre.min.js"></script>
   <script src="data.js"></script>
   <script src="domain-parser.js"></script>
   <script src="sysreq-parser.js"></script>
   <script src="app.js"></script>
+  <script src="diagram.js"></script>
 </body>
 </html>
