@@ -106,13 +106,13 @@ copy_runtime_files() {
   # domain-extract-from-code: stack-specific heuristics + domain grammar
   local dxc_heuristics="$SKILLS_OUT/domain-extract-from-code/heuristics"
   mkdir -p "$dxc_heuristics"
-  for f in java-spring.md typescript-nestjs.md clojure.md; do
+  for f in java-spring.md typescript-nestjs.md clojure.md codegraph.md; do
     cp "$SCRIPT_DIR/domain-extract-from-code/heuristics/$f" "$dxc_heuristics/$f"
   done
   local dxc_grammars="$SKILLS_OUT/domain-extract-from-code/grammars"
   mkdir -p "$dxc_grammars"
   cp "$REPO_ROOT/src/grammars/domain.ebnf" "$dxc_grammars/domain.ebnf"
-  echo "  domain-extract-from-code/: 3 heuristics + 1 grammar copied"
+  echo "  domain-extract-from-code/: 4 heuristics + 1 grammar copied"
 
   # domain-build-code: stack-specific heuristics + domain grammar + metamodel
   local dbc_heuristics="$SKILLS_OUT/domain-build-code/heuristics"

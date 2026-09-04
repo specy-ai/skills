@@ -11,6 +11,8 @@ user-invocable: true
 
 You are an expert Domain-Driven Design practitioner who reverse-engineers existing source code into Specy v3 domain model files. You extract the business logic — entities, aggregates, value objects, commands, queries, events, operations, preconditions, postconditions, reactions, invariants, agreements, and state machines — from a codebase and express them in a unified `.domain` file.
 
+When the codebase is JVM code and the **codegraph** pipeline is available, you read its artifacts first — the per-type domain-facts dossier and the bottom-up LLM insights side-car (`heuristics/codegraph.md`) — and open source files only to confirm or to write an exact expression. Facts stay facts, inferences stay inferences: the Decision Tests below apply to both.
+
 You also **derive system requirements** from the extracted domain model, producing a `.sysreq` file per bounded context that formalizes what the code actually does in testable EARS statements — including infrastructure concerns, unclear business rules, and gaps that the domain grammar cannot express. Finally, you produce a **refactoring report** with DDD-aligned design improvements.
 
 ---
@@ -34,6 +36,8 @@ Run these 4 tests **in sequence** on every element you are about to emit. If any
 ### Evidence weight
 
 Production code establishes **what exists** — the implementation. Test code establishes **what is expected** — the intent. When both sources converge on the same element, confidence is high. When a test reveals a behaviour not obvious in production code (e.g. an assertion on a side-effect buried in a helper), the test is sufficient evidence to emit, but the annotation signals reduced traceability.
+
+**Codegraph evidence.** A `domain-facts.json` entry (a declared field, annotation, call, throw site, import) is production-code evidence. An `insights` block is an **inference** made by a model: it counts only when it points at a fact (the record's anchored span, a matching domain-facts entry) or that span was read. Unconfirmed blocks are at best `// NOTE: inferred by codegraph explain, unconfirmed`. See `heuristics/codegraph.md` §4.
 
 **Non-regression rule:** absence of tests must never degrade extraction. When no test files exist or no test correlates to a handler, `domain-extract-from-code` extracts from production code exactly as before. Tests improve confidence; they do not condition it.
 
@@ -165,24 +169,33 @@ Three sequential phases. Print a summary at the end of each phase for user valid
 1. Study the canonical example below to calibrate output style.
 2. Load the grammar: read `grammars/domain.ebnf` to calibrate syntax.
 3. Explore the project tree. Identify language, framework, layout.
-4. Locate key code areas: models/entities, handlers/services, events, validators/reactions, test suites (integration, acceptance, BDD).
-5. Identify bounded context(s) and propose domain name(s).
-6. Print reconnaissance summary:
+4. **Codegraph detection (JVM corpora).** Resolve the CLI and the extractor jar as in `heuristics/codegraph.md` §1. If both are present:
+   - extract `specy/codegraph/model.jsonl` from the main source root, `validate` it, build `specy/codegraph/domain-facts.json` (`--framework spring` when Spring/Jakarta annotations are present);
+   - run `codegraph explain --dry-run` and read the plan: units per level, calls, estimated prompt tokens, package cycles (`cycle(n)` on module lines);
+   - **ask the user** whether to run the explanation (cost is theirs), proposing `--scope` per candidate context and `--max-calls` for a first pass; reuse an existing `specy/codegraph/model.insights.jsonl` when its header matches the model;
+   - if anything is missing or the user declines, continue with the manual workflow and say so.
+   Otherwise (no codegraph, non-JVM corpus) skip this step.
+5. Locate key code areas: models/entities, handlers/services, events, validators/reactions, test suites (integration, acceptance, BDD). With codegraph: the type list of `domain-facts.json` with stereotypes and the `type` records of the insights (sorted by `concept`) ARE this inventory; test suites are still located by hand.
+6. Identify bounded context(s) and propose domain name(s). With codegraph: start from the `module` records' `boundedContextHint` and the import graph (`modules[].imports`); a group of mutually dependent packages (`scc`) is one context or a shared kernel — never split it across two.
+7. Print reconnaissance summary:
    ```
    ## Reconnaissance Summary
    - Language: {lang}, Framework: {framework}
+   - Codegraph: {absent | model {entities}/{edges}, facts {types} types, insights {records} records ({llm} explained, {template} templated, {low-confidence} below 0.5) | plan only: {calls} calls, ~{tokens} prompt tokens}
    - Domain(s) identified: {list}
    - Models found: {count} — Handlers/Services: {count} — Events: {count} — Test suites: {count}
    - Mode: {creation | update}
    ```
-7. Determine mode:
+8. Determine mode:
    - If the user specified a definition name → **targeted mode**.
    - If `--full` flag → **full update mode**.
-   - If `specy/.meta.json` exists and `gitSha` is reachable → **incremental update mode**.
+   - If `specy/.meta.json` exists and (`gitSha` is reachable or it carries `codegraph.fingerprints`) → **incremental update mode**.
    - Otherwise → **full update mode**.
-8. Wait for user confirmation.
+9. Wait for user confirmation.
 
 ### Phase 2 — Extraction
+
+**With codegraph**, the inputs of the steps below change, not the steps: "read every class" means "walk the `type` records of the insights, sorted by `concept`, with the matching `domain-facts` dossier open"; "read every handler" means "walk the `operation` records with `origin: llm`" (templated accessors are never operations). The mapping from a block to a construct is the table in `heuristics/codegraph.md` §3; the evidence rules of §4 decide what may be emitted without opening the file. Open the anchored span (`file`, domain-facts `anchor.span`) whenever a predicate, a message or a cardinality must be exact, and whenever confidence is below 0.7. Everything below applies unchanged to a corpus without codegraph.
 
 For each bounded context:
 
@@ -246,6 +259,9 @@ For each bounded context:
     | **Orphan events** | Events emitted but never consumed by any operation or reaction | Flag as potential missing reactive behavior |
     | **Missing invariants** | Entity has cross-field consistency requirements evident in code but not formalized | Add invariants with enforcement strategy |
     | **Weak aggregate boundaries** | Cross-aggregate mutations without justification or agreement | Propose agreement/reconciliation or redesign boundaries |
+    | **Package cycle** (codegraph) | `module` insights records sharing an `scc`: the packages depend on each other | Quote the records' `sharedKernelHint`; propose the inversion or the shared kernel it names |
+    | **Type cycle** (codegraph) | `type` records sharing an `scc` across what should be separate aggregates | Split by the cycle's members; usually one of them is a missing value or event |
+    | **Concept disagreement** (codegraph) | The insights `concept` and the Decision-Test-4 verdict differ (e.g. `valueType` with an `@Id`) | Record the disagreement; the fact wins, the smell names why the code reads otherwise |
 
     For each detected smell, write a refactoring note with:
     - **What the code does:** describe the current implementation
@@ -267,6 +283,7 @@ For each bounded context:
     Agreements: {n} | State Machines: {n} | UNCLEAR: {n}
     Requirements (functional): {n} | Requirements (NFR): {n}
     Refactoring notes: {n}
+    Codegraph: {records used}/{records} insights records, {confirmed} confirmed by facts, {read} spans read by hand, {unconfirmed} left as NOTE
     ```
 
 ### Phase 3 — Cross-Validation
@@ -319,6 +336,12 @@ For each bounded context:
     UNCLEAR markers promoted to requirements: {n}/{n}
     Infrastructure elements promoted to NFRs: {n}
 
+    ## Codegraph Coverage (when used)
+    Units explained: {llm} | templated: {template} | failed: {failed} | reused from a previous run: {reused}
+    Records below confidence 0.5: {n} — read by hand: {n} — left UNCLEAR: {n}
+    Package cycles: {n} (largest {n} packages) | Type cycles: {n}
+    Cost: {calls} calls, {prompt}+{completion} tokens{, $cost}
+
     ## Refactoring Summary
     Design smells detected: {n}
     | Smell | Entity/Aggregate | Severity | Affected Requirements |
@@ -367,6 +390,7 @@ When no `specy/*.domain` files exist:
 - **`lastRun`**: ISO 8601 timestamp
 - **`gitSha`**: HEAD commit SHA at time of run
 - **`filemap`**: source file → list of Specy definitions (`"type Name"`)
+- **`codegraph`** (when the pipeline was used): `{ "model": "specy/codegraph/model.jsonl", "insights": "specy/codegraph/model.insights.jsonl", "promptVersion": "…", "models": {…}, "fingerprints": { "<record id>": "<sha256>" } }` — the header fields copied from the side-car, and one fingerprint per insights record that fed a definition. This is what makes the next incremental run cheap: a record whose fingerprint is unchanged needs no re-extraction.
 
 Can be committed or `.gitignore`d — mention this choice on first creation.
 
@@ -398,6 +422,7 @@ For all modes, present changes before applying:
 Applies when `specy/.meta.json` exists AND `gitSha` is reachable.
 
 1. **Differential recon:** `git diff --name-only <savedSha>..HEAD`. Cross-reference with filemap → modified, new, deleted files. Skip non-business files (config, CI, migrations). Include test files correlated to changed handlers.
+   **With codegraph:** re-extract the model, rebuild `domain-facts.json`, rerun `codegraph explain` with the same `--out` (unchanged units are reused, only changed ones are paid for), then diff `meta.codegraph.fingerprints` against the new records: changed, new and vanished ids are the delta. Union it with the VCS delta; a definition is re-extracted if either says so. See `heuristics/codegraph.md` §5.
 2. **If no pertinent changes** → `No changes detected since last run (commit <sha>).` and stop.
 3. **Targeted extraction:** load existing specs as base. Read only changed/new files. Re-extract impacted definitions. Merge with unchanged.
 4. **Cascade warning:** if an entity changes and unchanged operations reference it, signal the dependency but do not re-read the handler unless referenced fields changed.
@@ -779,6 +804,7 @@ Example signal:
 | `.java`, `pom.xml`, `build.gradle`, `@SpringBootApplication`, `@Entity` | Read `heuristics/java-spring.md` |
 | `.ts`, `.tsx`, `package.json` + `@nestjs/*`, `tsconfig.json` | Read `heuristics/typescript-nestjs.md` |
 | `.clj`, `.cljs`, `deps.edn`, `project.clj`, `lein` | Read `heuristics/clojure.md` |
+| JVM corpus **and** the `codegraph` CLI + Java extractor jar are reachable (`CODEGRAPH_HOME`, `codegraph` on PATH) | Read `heuristics/codegraph.md` **first** — it replaces file-by-file reading with the domain-facts dossier and the insights side-car; the stack file still applies for annotation → constraint mappings |
 
 If no specific stack is detected, rely on generic heuristics only. Annotate non-obvious mappings with `// NOTE: inferred from {pattern}`.
 
