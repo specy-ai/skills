@@ -7,6 +7,8 @@ package-lock.json
 
 # Vim swapfiles
 *.swp
+# Claude Code local worktrees
+.claude/worktrees/
 # Compiled tree-sitter parsers
 *.so
 # Compiled Langium parser + language server — rebuilt by
