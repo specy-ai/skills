@@ -232,7 +232,7 @@ function renderDiagramTree() {
   }
   let html = `<ul><li><div class="tree-group-label" style="--indent:0px">Modules</div></li>`;
   for (const mod of mods) {
-    const mains = mod.elements.filter(e => SpecyDiagram.MAIN_KINDS.has(e.kind)).length;
+    const mains = mod.elements.filter(e => SpecyDomainDiagrams.MAIN_KINDS.has(e.kind)).length;
     const sel = state.diagramModId === mod.id ? " selected" : "";
     html += `<li><button class="tree-row${sel}" data-select="diagmod:${esc(mod.id)}" style="--indent:0px" title="${esc(mod.description || mod.name)}">
       <span class="caret leaf">▶</span>${badge(KINDS.module)}<span class="row-name">${esc(mod.name)}</span>
@@ -696,7 +696,31 @@ function renderReqSetDetail(hit) {
 
 /* ================= Render root ================= */
 
-/* Diagram view fills the main panel with a React Flow canvas */
+/* ---- Diagram engine islands (vendor/specy-diagram-engine.js). Every mount
+   handle is kept here and disposed before the detail panel re-renders. ---- */
+let diagramMounts = [];
+function unmountDiagrams() {
+  for (const h of diagramMounts) { try { h.unmount(); } catch (e) { console.warn("diagram unmount failed:", e); } }
+  diagramMounts = [];
+}
+const hasDiagramEngine = () => typeof SpecyDiagramEngine !== "undefined" && SpecyDiagramEngine && typeof SpecyDiagramEngine.mount === "function";
+function mountDiagram(host, file, opts) {
+  if (!hasDiagramEngine()) {
+    host.innerHTML = `<div class="diagram-missing">Diagram engine not loaded — build <code class="inline">diagram-engine</code> (<code class="inline">npm run build</code>) and copy the bundle to <code class="inline">ui/vendor/specy-diagram-engine.js</code>.</div>`;
+    return null;
+  }
+  try {
+    const handle = SpecyDiagramEngine.mount(host, file, opts);
+    diagramMounts.push(handle);
+    return handle;
+  } catch (e) {
+    console.error("diagram mount failed for " + file.model.id + ":", e);
+    host.innerHTML = `<div class="diagram-missing">Could not render diagram <code class="inline">${esc(file.model.id)}</code>: ${esc(e && e.message ? e.message : e)}</div>`;
+    return null;
+  }
+}
+
+/* Diagram view fills the main panel with an engine-rendered module class diagram */
 function renderDiagramView(target) {
   const c = ctx();
   const mod = c.modules.find(m => m.id === state.diagramModId) || c.modules[0];
@@ -706,7 +730,7 @@ function renderDiagramView(target) {
   }
   state.diagramModId = mod.id;
   const show = state.diagramShow;
-  const shown = SpecyDiagram.countVisible(mod, show);
+  const shown = SpecyDomainDiagrams.countVisible(mod, show);
   const opts = [["interfaces", "interfaces"], ["entities", "entities / aggregates"], ["values", "values"], ["services", "services"]];
   target.innerHTML = `<div class="diagram-wrap">
     <div class="diagram-bar">
@@ -720,12 +744,41 @@ function renderDiagramView(target) {
     </div>
     <div id="flow" class="flow-host"></div>
   </div>`;
-  SpecyDiagram.mount(document.getElementById("flow"), mod, c, show);
+  const file = SpecyDomainDiagrams.moduleClassDiagram(mod, c, show, org().id);
+  mountDiagram(document.getElementById("flow"), file, {
+    storagePrefix: file.model.id,
+    interactive: true,
+    wheel: "pan",
+    fitView: true,
+    logo: false,
+    onNavigate: ref => { if (ref && ref.elementId) goto(ref.elementId); },
+  });
+}
+
+/* One read-only statechart per `[data-sm-host]` placeholder rendered by
+   stateMachineCards. Called after the detail innerHTML is set. */
+function mountStateMachines(container, hit) {
+  const machines = hit.el.stateMachines || [];
+  let n = 0;
+  for (const host of container.querySelectorAll("[data-sm-host]")) {
+    const sm = machines[Number(host.dataset.smHost)];
+    if (!sm || !sm.states.length) { host.remove(); continue; }
+    host.id = "sm-host-" + (n++);
+    const file = SpecyDomainDiagrams.stateMachineDiagram(hit.el, sm, hit);
+    mountDiagram(host, file, {
+      storagePrefix: file.model.id,
+      interactive: false,
+      wheel: "page",
+      autoHeight: true,
+      fitView: true,
+      logo: false,
+    });
+  }
 }
 
 function renderDetail() {
   const target = document.getElementById("detail");
-  if (typeof SpecyDiagram !== "undefined") SpecyDiagram.unmount();
+  unmountDiagrams();
   document.getElementById("main").classList.toggle("diagram-mode", state.view === "diagram");
   if (state.view === "diagram") { renderDiagramView(target); return; }
   const hit = INDEX[state.view === "req" ? state.reqSelected : state.selected];
@@ -744,8 +797,7 @@ function renderDetail() {
     html = renderContextDetail(hit.ctx);
   }
   target.innerHTML = `<div class="main-inner">${html}</div>`;
-  if (hit && hit.el && (hit.el.stateMachines || []).length && typeof SpecyDiagram !== "undefined")
-    SpecyDiagram.mountStateMachines(target, hit.el.stateMachines);
+  if (hit && hit.el && (hit.el.stateMachines || []).length) mountStateMachines(target, hit);
   document.getElementById("main").scrollTop = 0;
 }
 

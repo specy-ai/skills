@@ -5,7 +5,6 @@
   <title>Specy — Domain Navigator</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="ds-tokens.css" />
-  <link rel="stylesheet" href="vendor/reactflow.css" />
   <link rel="stylesheet" href="app.css" />
 </head>
 <body>
@@ -37,14 +36,14 @@
     <main id="main" class="main"><div id="detail"></div></main>
   </div>
 
-  <script src="vendor/react.production.min.js"></script>
-  <script src="vendor/react-dom.production.min.js"></script>
-  <script src="vendor/reactflow.umd.js"></script>
-  <script src="vendor/dagre.min.js"></script>
+  <!-- Specy Diagram Engine: single IIFE bundle (built from ../diagram-engine with
+       `npm run build`, copied to vendor/). It exposes window.SpecyDiagramEngine
+       and only auto-bootstraps when #diagram / window.SPECY_DIAGRAM exist. -->
+  <script src="vendor/specy-diagram-engine.js"></script>
   <script src="data.js"></script>
   <script src="domain-parser.js"></script>
   <script src="sysreq-parser.js"></script>
+  <script src="domain-to-diagram.js"></script>
   <script src="app.js"></script>
-  <script src="diagram.js"></script>
 </body>
 </html>

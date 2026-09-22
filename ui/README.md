@@ -1,8 +1,8 @@
 # Specy Navigator — HTML prototype
 
 Three header tabs: **Domain Navigator** (browse `.domain` models),
-**Domain Diagram** (per-module entity-relations diagram rendered with
-React Flow) and **Requirements Navigator** (browse `.sysreq` requirement
+**Domain Diagram** (per-module UML-like class diagram rendered by the Specy
+Diagram Engine) and **Requirements Navigator** (browse `.sysreq` requirement
 sets per SYSTEM-REQ-METAMODEL.md). Traceability is bidirectional: a domain element's
 `satisfies REQ-…` chips link to the requirement, and each requirement computes
 its **Satisfied by** table by scanning the `satisfies` lists of every loaded
@@ -26,40 +26,98 @@ A static prototype for navigating a Specy domain model, structured by
   machines (see below), escalation chains, and `satisfies` traceability chips.
   Every reference is a link — cross-context links switch the context automatically.
 
+## Diagrams: the Specy Diagram Engine
+
+Both diagram kinds are drawn by the generic **Specy Diagram Engine**, a single
+IIFE bundle vendored as `vendor/specy-diagram-engine.js`. It is built from the
+sibling repository `../diagram-engine` with `npm run build` and copied into
+`ui/vendor/` (the bundle is not generated here; if it is missing the diagram
+hosts show a small inline notice instead of a canvas). The bundle exposes
+`window.SpecyDiagramEngine.mount(container, diagramFile, opts) → { unmount() }`
+and reads a **DiagramFile** (`{ version, model, diagram }`) whose shape is the
+normative contract `diagram-engine/docs/DERIVED-DIAGRAMS.md`.
+
+The Navigator only produces those files: `domain-to-diagram.js` is a pure,
+DOM-free converter (global `SpecyDomainDiagrams`) that turns the parsed domain
+shape into DiagramFile JSON — the engine does the layout (dagre, from the
+file's `layout` hint; nodes carry no positions), the node/edge components,
+the routing, the minimap/legend and the per-diagram persisted positions
+(`storagePrefix = model.id`, so hand-tuned layouts never bleed across
+modules or machines).
+
+- `SpecyDomainDiagrams.moduleClassDiagram(mod, context, show, orgId?)` —
+  metamodel `domain-class`; `show` is the category toggle map
+  (`{ interfaces, entities, values, services }`, default `DEFAULT_SHOW`).
+- `SpecyDomainDiagrams.stateMachineDiagram(el, sm, hit?)` — metamodel
+  `state-machine`, one file per `machine` of an entity / aggregate.
+- Also exported: `MAIN_KINDS`, `CATEGORY_OF`, `DEFAULT_SHOW`, `countVisible`,
+  `moduleModelId`, `machineModelId`, `compartmentsFor`, `KINDS_FALLBACK`.
+
+Model ids are stable across re-parses: `<org>.<ctx>.<module>` for a class
+diagram (derived from the parser's ids, e.g. `business-loan.BL.LoanServicing`)
+and `<element id>.<machine>` for a statechart. Node ids equal the parser's
+element ids; cross-module ghosts are `ghost:<id>`.
+
+`app.js` mounts the engine (`mountDiagram`), keeps every mount handle in
+`diagramMounts` and disposes them all before the detail panel re-renders.
+
 ## State machines (entity / aggregate detail)
 
 Each `machine` of an entity or aggregate renders as a **UML state diagram**
-(React Flow island embedded in the detail card): initial pseudo-state bullet,
-rounded state boxes with state invariants as `{ constraint }` compartments,
-final states double-bordered, and transitions labeled `operation [guard]`.
-Layout is dagre top-to-bottom; self-transitions draw as nested arcs on the
-right of their state, back-transitions arc around the left side, and long
-transitions bow around any state their straight line would cross. Endpoints
-of sibling transitions fan across the node border and their labels stagger
-vertically to stay legible. Below the diagram, the detail card keeps the
-state list (description + `holds:` invariants) and the full transitions
-table — including the `● → initialState` creation rows with their operation.
+(engine island embedded in the detail card, mounted read-only with
+`interactive: false`, `wheel: 'page'` so the page keeps scrolling, and
+`autoHeight` — the host's height follows the layout, clamped by
+`.sm-flow-host { min-height: 180px; max-height: 520px }`): initial pseudo-state
+bullet, rounded state boxes with state invariants as `{ constraint }`
+compartments, final states double-bordered, and transitions labeled
+`operation [guard]`. Layout is dagre top-to-bottom; self-transitions draw as
+nested arcs on the right of their state, back-transitions arc around the left
+side, and long transitions bow around any state their straight line would
+cross. Below the diagram, the detail card keeps the state list (description +
+`holds:` invariants) and the full transitions table — including the
+`● → initialState` creation rows with their operation. The converter emits a
+`[*]` element only when the machine has start transitions or an initial state.
 
 ## Domain Diagram tab
 
-Pick a module in the left panel; the main panel becomes a React Flow canvas
+Pick a module in the left panel; the main panel becomes an engine canvas
 showing a UML-like class diagram of the module. **Class cards** render
 entities, aggregates (2px navy identity), services, values, enums and
-interfaces (dashed border) with compartments: attributes (identity first,
-then typed fields), operations, enum literals, and invariants folded in as
-`{ constraint }` rows. **Relations are labeled edges**: `CONTAINS` (heavier),
-`CALLS`, `DELEGATES TO`, `DESCRIBES`, `EXPOSES`, `PROJECTS`, `COMPOSES`,
-reference names with cardinality, and attribute-type links (drawn quieter —
-they are numerous). Commands, queries, events and reactions are deliberately
-excluded, as are repositories and agreements. Header checkboxes toggle the four categories: interfaces,
-entities / aggregates, values, services. Cross-module endpoints appear as
-dashed ghost cards naming their home module. Layout is dagre left-to-right
-for the connected graph, with edge-less cards flowed into a wrapped grid
-beside it. Double-click any element to open it in the Domain Navigator.
-Everything runs from vendored UMD bundles (`vendor/`: React, React Flow,
-dagre) — still no build step. `diagram.js` holds the graph construction +
-node components; geometry constants there mirror the `.specy-node` / `.cc-*`
-CSS in `app.css`.
+interfaces (dashed border) with compartments precomputed by the converter:
+attributes (identity first, then typed fields), operations, enum literals, and
+invariants folded in as `{ constraint }` rows (capped at 12 / 10 / 8 rows with
+a `+ N more…` row). **Relations are labeled edges**, each backed by a typed
+`model.relations` entry: `CONTAINS` (`contains`, heavier), `CALLS`,
+`DELEGATES TO`, `DESCRIBES`, `EXPOSES`, `PROJECTS`, `COMPOSES`, reference
+names with cardinality (`reference`), and attribute-type links
+(`attribute-type`, drawn quieter — they are numerous). Commands, queries,
+events and reactions are deliberately excluded, as are repositories and
+agreements. Header checkboxes toggle the four categories: interfaces,
+entities / aggregates, values, services — the converter decides visibility,
+so a hidden endpoint simply drops its edges. Cross-module endpoints appear as
+dashed ghost cards naming their home module (their `modelRef` points at the
+home module's model). Double-click any element to open it in the Domain
+Navigator (`onNavigate`). Still no build step on this side: only the vendored
+engine bundle is a build product.
+
+## Checking the converters
+
+```bash
+node scripts/check-diagram-export.mjs                 # examples/business-loan
+node scripts/check-diagram-export.mjs path/to/x.domain
+```
+
+The script needs only Node (no dependencies): it loads `domain-parser.js` and
+`domain-to-diagram.js` in a bare `vm` context, converts every module (with
+every category toggle) and every state machine of the model, validates the
+DiagramFiles against the contract (required fields, edge endpoints among the
+nodes, every `modelRef` resolving, no node positions, ghosts prefixed
+`ghost:`, one relation per edge), checks that `KINDS_FALLBACK` has not drifted
+from `KINDS` in `app.js`, prints counts, and writes the richest module and
+machine to `../diagram-engine/examples/diagrams/navigator-domain-class.json`
+and `navigator-statechart.json` as engine fixtures. Examples that elide the
+`organization` / `context` containers (business-loan) are wrapped in a
+synthetic one before parsing.
 
 ## Run
 
@@ -89,11 +147,21 @@ and `emits` gives each event its `raised by`).
 
 ## Files
 
-- `index.html` — shell (header / tree / main triptych)
+- `index.html` — shell (header / tree / main triptych); loads the engine
+  bundle first, then `data.js`, the parsers, `domain-to-diagram.js`, `app.js`
 - `ds-tokens.css` — design tokens imported from the specy.ai design system
   (claude.ai/design project `019e2b0b…`); fonts via Google Fonts instead of the
   project's self-hosted TTFs
-- `app.css` — app styles (ClassCard reproduced from `ui_kits/specy-ai/ClassCard.jsx`)
+- `app.css` — app styles (ClassCard reproduced from `ui_kits/specy-ai/ClassCard.jsx`);
+  the diagram host rules (`.diagram-wrap`, `.diagram-bar`, `.flow-host`,
+  `.sm-flow-host`) plus the `.specy-node` / `.cc-*` / `.specy-ghost` /
+  `.specy-state` visual language the engine reproduces (the bundle ships its
+  own copy of those)
 - `data.js` — sample "Acme Mobility" + "Acme Retail" organizations exercising every
   metamodel concept
-- `app.js` — vanilla JS rendering, no build step
+- `domain-parser.js` / `sysreq-parser.js` — tolerant readers for `.domain` / `.sysreq`
+- `domain-to-diagram.js` — model → DiagramFile converters (`SpecyDomainDiagrams`)
+- `app.js` — vanilla JS rendering, no build step; mounts the engine islands
+- `vendor/specy-diagram-engine.js` — the Specy Diagram Engine bundle
+  (built in `../diagram-engine` with `npm run build`, copied here)
+- `scripts/check-diagram-export.mjs` — converter contract check + engine fixtures
