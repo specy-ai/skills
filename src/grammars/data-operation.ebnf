@@ -7,10 +7,17 @@
 // (metamodel: <Section>).
 //
 // This is a DESCRIPTION language, not a programming language: operations have no
-// bodies — no statements, no control structures, no computed expressions. The two
-// small value/condition syntaxes are strictly scoped to data: the JSON literal
-// that initializes a global binding, and the boolean predicate that names a
-// struct's state over an instance (`_`). Neither appears in an operation.
+// bodies — no statements, no branching on the happy path, no loops, no computed
+// expressions. Conditions appear in exactly three places, all in ONE small
+// predicate language: a struct's states, an operation's contract, and the guards
+// on a flow's failure exits. A flow is a straight-line list of calls, not an
+// algorithm.
+//
+// Two conformance levels share this grammar (metamodel: Conformance levels):
+// `strict` (the default, for designed models) and `observed` (for models
+// extracted from code). Every production is legal at both levels; the semantic
+// rules at the foot of this file say which are rejections under `strict` and
+// findings under `observed`.
 //
 // EBNF (ISO 14977 style)
 // =============================================================================
@@ -20,13 +27,15 @@
 //
 // The outer containers (model > module) may be ELIDED: a file may start at a
 // module or at a bare declaration. An elided container is implicit, not absent —
-// a declaration still belongs to exactly one module, which belongs to one model.
+// a declaration still belongs to exactly one module, which belongs to one model,
+// and an elided model is `strict`.
 // -----------------------------------------------------------------------------
 
 dataOpFile       = { comment | topLevelElement } ;
 
 topLevelElement  = modelDef
                  | moduleDef
+                 | externalDecl
                  | declaration ;
 
 declaration      = structDef
@@ -34,16 +43,20 @@ declaration      = structDef
                  | operationDef ;
 
 // -----------------------------------------------------------------------------
-// Model  (metamodel: Model)
+// Model  (metamodel: Model, Conformance levels)
 //
-// `implements` targets a domain bounded context or organization. It is optional:
-// when omitted, the link is presumed from the model name (metamodel: Convention).
+// `conformance` fixes the level; absent = `strict`. `implements` targets a
+// domain bounded context or organization; when omitted, the link is presumed
+// from the model name (metamodel: Convention).
 // -----------------------------------------------------------------------------
 
-modelDef         = "model" , modelName , [ implementsClause ] , [ description ]
-                 , [ metadataBlock ] , "{"
-                 , moduleDef , { comment | moduleDef }
+modelDef         = "model" , modelName , [ conformance ] , [ implementsClause ]
+                 , [ description ] , [ metadataBlock ] , "{"
+                 , { comment | externalDecl }
+                 , moduleDef , { comment | moduleDef | externalDecl }
                  , "}" ;
+
+conformance      = "strict" | "observed" ;
 
 // -----------------------------------------------------------------------------
 // Module  (metamodel: Module)
@@ -52,23 +65,38 @@ modelDef         = "model" , modelName , [ implementsClause ] , [ description ]
 // references its declarations make, never declared (metamodel: Module).
 // -----------------------------------------------------------------------------
 
-moduleDef        = "module" , identifier , [ implementsClause ] , [ description ]
+moduleDef        = "module" , qualifiedName , [ implementsClause ] , [ description ]
                  , [ metadataBlock ] , "{"
-                 , { comment | declaration }
+                 , { comment | declaration | externalDecl }
                  , "}" ;
 
 // -----------------------------------------------------------------------------
-// Struct  (metamodel: Struct)
+// External declaration  (metamodel: External declaration)
 //
-// A named data structure: a mandatory `schema` block (its fields) and an optional
-// `state` block (named predicate-states over an instance). `represents` targets a
-// domain entity, value type or enum.
+// Names a struct or a module the model references but does not describe. An
+// external struct has no schema, no states, no operations: it is a nominal type.
+// Only types and modules are external-declarable — never operations or globals.
+// -----------------------------------------------------------------------------
+
+externalDecl     = "external" , ( "struct" | "module" ) , qualifiedName
+                 , [ description ] , [ metadataBlock ] ;
+
+// -----------------------------------------------------------------------------
+// Struct  (metamodel: Struct, Attachment)
+//
+// A named data structure: a mandatory `schema` block (its fields), an optional
+// `state` block (named predicate-states over an instance), and zero or more
+// NESTED operations, which are thereby attached to the struct — inside them `_`
+// is the receiver. `represents` targets a domain entity, value type or enum.
 // -----------------------------------------------------------------------------
 
 structDef        = "struct" , typeName , [ representsClause ] , [ description ]
                  , [ metadataBlock ] , "{"
+                 , { comment }
                  , schemaBlock
+                 , { comment }
                  , [ stateBlock ]
+                 , { comment | operationDef }
                  , "}" ;
 
 representsClause = "represents" , qualifiedName ;
@@ -89,8 +117,19 @@ stateBlock       = "state" , "{" , { comment | stateDecl } , "}" ;
 
 stateDecl        = stringLiteral , ":" , predicate ;
 
-// A small, total boolean predicate language over the instance. No function calls,
-// no arithmetic, nothing outside the instance.
+// -----------------------------------------------------------------------------
+// Predicate  (metamodel: State, Level 1 — Contract, Level 2 — Flow)
+//
+// ONE small, total boolean predicate language, shared by states, contracts and
+// flow guards. No function calls, no arithmetic. What differs between the three
+// uses is only which path ROOTS are in scope — a semantic rule (rule 12), not a
+// syntactic one:
+//   state        : `_`
+//   requires     : `_` (attached ops), argument names, globals in reads/writes
+//   ensures      : the above, `result`, and `old(_)` / `old(global)`
+//   flow guard   : `_`, argument names, earlier bindings, globals in reads
+// -----------------------------------------------------------------------------
+
 predicate        = orPredicate ;
 
 orPredicate      = andPredicate , { "or" , andPredicate } ;
@@ -100,22 +139,30 @@ andPredicate     = notPredicate , { "and" , notPredicate } ;
 notPredicate     = [ "not" ] , atomPredicate ;
 
 atomPredicate    = "(" , predicate , ")"
-                 | instancePath , "is" , [ "not" ] , "null"
-                 | instancePath , compOp , literalValue
-                 | instancePath , [ "not" ] , "in" , "{" , literalValue
-                                                 , { "," , literalValue } , "}" ;
+                 | path , "is" , [ "not" ] , "null"
+                 | path , compOp , ( literalValue | path )
+                 | path , [ "not" ] , "in" , "{" , literalValue
+                                          , { "," , literalValue } , "}" ;
 
 compOp           = "=" | "!=" | ">" | "<" | ">=" | "<=" ;
 
-// `_` is the instance; every path is rooted at it.
-instancePath     = "_" , { "." , fieldName } ;
+// A dot-path from a root. `_` is the receiver/instance; a bare identifier is an
+// argument, a flow binding or a global; `result` and `old(...)` are legal only in
+// `ensures`.
+path             = pathRoot , { "." , fieldName } ;
+
+pathRoot         = "_"
+                 | "result"
+                 | "old" , "(" , ( "_" | qualifiedName ) , ")"
+                 | qualifiedName ;
 
 // -----------------------------------------------------------------------------
 // Type  (metamodel: Type)
 //
-// Exactly five constructors: scalar, vector, map, struct reference, and the
-// nullable marker. There is no union type — `?` is the ONLY way a value may be
-// absent, and it applies to any type.
+// Exactly seven constructors: scalar, vector, map, struct reference, function,
+// opaque, and the nullable marker. There is no union type — `?` is the ONLY way a
+// value may be absent, and it applies to any type. `opaque` is `observed` only
+// (rule 15).
 // -----------------------------------------------------------------------------
 
 type             = baseType , [ "?" ] ;
@@ -123,6 +170,8 @@ type             = baseType , [ "?" ] ;
 baseType         = scalarType
                  | vectorType
                  | mapType
+                 | functionType
+                 | opaqueType
                  | structRef ;
 
 scalarType       = "string"
@@ -135,6 +184,13 @@ vectorType       = "vector" , "<" , type , ">" ;
 // An inline anonymous record. The named form is a struct's `schema` block.
 mapType          = "{" , { comment | fieldDecl } , "}" ;
 
+// A callable value: parameter types in order, then the return type or `void` for
+// a function that exists for its effects. `(Money) -> Money`, `(Event) -> void`.
+functionType     = "(" , [ type , { "," , type } ] , ")" , "->" , ( type | "void" ) ;
+
+// The verbatim signature of a type the closed language cannot express.
+opaqueType       = "opaque" , stringLiteral ;
+
 fieldDecl        = fieldName , ":" , type , [ description ] ;
 
 fieldName        = camelCaseId ;
@@ -145,54 +201,85 @@ structRef        = qualifiedName ;
 // -----------------------------------------------------------------------------
 // Global Binding  (metamodel: Global Binding)
 //
-// The initial value is MANDATORY and shall conform to the declared type.
+// The initial value is MANDATORY and shall conform to the declared type: a JSON
+// literal, or — when the type is a function type — the reference of an operation
+// whose signature conforms (rule 6). A function-valued global is a value holder
+// AND invocable.
 // -----------------------------------------------------------------------------
 
-globalDef        = "global" , camelCaseId , ":" , type , "=" , jsonValue
+globalDef        = "global" , camelCaseId , ":" , type , "=" , initialValue
                  , [ description ] , [ metadataBlock ] ;
 
+initialValue     = jsonValue
+                 | operationRef ;
+
 // -----------------------------------------------------------------------------
-// Operation  (metamodel: Operation)
+// Operation  (metamodel: Operation, Attachment)
 //
-// A signature and nothing else — no body. The clauses declare what the operation
-// needs; they are CLOSED-WORLD (metamodel: Dependency graph): every direct
-// dependency and every global read or written is declared here. Transitive access
-// is derived by graph traversal, never re-declared.
+// A signature, its declared needs, and — optionally — a description of its
+// processing at one of three levels: description (`::`), contract (`requires` /
+// `ensures`), flow. Never a body.
 //
-// Clause order is fixed to keep the parser and the reader in agreement.
+// The clauses are CLOSED-WORLD (metamodel: Dependency graph): every direct
+// dependency and every global or receiver field read or written is declared.
+// Transitive access is derived by graph traversal, never re-declared. When a
+// `flow` is present the clauses are derivable from it and shall agree (rule 18).
+//
+// `on` attaches the operation to a struct declared elsewhere; an operation nested
+// in a struct is attached to it without `on`. Clause order is fixed to keep the
+// parser and the reader in agreement.
 // -----------------------------------------------------------------------------
 
 operationDef     = "operation" , camelCaseId , "(" , [ paramList ] , ")"
                  , [ ":" , type ]              (* absent = the operation exists for its effects *)
+                 , [ onClause ]
                  , [ description ]
                  , [ metadataBlock ]
                  , [ errorsBlock ]
                  , [ dependsOnClause ]
                  , [ readsClause ]
                  , [ writesClause ]
+                 , [ requiresBlock ]
+                 , [ ensuresBlock ]
+                 , [ flowBlock ]
                  , [ implementsClause ] ;
 
 paramList        = paramDecl , { "," , paramDecl } ;
 
 paramDecl        = camelCaseId , ":" , type ;
 
-dependsOnClause  = "depends" , "on" , "{" , nameList , "}" ;
+onClause         = "on" , structRef ;
 
-readsClause      = "reads" , "{" , nameList , "}" ;
+// A dependency may be UNCERTAIN (`?`): the call site was observed but its target
+// could not be resolved to one operation. `observed` only (rule 16).
+dependsOnClause  = "depends" , "on" , "{" , dependencyRef , { "," , dependencyRef } , "}" ;
 
-writesClause     = "writes" , "{" , nameList , "}" ;
+dependencyRef    = operationRef , [ "?" ] ;
 
-nameList         = qualifiedName , { "," , qualifiedName } ;
+// A global binding, or — in an attached operation — a receiver field `_.field`.
+readsClause      = "reads" , "{" , accessTarget , { "," , accessTarget } , "}" ;
+
+writesClause     = "writes" , "{" , accessTarget , { "," , accessTarget } , "}" ;
+
+accessTarget     = qualifiedName
+                 | "_" , "." , fieldName , { "." , fieldName } ;
+
+// An operation reference: `findPriceEntry`, `PriceEntry.effectivePrice`,
+// `pricing.PriceEntry.effectivePrice`; the parenthesised parameter type list is
+// the DISAMBIGUATOR and is written only for overloaded operations
+// (metamodel: Convention).
+operationRef     = qualifiedName , [ "(" , [ type , { "," , type } ] , ")" ] ;
 
 // -----------------------------------------------------------------------------
 // Error signature  (metamodel: Error signature)
 //
 // A named failure mode with an optional payload: either an inline field list or
 // a struct reference. Errors are part of the signature — a caller knows every way
-// an operation can fail without inspecting a body.
+// an operation can fail without inspecting a body. Errors are separated by
+// newlines or commas.
 // -----------------------------------------------------------------------------
 
-errorsBlock      = "errors" , "{" , { comment | errorDef } , "}" ;
+errorsBlock      = "errors" , "{" , { comment | errorDef , [ "," ] } , "}" ;
 
 errorDef         = typeName , [ errorPayload ] , [ correspondsToClause ] , [ description ] ;
 
@@ -200,6 +287,74 @@ errorPayload     = "(" , [ paramList ] , ")"   (* inline payload fields *)
                  | "of" , structRef ;          (* payload described by a struct *)
 
 correspondsToClause = "corresponds" , "to" , qualifiedName ;
+
+// -----------------------------------------------------------------------------
+// Contract — Level 1  (metamodel: Level 1 — Contract)
+//
+// `requires`: preconditions, obligations on the caller. `else E` binds the
+// violation to a declared error signature: the operation checks the condition
+// and signals E. Without `else`, a violation is a caller defect, not a failure.
+// `ensures`: postconditions, guarantees over `result`, `_`, the declared globals
+// and their `old(...)` values (rule 12, rule 13).
+// Conditions are separated by newlines or commas.
+// -----------------------------------------------------------------------------
+
+requiresBlock    = "requires" , "{" , { comment | precondition , [ "," ] } , "}" ;
+
+precondition     = predicate , [ "else" , typeName ] , [ description ] ;
+
+ensuresBlock     = "ensures" , "{" , { comment | postcondition , [ "," ] } , "}" ;
+
+postcondition    = predicate , [ description ] ;
+
+// -----------------------------------------------------------------------------
+// Flow — Level 2  (metamodel: Level 2 — Flow)
+//
+// An ORDERED list of steps in exactly four forms. No expressions: every value is
+// a name in scope, a path from one, a literal, or the result of a call. The happy
+// path is STRAIGHT-LINE: `when` guards are legal on `write` and `raise` only.
+// -----------------------------------------------------------------------------
+
+flowBlock        = "flow" , "{" , { comment | flowStep } , "}" ;
+
+flowStep         = bindStep
+                 | writeStep
+                 | raiseStep
+                 | returnStep ;
+
+// `name = callee(args)` — call a declared dependency and name its result.
+bindStep         = camelCaseId , "=" , call ;
+
+// `write target = value [when p]` — store into a global or a receiver field.
+writeStep        = "write" , accessTarget , "=" , flowValue , [ guard ] ;
+
+// `raise Error(field: value, …) [when p]` — signal a declared error.
+raiseStep        = "raise" , typeName , [ "(" , [ errorArg , { "," , errorArg } ] , ")" ]
+                 , [ guard ] ;
+
+errorArg         = fieldName , ":" , flowValue ;
+
+// `return value` — end with the named value; at most one, and last (rule 17).
+returnStep       = "return" , flowValue ;
+
+guard            = "when" , predicate ;
+
+// The callee: a module-level operation or a function-valued global
+// (`findPriceEntry(…)`), a method on a bound value (`entry.effectivePrice()` —
+// syntactically a qualified name, resolved through the binding by rule 9), a
+// method on the receiver (`_.complete()`), or a fully qualified attached
+// operation (`pricing.PriceEntry.effectivePrice`). The optional disambiguator
+// selects an overload.
+call             = callee , "(" , [ flowValue , { "," , flowValue } ] , ")" ;
+
+callee           = operationRef
+                 | "_" , "." , camelCaseId ;
+
+// A value in a flow: a name in scope or a path from one, a literal, or the
+// result of a nested call (allowed as an argument, never as a bare statement).
+flowValue        = path
+                 | literalValue
+                 | call ;
 
 // -----------------------------------------------------------------------------
 // Domain link  (metamodel: Traceability to the Domain model)
@@ -211,10 +366,9 @@ correspondsToClause = "corresponds" , "to" , qualifiedName ;
 implementsClause = "implements" , qualifiedName ;
 
 // -----------------------------------------------------------------------------
-// JSON values — the initial value of a global binding
+// JSON values — the initial value of a non-function global binding
 //
-// This is the ONLY value syntax in the language, and it is literal JSON: no
-// expressions, no references, no arithmetic.
+// Literal JSON: no expressions, no references, no arithmetic.
 // -----------------------------------------------------------------------------
 
 jsonValue        = jsonObject
@@ -232,7 +386,7 @@ jsonMember       = stringLiteral , ":" , jsonValue ;
 jsonArray        = "[" , [ jsonValue , { "," , jsonValue } ] , "]" ;
 
 // -----------------------------------------------------------------------------
-// Description — :: operator
+// Description — :: operator  (metamodel: Level 0 — Description)
 // Attaches a human-readable description to any construct. Does not change semantics.
 // -----------------------------------------------------------------------------
 
@@ -249,9 +403,11 @@ metadataEntry    = identifier , "=" , literalValue ;
 // -----------------------------------------------------------------------------
 // Names and literals
 //
-// A qualified name reaches into another module (`pricing.Money`) or names a
-// domain element (`pricing.GrantProductDiscount`). Unqualified names resolve
-// within the enclosing module.
+// A qualified name reaches into another module (`pricing.Money`), names an
+// attached operation (`PriceEntry.effectivePrice`), or names a domain element
+// (`pricing.GrantProductDiscount`). Unqualified names resolve within the
+// enclosing scope: flow bindings and parameters, then the enclosing struct's
+// members, then the enclosing module (rule 9).
 // -----------------------------------------------------------------------------
 
 qualifiedName    = nameSegment , { "." , nameSegment } ;
@@ -279,6 +435,13 @@ camelCaseId      = lowerLetter , { letter | digit } ;
 
 // -----------------------------------------------------------------------------
 // Comments
+//
+// A comment may appear between ANY two tokens — the `comment` alternatives
+// written into block productions above show the conventional places, not the
+// only legal ones. A comment of the form `// source: path:start-end` is an
+// EVIDENCE anchor (metamodel: Convention): still a comment to this grammar, a
+// source location to the tooling. Expected on every declaration of an
+// `observed` model, conventionally on the line after the declaration's header.
 // -----------------------------------------------------------------------------
 
 comment          = "//" , { character } , newline ;
@@ -310,38 +473,92 @@ newline          = "\n" ;
 // Semantic rules — TRUE of the metamodel, NOT expressible in a context-free
 // grammar. These belong to a validator, not here.
 //
-//  1. Struct DAG: a struct's `schema` block shall only reference PREVIOUSLY
-//     defined structs. No forward references, no direct or transitive
-//     self-reference (metamodel: Struct). Every value is therefore finite.
-//  2. Operation DAG: the `depends on` graph shall be acyclic — no recursion, no
-//     mutual recursion (metamodel: Dependency graph).
-//  3. Derived module dependency graph shall be acyclic; it follows from rules 1
-//     and 2 plus the module of each referenced element (metamodel: Module).
-//  4. Closed world: an operation shall declare EVERY operation it directly
-//     depends on and EVERY global it directly reads or writes. Undeclared access
-//     is a model defect, not a syntax error.
-//  5. An operation with no return type shall declare at least one `writes` — an
-//     operation with neither a return nor a write does nothing observable
-//     (metamodel: Operation).
-//  6. A global binding's initial value shall conform to its declared type. The
-//     grammar accepts any JSON literal in that position; conformance is checked.
-//  7. A field whose type is not nullable shall not hold `null`, and a map value
-//     always carries ALL declared fields — absence is expressed with `?` only
-//     (metamodel: Type).
-//  8. Names shall be unique within their module, per kind (struct, global,
-//     operation).
-//  9. An unqualified name resolves within the enclosing module; a qualified name
-//     shall resolve to a declared element of the named module, or — for
+// Each rule is tagged: [both] applies identically at both conformance levels;
+// [strict: reject / observed: finding] is a rejection in a `strict` model and a
+// reported finding in an `observed` one; [strict only] is a rejection in a
+// `strict` model and not checked in an `observed` one.
+//
+//  1. Struct DAG [strict: reject / observed: finding]: a struct's `schema` block
+//     shall only reference PREVIOUSLY defined structs. No forward references, no
+//     direct or transitive self-reference (metamodel: Struct). Under `strict`
+//     every value is therefore finite. The rule covers the `schema` block only —
+//     a nested operation's signature may reference any struct.
+//  2. Operation DAG [strict: reject / observed: finding]: the `depends on` graph
+//     (including flow callees) shall be acyclic — no recursion, no mutual
+//     recursion (metamodel: Dependency graph). Under `observed`, analyses run on
+//     the graph's condensation.
+//  3. Module DAG [strict: reject / observed: finding]: the derived module
+//     dependency graph shall be acyclic; it follows from rules 1 and 2 plus the
+//     module of each referenced element (metamodel: Module).
+//  4. Closed world [both]: an operation shall declare EVERY operation it directly
+//     depends on and EVERY global or receiver field it directly reads or writes.
+//     Undeclared access is a model defect, not a syntax error. Under `observed`
+//     the extractor's documented blind spots are findings, not omissions.
+//  5. Observable effect [both]: an operation with no return type shall declare at
+//     least one `writes` — an operation with neither a return nor a write does
+//     nothing observable (metamodel: Operation).
+//  6. Initial value conformance [both]: a global binding's initial value shall
+//     conform to its declared type. For a function type, the initial value shall
+//     be an operation whose parameter types and return type match the function
+//     type exactly (`void` ↔ no return type). The grammar accepts any JSON
+//     literal or operation reference in that position; conformance is checked.
+//  7. Nullability [both]: a field whose type is not nullable shall not hold
+//     `null`, and a map value always carries ALL declared fields — absence is
+//     expressed with `?` only (metamodel: Type).
+//  8. Uniqueness [both]: names shall be unique within their module, per kind
+//     (struct, global, operation); attached operations are unique within their
+//     struct. Two operations may share a name only when their parameter type
+//     lists differ, and every reference to an overloaded operation shall carry
+//     the disambiguator (metamodel: Convention).
+//  9. Resolution [both]: an unqualified name resolves in order through the flow
+//     bindings and parameters, the enclosing struct's fields and operations, and
+//     the enclosing module; a qualified name shall resolve to a declared element
+//     (including external declarations) of the named module or struct, or — for
 //     `implements`, `represents` and `corresponds to` — to an element of the
 //     domain model.
-// 10. Implicit domain links: when no `implements` / `represents` /
+// 10. Implicit domain links [both]: when no `implements` / `represents` /
 //     `corresponds to` is declared, a link is presumed where names match,
 //     case-style ignored (metamodel: Convention). An explicit declaration always
-//     wins over the presumption.
-// 11. Error correspondence: an error signature of an operation that implements a
-//     domain operation should surface as that domain operation's matching Error
-//     Event. A missing counterpart is a traceability gap, detectable by audit.
-// 12. State scope: every `_.field` path in a state predicate shall resolve to a
-//     field declared in the enclosing struct's `schema` block; a predicate refers
-//     to nothing outside the instance (metamodel: State).
+//     wins over the presumption. An attached operation matches an operation
+//     owned by the entity its struct represents.
+// 11. Error correspondence [both]: an error signature of an operation that
+//     implements a domain operation should surface as that domain operation's
+//     matching Error Event. A missing counterpart is a traceability gap,
+//     detectable by audit.
+// 12. Predicate scope [both]: every path shall resolve from a root in scope for
+//     its position (metamodel: Level 1 — Contract). In a state: `_` only, and
+//     `_.field` shall name a field of the enclosing struct. In `requires`: `_`
+//     (attached operations only), argument names, and globals declared in
+//     `reads` or `writes`. In `ensures`: the same plus `result` (only when the
+//     operation has a return type) and `old(_)` / `old(g)` where `g` is a global
+//     in `writes`. In a flow guard: `_`, argument names, bindings made by
+//     EARLIER steps, and globals in `reads`. Every dotted step shall name a field
+//     of the preceding value's type; an `opaque` value has no fields.
+// 13. Precondition binding [both]: the error named by `else` shall be declared
+//     in the operation's `errors` block.
+// 14. Attachment [both]: the struct named by `on` shall be a struct of the model
+//     (not an external struct). A nested operation without `on` is attached to
+//     its enclosing struct. Receiver paths (`_.field`) in `reads`, `writes`,
+//     predicates and flows are legal only in attached operations.
+// 15. Opaque [strict only]: `opaque` shall not appear in a `strict` model
+//     (metamodel: Type).
+// 16. Uncertain dependency [strict only]: `?` on a dependency shall not appear in
+//     a `strict` model; under `observed` the edge carries the `candidate`
+//     provenance (metamodel: Dependency graph).
+// 17. Flow shape [both]: a flow contains at most one `return` step, which is the
+//     last step, and exactly one when the operation has a return type; a guard
+//     appears only on `write` and `raise` steps; every binding name is bound
+//     once; every callee argument count and every `write` value shall match the
+//     callee's or target's type.
+// 18. Flow / clause agreement [both]: when a flow is present, the set of callees
+//     (through bindings and function-valued globals) equals `depends on`
+//     (ignoring `?`), the set of `write` targets equals `writes`, every global
+//     and receiver field read by a step or guard is in `reads`, and every
+//     `raise` names an error in `errors`. Errors declared but never raised are
+//     legal: they are propagated from dependencies.
+// 19. Happy path [both]: no construct may make a bind step conditional. Under
+//     `observed`, branching in a body that a flow cannot express is a finding
+//     recorded beside the operation, never a guard on a bind step.
+// 20. Evidence [observed only, advisory]: every declaration should carry a
+//     `// source:` anchor; a missing anchor is a finding.
 // =============================================================================
