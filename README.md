@@ -251,6 +251,8 @@ A `.prd` file structures product thinking into traceable concepts: problem state
 
 **Traceability:** each feature traces to goals and personas; each user story traces to a feature; each release groups features. The PRD feeds into system requirements via feature-to-requirement coverage.
 
+![Specy PRD metamodel](./specy-PRD-metamodel.svg)
+
 <details>
 <summary><b>PRD key concepts</b></summary>
 
@@ -276,6 +278,8 @@ A `.prd` file structures product thinking into traceable concepts: problem state
 A `.sysreq` file contains requirement sets grouped by feature or capability, using the **EARS** (Easy Approach to Requirements Syntax) patterns. Each requirement has a unique ID, a priority (MoSCoW), and traces back to a PRD feature.
 
 **Traceability:** each requirement set links to a PRD feature via `feature-ref`; each requirement has a unique ID (e.g., `REQ-ORD-001`) that domain model constructs reference via `satisfies`.
+
+![Specy system requirement metamodel](./specy-SysReq-metamodel.svg)
 
 <details>
 <summary><b>EARS patterns &amp; key concepts</b></summary>
