@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Build the metamodel diagrams (repo root: specy-PRD-metamodel.svg, specy-SysReq-metamodel.svg).
+# Build the metamodel diagrams (repo root: specy-PRD-metamodel.svg, specy-SysReq-metamodel.svg,
+# specy-Arch-metamodel.svg, specy-DataOp-metamodel.svg).
 # Requires python3 + network on first run (fonts and fontTools are fetched into git-ignored caches).
 set -euo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -27,3 +28,4 @@ cd "$DIR"
 "$VENV/bin/python" prd_metamodel.py "$ROOT/specy-PRD-metamodel.svg"
 "$VENV/bin/python" sysreq_metamodel.py "$ROOT/specy-SysReq-metamodel.svg"
 "$VENV/bin/python" arch_metamodel.py "$ROOT/specy-Arch-metamodel.svg"
+"$VENV/bin/python" dataop_metamodel.py "$ROOT/specy-DataOp-metamodel.svg"
