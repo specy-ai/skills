@@ -70,7 +70,7 @@ class Font:
             return ""
         from fontTools import subset
         from fontTools.ttLib import TTFont
-        font = TTFont(self.path)
+        font = TTFont(self.path, recalcTimestamp=False)  # reproducible output: keep the font's own dates
         opts = subset.Options()
         opts.flavor = "woff2"
         opts.desubroutinize = True

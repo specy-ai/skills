@@ -26,3 +26,4 @@ fi
 cd "$DIR"
 "$VENV/bin/python" prd_metamodel.py "$ROOT/specy-PRD-metamodel.svg"
 "$VENV/bin/python" sysreq_metamodel.py "$ROOT/specy-SysReq-metamodel.svg"
+"$VENV/bin/python" arch_metamodel.py "$ROOT/specy-Arch-metamodel.svg"
