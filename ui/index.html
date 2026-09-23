@@ -4,8 +4,8 @@
   <meta charset="utf-8" />
   <title>Specy — Domain Navigator</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="ds-tokens.css" />
-  <link rel="stylesheet" href="app.css" />
+  <link rel="stylesheet" href="ds-tokens.css?v=2026-09-23" />
+  <link rel="stylesheet" href="app.css?v=2026-09-23" />
 </head>
 <body>
   <div class="app">
@@ -37,16 +37,19 @@
     <main id="main" class="main"><div id="detail"></div></main>
   </div>
 
-  <!-- Specy Diagram Engine: single IIFE bundle (built from ../diagram-engine with
+  <!-- Local assets carry ?v=… so a browser holding an older cached copy (the
+       dev server used to send no Cache-Control) fetches the current one;
+       serve.sh now sends Cache-Control: no-cache, so edits revalidate anyway.
+       Specy Diagram Engine: single IIFE bundle (built from ../diagram-engine with
        `npm run build`, copied to vendor/). It exposes window.SpecyDiagramEngine
        and only auto-bootstraps when #diagram / window.SPECY_DIAGRAM exist. -->
-  <script src="vendor/specy-diagram-engine.js"></script>
-  <script src="data.js"></script>
-  <script src="domain-parser.js"></script>
-  <script src="sysreq-parser.js"></script>
-  <script src="domain-to-diagram.js"></script>
-  <script src="arch-parser.js"></script>
-  <script src="arch-to-diagram.js"></script>
-  <script src="app.js"></script>
+  <script src="vendor/specy-diagram-engine.js?v=2026-09-23"></script>
+  <script src="data.js?v=2026-09-23"></script>
+  <script src="domain-parser.js?v=2026-09-23"></script>
+  <script src="sysreq-parser.js?v=2026-09-23"></script>
+  <script src="domain-to-diagram.js?v=2026-09-23"></script>
+  <script src="arch-parser.js?v=2026-09-23"></script>
+  <script src="arch-to-diagram.js?v=2026-09-23"></script>
+  <script src="app.js?v=2026-09-23"></script>
 </body>
 </html>

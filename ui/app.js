@@ -42,7 +42,10 @@ const GROUPS = [
   ["Properties", ["invariant", "agreement", "reconciliation"]],
 ];
 
-/* ---- .domain / .sysreq / .arch files loaded at boot ---- */
+/* ---- .domain / .sysreq / .arch files loaded at boot ----
+   Always revalidated with the server (304 when unchanged): an edited model
+   must never be read from a stale HTTP cache next to newer code. */
+const NO_CACHE = { cache: "no-cache" };
 const DOMAIN_FILES = ["fipro.domain", "fipro.refactored.domain", "ffm.domain", "url-shortener.domain"];
 const SYSREQ_FILES = ["fipro.sysreq"];
 const ARCH_FILES = [
@@ -1237,7 +1240,7 @@ document.addEventListener("change", e => {
 (async function boot() {
   for (const file of DOMAIN_FILES) {
     try {
-      const res = await fetch(file);
+      const res = await fetch(file, NO_CACHE);
       if (!res.ok) continue;
       const org = parseDomain(await res.text(), file.replace(/\.domain$/, ""));
       MODEL.organizations.push(org);
@@ -1247,7 +1250,7 @@ document.addEventListener("change", e => {
   }
   for (const file of SYSREQ_FILES) {
     try {
-      const res = await fetch(file);
+      const res = await fetch(file, NO_CACHE);
       if (!res.ok) continue;
       REQSETS.push(...parseSysreq(await res.text(), file.replace(/\.sysreq$/, "")));
     } catch (e) {
@@ -1256,7 +1259,7 @@ document.addEventListener("change", e => {
   }
   for (const file of ARCH_FILES) {
     try {
-      const res = await fetch(file);
+      const res = await fetch(file, NO_CACHE);
       if (!res.ok) { console.warn(`could not load ${file}: HTTP ${res.status}`); continue; }
       ARCHS.push(parseArch(await res.text(), file.replace(/\.arch$/, "")));
     } catch (e) {
