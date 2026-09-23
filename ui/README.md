@@ -1,9 +1,11 @@
 # Specy Navigator — HTML prototype
 
-Three header tabs: **Domain Navigator** (browse `.domain` models),
+Four header tabs: **Domain Navigator** (browse `.domain` models),
 **Domain Diagram** (per-module UML-like class diagram rendered by the Specy
-Diagram Engine) and **Requirements Navigator** (browse `.sysreq` requirement
-sets per SYSTEM-REQ-METAMODEL.md). Traceability is bidirectional: a domain element's
+Diagram Engine), **Architecture diagram** (a `.arch` software architecture as
+a nested, foldable C4 diagram, also rendered by the engine) and
+**Requirements Navigator** (browse `.sysreq` requirement sets per
+SYSTEM-REQ-METAMODEL.md). Traceability is bidirectional: a domain element's
 `satisfies REQ-…` chips link to the requirement, and each requirement computes
 its **Satisfied by** table by scanning the `satisfies` lists of every loaded
 domain model — with the satisfaction role derived from the element's kind
@@ -100,11 +102,88 @@ home module's model). Double-click any element to open it in the Domain
 Navigator (`onNavigate`). Still no build step on this side: only the vendored
 engine bundle is a build product.
 
+## Architecture diagram tab
+
+Renders one `.arch` file (SOFTWARE-ARCHITECTURE-METAMODEL.md, grammar
+`src/grammars/architecture.ebnf`) as a **nested, foldable C4 diagram**: the
+system in focus is a group (`er-group`, kind `system`) holding its
+containers; a container with components — or a broker hosting channels — is
+a nested group, a black-box container (database, SPA, store…) a plain card.
+Persons and external systems sit outside the system (dagre top-to-bottom:
+persons above, external systems below). The engine's group **detail levels
+are the C4 zoom levels**: *Groups 1* folds everything to the System Context
+view, *2* shows containers, *3* opens the components; each group also has its
+own `1 | 2 | 3` control and a header double-click cycle. Folded groups carry
+aggregated edges with a count badge.
+
+- **Picker** — the left-panel dropdown lists the loaded architectures
+  (`ARCH_FILES` at the top of `app.js`: `ffm.arch`, the FFM landscape, and the
+  public `url-shortener.arch`); the
+  tree shows the system, element counts keyed by the canvas colours, the fold
+  hint and the containers (info rows; the filter box is hidden in this view).
+- **Landscapes** — a file may hold several `system` blocks (a C4 system
+  landscape). Each system is its own foldable group, so *Groups 1* shows the
+  systems and the flows between them, *2* their containers, *3* the
+  components; the tree lists the containers under their system.
+  `ffm.arch` is such a landscape: `scripts/merge-arch.mjs` merges the 11
+  single-system files generated for FFM (kept, git-ignored, in
+  `ffm.arch-sources/`) — persons and external systems once, each type and
+  interface declared once, a flow described by both of its systems fused into
+  one connector, same-name containers suffixed with their system:
+
+  ```bash
+  node scripts/merge-arch.mjs -o ffm.arch --name PaysageApplicatifFfm \
+    ffm.arch-sources/exalto.arch ffm.arch-sources/engage-sports.arch …   # order = type placement
+  ```
+- **Toggles** — persons, external systems, channels, edge labels. A hidden
+  kind drops its cards and every edge touching them; with channels hidden a
+  broker with no other member becomes a black-box card.
+- **Edges** — one per connector (`<interface> · <protocol>`, protocol cut at
+  its first ` (`, label capped at 32 characters; the full protocol and the
+  connector description stay in `data.description`). Solid = `sync`, dashed
+  `6 4` = `async`, dotted `2 3` = `streaming`; `publishes` / `subscribes`
+  (component → channel) are dashed. Parallel connectors with the same
+  source, target and style merge into one edge (`data.relationIds`, labels
+  joined with ` / `); a connector from a component to its own container stays
+  in the model but is not drawn. Edge sides are derived by the engine
+  (`layout.handles: "auto"`).
+- **Navigation** — a card whose `realizes module "…"` / `realizes context X`
+  resolves in the `.domain` named by the file's `domain-source` (it must be
+  loaded through `DOMAIN_FILES`) carries `data.domainRef` and an
+  `Open module "…"` action; double-click or the action opens it in the
+  Domain Navigator. Deep link: `#arch:<file stem>` (e.g. `#arch:url-shortener`).
+- Model id `<file stem>-architecture` (also the storage prefix: positions and
+  fold levels persist per file), diagram id `<model id>#architecture`.
+
+`arch-parser.js` (`parseArch(text, fileStem)`) is a tolerant structural
+reader like `domain-parser.js`: comments stripped, multi-line headers and
+operations joined into logical lines, quote-aware brace counting (one-line
+`enum { … }` / `exception { … }` / `meta { … }` blocks stay statements).
+Types (`struct`, `enum`, `union`, `exception`, `typedef`, `import`) are
+skipped and interface operations only counted — none of them is drawn. `arch-to-diagram.js`
+(global `SpecyArchDiagrams`) is the pure converter:
+`architectureDiagram(arch, show, { domainOrg })`, plus `DEFAULT_SHOW`,
+`modelIdOf`, `countVisible`, `KIND_LEGEND` (kind colours mirroring the
+engine's `.er-node--kind-*` rules).
+
+Every `.arch` and `.domain` file in `ui/` is git-ignored (client models stay
+local; a file listed in `ARCH_FILES` / `DOMAIN_FILES` but missing is skipped).
+For the public Sniplink sample, link it from `examples/` once after cloning
+(`./serve.sh`'s `python3 -m http.server` follows symlinks); double-click
+navigation then lands in the Sniplink organization:
+
+```bash
+ln -s ../examples/url-shortener/url-shortener.arch   ui/url-shortener.arch
+ln -s ../examples/url-shortener/url-shortener.domain ui/url-shortener.domain
+```
+
 ## Checking the converters
 
 ```bash
 node scripts/check-diagram-export.mjs                 # examples/business-loan
 node scripts/check-diagram-export.mjs path/to/x.domain
+node scripts/check-arch-export.mjs                    # examples/url-shortener
+node scripts/check-arch-export.mjs path/to/x.arch     # validate only
 ```
 
 The script needs only Node (no dependencies): it loads `domain-parser.js` and
@@ -118,6 +197,20 @@ machine to `../diagram-engine/examples/diagrams/navigator-domain-class.json`
 and `navigator-statechart.json` as engine fixtures. Examples that elide the
 `organization` / `context` containers (business-loan) are wrapped in a
 synthetic one before parsing.
+
+`check-arch-export.mjs` does the same for the architecture converter: it
+parses the `.arch` (and its `domain-source`, for the `domainRef` links),
+converts it with every toggle combination and checks the DiagramFiles —
+`software-architecture` metamodel, dagre layout with `handles: "auto"`,
+unique ids, no node position or height, parents before members with
+`extent: "parent"`, `er-group` iff the node has members, every `modelRef`
+resolving, dash pattern per connector style, no edge into an ancestor, every
+relation drawn (except component → own-container connectors), no unresolved
+connector endpoint. It prints counts, merged / dropped connectors and the
+resolved `domainRef`s, and writes the default (url-shortener) conversion to
+`../diagram-engine/examples/diagrams/navigator-architecture.json`. A file
+passed on the command line is validated only, never written — client
+models stay out of the engine repository.
 
 ## Run
 
@@ -140,7 +233,8 @@ the `fipro.*` client models, which are **not** in this repo (they are gitignored
 `examples/` (e.g. `business-loan.domain` + `business-loan.sysreq`) into `ui/`.
 
 To add another model, drop the file in `ui/` and append its name to
-`DOMAIN_FILES`. Cross-references are resolved by name within the bounded
+`DOMAIN_FILES` (`.arch` files: `ARCH_FILES`; a missing file is skipped with a
+console warning). Cross-references are resolved by name within the bounded
 context; command→operation→event chains are back-linked automatically
 (`"Label" on Command` gives the command its `targets`/`triggers`/`produces`,
 and `emits` gives each event its `raised by`).
@@ -148,7 +242,8 @@ and `emits` gives each event its `raised by`).
 ## Files
 
 - `index.html` — shell (header / tree / main triptych); loads the engine
-  bundle first, then `data.js`, the parsers, `domain-to-diagram.js`, `app.js`
+  bundle first, then `data.js`, the parsers, `domain-to-diagram.js`,
+  `arch-parser.js`, `arch-to-diagram.js`, `app.js`
 - `ds-tokens.css` — design tokens imported from the specy.ai design system
   (claude.ai/design project `019e2b0b…`); fonts via Google Fonts instead of the
   project's self-hosted TTFs
@@ -161,7 +256,14 @@ and `emits` gives each event its `raised by`).
   metamodel concept
 - `domain-parser.js` / `sysreq-parser.js` — tolerant readers for `.domain` / `.sysreq`
 - `domain-to-diagram.js` — model → DiagramFile converters (`SpecyDomainDiagrams`)
+- `arch-parser.js` — tolerant reader for `.arch` software architectures (`parseArch`)
+- `arch-to-diagram.js` — architecture → nested C4 DiagramFile (`SpecyArchDiagrams`)
+- `url-shortener.arch`, `url-shortener.domain` — local symlinks to the public
+  `examples/url-shortener/` sample (git-ignored, see above)
 - `app.js` — vanilla JS rendering, no build step; mounts the engine islands
 - `vendor/specy-diagram-engine.js` — the Specy Diagram Engine bundle
   (built in `../diagram-engine` with `npm run build`, copied here)
 - `scripts/check-diagram-export.mjs` — converter contract check + engine fixtures
+- `scripts/merge-arch.mjs` — merges single-system `.arch` files into one landscape (`ffm.arch` from `ffm.arch-sources/`)
+- `scripts/check-arch-export.mjs` — architecture converter contract check +
+  `navigator-architecture.json` fixture

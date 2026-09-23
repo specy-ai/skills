@@ -196,7 +196,15 @@ if (errors.length) {
   process.exit(1);
 }
 
-/* ---- samples: richest module + richest machine ---- */
+console.log(`\nOK — all DiagramFiles satisfy DERIVED-DIAGRAMS.md`);
+
+/* ---- samples: richest module + richest machine — only for the default
+   (public, anonymized) business-loan model. A client model passed on the
+   command line is checked but never written into the engine's examples. ---- */
+if (process.argv[2]) {
+  console.log("custom model: fixtures not written (engine examples stay on business-loan)");
+  process.exit(0);
+}
 const bestClass = classFiles.slice().sort((a, b) => b.file.diagram.edges.length - a.file.diagram.edges.length)[0];
 const bestSm = smFiles.slice().sort((a, b) => b.file.diagram.edges.length - a.file.diagram.edges.length)[0];
 fs.mkdirSync(ENGINE_EXAMPLES, { recursive: true });
@@ -204,7 +212,6 @@ const outClass = path.join(ENGINE_EXAMPLES, "navigator-domain-class.json");
 const outSm = path.join(ENGINE_EXAMPLES, "navigator-statechart.json");
 fs.writeFileSync(outClass, JSON.stringify(bestClass.file, null, 2) + "\n");
 if (bestSm) fs.writeFileSync(outSm, JSON.stringify(bestSm.file, null, 2) + "\n");
-console.log(`\nOK — all DiagramFiles satisfy DERIVED-DIAGRAMS.md`);
 console.log(`wrote ${outClass}  (${bestClass.file.model.id})`);
 if (bestSm) console.log(`wrote ${outSm}  (${bestSm.file.model.id})`);
 else console.log("no state machine found — navigator-statechart.json not written");

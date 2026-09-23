@@ -21,3 +21,8 @@ src/skills/*/workspace/
 # Client domain models used by the ui/ navigator prototype — kept local,
 # the repo ships the anonymized equivalents in examples/business-loan/.
 ui/fipro.*
+ui/ffm.*
+# Every model the navigator serves from ui/ stays local (client files, merged
+# landscapes, symlinks to examples/) — the navigator skips a missing file.
+ui/**/*.arch
+ui/**/*.domain

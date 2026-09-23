@@ -42,9 +42,15 @@ const GROUPS = [
   ["Properties", ["invariant", "agreement", "reconciliation"]],
 ];
 
-/* ---- .domain / .sysreq files loaded at boot ---- */
-const DOMAIN_FILES = ["fipro.domain", "fipro.refactored.domain"];
+/* ---- .domain / .sysreq / .arch files loaded at boot ---- */
+const DOMAIN_FILES = ["fipro.domain", "fipro.refactored.domain", "ffm.domain", "url-shortener.domain"];
 const SYSREQ_FILES = ["fipro.sysreq"];
+const ARCH_FILES = [
+  "ffm.arch",            // FFM landscape: 11 systems merged by scripts/merge-arch.mjs from ffm.arch-sources/
+  "url-shortener.arch",  // public sample (symlink to examples/)
+];
+
+const ARCHS = [];            // parsed .arch architectures (arch-parser.js)
 
 const REQSETS = [];          // parsed requirement sets
 const REQ_BY_ID = {};        // "REQ-FIPRO-001" → requirement object
@@ -117,7 +123,7 @@ buildIndex();
 
 /* ---- State ---- */
 const state = {
-  view: "domain",            // "domain" | "diagram" | "req"
+  view: "domain",            // "domain" | "diagram" | "arch" | "req"
   orgId: MODEL.organizations[0].id,
   ctxId: MODEL.organizations[0].contexts[0].id,
   selected: "ctx:" + MODEL.organizations[0].contexts[0].id,
@@ -125,11 +131,14 @@ const state = {
   reqSelected: null,
   diagramModId: null,        // module rendered in the diagram view
   diagramShow: { interfaces: true, entities: true, values: true, services: true },
+  archId: null,              // architecture rendered in the arch view
+  archShow: { persons: true, externalSystems: true, channels: true, edgeLabels: true },
   expanded: new Set(),
   filter: "",
 };
 
 const curSet = () => REQSETS.find(s => s.id === state.reqSetId) || REQSETS[0];
+const curArch = () => ARCHS.find(a => a.id === state.archId) || ARCHS[0];
 
 const org = () => MODEL.organizations.find(o => o.id === state.orgId);
 const ctx = () => org().contexts.find(c => c.id === state.ctxId) || org().contexts[0];
@@ -243,9 +252,75 @@ function renderDiagramTree() {
   document.getElementById("tree").innerHTML = html;
 }
 
+/* ---- Architecture view (arch-parser.js + arch-to-diagram.js) ---- */
+const ARCH_BADGE = { label: "C4", title: "Software architecture", color: "#172741" };
+/* a landscape (several systems) is named after its architecture, a single
+   system in focus after the system */
+const archTitle = a => (a.systems && a.systems.length > 1 ? a.name : (a.system && a.system.name) || a.name);
+const archDomainStem = a => String(a.domainSource || "").split("/").pop().replace(/\.domain$/, "");
+/* the loaded organization parsed from the .arch's domain-source (ids = file stems) */
+const archDomainOrg = a => (a.domainSource && MODEL.organizations.find(o => o.id === archDomainStem(a))) || null;
+
+function archSwatch(kind) {
+  const k = SpecyArchDiagrams.KIND_LEGEND[kind];
+  if (!k) return `<span class="arch-swatch none"></span>`;
+  return `<span class="arch-swatch${k.dashed ? " dashed" : ""}" style="background:${k.color};border-color:${k.border}" title="${esc(k.label)}"></span>`;
+}
+
+/* Architecture view tree: the system in focus, element counts keyed by the
+   canvas colours, the fold-level hint and the containers. Info rows only —
+   no data-select (the canvas is the navigation; the filter box is hidden). */
+function renderArchTree() {
+  const tree = document.getElementById("tree");
+  const a = curArch();
+  if (!a) {
+    tree.innerHTML = `<div class="tree-empty">No .arch file loaded — list one in <code class="inline">ARCH_FILES</code> (top of app.js).</div>`;
+    return;
+  }
+  const sys = a.system, n = a.counts, dorg = archDomainOrg(a);
+  const multi = a.systems.length > 1;   // a landscape (scripts/merge-arch.mjs)
+  const info = (lead, name, count, title, depth) =>
+    `<li><div class="tree-info" style="--indent:${(depth || 0) * 16}px"${title ? ` title="${esc(title)}"` : ""}>${lead}<span class="row-name">${esc(name)}</span>${count != null ? `<span class="row-count">${esc(count)}</span>` : ""}</div></li>`;
+  const desc = multi ? a.description : sys.description || a.description;
+  let html = `<div class="arch-head">
+      <div class="arch-name">${archSwatch("system")}<span>${esc(archTitle(a))}</span></div>
+      ${desc ? `<p class="arch-desc">${esc(desc)}</p>` : ""}
+      <p class="arch-source">${a.domainSource
+        ? `domain-source <code class="inline">${esc(a.domainSource)}</code> · ${dorg ? "linked — double-click a card to open what it realizes" : "not loaded"}`
+        : "no domain-source"}</p>
+    </div>
+    <ul class="arch-legend">
+      <li><div class="tree-group-label" style="--indent:0px">Elements</div></li>`;
+  for (const [kind, key, label] of [
+    ...(multi ? [["system", "systems", "Systems"]] : []),
+    ["person", "persons", "Persons"], ["externalSystem", "externalSystems", "External systems"],
+    ["container", "containers", "Containers"], ["component", "components", "Components"], ["channel", "channels", "Channels"]])
+    html += info(archSwatch(kind), label, n[key]);
+  for (const [key, label, title] of [
+    ["interfaces", "Interfaces", "edge labels and provides / requires rows"],
+    ["connectors", "Connectors", "drawn as edges; parallel ones merged"],
+    ["environments", "Environments", "deployment view — not drawn"]])
+    html += info(archSwatch(null), label, n[key], title);
+  html += `<li><div class="tree-group-label" style="--indent:0px">Fold levels</div></li>
+      <li><div class="tree-hint">Groups <b>1</b> ${multi ? "systems" : "context"} · <b>2</b> containers · <b>3</b> components</div></li>
+      <li><div class="tree-group-label" style="--indent:0px">${multi ? "Systems and containers" : "Containers"}</div></li>`;
+  for (const s of a.systems) {
+    if (multi) html += info(archSwatch("system"), s.name, `${s.containers.length} ct`, s.description, 0);
+    for (const c of s.containers) {
+      const chans = s.channels.filter(ch => ch.broker === c.name).length;
+      const count = c.components.length ? c.components.length : chans ? `${chans} ch` : "—";
+      const title = [c.technology, c.description].filter(Boolean).join(" — ");
+      html += info(archSwatch("container"), c.name, count, title, multi ? 1 : 0);
+    }
+  }
+  html += `</ul>`;
+  tree.innerHTML = html;
+}
+
 function renderTree() {
   if (state.view === "req") { renderReqTree(); return; }
   if (state.view === "diagram") { renderDiagramTree(); return; }
+  if (state.view === "arch") { renderArchTree(); return; }
   const c = ctx();
   const f = state.filter.trim().toLowerCase();
   let html = `<ul><li>${treeRow({ id: "ctx:" + c.id, name: c.name + " — context map", k: null, depth: 0, hasChildren: false })}</li>`;
@@ -755,6 +830,46 @@ function renderDiagramView(target) {
   });
 }
 
+/* Architecture view: the .arch system as a nested, foldable C4 diagram —
+   the engine's group levels are the C4 zoom (system folded = context,
+   containers folded = containers, all open = components). Double-click (or
+   the card's "Open module" action) jumps to the realized domain module or
+   context in the Domain Navigator. */
+function renderArchView(target) {
+  const a = curArch();
+  if (!a) {
+    target.innerHTML = `<div class="empty-state"><span class="brackets">[ ]</span>No .arch file loaded — list one in <code class="inline">ARCH_FILES</code> (top of app.js).</div>`;
+    return;
+  }
+  state.archId = a.id;
+  const show = state.archShow;
+  const n = a.counts;
+  const opts = [["persons", "persons"], ["externalSystems", "external systems"], ["channels", "channels"], ["edgeLabels", "edge labels"]];
+  target.innerHTML = `<div class="diagram-wrap">
+    <div class="diagram-bar">
+      ${badge(ARCH_BADGE)}<span class="diagram-title">${esc(archTitle(a))}</span>
+      <span class="diagram-sub">${esc(a.id)}.arch · ${a.systems.length > 1 ? `${n.systems} systems · ` : ""}${n.containers} containers · ${n.components} components · ${n.connectors} connectors</span>
+      <span class="spacer"></span>
+      <div class="diagram-opts">${opts.map(([key, label]) =>
+        `<label class="diag-opt"><input type="checkbox" data-archopt="${key}"${show[key] ? " checked" : ""}/>${esc(label)}</label>`).join("")}
+      </div>
+    </div>
+    <div id="flow" class="flow-host"></div>
+  </div>`;
+  const file = SpecyArchDiagrams.architectureDiagram(a, show, { domainOrg: archDomainOrg(a) });
+  mountDiagram(document.getElementById("flow"), file, {
+    storagePrefix: file.model.id,
+    interactive: true,
+    wheel: "pan",
+    fitView: true,
+    logo: false,
+    onNavigate: (ref, node) => {
+      const d = node && node.data && node.data.domainRef;
+      if (d && INDEX[d.id]) goto(d.id);
+    },
+  });
+}
+
 /* One read-only statechart per `[data-sm-host]` placeholder rendered by
    stateMachineCards. Called after the detail innerHTML is set. */
 function mountStateMachines(container, hit) {
@@ -779,8 +894,9 @@ function mountStateMachines(container, hit) {
 function renderDetail() {
   const target = document.getElementById("detail");
   unmountDiagrams();
-  document.getElementById("main").classList.toggle("diagram-mode", state.view === "diagram");
+  document.getElementById("main").classList.toggle("diagram-mode", state.view === "diagram" || state.view === "arch");
   if (state.view === "diagram") { renderDiagramView(target); return; }
+  if (state.view === "arch") { renderArchView(target); return; }
   const hit = INDEX[state.view === "req" ? state.reqSelected : state.selected];
   let html;
   if (!hit) {
@@ -806,13 +922,20 @@ function renderHeader() {
   sel.innerHTML = MODEL.organizations.map(o =>
     `<option value="${esc(o.id)}"${o.id === state.orgId ? " selected" : ""}>${esc(o.name)}</option>`).join("");
   document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.view === state.view));
-  document.querySelector(".org-picker").style.visibility = state.view === "req" ? "hidden" : "visible";
+  document.querySelector(".org-picker").style.visibility = state.view === "req" || state.view === "arch" ? "hidden" : "visible";
 }
 
 function renderContextSelect() {
   const label = document.getElementById("panel-label");
   const sel = document.getElementById("context-select");
-  if (state.view === "req") {
+  document.getElementById("tree-filter").style.display = state.view === "arch" ? "none" : "";
+  if (state.view === "arch") {
+    const cur = curArch();
+    label.textContent = "Architecture";
+    sel.innerHTML = ARCHS.map(a =>
+      `<option value="${esc(a.id)}"${cur && a.id === cur.id ? " selected" : ""}>${esc(archTitle(a))} (${esc(a.id)}.arch)</option>`).join("")
+      || `<option>— no .arch loaded —</option>`;
+  } else if (state.view === "req") {
     label.textContent = "Requirement set";
     sel.innerHTML = REQSETS.map(s =>
       `<option value="${esc(s.id)}"${s.id === (curSet() && curSet().id) ? " selected" : ""}>${esc(s.name)}</option>`).join("")
@@ -863,6 +986,10 @@ document.addEventListener("click", e => {
     if (state.view === "diagram" && !ctx().modules.some(m => m.id === state.diagramModId)) {
       state.diagramModId = ctx().modules.length ? ctx().modules[0].id : null;
     }
+    if (state.view === "arch") {
+      if (!ARCHS.some(a => a.id === state.archId)) state.archId = ARCHS.length ? ARCHS[0].id : null;
+      if (state.archId) history.replaceState(null, "", "#arch:" + state.archId);
+    }
     state.filter = "";
     document.getElementById("tree-filter").value = "";
     renderAll();
@@ -908,7 +1035,10 @@ document.getElementById("org-select").addEventListener("change", e => {
 });
 
 document.getElementById("context-select").addEventListener("change", e => {
-  if (state.view === "req") {
+  if (state.view === "arch") {
+    state.archId = e.target.value;
+    history.replaceState(null, "", "#arch:" + state.archId);
+  } else if (state.view === "req") {
     state.reqSetId = e.target.value;
     state.reqSelected = "reqset:" + e.target.value;
   } else {
@@ -925,15 +1055,18 @@ document.getElementById("tree-filter").addEventListener("input", e => {
   renderTree();
 });
 
-/* Diagram header category toggles */
+/* Diagram header toggles: domain categories (data-diagopt) and
+   architecture kinds / edge labels (data-archopt) */
 document.addEventListener("change", e => {
-  const key = e.target && e.target.dataset ? e.target.dataset.diagopt : null;
-  if (!key) return;
-  state.diagramShow[key] = e.target.checked;
+  const ds = e.target && e.target.dataset;
+  if (!ds) return;
+  if (ds.diagopt) state.diagramShow[ds.diagopt] = e.target.checked;
+  else if (ds.archopt) state.archShow[ds.archopt] = e.target.checked;
+  else return;
   renderDetail();
 });
 
-/* ---- Boot: load .domain and .sysreq files, then honor a deep link ---- */
+/* ---- Boot: load .domain, .sysreq and .arch files, then honor a deep link ---- */
 (async function boot() {
   for (const file of DOMAIN_FILES) {
     try {
@@ -954,10 +1087,24 @@ document.addEventListener("change", e => {
       console.warn("could not load " + file + ":", e);
     }
   }
+  for (const file of ARCH_FILES) {
+    try {
+      const res = await fetch(file);
+      if (!res.ok) { console.warn(`could not load ${file}: HTTP ${res.status}`); continue; }
+      ARCHS.push(parseArch(await res.text(), file.replace(/\.arch$/, "")));
+    } catch (e) {
+      console.warn("could not load " + file + ":", e);
+    }
+  }
   buildIndex();
   const hash = decodeURIComponent(location.hash.slice(1));
   const hit = hash && INDEX[hash];
-  if (hit && (hit.req || hit.set)) {
+  if (hash.startsWith("arch:") && ARCHS.length) {
+    state.view = "arch";
+    const id = hash.slice("arch:".length);
+    state.archId = ARCHS.some(a => a.id === id) ? id : ARCHS[0].id;
+    state.expanded.add("mod:" + ctx().modules[0].id);
+  } else if (hit && (hit.req || hit.set)) {
     state.view = "req";
     state.reqSetId = hit.set.id;
     state.reqSelected = hash;

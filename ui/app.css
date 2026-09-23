@@ -181,6 +181,41 @@ html, body {
 .row-count { margin-left: auto; font-size: 10px; color: var(--fg-subtle); font-family: var(--font-mono); }
 .tree-empty { padding: var(--sp-3); color: var(--fg-subtle); font-size: var(--fs-xs); }
 
+/* Architecture view tree: non-selectable info rows (same metrics as
+   .tree-row), kind swatches matching the engine's .er-node--kind-* colours */
+.arch-head { padding: 2px var(--sp-3) var(--sp-2) var(--sp-2); border-bottom: 1px solid var(--border-default); margin-bottom: var(--sp-1); }
+.arch-name {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--font-display-condensed); font-weight: var(--weight-bold); font-size: var(--fs-sm);
+  color: var(--fg-default);
+}
+.arch-desc { margin: 3px 0 0; font-size: 11px; line-height: var(--lh-normal); color: var(--fg-muted); }
+.arch-source { margin: 5px 0 0; font-size: 10px; line-height: var(--lh-normal); color: var(--fg-subtle); }
+.arch-legend { padding-bottom: var(--sp-2); }
+.tree-info {
+  display: flex; align-items: center; gap: 6px;
+  padding: 3px var(--sp-3) 3px calc(var(--sp-2) + 16px + var(--indent, 0px));
+  font-size: var(--fs-xs); line-height: 1.5;
+  color: var(--fg-default);
+  cursor: default;
+}
+.tree-info .row-name { padding: 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.arch-swatch {
+  flex: 0 0 auto;
+  width: 15px; height: 11px;
+  border: 1px solid transparent; border-radius: var(--r-1);
+}
+.arch-swatch.dashed { border-style: dashed; border-width: 1.5px; }
+.arch-swatch.none { visibility: hidden; }
+.tree-hint {
+  padding: 2px var(--sp-3) 4px calc(var(--sp-2) + 16px);
+  font-size: 11px; color: var(--fg-muted);
+}
+.tree-hint b {
+  font-family: var(--font-mono); font-weight: var(--weight-bold); font-size: 10px;
+  color: var(--fg-accent);
+}
+
 /* ============ Main panel ============ */
 .main {
   grid-area: main;
