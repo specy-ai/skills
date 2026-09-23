@@ -135,6 +135,17 @@ aggregated edges with a count badge.
   node scripts/merge-arch.mjs -o ffm.arch --name PaysageApplicatifFfm \
     ffm.arch-sources/exalto.arch ffm.arch-sources/engage-sports.arch …   # order = type placement
   ```
+- **Selection and details** — a system or container row in the tree selects
+  it in the canvas and frames it (the groups folding it away open just
+  enough: its system at level 2 at least), and a details panel opens beside
+  the canvas: kind, where it lives, technology / bounded context,
+  description, the realized domain module or context (button), contracts
+  (provides / requires / publishes / subscribes / realizes), what is drawn
+  inside it, deployment (containers), and every flow crossing its boundary,
+  outgoing and incoming, with the element it goes through. Names in the
+  panel are links (same behaviour); a click in the canvas selects too and
+  the tree follows; an empty-canvas click or `×` closes the panel. Built on
+  the engine's `handle.focus()` and `onSelect` (DERIVED-DIAGRAMS.md §1).
 - **Toggles** — persons, external systems, channels, edge labels. A hidden
   kind drops its cards and every edge touching them; with channels hidden a
   broker with no other member becomes a black-box card.

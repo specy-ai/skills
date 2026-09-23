@@ -533,3 +533,48 @@ code.inline {
   .main-inner { padding: var(--sp-3) var(--sp-3) var(--sp-7); }
   .detail-title h1 { font-size: 20px; }
 }
+
+/* ── Architecture view: canvas + details panel ──────────────────────────────
+   The canvas and the details of the selected element (tree row or canvas
+   click) side by side; the panel only shows while something is selected. */
+.arch-body { flex: 1; min-height: 0; display: flex; }
+.arch-body > .flow-host { flex: 1; min-width: 0; }
+.arch-details {
+  flex: 0 0 360px; width: 360px;
+  overflow-y: auto;
+  padding: var(--sp-3) var(--sp-4) var(--sp-6);
+  background: var(--ds-white);
+  border-left: 1px solid var(--border-strong);
+  font-size: var(--fs-xs);
+}
+.arch-details[hidden] { display: none; }
+.arch-details-head { display: flex; align-items: center; justify-content: space-between; }
+.arch-details-head .eyebrow { margin: 0; }
+.arch-details-close {
+  border: none; background: transparent; cursor: pointer;
+  font-size: 18px; line-height: 1; color: var(--fg-subtle); padding: 2px 4px;
+}
+.arch-details-close:hover { color: var(--fg-accent); }
+.arch-details-title {
+  margin: 4px 0 var(--sp-2);
+  font-family: var(--font-display-condensed); font-weight: var(--weight-bold);
+  font-size: 20px; line-height: 1.15; letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+.arch-details .chips { margin-bottom: var(--sp-3); }
+.arch-details-desc { margin: 0 0 var(--sp-3); line-height: var(--lh-normal); color: var(--fg-muted); }
+.arch-details-open { margin-bottom: var(--sp-3); }
+.arch-details .card { margin-bottom: var(--sp-3); }
+.arch-details .rel-table td { font-size: 11px; overflow-wrap: anywhere; }
+.arch-link {
+  display: inline-flex; align-items: center; gap: 4px;
+  border: none; background: transparent; padding: 0; cursor: pointer;
+  font: inherit; font-weight: var(--weight-semi); color: var(--fg-default);
+  text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 2px;
+}
+.arch-link:hover { color: var(--fg-accent); text-decoration-color: currentColor; }
+.arch-link .arch-swatch { flex: 0 0 auto; }
+.arch-flows li { display: block; }
+.arch-flow-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.arch-flow-what { font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-default); margin-top: 1px; overflow-wrap: anywhere; }
+.arch-flows .row-sub { font-size: 11px; line-height: 1.4; }

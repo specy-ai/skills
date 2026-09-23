@@ -133,6 +133,7 @@ const state = {
   diagramShow: { interfaces: true, entities: true, values: true, services: true },
   archId: null,              // architecture rendered in the arch view
   archShow: { persons: true, externalSystems: true, channels: true, edgeLabels: true },
+  archSel: null,             // "kind:name" of the element selected in the arch view (tree or canvas)
   expanded: new Set(),
   filter: "",
 };
@@ -268,8 +269,9 @@ function archSwatch(kind) {
 }
 
 /* Architecture view tree: the system in focus, element counts keyed by the
-   canvas colours, the fold-level hint and the containers. Info rows only —
-   no data-select (the canvas is the navigation; the filter box is hidden). */
+   canvas colours, the fold-level hint, then the systems and containers as
+   selectable rows (`data-archsel="kind:name"`): a row selects and frames the
+   element in the diagram and opens its details. The filter box is hidden. */
 function renderArchTree() {
   const tree = document.getElementById("tree");
   const a = curArch();
@@ -301,16 +303,20 @@ function renderArchTree() {
     ["connectors", "Connectors", "drawn as edges; parallel ones merged"],
     ["environments", "Environments", "deployment view — not drawn"]])
     html += info(archSwatch(null), label, n[key], title);
+  const pick = (kind, name, count, title, depth) => {
+    const key = `${kind}:${name}`;
+    return `<li><button class="tree-row arch-row${state.archSel === key ? " selected" : ""}" data-archsel="${esc(key)}" style="--indent:${depth * 16}px"${title ? ` title="${esc(title)}"` : ""}>${archSwatch(kind)}<span class="row-name">${esc(name)}</span>${count != null ? `<span class="row-count">${esc(count)}</span>` : ""}</button></li>`;
+  };
   html += `<li><div class="tree-group-label" style="--indent:0px">Fold levels</div></li>
       <li><div class="tree-hint">Groups <b>1</b> ${multi ? "systems" : "context"} · <b>2</b> containers · <b>3</b> components</div></li>
-      <li><div class="tree-group-label" style="--indent:0px">${multi ? "Systems and containers" : "Containers"}</div></li>`;
+      <li><div class="tree-group-label" style="--indent:0px">${multi ? "Systems and containers" : "System and containers"}</div></li>`;
   for (const s of a.systems) {
-    if (multi) html += info(archSwatch("system"), s.name, `${s.containers.length} ct`, s.description, 0);
+    html += pick("system", s.name, `${s.containers.length} ct`, s.description, 0);
     for (const c of s.containers) {
       const chans = s.channels.filter(ch => ch.broker === c.name).length;
       const count = c.components.length ? c.components.length : chans ? `${chans} ch` : "—";
       const title = [c.technology, c.description].filter(Boolean).join(" — ");
-      html += info(archSwatch("container"), c.name, count, title, multi ? 1 : 0);
+      html += pick("container", c.name, count, title, 1);
     }
   }
   html += `</ul>`;
@@ -854,10 +860,14 @@ function renderArchView(target) {
         `<label class="diag-opt"><input type="checkbox" data-archopt="${key}"${show[key] ? " checked" : ""}/>${esc(label)}</label>`).join("")}
       </div>
     </div>
-    <div id="flow" class="flow-host"></div>
+    <div class="arch-body">
+      <div id="flow" class="flow-host"></div>
+      <aside id="arch-details" class="arch-details" hidden></aside>
+    </div>
   </div>`;
   const file = SpecyArchDiagrams.architectureDiagram(a, show, { domainOrg: archDomainOrg(a) });
-  mountDiagram(document.getElementById("flow"), file, {
+  archView = { arch: a, file, mount: null };
+  archView.mount = mountDiagram(document.getElementById("flow"), file, {
     storagePrefix: file.model.id,
     interactive: true,
     wheel: "pan",
@@ -867,7 +877,160 @@ function renderArchView(target) {
       const d = node && node.data && node.data.domainRef;
       if (d && INDEX[d.id]) goto(d.id);
     },
+    // a click in the canvas selects too: the details and the tree follow
+    onSelect: ref => {
+      const el = ref && archView && archView.file.model.elements.find(e => e.id === ref.elementId);
+      const key = el ? `${el.type}:${el.data.name}` : null;
+      if (key !== state.archSel) selectArchElement(key, { focus: false });
+    },
   });
+  // keep the selection across re-renders (toggles, tab switches)
+  if (state.archSel) {
+    if (archElementOf(state.archSel)) selectArchElement(state.archSel, { focus: true });
+    else state.archSel = null;
+  }
+}
+
+/* ---- Architecture selection: tree row / canvas click → details panel ---- */
+let archView = null;   // { arch, file, mount } of the mounted architecture diagram
+
+const ARCH_KIND_TITLE = {
+  system: "System", container: "Container", component: "Component",
+  person: "Person", externalSystem: "External system", channel: "Channel",
+};
+function archElementOf(key) {
+  if (!key || !archView) return null;
+  const i = key.indexOf(":");
+  const kind = key.slice(0, i), name = key.slice(i + 1);
+  return archView.file.model.elements.find(e => e.type === kind && e.data.name === name) || null;
+}
+const archKeyOf = el => `${el.type}:${el.data.name}`;
+
+/* Select an element (by "kind:name", or null to clear): tree highlight,
+   details panel, and — from the tree or the panel — frame it in the canvas. */
+function selectArchElement(key, { focus } = {}) {
+  state.archSel = key;
+  let row = null;
+  for (const b of document.querySelectorAll("#tree [data-archsel]")) {
+    const on = b.dataset.archsel === key;
+    b.classList.toggle("selected", on);
+    if (on) row = b;
+  }
+  if (row && !focus) row.scrollIntoView({ block: "nearest" });
+  const el = archElementOf(key);
+  renderArchDetails(el);
+  if (focus && el && archView && archView.mount && archView.mount.focus) archView.mount.focus({ elementId: el.id });
+}
+
+/* The element and everything drawn inside it (a system's containers and
+   their components, a container's components / channels). */
+function archDescendants(elementId) {
+  const nodes = archView.file.diagram.nodes;
+  const elOfNode = new Map(nodes.map(n => [n.id, n.data.modelRef.elementId]));
+  const parentEl = new Map(nodes.filter(n => n.parentId).map(n => [elOfNode.get(n.id), elOfNode.get(n.parentId)]));
+  const out = new Set([elementId]);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const [child, parent] of parentEl) if (out.has(parent) && !out.has(child)) { out.add(child); grew = true; }
+  }
+  return out;
+}
+
+function renderArchDetails(el) {
+  const aside = document.getElementById("arch-details");
+  if (!aside) return;
+  if (!el || !archView) { aside.hidden = true; aside.innerHTML = ""; return; }
+  const { file, arch } = archView;
+  const d = el.data || {};
+  const byId = new Map(file.model.elements.map(e => [e.id, e]));
+  const node = file.diagram.nodes.find(n => n.data.modelRef.elementId === el.id);
+  const parentOf = n => n && n.parentId && file.diagram.nodes.find(p => p.id === n.parentId);
+  const link = e => `<button class="arch-link" data-archsel="${esc(archKeyOf(e))}">${archSwatch(e.type)}${esc(e.data.name)}</button>`;
+  const list = v => (Array.isArray(v) ? v : v ? [v] : []).filter(Boolean);
+
+  // where it lives: container → system, component → container › system
+  const trail = [];
+  for (let p = parentOf(node); p; p = parentOf(p)) trail.push(byId.get(p.data.modelRef.elementId));
+  let html = `<div class="arch-details-head">
+      <p class="eyebrow">${esc(ARCH_KIND_TITLE[el.type] || el.type)}</p>
+      <button class="arch-details-close" data-archclose title="Close details">×</button>
+    </div>
+    <h2 class="arch-details-title">${esc(d.name)}</h2>`;
+  const chips = [];
+  if (trail.length) chips.push(`<span class="chip">in ${trail.map(link).join(" › ")}</span>`);
+  if (d.technology) chips.push(`<span class="chip info">${esc(d.technology)}</span>`);
+  if (d.boundedContext) chips.push(`<span class="chip">«${esc(d.boundedContext)}»</span>`);
+  if (d.broker) chips.push(`<span class="chip">on ${esc(d.broker)}</span>`);
+  if (chips.length) html += `<div class="chips">${chips.join("")}</div>`;
+  const desc = d.description || (el.type === "person" || el.type === "externalSystem" ? d.subtitle : "");
+  if (desc) html += `<p class="arch-details-desc">${esc(desc)}</p>`;
+  const domainRef = node && node.data.domainRef;
+  if (domainRef && INDEX[domainRef.id]) {
+    const action = (node.data.actions || [])[0];
+    html += `<button class="diagram-open arch-details-open" data-goto="${esc(domainRef.id)}">${esc(action ? action.label : "Open in the domain")} ↗</button>`;
+  }
+
+  // contracts
+  const bodyRows = (node && node.data.body && node.data.body.rows) || [];
+  const rel = [];
+  for (const [key, label] of [["provides", "provides"], ["requires", "requires"], ["consumes", "consumes"]]) {
+    const v = list(d[key]).length ? list(d[key]) : (bodyRows.find(r => r.key === key) || {}).value;
+    if (v && (!Array.isArray(v) || v.length)) rel.push([label, Array.isArray(v) ? v.join(", ") : v]);
+  }
+  for (const key of ["publishes", "subscribes", "carries", "realizes", "satisfies"]) {
+    const r = bodyRows.find(x => x.key === key);
+    const v = r ? r.value : list(d[key]).join(", ");
+    if (v) rel.push([key, v]);
+  }
+  if (rel.length) html += `<p class="card-caption">Contracts</p><div class="card"><table class="rel-table">` +
+    rel.map(([k, v]) => `<tr><td class="rel-name">${esc(k)}</td><td>${esc(v)}</td></tr>`).join("") + `</table></div>`;
+
+  // structure: what is drawn inside it
+  const children = file.diagram.nodes.filter(n => node && n.parentId === node.id).map(n => byId.get(n.data.modelRef.elementId));
+  if (children.length) {
+    html += `<p class="card-caption">${el.type === "system" ? "Containers" : "Components and channels"} (${children.length})</p><div class="card"><ul class="card-rows">` +
+      children.map(c => `<li>${link(c)}${c.data.technology || c.data.boundedContext
+        ? ` <span class="row-sub">${esc(c.data.technology || "«" + c.data.boundedContext + "»")}</span>` : ""}</li>`).join("") +
+      `</ul></div>`;
+  }
+
+  // deployment (containers)
+  if (el.type === "container") {
+    const deploys = [];
+    for (const s of arch.systems) for (const env of s.environments)
+      for (const dep of env.deploys) if (dep.container === d.name) deploys.push({ env, replicas: dep.replicas });
+    if (deploys.length) html += `<p class="card-caption">Deployment</p><div class="card"><ul class="card-rows">` +
+      deploys.map(x => `<li><span class="row-title">${esc(x.env.name)}</span>${x.replicas ? ` <span class="chip">× ${x.replicas}</span>` : ""}${x.env.description
+        ? ` <span class="row-sub">— ${esc(x.env.description)}</span>` : ""}</li>`).join("") + `</ul></div>`;
+  }
+
+  // flows crossing its boundary
+  const inside = archDescendants(el.id);
+  const flowRow = (r, dir) => {
+    const mine = byId.get(dir === "out" ? r.sourceElementId : r.targetElementId);
+    const other = byId.get(dir === "out" ? r.targetElementId : r.sourceElementId);
+    const rd = r.data || {};
+    const what = r.type === "connect"
+      ? [rd.interface, rd.protocol].filter(Boolean).join(" · ")
+      : r.type === "publishes" ? `publishes ${list(rd.messages).join(", ")}` : "subscribes";
+    const style = r.type === "connect" ? rd.style : "async";
+    return `<li><div class="arch-flow-head">${dir === "out" ? "→" : "←"} ${other ? link(other) : "?"}${style ? ` <span class="chip">${esc(style)}</span>` : ""}</div>
+      ${mine && mine.id !== el.id ? `<div class="row-sub">via ${link(mine)}</div>` : ""}
+      ${what ? `<div class="arch-flow-what">${esc(what)}</div>` : ""}
+      ${rd.description ? `<div class="row-sub">${esc(rd.description)}</div>` : ""}</li>`;
+  };
+  const out = file.model.relations.filter(r => inside.has(r.sourceElementId) && !inside.has(r.targetElementId));
+  const inc = file.model.relations.filter(r => inside.has(r.targetElementId) && !inside.has(r.sourceElementId));
+  for (const [title, rows, dir] of [["Outgoing flows", out, "out"], ["Incoming flows", inc, "in"]]) {
+    if (!rows.length) continue;
+    html += `<p class="card-caption">${title} (${rows.length})</p><div class="card"><ul class="card-rows arch-flows">` +
+      rows.map(r => flowRow(r, dir)).join("") + `</ul></div>`;
+  }
+
+  aside.innerHTML = html;
+  aside.hidden = false;
+  aside.scrollTop = 0;
 }
 
 /* One read-only statechart per `[data-sm-host]` placeholder rendered by
@@ -995,6 +1158,9 @@ document.addEventListener("click", e => {
     renderAll();
     return;
   }
+  const archSel = e.target.closest("[data-archsel]");
+  if (archSel) { e.preventDefault(); selectArchElement(archSel.dataset.archsel, { focus: true }); return; }
+  if (e.target.closest("[data-archclose]")) { selectArchElement(null); return; }
   const nav = e.target.closest("[data-goto]");
   if (nav) { e.preventDefault(); goto(nav.dataset.goto); return; }
   const row = e.target.closest("[data-select]");
@@ -1037,6 +1203,7 @@ document.getElementById("org-select").addEventListener("change", e => {
 document.getElementById("context-select").addEventListener("change", e => {
   if (state.view === "arch") {
     state.archId = e.target.value;
+    state.archSel = null;
     history.replaceState(null, "", "#arch:" + state.archId);
   } else if (state.view === "req") {
     state.reqSetId = e.target.value;
