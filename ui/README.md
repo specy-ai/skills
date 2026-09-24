@@ -114,7 +114,7 @@ persons above, external systems below). The engine's group **detail levels
 are the C4 zoom levels**: *Groups 1* folds everything to the System Context
 view, *2* shows containers, *3* opens the components; each group also has its
 own `1 | 2 | 3` control and a header double-click cycle. Folded groups carry
-aggregated edges with a count badge.
+aggregated edges (one line per direction; hovering it lists the connectors it stands for).
 
 - **Picker** — the left-panel dropdown lists the loaded architectures
   (`ARCH_FILES` at the top of `app.js`: `ffm.arch`, the FFM landscape, and the
