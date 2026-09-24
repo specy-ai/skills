@@ -3,7 +3,7 @@
 import sys
 from metamodel_diagram import Diagram
 
-d = Diagram(["System Requirement", "Metamodel"], "Specy System Requirement Metamodel", height=1440, seed=23)
+d = Diagram(["System Requirement", "Metamodel"], "Specy System Requirement Metamodel", height=1440, edges="clean")
 B, E = d.box, d.edge
 
 # --- left: scope, requirement set, the requirement hub, provenance and relations
