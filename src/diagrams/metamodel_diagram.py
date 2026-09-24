@@ -3,8 +3,14 @@
 
 Style (shared with the hand-built DDD diagram): #EBEBEB background inside a dashed frame,
 a white title card in EB Garamond Bold, #FBFBFB nodes with #1B2935 ink and IBM Plex Sans
-Condensed labels (Bold) / subtitles (Regular), "sloppy" double-stroked #E46765 connectors,
-and the specy.ai logo at the bottom-left, linked to https://specy.ai.
+Condensed labels (Bold) / subtitles (Regular), #E46765 connectors, and the specy.ai logo at the
+bottom-left, linked to https://specy.ai.
+
+Connectors come in two styles, chosen per diagram with Diagram(..., edges=...):
+  "rough" (default) - the DDD look: each cubic is sampled and jittered into a double-stroked,
+                      hand-drawn line (deterministic, from the diagram's seed);
+  "clean"           - one smooth cubic Bezier per edge, handles sized to half the gap along the
+                      port's axis so the curve never overshoots the box it joins.
 
 Fonts are subsetted to the glyphs actually used and embedded as woff2 so the SVG is
 self-contained (renders on GitHub, in editors, in browsers).  The website build
@@ -130,9 +136,13 @@ class Edge:
 
 
 class Diagram:
-    def __init__(self, title_lines, svg_title, width=W_DEFAULT, height=H_DEFAULT, seed=7):
+    OUT = {"left": (-1, 0), "right": (1, 0), "top": (0, -1), "bottom": (0, 1)}  # outward normal per side
+
+    def __init__(self, title_lines, svg_title, width=W_DEFAULT, height=H_DEFAULT, seed=7, edges="rough"):
         self.title_lines, self.svg_title = title_lines, svg_title
         self.W, self.H = width, height
+        assert edges in ("rough", "clean"), "edges must be 'rough' or 'clean'"
+        self.edge_style = edges
         self.boxes, self.edges = {}, []
         self.rng = random.Random(seed)
         self.fonts = {c: Font(c) for c in FONT_FILES}
@@ -213,17 +223,35 @@ class Diagram:
             x + r, y, x, y, x, y + r, x, y + h - r, x, y + h, x + r, y + h, x + w - r, y + h,
             x + w, y + h, x + w, y + h - r, x + w, y + r, x + w, y, x + w - r, y))
 
+    @classmethod
+    def _handle(cls, p_from, p_to, side, k_min=30):
+        """Length of the Bezier handle leaving p_from through `side` towards p_to (clean style).
+
+        Half the distance to the target measured along the port's axis: for two horizontal ports
+        both handles land on the vertical midline, the classic S-curve, and the x coordinate stays
+        monotone (it never overshoots the target) as long as the handle is no longer than the gap.
+        A short minimum keeps the exit perpendicular to the box edge on tiny gaps; when the target
+        lies behind the port the handle can only be that minimum."""
+        vx, vy = cls.OUT[side]
+        along = (p_to[0] - p_from[0]) * vx + (p_to[1] - p_from[1]) * vy
+        if along <= 0:
+            return k_min
+        return max(along / 2, min(k_min, along))
+
     def _bezier(self, e):
         s, d = self.boxes[e.src], self.boxes[e.dst]
         p0, p3 = s.port(e.src_side, e.src_t), d.port(e.dst_side, e.dst_t)
         if e.straight:
             return p0, p0, p3, p3
-        dist = math.hypot(p3[0] - p0[0], p3[1] - p0[1])
-        k = min(0.55 * dist, 260)
-        out = {"left": (-1, 0), "right": (1, 0), "top": (0, -1), "bottom": (0, 1)}
-        v0, v3 = out[e.src_side], out[e.dst_side]
-        p1 = (p0[0] + v0[0] * k, p0[1] + v0[1] * k)
-        p2 = (p3[0] + v3[0] * k, p3[1] + v3[1] * k)
+        v0, v3 = self.OUT[e.src_side], self.OUT[e.dst_side]
+        if self.edge_style == "rough":
+            # legacy handles: same length at both ends whatever the gap (overshoots on short ones,
+            # which the jitter hides); kept as-is so existing rough diagrams re-render identically
+            k0 = k3 = min(0.55 * math.hypot(p3[0] - p0[0], p3[1] - p0[1]), 260)
+        else:
+            k0, k3 = self._handle(p0, p3, e.src_side), self._handle(p3, p0, e.dst_side)
+        p1 = (p0[0] + v0[0] * k0, p0[1] + v0[1] * k0)
+        p2 = (p3[0] + v3[0] * k3, p3[1] + v3[1] * k3)
         return p0, p1, p2, p3
 
     def _rough_path(self, p0, p1, p2, p3, amp):
@@ -251,6 +279,10 @@ class Diagram:
 
     def _edge_svg(self, e):
         p0, p1, p2, p3 = self._bezier(e)
+        if self.edge_style == "clean":
+            d = ("M%.1f,%.1f L%.1f,%.1f" % (p0 + p3) if e.straight
+                 else "M%.1f,%.1f C%.1f,%.1f %.1f,%.1f %.1f,%.1f" % (p0 + p1 + p2 + p3))
+            return '<path class="c" stroke-width="2.5" d="%s"/>' % d
         out = []
         for amp, sw, op in ((1.6, 2.4, 0.95), (2.2, 1.7, 0.75)):
             out.append('<path class="c" stroke-width="%g" stroke-opacity="%g" d="%s"/>'

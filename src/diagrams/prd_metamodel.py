@@ -3,7 +3,7 @@
 import sys
 from metamodel_diagram import Diagram
 
-d = Diagram(["Product Requirement", "Metamodel"], "Specy Product Requirement Metamodel", seed=11)
+d = Diagram(["Product Requirement", "Metamodel"], "Specy Product Requirement Metamodel", edges="clean")
 B, E = d.box, d.edge
 
 # --- left: the product and its context (chain, like the DDD organization column)
