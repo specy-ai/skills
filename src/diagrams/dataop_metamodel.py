@@ -3,7 +3,7 @@
 import sys
 from metamodel_diagram import Diagram
 
-d = Diagram(["Data & Operation", "Metamodel"], "Specy Data & Operation Metamodel", seed=43)
+d = Diagram(["Data & Operation", "Metamodel"], "Specy Data & Operation Metamodel", edges="clean")
 B, E = d.box, d.edge
 
 # --- left: the containment chain (model → module → declarations) and the trait vocabulary
