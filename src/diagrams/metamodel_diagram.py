@@ -12,6 +12,10 @@ Connectors come in two styles, chosen per diagram with Diagram(..., edges=...):
   "clean"           - one smooth cubic Bezier per edge, handles sized to half the gap along the
                       port's axis so the curve never overshoots the box it joins.
 
+Boxes can be gathered into groups (packages) with Diagram.group(...): a labelled frame drawn
+behind its members, dashed or solid, with an optional Diagram.legend(...) naming what each frame
+style stands for.  A diagram without groups renders exactly as before.
+
 Fonts are subsetted to the glyphs actually used and embedded as woff2 so the SVG is
 self-contained (renders on GitHub, in editors, in browsers).  The website build
 (specy.ai/scripts/build-metamodel-diagram.py) strips them again and turns every
@@ -31,6 +35,11 @@ BG, BOX_FILL, INK, RED, TITLE_INK = "#ebebeb", "#fbfbfb", "#1b2935", "#e46765", 
 HUB_SIZE, NODE_SIZE, SUB_SIZE, CARD_SIZE, TITLE_SIZE = 45.1, 28.65, 21.5, 28.65, 63.1
 PAD_X = 24               # horizontal padding inside a box
 BOX_R = 7.5              # corner radius (DDD boxes)
+GROUP_SIZE, GROUP_SPACING, GROUP_R = 24, 2.2, 14   # group label (uppercase, letter-spaced), frame radius
+GROUP_STYLES = {         # kind → (frame fill, stroke-dasharray)
+    "dashed": ("none", "11 8"),
+    "solid": ("#dedede", None),
+}
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FONT_DIR = os.environ.get("SPECY_FONT_DIR", os.path.join(HERE, ".fonts"))
@@ -129,10 +138,21 @@ class Box:
 
 class Edge:
     def __init__(self, src, dst, card=None, src_side="right", dst_side="left", src_t=0.5, dst_t=0.5,
-                 card_at="dst", straight=False, src_card=None):
+                 card_at="dst", straight=False, src_card=None, card_dx=0, card_dy=0):
         self.src, self.dst, self.card = src, dst, card
         self.src_side, self.dst_side, self.src_t, self.dst_t = src_side, dst_side, src_t, dst_t
         self.card_at, self.straight, self.src_card = card_at, straight, src_card
+        self.card_dx, self.card_dy = card_dx, card_dy    # nudge `card` off a frame or off its own curve
+
+
+class Group:
+    """A labelled frame around member boxes (a package). `pad` is the margin around the members,
+    `head` the height reserved for the label, above the members or below them (label_at)."""
+    def __init__(self, id, label, members, sub=None, kind="dashed", anchor=None, pad=24, head=58, label_at="top"):
+        assert kind in GROUP_STYLES, "unknown group kind %s" % kind
+        assert label_at in ("top", "bottom"), "label_at must be 'top' or 'bottom'"
+        self.id, self.label, self.members, self.sub, self.kind = id, label, list(members), sub, kind
+        self.anchor, self.pad, self.head, self.label_at = anchor or id, pad, head, label_at
 
 
 class Diagram:
@@ -143,7 +163,8 @@ class Diagram:
         self.W, self.H = width, height
         assert edges in ("rough", "clean"), "edges must be 'rough' or 'clean'"
         self.edge_style = edges
-        self.boxes, self.edges = {}, []
+        self.boxes, self.edges, self.groups = {}, [], []
+        self.legend_at, self.legend_items = None, []
         self.rng = random.Random(seed)
         self.fonts = {c: Font(c) for c in FONT_FILES}
 
@@ -157,6 +178,16 @@ class Diagram:
         e = Edge(*a, **k)
         self.edges.append(e)
         return e
+
+    def group(self, *a, **k):
+        g = Group(*a, **k)
+        assert g.id not in [o.id for o in self.groups], "duplicate group id %s" % g.id
+        self.groups.append(g)
+        return g
+
+    def legend(self, x, y, items):
+        """A row of (group kind, text) entries: left edge at x, text baseline at y."""
+        self.legend_at, self.legend_items = (x, y), list(items)
 
     def row(self, ids, x, gap=25):
         """Lay out boxes side by side starting at x (their y is kept). Returns the right edge."""
@@ -214,6 +245,17 @@ class Diagram:
                 b.h = last_label + 24 if not S else last_label + b.sub_gap + b.sub_dy * (S - 1) + 18
         for l in self.title_lines:
             self.fonts["t"].width(l, TITLE_SIZE)
+        for g in self.groups:
+            g.label_w = fb.width(g.label.upper(), GROUP_SIZE, GROUP_SPACING)
+            g.sub_w = fr.width(g.sub, SUB_SIZE) if g.sub else 0
+        for _, text in self.legend_items:
+            fr.width(text, SUB_SIZE)
+
+    def _group_rect(self, g):
+        bs = [self.boxes[i] for i in g.members]
+        above, below = (g.head, g.pad) if g.label_at == "top" else (g.pad, g.head)
+        x, y = min(b.x for b in bs) - g.pad, min(b.y for b in bs) - above
+        return x, y, max(b.x1 for b in bs) + g.pad - x, max(b.y1 for b in bs) + below - y
 
     # -- rendering pieces
     @staticmethod
@@ -292,7 +334,7 @@ class Diagram:
     def _card_svg(self, e):
         out = []
         fr = self.fonts["r"]
-        for text, at in ((e.card, e.card_at), (e.src_card, "src")):
+        for text, at, dx, dy in ((e.card, e.card_at, e.card_dx, e.card_dy), (e.src_card, "src", 0, 0)):
             if not text:
                 continue
             b = self.boxes[e.dst if at == "dst" else e.src]
@@ -305,7 +347,7 @@ class Diagram:
             elif side == "top":   x, y, anchor = px + 10, py - 10, "start"
             else:                 x, y, anchor = px + 10, py + 32, "start"
             out.append('<text class="r" font-size="%g" text-anchor="%s" x="%.1f" y="%.1f">%s</text>'
-                       % (CARD_SIZE, anchor, x, y, esc(text)))
+                       % (CARD_SIZE, anchor, x + dx, y + dy, esc(text)))
         return "\n".join(out)
 
     def _box_svg(self, b):
@@ -320,6 +362,35 @@ class Diagram:
         for s in b.sub_lines:
             parts.append('<text class="r" font-size="%g" text-anchor="middle" x="%g" y="%g">%s</text>' % (SUB_SIZE, b.cx, y, esc(s)))
             y += b.sub_dy
+        parts.append("</g>")
+        return "\n".join(parts)
+
+    @staticmethod
+    def _frame_svg(kind, x, y, w, h, r):
+        fill, dash = GROUP_STYLES[kind]
+        return ('<rect x="%g" y="%g" width="%g" height="%g" rx="%g" fill="%s" stroke="%s" stroke-width="2"%s/>'
+                % (x, y, w, h, r, fill, INK, ' stroke-dasharray="%s"' % dash if dash else ""))
+
+    def _group_svg(self, g):
+        x, y, w, h = self._group_rect(g)
+        tx, ty = x + g.pad, (y + 38 if g.label_at == "top" else y + h - 22)
+        parts = ['<g class="group" data-anchor="%s" data-label="%s">' % (esc(g.anchor), esc(g.label)),
+                 self._frame_svg(g.kind, x, y, w, h, GROUP_R),
+                 '<text class="b" font-size="%g" letter-spacing="%g" x="%g" y="%g">%s</text>'
+                 % (GROUP_SIZE, GROUP_SPACING, tx, ty, esc(g.label.upper()))]
+        if g.sub:
+            parts.append('<text class="r" font-size="%g" x="%.1f" y="%g">%s</text>'
+                         % (SUB_SIZE, tx + g.label_w + 16, ty, esc(g.sub)))
+        parts.append("</g>")
+        return "\n".join(parts)
+
+    def _legend_svg(self):
+        (x, y), fr = self.legend_at, self.fonts["r"]
+        parts = ['<g class="legend">']
+        for kind, text in self.legend_items:
+            parts.append(self._frame_svg(kind, x, y - 23, 48, 30, 6))
+            parts.append('<text class="r" font-size="%g" x="%.1f" y="%g">%s</text>' % (SUB_SIZE, x + 62, y, esc(text)))
+            x += 62 + fr.width(text, SUB_SIZE) + 56
         parts.append("</g>")
         return "\n".join(parts)
 
@@ -353,6 +424,25 @@ class Diagram:
             for b in bs[i + 1:]:
                 if a.x < b.x1 and b.x < a.x1 and a.y < b.y1 and b.y < a.y1:
                     print("WARN boxes %s and %s overlap" % (a.id, b.id))
+        rects = []
+        for g in self.groups:
+            for k in g.members:
+                if k not in self.boxes:
+                    sys.exit("group %s references unknown box %s" % (g.id, k))
+            x, y, w, h = self._group_rect(g)
+            if x < 30 or y < 210 or x + w > self.W - 30 or y + h > self.H - 30:
+                print("WARN group %s outside the frame (%d,%d)-(%d,%d)" % (g.id, x, y, x + w, y + h))
+            if x < 340 and y + h > self.H - 130:
+                print("WARN group %s overlaps the logo area" % g.id)
+            if g.label_w + (16 + g.sub_w if g.sub else 0) > w - 2 * g.pad:
+                print("WARN group %s label does not fit in its frame" % g.id)
+            for b in bs:
+                if b.id not in g.members and x < b.x1 and b.x < x + w and y < b.y1 and b.y < y + h:
+                    print("WARN box %s overlaps group %s" % (b.id, g.id))
+            for o, (ox, oy, ow, oh) in rects:
+                if x < ox + ow and ox < x + w and y < oy + oh and oy < y + h:
+                    print("WARN groups %s and %s overlap" % (o.id, g.id))
+            rects.append((g, (x, y, w, h)))
         for e in self.edges:
             for k in (e.src, e.dst):
                 if k not in self.boxes:
@@ -366,6 +456,10 @@ class Diagram:
         edges = "\n".join(self._edge_svg(e) for e in self.edges)
         cards = "\n".join(self._card_svg(e) for e in self.edges)
         boxes = "\n".join(self._box_svg(b) for b in self.boxes.values())
+        # groups sit behind the edges, the legend after the logo; both vanish when unused
+        groups = ('<g class="groups">\n%s\n</g>\n' % "\n".join(self._group_svg(g) for g in self.groups)
+                  if self.groups else "")
+        legend = self._legend_svg() + "\n" if self.legend_items else ""
         title, logo = self._title_svg(), self._logo_svg()
         faces = "".join(self.fonts[c].embedded_face() for c in ("b", "r", "t"))
         css = (faces +
@@ -382,11 +476,12 @@ class Diagram:
                 '<defs><style>%s</style>\n'
                 '<filter id="sh" x="-5%%" y="-15%%" width="112%%" height="132%%">'
                 '<feDropShadow dx="6" dy="6" stdDeviation="3.5" flood-color="#000" flood-opacity="0.4"/></filter></defs>\n'
-                '<rect width="%d" height="%d" fill="%s"/>\n%s\n%s\n<g class="edges">\n%s\n</g>\n<g class="cards">\n%s\n</g>\n'
-                '<g class="nodes">\n%s\n</g>\n%s\n</svg>\n'
-                % (W, H, W, H, esc(self.svg_title), css, W, H, BG, frame, title, edges, cards, boxes, logo))
+                '<rect width="%d" height="%d" fill="%s"/>\n%s\n%s\n%s<g class="edges">\n%s\n</g>\n<g class="cards">\n%s\n</g>\n'
+                '<g class="nodes">\n%s\n</g>\n%s\n%s</svg>\n'
+                % (W, H, W, H, esc(self.svg_title), css, W, H, BG, frame, title, groups, edges, cards, boxes, logo, legend))
 
     def write(self, path):
         svg = self.render()
         open(path, "w", encoding="utf-8").write(svg)
-        print("wrote %s (%d nodes, %d edges, %d bytes)" % (path, len(self.boxes), len(self.edges), len(svg)))
+        extra = ", %d groups" % len(self.groups) if self.groups else ""
+        print("wrote %s (%d nodes, %d edges%s, %d bytes)" % (path, len(self.boxes), len(self.edges), extra, len(svg)))

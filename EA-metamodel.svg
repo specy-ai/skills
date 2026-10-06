@@ -1,0 +1,254 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="2618" height="1712" viewBox="0 0 2618 1712">
+<title>Specy Enterprise Architecture Metamodel</title>
+<defs><style>@font-face{font-family:'IBM Plex Sans Condensed';font-weight:700;font-style:normal;src:url(data:font/woff2;base64,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) format('woff2')}@font-face{font-family:'IBM Plex Sans Condensed';font-weight:400;font-style:normal;src:url(data:font/woff2;base64,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) format('woff2')}@font-face{font-family:'EB Garamond';font-weight:700;font-style:normal;src:url(data:font/woff2;base64,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) format('woff2')}.b{font-family:"IBM Plex Sans Condensed",sans-serif;font-weight:700;fill:#1b2935}.r{font-family:"IBM Plex Sans Condensed",sans-serif;font-weight:400;fill:#1b2935}.t{font-family:"EB Garamond",serif;font-weight:700;fill:#1c2631}.c{fill:none;stroke:#e46765;stroke-linecap:round;stroke-linejoin:round}</style>
+<filter id="sh" x="-5%" y="-15%" width="112%" height="132%"><feDropShadow dx="6" dy="6" stdDeviation="3.5" flood-color="#000" flood-opacity="0.4"/></filter></defs>
+<rect width="2618" height="1712" fill="#ebebeb"/>
+<g fill="none" stroke="#1e2d3b" stroke-width="3" stroke-dasharray="11 8.634"><line x1="11.5" y1="10.5" x2="2603" y2="10.5"/><line x1="2603" y1="10.5" x2="2603" y2="1697"/><line x1="11.5" y1="10.5" x2="11.5" y2="1697"/><line x1="11.5" y1="1697" x2="2603" y2="1697"/></g>
+<rect x="735.5" y="35.5" width="1147" height="159" rx="27" fill="#fff" stroke="#1c2631" stroke-width="3" filter="url(#sh)"/>
+<text class="t" font-size="63.1" text-anchor="middle" x="1309" y="101.0">Enterprise Architecture</text>
+<text class="t" font-size="63.1" text-anchor="middle" x="1309" y="170.0">Metamodel</text>
+<g class="groups">
+<g class="group" data-anchor="governance-package" data-label="Governance">
+<rect x="36" y="222" width="2522" height="284" rx="14" fill="none" stroke="#1b2935" stroke-width="2" stroke-dasharray="11 8"/>
+<text class="b" font-size="24" letter-spacing="2.2" x="60" y="260">GOVERNANCE</text>
+<text class="r" font-size="21.5" x="242.4" y="260">cross-cutting — constrains every element of every package</text>
+</g>
+<g class="group" data-anchor="strategy-package" data-label="Strategy">
+<rect x="470" y="546" width="432" height="358" rx="14" fill="none" stroke="#1b2935" stroke-width="2" stroke-dasharray="11 8"/>
+<text class="b" font-size="24" letter-spacing="2.2" x="494" y="584">STRATEGY</text>
+<text class="r" font-size="21.5" x="636.1" y="584">why</text>
+</g>
+<g class="group" data-anchor="organization-package" data-label="Organization">
+<rect x="470" y="944" width="432" height="358" rx="14" fill="none" stroke="#1b2935" stroke-width="2" stroke-dasharray="11 8"/>
+<text class="b" font-size="24" letter-spacing="2.2" x="494" y="982">ORGANIZATION</text>
+<text class="r" font-size="21.5" x="701.0" y="982">who</text>
+</g>
+<g class="group" data-anchor="domain-package" data-label="Domain">
+<rect x="1022" y="642" width="432" height="538" rx="14" fill="#dedede" stroke="#1b2935" stroke-width="2"/>
+<text class="b" font-size="24" letter-spacing="2.2" x="1046" y="680">DOMAIN</text>
+<text class="r" font-size="21.5" x="1161.3" y="680">.domain</text>
+</g>
+<g class="group" data-anchor="system-package" data-label="System">
+<rect x="1574" y="546" width="432" height="448" rx="14" fill="#dedede" stroke="#1b2935" stroke-width="2"/>
+<text class="b" font-size="24" letter-spacing="2.2" x="1598" y="584">SYSTEM</text>
+<text class="r" font-size="21.5" x="1709.1" y="584">.arch</text>
+</g>
+<g class="group" data-anchor="data-package" data-label="Data">
+<rect x="1574" y="1034" width="432" height="310" rx="14" fill="#dedede" stroke="#1b2935" stroke-width="2"/>
+<text class="b" font-size="24" letter-spacing="2.2" x="1598" y="1072">DATA</text>
+<text class="r" font-size="21.5" x="1678.0" y="1072">.dataop, .arch</text>
+</g>
+<g class="group" data-anchor="deployment-package" data-label="Deployment">
+<rect x="2126" y="626" width="432" height="612" rx="14" fill="#dedede" stroke="#1b2935" stroke-width="2"/>
+<text class="b" font-size="24" letter-spacing="2.2" x="2150" y="664">DEPLOYMENT</text>
+<text class="r" font-size="21.5" x="2328.4" y="664">.arch</text>
+</g>
+<g class="group" data-anchor="transformation-package" data-label="Transformation">
+<rect x="36" y="1384" width="2522" height="172" rx="14" fill="none" stroke="#1b2935" stroke-width="2" stroke-dasharray="11 8"/>
+<text class="b" font-size="24" letter-spacing="2.2" x="60" y="1534">TRANSFORMATION</text>
+<text class="r" font-size="21.5" x="304.3" y="1534">cross-cutting — moves every package from one plateau to the next</text>
+</g>
+</g>
+<g class="edges">
+<path class="c" stroke-width="2.5" d="M210.0,850.0 C210.0,638.0 210.0,638.0 210.0,426.0"/>
+<path class="c" stroke-width="2.5" d="M210.0,986.0 C210.0,1197.0 210.0,1197.0 210.0,1408.0"/>
+<path class="c" stroke-width="2.5" d="M360.0,890.8 C427.0,890.8 427.0,661.0 494.0,661.0"/>
+<path class="c" stroke-width="2.5" d="M360.0,945.2 C427.0,945.2 427.0,1059.0 494.0,1059.0"/>
+<path class="c" stroke-width="2.5" d="M686.0,718.0 C686.0,748.0 686.0,736.0 686.0,766.0"/>
+<path class="c" stroke-width="2.5" d="M686.0,1116.0 C686.0,1146.0 686.0,1134.0 686.0,1164.0"/>
+<path class="c" stroke-width="2.5" d="M878.0,823.0 C962.0,823.0 962.0,757.0 1046.0,757.0"/>
+<path class="c" stroke-width="2.5" d="M878.0,1221.0 C962.0,1221.0 962.0,928.0 1046.0,928.0"/>
+<path class="c" stroke-width="2.5" d="M1238.0,814.0 C1238.0,844.0 1238.0,844.0 1238.0,874.0"/>
+<path class="c" stroke-width="2.5" d="M1238.0,982.0 C1238.0,1012.0 1238.0,1012.0 1238.0,1042.0"/>
+<path class="c" stroke-width="2.5" d="M1430.0,928.0 C1514.0,928.0 1514.0,649.0 1598.0,649.0"/>
+<path class="c" stroke-width="2.5" d="M1430.0,1099.0 C1514.0,1099.0 1514.0,1137.0 1598.0,1137.0"/>
+<path class="c" stroke-width="2.5" d="M1790.0,694.0 C1790.0,724.0 1790.0,712.0 1790.0,742.0"/>
+<path class="c" stroke-width="2.5" d="M1790.0,832.0 C1790.0,862.0 1790.0,850.0 1790.0,880.0"/>
+<path class="c" stroke-width="2.5" d="M1874.5,970.0 C1874.5,1031.0 1874.5,1031.0 1874.5,1092.0"/>
+<path class="c" stroke-width="2.5" d="M1790.0,1182.0 C1790.0,1212.0 1790.0,1200.0 1790.0,1230.0"/>
+<path class="c" stroke-width="2.5" d="M1982.0,787.0 C2066.0,787.0 2066.0,949.0 2150.0,949.0"/>
+<path class="c" stroke-width="2.5" d="M1982.0,1137.0 C2066.0,1137.0 2066.0,1169.0 2150.0,1169.0"/>
+<path class="c" stroke-width="2.5" d="M2342.0,774.0 C2342.0,839.0 2342.0,839.0 2342.0,904.0"/>
+<path class="c" stroke-width="2.5" d="M2342.0,994.0 C2342.0,1059.0 2342.0,1059.0 2342.0,1124.0"/>
+<path class="c" stroke-width="2.5" d="M581.0,381.0 C646.0,381.0 646.0,381.0 711.0,381.0"/>
+<path class="c" stroke-width="2.5" d="M1232.0,367.5 C1297.0,367.5 1297.0,325.0 1362.0,325.0"/>
+<path class="c" stroke-width="2.5" d="M1232.0,394.5 C1297.0,394.5 1297.0,437.0 1362.0,437.0"/>
+<path class="c" stroke-width="2.5" d="M2013.0,381.0 C1948.0,381.0 1948.0,437.0 1883.0,437.0"/>
+<path class="c" stroke-width="2.5" d="M711.0,1453.0 C646.0,1453.0 646.0,1453.0 581.0,1453.0"/>
+<path class="c" stroke-width="2.5" d="M1362.0,1453.0 C1297.0,1453.0 1297.0,1453.0 1232.0,1453.0"/>
+<path class="c" stroke-width="2.5" d="M1883.0,1453.0 C1948.0,1453.0 1948.0,1453.0 2013.0,1453.0"/>
+</g>
+<g class="cards">
+<text class="r" font-size="28.65" text-anchor="start" x="220.0" y="458.0">0..n</text>
+<text class="r" font-size="28.65" text-anchor="start" x="220.0" y="1360.0">1..n</text>
+<text class="r" font-size="28.65" text-anchor="end" x="463.0" y="653.0">1..n</text>
+<text class="r" font-size="28.65" text-anchor="end" x="463.0" y="1088.0">1..n</text>
+<text class="r" font-size="28.65" text-anchor="start" x="696.0" y="756.0">0..n</text>
+<text class="r" font-size="28.65" text-anchor="start" x="696.0" y="1154.0">0..n</text>
+<text class="r" font-size="28.65" text-anchor="end" x="1015.0" y="749.0">1..n</text>
+<text class="r" font-size="28.65" text-anchor="end" x="1015.0" y="920.0">1</text>
+<text class="r" font-size="28.65" text-anchor="start" x="1248.0" y="864.0">1..n</text>
+<text class="r" font-size="28.65" text-anchor="start" x="1248.0" y="1032.0">0..n</text>
+<text class="r" font-size="28.65" text-anchor="end" x="1567.0" y="641.0">1..n</text>
+<text class="r" font-size="28.65" text-anchor="end" x="1567.0" y="1166.0">0..n</text>
+<text class="r" font-size="28.65" text-anchor="start" x="1800.0" y="732.0">1..n</text>
+<text class="r" font-size="28.65" text-anchor="start" x="1800.0" y="870.0">0..n</text>
+<text class="r" font-size="28.65" text-anchor="start" x="1884.5" y="1082.0">0..n</text>
+<text class="r" font-size="28.65" text-anchor="start" x="1800.0" y="1220.0">0..n</text>
+<text class="r" font-size="28.65" text-anchor="end" x="2119.0" y="978.0">0..n</text>
+<text class="r" font-size="28.65" text-anchor="end" x="2119.0" y="1198.0">0..n</text>
+<text class="r" font-size="28.65" text-anchor="start" x="2352.0" y="894.0">1..n</text>
+<text class="r" font-size="28.65" text-anchor="start" x="2352.0" y="1114.0">0..n</text>
+<text class="r" font-size="28.65" text-anchor="end" x="702.0" y="373.0">1..n</text>
+<text class="r" font-size="28.65" text-anchor="end" x="1353.0" y="317.0">0..n</text>
+<text class="r" font-size="28.65" text-anchor="end" x="1353.0" y="466.0">0..n</text>
+<text class="r" font-size="28.65" text-anchor="start" x="1892.0" y="466.0">0..n</text>
+<text class="r" font-size="28.65" text-anchor="start" x="590.0" y="1445.0">2</text>
+<text class="r" font-size="28.65" text-anchor="start" x="1241.0" y="1445.0">1..n</text>
+<text class="r" font-size="28.65" text-anchor="end" x="2004.0" y="1445.0">1..n</text>
+</g>
+<g class="nodes">
+<g class="node" data-anchor="principle" data-label="Principle">
+<path fill="#fbfbfb" stroke="#1b2935" stroke-width="2" d="M67.5,336 Q60,336 60,343.5 L60,418.5 Q60,426 67.5,426 L573.5,426 Q581,426 581,418.5 L581,343.5 Q581,336 573.5,336 Z"/>
+<text class="b" font-size="28.65" text-anchor="middle" x="320.5" y="380">Principle</text>
+<text class="r" font-size="21.5" text-anchor="middle" x="320.5" y="408">statement, rationale, implications</text>
+</g>
+<g class="node" data-anchor="rule" data-label="Rule">
+<path fill="#fbfbfb" stroke="#1b2935" stroke-width="2" d="M718.5,336 Q711,336 711,343.5 L711,418.5 Q711,426 718.5,426 L1224.5,426 Q1232,426 1232,418.5 L1232,343.5 Q1232,336 1224.5,336 Z"/>
+<text class="b" font-size="28.65" text-anchor="middle" x="971.5" y="380">Rule</text>
+<text class="r" font-size="21.5" text-anchor="middle" x="971.5" y="408">checkable constraint on a kind of element</text>
+</g>
+<g class="node" data-anchor="fitness-function" data-label="Fitness Function">
+<path fill="#fbfbfb" stroke="#1b2935" stroke-width="2" d="M1369.5,280 Q1362,280 1362,287.5 L1362,362.5 Q1362,370 1369.5,370 L1875.5,370 Q1883,370 1883,362.5 L1883,287.5 Q1883,280 1875.5,280 Z"/>
+<text class="b" font-size="28.65" text-anchor="middle" x="1622.5" y="324">Fitness Function</text>
+<text class="r" font-size="21.5" text-anchor="middle" x="1622.5" y="352">repeatable check on models, code or runtime</text>
+</g>
+<g class="node" data-anchor="waiver" data-label="Waiver">
+<path fill="#fbfbfb" stroke="#1b2935" stroke-width="2" d="M1369.5,392 Q1362,392 1362,399.5 L1362,474.5 Q1362,482 1369.5,482 L1875.5,482 Q1883,482 1883,474.5 L1883,399.5 Q1883,392 1875.5,392 Z"/>
+<text class="b" font-size="28.65" text-anchor="middle" x="1622.5" y="436">Waiver</text>
+<text class="r" font-size="21.5" text-anchor="middle" x="1622.5" y="464">time-boxed exception for named elements</text>
+</g>
+<g class="node" data-anchor="decision" data-label="Decision">
+<path fill="#fbfbfb" stroke="#1b2935" stroke-width="2" d="M2020.5,336 Q2013,336 2013,343.5 L2013,418.5 Q2013,426 2020.5,426 L2526.5,426 Q2534,426 2534,418.5 L2534,343.5 Q2534,336 2526.5,336 Z"/>
+<text class="b" font-size="28.65" text-anchor="middle" x="2273.5" y="380">Decision</text>
+<text class="r" font-size="21.5" text-anchor="middle" x="2273.5" y="408">context, decision, consequences, status</text>
+</g>
+<g class="node" data-anchor="enterprise" data-label="Enterprise">
+<path fill="#fbfbfb" stroke="#1b2935" stroke-width="2" d="M67.5,850 Q60,850 60,857.5 L60,978.5 Q60,986 67.5,986 L352.5,986 Q360,986 360,978.5 L360,857.5 Q360,850 352.5,850 Z"/>
+<text class="b" font-size="45.1" text-anchor="middle" x="210" y="911">Enterprise</text>
+<text class="r" font-size="21.5" text-anchor="middle" x="210" y="944">the root; the organization</text>
+<text class="r" font-size="21.5" text-anchor="middle" x="210" y="972">of the domain model</text>
+</g>
+<g class="node" data-anchor="goal" data-label="Goal">
+<path fill="#fbfbfb" stroke="#1b2935" stroke-width="2" d="M501.5,604 Q494,604 494,611.5 L494,710.5 Q494,718 501.5,718 L870.5,718 Q878,718 878,710.5 L878,611.5 Q878,604 870.5,604 Z"/>
+<text class="b" font-size="28.65" text-anchor="middle" x="686" y="644">Goal</text>
+<text class="r" font-size="21.5" text-anchor="middle" x="686" y="672">strategic outcome the enterprise</text>
+<text class="r" font-size="21.5" text-anchor="middle" x="686" y="700">pursues, measured, with a horizon</text>
+</g>
+<g class="node" data-anchor="capability" data-label="Capability">
+<path fill="#fbfbfb" stroke="#1b2935" stroke-width="2" d="M501.5,766 Q494,766 494,773.5 L494,872.5 Q494,880 501.5,880 L870.5,880 Q878,880 878,872.5 L878,773.5 Q878,766 870.5,766 Z"/>
+<text class="b" font-size="28.65" text-anchor="middle" x="686" y="806">Capability</text>
+<text class="r" font-size="21.5" text-anchor="middle" x="686" y="834">what the business is able to do,</text>
+<text class="r" font-size="21.5" text-anchor="middle" x="686" y="862">whoever does it</text>
+</g>
+<g class="node" data-anchor="team" data-label="Team">
+<path fill="#fbfbfb" stroke="#1b2935" stroke-width="2" d="M501.5,1002 Q494,1002 494,1009.5 L494,1108.5 Q494,1116 501.5,1116 L870.5,1116 Q878,1116 878,1108.5 L878,1009.5 Q878,1002 870.5,1002 Z"/>
+<text class="b" font-size="28.65" text-anchor="middle" x="686" y="1042">Team</text>
+<text class="r" font-size="21.5" text-anchor="middle" x="686" y="1070">stream-aligned | platform |</text>
+<text class="r" font-size="21.5" text-anchor="middle" x="686" y="1098">enabling | complicated-subsystem</text>
+</g>
+<g class="node" data-anchor="ownership" data-label="Ownership">
+<path fill="#fbfbfb" stroke="#1b2935" stroke-width="2" d="M501.5,1164 Q494,1164 494,1171.5 L494,1270.5 Q494,1278 501.5,1278 L870.5,1278 Q878,1278 878,1270.5 L878,1171.5 Q878,1164 870.5,1164 Z"/>
+<text class="b" font-size="28.65" text-anchor="middle" x="686" y="1204">Ownership</text>
+<text class="r" font-size="21.5" text-anchor="middle" x="686" y="1232">one team, one element, one role:</text>
+<text class="r" font-size="21.5" text-anchor="middle" x="686" y="1260">owner | steward | operator</text>
+</g>
+<g class="node" data-anchor="subdomain" data-label="Subdomain">
+<path fill="#fbfbfb" stroke="#1b2935" stroke-width="2" d="M1053.5,700 Q1046,700 1046,707.5 L1046,806.5 Q1046,814 1053.5,814 L1422.5,814 Q1430,814 1430,806.5 L1430,707.5 Q1430,700 1422.5,700 Z"/>
+<text class="b" font-size="28.65" text-anchor="middle" x="1238" y="740">Subdomain</text>
+<text class="r" font-size="21.5" text-anchor="middle" x="1238" y="768">an area of the problem space:</text>
+<text class="r" font-size="21.5" text-anchor="middle" x="1238" y="796">core | supporting | generic</text>
+</g>
+<g class="node" data-anchor="bounded-context" data-label="Bounded Context">
+<path fill="#fbfbfb" stroke="#1b2935" stroke-width="2" d="M1053.5,874 Q1046,874 1046,881.5 L1046,974.5 Q1046,982 1053.5,982 L1422.5,982 Q1430,982 1430,974.5 L1430,881.5 Q1430,874 1422.5,874 Z"/>
+<text class="b" font-size="45.1" text-anchor="middle" x="1238" y="935">Bounded Context</text>
+<text class="r" font-size="21.5" text-anchor="middle" x="1238" y="968">one language, one owning team</text>
+</g>
+<g class="node" data-anchor="aggregate" data-label="Aggregate">
+<path fill="#fbfbfb" stroke="#1b2935" stroke-width="2" d="M1053.5,1042 Q1046,1042 1046,1049.5 L1046,1148.5 Q1046,1156 1053.5,1156 L1422.5,1156 Q1430,1156 1430,1148.5 L1430,1049.5 Q1430,1042 1422.5,1042 Z"/>
+<text class="b" font-size="28.65" text-anchor="middle" x="1238" y="1082">Aggregate</text>
+<text class="r" font-size="21.5" text-anchor="middle" x="1238" y="1110">consistency boundary;</text>
+<text class="r" font-size="21.5" text-anchor="middle" x="1238" y="1138">system of record for its data</text>
+</g>
+<g class="node" data-anchor="system" data-label="System">
+<path fill="#fbfbfb" stroke="#1b2935" stroke-width="2" d="M1605.5,604 Q1598,604 1598,611.5 L1598,686.5 Q1598,694 1605.5,694 L1974.5,694 Q1982,694 1982,686.5 L1982,611.5 Q1982,604 1974.5,604 Z"/>
+<text class="b" font-size="28.65" text-anchor="middle" x="1790" y="648">System</text>
+<text class="r" font-size="21.5" text-anchor="middle" x="1790" y="676">unit of the application portfolio</text>
+</g>
+<g class="node" data-anchor="container" data-label="Container">
+<path fill="#fbfbfb" stroke="#1b2935" stroke-width="2" d="M1605.5,742 Q1598,742 1598,749.5 L1598,824.5 Q1598,832 1605.5,832 L1974.5,832 Q1982,832 1982,824.5 L1982,749.5 Q1982,742 1974.5,742 Z"/>
+<text class="b" font-size="28.65" text-anchor="middle" x="1790" y="786">Container</text>
+<text class="r" font-size="21.5" text-anchor="middle" x="1790" y="814">deployable or runnable unit</text>
+</g>
+<g class="node" data-anchor="api" data-label="API">
+<path fill="#fbfbfb" stroke="#1b2935" stroke-width="2" d="M1605.5,880 Q1598,880 1598,887.5 L1598,962.5 Q1598,970 1605.5,970 L1974.5,970 Q1982,970 1982,962.5 L1982,887.5 Q1982,880 1974.5,880 Z"/>
+<text class="b" font-size="28.65" text-anchor="middle" x="1790" y="924">API</text>
+<text class="r" font-size="21.5" text-anchor="middle" x="1790" y="952">provided interfaces and channels</text>
+</g>
+<g class="node" data-anchor="schema" data-label="Schema">
+<path fill="#fbfbfb" stroke="#1b2935" stroke-width="2" d="M1605.5,1092 Q1598,1092 1598,1099.5 L1598,1174.5 Q1598,1182 1605.5,1182 L1974.5,1182 Q1982,1182 1982,1174.5 L1982,1099.5 Q1982,1092 1974.5,1092 Z"/>
+<text class="b" font-size="28.65" text-anchor="middle" x="1790" y="1136">Schema</text>
+<text class="r" font-size="21.5" text-anchor="middle" x="1790" y="1164">data shape, at rest or in motion</text>
+</g>
+<g class="node" data-anchor="lineage" data-label="Lineage">
+<path fill="#fbfbfb" stroke="#1b2935" stroke-width="2" d="M1605.5,1230 Q1598,1230 1598,1237.5 L1598,1312.5 Q1598,1320 1605.5,1320 L1974.5,1320 Q1982,1320 1982,1312.5 L1982,1237.5 Q1982,1230 1974.5,1230 Z"/>
+<text class="b" font-size="28.65" text-anchor="middle" x="1790" y="1274">Lineage</text>
+<text class="r" font-size="21.5" text-anchor="middle" x="1790" y="1302">a schema derives from another</text>
+</g>
+<g class="node" data-anchor="environment" data-label="Environment">
+<path fill="#fbfbfb" stroke="#1b2935" stroke-width="2" d="M2157.5,684 Q2150,684 2150,691.5 L2150,766.5 Q2150,774 2157.5,774 L2526.5,774 Q2534,774 2534,766.5 L2534,691.5 Q2534,684 2526.5,684 Z"/>
+<text class="b" font-size="28.65" text-anchor="middle" x="2342" y="728">Environment</text>
+<text class="r" font-size="21.5" text-anchor="middle" x="2342" y="756">production, staging, …</text>
+</g>
+<g class="node" data-anchor="node" data-label="Node">
+<path fill="#fbfbfb" stroke="#1b2935" stroke-width="2" d="M2157.5,904 Q2150,904 2150,911.5 L2150,986.5 Q2150,994 2157.5,994 L2526.5,994 Q2534,994 2534,986.5 L2534,911.5 Q2534,904 2526.5,904 Z"/>
+<text class="b" font-size="28.65" text-anchor="middle" x="2342" y="948">Node</text>
+<text class="r" font-size="21.5" text-anchor="middle" x="2342" y="976">where containers run; nodes nest</text>
+</g>
+<g class="node" data-anchor="resource" data-label="Resource">
+<path fill="#fbfbfb" stroke="#1b2935" stroke-width="2" d="M2157.5,1124 Q2150,1124 2150,1131.5 L2150,1206.5 Q2150,1214 2157.5,1214 L2526.5,1214 Q2534,1214 2534,1206.5 L2534,1131.5 Q2534,1124 2526.5,1124 Z"/>
+<text class="b" font-size="28.65" text-anchor="middle" x="2342" y="1168">Resource</text>
+<text class="r" font-size="21.5" text-anchor="middle" x="2342" y="1196">provisioned unit; where data lives</text>
+</g>
+<g class="node" data-anchor="plateau" data-label="Plateau">
+<path fill="#fbfbfb" stroke="#1b2935" stroke-width="2" d="M67.5,1408 Q60,1408 60,1415.5 L60,1490.5 Q60,1498 67.5,1498 L573.5,1498 Q581,1498 581,1490.5 L581,1415.5 Q581,1408 573.5,1408 Z"/>
+<text class="b" font-size="28.65" text-anchor="middle" x="320.5" y="1452">Plateau</text>
+<text class="r" font-size="21.5" text-anchor="middle" x="320.5" y="1480">stable state: baseline | transition | target</text>
+</g>
+<g class="node" data-anchor="gap" data-label="Gap">
+<path fill="#fbfbfb" stroke="#1b2935" stroke-width="2" d="M718.5,1408 Q711,1408 711,1415.5 L711,1490.5 Q711,1498 718.5,1498 L1224.5,1498 Q1232,1498 1232,1490.5 L1232,1415.5 Q1232,1408 1224.5,1408 Z"/>
+<text class="b" font-size="28.65" text-anchor="middle" x="971.5" y="1452">Gap</text>
+<text class="r" font-size="21.5" text-anchor="middle" x="971.5" y="1480">the difference between two plateaus</text>
+</g>
+<g class="node" data-anchor="initiative" data-label="Initiative">
+<path fill="#fbfbfb" stroke="#1b2935" stroke-width="2" d="M1369.5,1408 Q1362,1408 1362,1415.5 L1362,1490.5 Q1362,1498 1369.5,1498 L1875.5,1498 Q1883,1498 1883,1490.5 L1883,1415.5 Q1883,1408 1875.5,1408 Z"/>
+<text class="b" font-size="28.65" text-anchor="middle" x="1622.5" y="1452">Initiative</text>
+<text class="r" font-size="21.5" text-anchor="middle" x="1622.5" y="1480">body of work that closes gaps and serves goals</text>
+</g>
+<g class="node" data-anchor="milestone" data-label="Milestone">
+<path fill="#fbfbfb" stroke="#1b2935" stroke-width="2" d="M2020.5,1408 Q2013,1408 2013,1415.5 L2013,1490.5 Q2013,1498 2020.5,1498 L2526.5,1498 Q2534,1498 2534,1490.5 L2534,1415.5 Q2534,1408 2526.5,1408 Z"/>
+<text class="b" font-size="28.65" text-anchor="middle" x="2273.5" y="1452">Milestone</text>
+<text class="r" font-size="21.5" text-anchor="middle" x="2273.5" y="1480">dated checkpoint; a plateau reached</text>
+</g>
+</g>
+<a href="https://specy.ai" xlink:href="https://specy.ai" target="_blank" rel="noopener"><title>specy.ai</title><g id="logo" transform="translate(40,1592) scale(1.1325,1.1050)"><path d="M24.3566 45C23.1406 45 22.0206 44.696 20.9966 44.088C20.0046 43.48 19.2046 42.68 18.5966 41.688C17.9886 40.664 17.6846 39.544 17.6846 38.328V35.688H24.0206V38.04C24.0206 38.2 24.0686 38.344 24.1646 38.472C24.2926 38.568 24.4366 38.616 24.5966 38.616H45.2846C45.4446 38.616 45.5726 38.568 45.6686 38.472C45.7966 38.344 45.8606 38.2 45.8606 38.04V31.464C45.8606 31.304 45.7966 31.176 45.6686 31.08C45.5726 30.984 45.4446 30.936 45.2846 30.936H24.3566C23.1406 30.936 22.0206 30.632 20.9966 30.024C20.0046 29.416 19.2046 28.616 18.5966 27.624C17.9886 26.6 17.6846 25.464 17.6846 24.216V17.112C17.6846 15.896 17.9886 14.792 18.5966 13.8C19.2046 12.776 20.0046 11.96 20.9966 11.352C22.0206 10.744 23.1406 10.44 24.3566 10.44H45.5726C46.7886 10.44 47.8926 10.744 48.8846 11.352C49.9086 11.96 50.7246 12.776 51.3326 13.8C51.9406 14.792 52.2446 15.896 52.2446 17.112V19.752H45.8606V17.4C45.8606 17.24 45.7966 17.112 45.6686 17.016C45.5726 16.888 45.4446 16.824 45.2846 16.824H24.5966C24.4366 16.824 24.2926 16.888 24.1646 17.016C24.0686 17.112 24.0206 17.24 24.0206 17.4V23.976C24.0206 24.136 24.0686 24.264 24.1646 24.36C24.2926 24.456 24.4366 24.504 24.5966 24.504H45.5726C46.7886 24.504 47.8926 24.808 48.8846 25.416C49.9086 26.024 50.7246 26.84 51.3326 27.864C51.9406 28.856 52.2446 29.976 52.2446 31.224V38.328C52.2446 39.544 51.9406 40.664 51.3326 41.688C50.7246 42.68 49.9086 43.48 48.8846 44.088C47.8926 44.696 46.7886 45 45.5726 45H24.3566Z" fill="#F65E5E"/>
+<path d="M57.3889 56.04V17.16H79.0369C80.2529 17.16 81.3569 17.464 82.3489 18.072C83.3729 18.68 84.1729 19.48 84.7489 20.472C85.3569 21.464 85.6609 22.568 85.6609 23.784V38.376C85.6609 39.592 85.3569 40.696 84.7489 41.688C84.1729 42.68 83.3729 43.48 82.3489 44.088C81.3569 44.696 80.2529 45 79.0369 45H63.6769V56.04H57.3889ZM64.2529 38.712H78.7969C78.9569 38.712 79.0849 38.664 79.1809 38.568C79.3089 38.44 79.3729 38.296 79.3729 38.136V24.024C79.3729 23.864 79.3089 23.736 79.1809 23.64C79.0849 23.512 78.9569 23.448 78.7969 23.448H64.2529C64.0929 23.448 63.9489 23.512 63.8209 23.64C63.7249 23.736 63.6769 23.864 63.6769 24.024V38.136C63.6769 38.296 63.7249 38.44 63.8209 38.568C63.9489 38.664 64.0929 38.712 64.2529 38.712ZM95.7439 45C94.5279 45 93.4239 44.696 92.4319 44.088C91.4399 43.48 90.6399 42.68 90.0319 41.688C89.4239 40.696 89.1199 39.592 89.1199 38.376V23.784C89.1199 22.568 89.4239 21.464 90.0319 20.472C90.6399 19.48 91.4399 18.68 92.4319 18.072C93.4239 17.464 94.5279 17.16 95.7439 17.16H110.768C111.984 17.16 113.088 17.464 114.08 18.072C115.104 18.68 115.904 19.48 116.48 20.472C117.088 21.464 117.392 22.568 117.392 23.784V34.248H95.4079V38.136C95.4079 38.296 95.4559 38.44 95.5519 38.568C95.6799 38.664 95.8239 38.712 95.9839 38.712H117.392V45H95.7439ZM95.4079 28.584H111.104V24.024C111.104 23.864 111.04 23.736 110.912 23.64C110.816 23.512 110.688 23.448 110.528 23.448H95.9839C95.8239 23.448 95.6799 23.512 95.5519 23.64C95.4559 23.736 95.4079 23.864 95.4079 24.024V28.584ZM127.853 45C126.637 45 125.533 44.696 124.541 44.088C123.549 43.48 122.749 42.68 122.141 41.688C121.533 40.696 121.229 39.592 121.229 38.376V23.784C121.229 22.568 121.533 21.464 122.141 20.472C122.749 19.48 123.549 18.68 124.541 18.072C125.533 17.464 126.637 17.16 127.853 17.16H149.453V23.448H128.093C127.933 23.448 127.789 23.512 127.661 23.64C127.565 23.736 127.517 23.864 127.517 24.024V38.136C127.517 38.296 127.565 38.44 127.661 38.568C127.789 38.664 127.933 38.712 128.093 38.712H149.501V45H127.853ZM158.828 55.32V48.984H175.58C175.74 48.984 175.868 48.92 175.964 48.792C176.092 48.696 176.156 48.568 176.156 48.408V45H160.796C159.612 45 158.508 44.696 157.484 44.088C156.492 43.48 155.692 42.68 155.084 41.688C154.476 40.696 154.172 39.592 154.172 38.376V17.256H160.46V38.136C160.46 38.296 160.508 38.44 160.604 38.568C160.732 38.664 160.876 38.712 161.036 38.712H175.58C175.74 38.712 175.868 38.664 175.964 38.568C176.092 38.44 176.156 38.296 176.156 38.136V17.256H182.444V48.696C182.444 49.912 182.156 51.016 181.58 52.008C181.004 53.032 180.204 53.832 179.18 54.408C178.188 55.016 177.084 55.32 175.868 55.32H158.828ZM187.608 45V38.712H193.896V45H187.608ZM205.011 45C203.795 45 202.675 44.696 201.651 44.088C200.659 43.48 199.859 42.68 199.251 41.688C198.675 40.696 198.387 39.592 198.387 38.376V27.912H220.371V24.024C220.371 23.864 220.307 23.736 220.179 23.64C220.083 23.512 219.955 23.448 219.795 23.448H198.387V17.16H220.035C221.251 17.16 222.355 17.464 223.347 18.072C224.371 18.68 225.171 19.48 225.747 20.472C226.355 21.464 226.659 22.568 226.659 23.784V45H205.011ZM205.251 38.712H220.371V33.576H204.675V38.136C204.675 38.296 204.723 38.44 204.819 38.568C204.947 38.664 205.091 38.712 205.251 38.712ZM231.715 45V17.16H238.003V45H231.715ZM231.715 14.376V8.04H238.003V14.376H231.715Z" fill="#1A2A36"/>
+<path d="M7 48H15V55H0V0H15V7H7V48Z" fill="#F65E5E"/>
+<path d="M255 55H240V48H248V7H240V0H255V55Z" fill="#F65E5E"/></g></a>
+<g class="legend">
+<rect x="430" y="1627" width="48" height="30" rx="6" fill="none" stroke="#1b2935" stroke-width="2" stroke-dasharray="11 8"/>
+<text class="r" font-size="21.5" x="492.0" y="1650">enterprise scope — new in this metamodel</text>
+<rect x="916.639" y="1627" width="48" height="30" rx="6" fill="#dedede" stroke="#1b2935" stroke-width="2"/>
+<text class="r" font-size="21.5" x="978.6" y="1650">bounded-context scope — where the Specy models live (.domain, .arch, .dataop)</text>
+</g>
+</svg>
