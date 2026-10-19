@@ -46,11 +46,12 @@ const GROUPS = [
    Always revalidated with the server (304 when unchanged): an edited model
    must never be read from a stale HTTP cache next to newer code. */
 const NO_CACHE = { cache: "no-cache" };
-const DOMAIN_FILES = ["fipro.domain", "fipro.refactored.domain", "ffm.domain", "url-shortener.domain"];
+const DOMAIN_FILES = ["fipro.domain", "fipro.refactored.domain", "ffm.domain", "url-shortener.domain", "retail-media.domain"];
 const SYSREQ_FILES = ["fipro.sysreq"];
 const ARCH_FILES = [
   "ffm.arch",            // FFM landscape: 11 systems merged by scripts/merge-arch.mjs from ffm.arch-sources/
   "url-shortener.arch",  // public sample (symlink to examples/)
+  "retail-media.arch",   // public sample, an `organization` file — level 0 (symlink to examples/)
 ];
 
 const ARCHS = [];            // parsed .arch architectures (arch-parser.js)
@@ -110,7 +111,8 @@ function buildIndex() {
       INDEX["ctx:" + ctx.id] = { ctx, org };
       for (const mod of ctx.modules) {
         INDEX["mod:" + mod.id] = { mod, ctx, org };
-        for (const el of mod.elements) INDEX[el.id] = { el, mod, ctx, org };
+        /* first wins: a second definition of the same name in a context never shadows the first */
+        for (const el of mod.elements) if (!INDEX[el.id]) INDEX[el.id] = { el, mod, ctx, org };
       }
     }
   }
@@ -137,6 +139,10 @@ const state = {
   archId: null,              // architecture rendered in the arch view
   archShow: { persons: true, externalSystems: true, channels: true, edgeLabels: true },
   archSel: null,             // "kind:name" of the element selected in the arch view (tree or canvas)
+  archMode: {},              // organization files only: arch id → "landscape" (default) | "c4"
+  archUnfold: null,          // "system:name" to open on its containers at the next C4 render ("Open C4 view")
+  landShow: {},              // landscape toggles the user changed (defaults: LANDSCAPE_DEFAULT_SHOW)
+  returnTo: null,            // { hash, label } of the architecture place a domain link was followed from
   expanded: new Set(),
   filter: "",
 };
@@ -258,18 +264,158 @@ function renderDiagramTree() {
 
 /* ---- Architecture view (arch-parser.js + arch-to-diagram.js) ---- */
 const ARCH_BADGE = { label: "C4", title: "Software architecture", color: "#172741" };
-/* a landscape (several systems) is named after its architecture, a single
-   system in focus after the system */
-const archTitle = a => (a.systems && a.systems.length > 1 ? a.name : (a.system && a.system.name) || a.name);
+const ORG_BADGE = { label: "L0", title: "Organization landscape (level 0)", color: "#172741" };
+/* An `organization` file (level 0) opens on its landscape — systems by area,
+   "depends on" edges, numbered flows — and keeps the C4 diagram of its
+   detailed systems one click away; an `architecture` file only has the C4
+   view. Without the landscape converter (arch-to-diagram.js), or when it
+   fails on a file, an organization file falls back to the C4 view. */
+const isOrgArch = a => !!a && a.root === "organization";
+const landscapeFailed = new Set();   // arch ids whose landscape conversion threw
+const hasLandscape = a => typeof SpecyArchDiagrams.landscapeDiagram === "function" && !landscapeFailed.has(a.id);
+const archModeOf = a => (isOrgArch(a) && hasLandscape(a) ? state.archMode[a.id] || "landscape" : "c4");
+/* an organization and a landscape (several systems) are named after the
+   file's root, a single system in focus after the system */
+const archTitle = a => (isOrgArch(a) || (a.systems && a.systems.length > 1) ? a.name : (a.system && a.system.name) || a.name);
 const archDomainStem = a => String(a.domainSource || "").split("/").pop().replace(/\.domain$/, "");
 /* the loaded organization parsed from the .arch's domain-source (ids = file stems) */
 const archDomainOrg = a => (a.domainSource && MODEL.organizations.find(o => o.id === archDomainStem(a))) || null;
 
+/* kinds the converter's KIND_LEGEND may not know */
+const ARCH_SWATCH_FALLBACK = { area: { label: "Area", color: "transparent", border: "#9aa5b1", dashed: true } };
 function archSwatch(kind) {
-  const k = SpecyArchDiagrams.KIND_LEGEND[kind];
+  const k = SpecyArchDiagrams.KIND_LEGEND[kind] || ARCH_SWATCH_FALLBACK[kind];
   if (!k) return `<span class="arch-swatch none"></span>`;
-  return `<span class="arch-swatch${k.dashed ? " dashed" : ""}" style="background:${k.color};border-color:${k.border}" title="${esc(k.label)}"></span>`;
+  return `<span class="arch-swatch${k.dashed ? " dashed" : ""}" style="background:${esc(k.color)};border-color:${esc(k.border)}" title="${esc(k.label)}"></span>`;
 }
+
+/* ---- Level 0: concept references resolved against the loaded domain models
+   (arch-concepts.js). One resolution per parsed architecture, recomputed
+   when a domain model was loaded since (boot loads the files one by one). ---- */
+const archResolutions = new WeakMap();
+function archResolution(a) {
+  let r = archResolutions.get(a);
+  if (r && r.loaded === MODEL.organizations.length) return r;
+  r = { loaded: MODEL.organizations.length, sources: [], orgs: [], missing: [], summary: null };
+  if (typeof SpecyArchConcepts !== "undefined") {
+    try {
+      r.sources = SpecyArchConcepts.domainSources(a);
+      const found = SpecyArchConcepts.domainOrgsFor(a, MODEL.organizations);
+      r.orgs = found.orgs;
+      r.missing = found.missing;
+      r.summary = SpecyArchConcepts.resolveAll(a, r.orgs);
+    } catch (e) {
+      console.warn("concept resolution failed for " + a.id + ".arch:", e);
+      r.summary = null;
+    }
+  }
+  archResolutions.set(a, r);
+  return r;
+}
+/* how a concept reference resolved: { status: "resolved" | "ambiguous" |
+   "acknowledged" | "unresolved" | "plain", … } (see arch-concepts.js) */
+function conceptResolution(a, ref) {
+  const r = archResolution(a);
+  const x = (r.summary && r.summary.of(ref)) || { status: "plain" };
+  /* with a domain source missing, "unresolved" proves nothing */
+  return x.status === "unresolved" && r.missing.length ? { status: "plain" } : x;
+}
+const unresolvedReason = (ref, x) => (x.reason === "unknown-context" ? `no bounded context ${ref.context} in the domain model`
+  : x.reason === "not-referable" ? `names ${(x.found || []).map(c => `${c.kindLabel} ${c.context}.${c.name}`).join(", ")} — not a kind a concept may name`
+  : "no domain element");
+
+/* A concept name of a level-0 clause (`masters`, `handles`, `carries … as …`,
+   a hotspot's `concerns`). Resolved, it is a link into the Domain Navigator;
+   ambiguous, it offers its candidates; acknowledged or unresolved, it is
+   plain text with its reason (the NOTE, "no domain element") — in the
+   tooltip, or next to the name with `opts.reason`. `opts.bare` shows the
+   name without its context qualifier (the caller prints the context). */
+function conceptHtml(a, ref, opts = {}) {
+  if (!ref) return "";
+  const x = conceptResolution(a, ref);
+  const label = esc(opts.bare ? ref.name : ref.raw || ref.name);
+  if (x.status === "resolved" && INDEX[x.id]) {
+    const tip = `${x.kindLabel} ${x.name} — context ${x.context}${x.sourcedFrom ? `, sourced from ${x.sourcedFrom}` : ""} · open in the Domain Navigator`;
+    return `<a class="ref concept" href="#${esc(x.id)}" data-goto="${esc(x.id)}" title="${esc(tip)}">${badge(kindOf(INDEX[x.id].el))}${label}</a>`;
+  }
+  if (x.status === "ambiguous") {
+    const cands = (x.candidates || []).map(c => (INDEX[c.id]
+      ? `<a class="ref concept" href="#${esc(c.id)}" data-goto="${esc(c.id)}">${badge(kindOf(INDEX[c.id].el))}${esc(c.context)}.${esc(c.name)}</a>`
+      : `<span class="rel-plain">${esc(c.context)}.${esc(c.name)}</span>`)
+      + ` <span class="rel-note">${esc(c.kindLabel)}${c.module ? ` · module ${esc(c.module)}` : ""}</span>`);
+    return `<details class="concept-amb"><summary title="Ambiguous: ${cands.length} domain elements bear this name — pick one (and qualify the name in the .arch)">${label}<span class="amb-mark">${cands.length}?</span></summary>` +
+      `<span class="amb-menu">${cands.map(c => `<span class="amb-item">${c}</span>`).join("")}</span></details>`;
+  }
+  if (x.status === "acknowledged" || x.status === "unresolved") {
+    const why = x.status === "acknowledged" ? x.note || "acknowledged by a // NOTE:" : unresolvedReason(ref, x);
+    const tip = x.status === "acknowledged" ? `Not in the domain model — NOTE: ${why}` : `Not linked: ${why}`;
+    return `<span class="concept-plain ${x.status}" title="${esc(tip)}">${label}</span>` +
+      (opts.reason ? ` <span class="concept-why">${esc(why)}</span>` : "");
+  }
+  return `<span class="concept-plain">${label}</span>`;
+}
+
+/* bounded contexts named by `realizes context X`, looked up (by name or
+   shortname) in the domain models the architecture resolves against */
+function archContexts(a, names) {
+  const orgs = archResolution(a).orgs;
+  const norm = typeof SpecyArchConcepts !== "undefined" ? SpecyArchConcepts.norm : s => String(s || "").toLowerCase();
+  return (names || []).map(name => {
+    let ctx = null;
+    for (const o of orgs) for (const c of o.contexts) if (!ctx && (norm(c.name) === norm(name) || norm(c.shortname) === norm(name))) ctx = c;
+    return { name, ctx };
+  });
+}
+const contextLink = (name, ctx) => (ctx && INDEX["ctx:" + ctx.id]
+  ? `<a class="ref" href="#ctx:${esc(ctx.id)}" data-goto="ctx:${esc(ctx.id)}" title="Bounded context ${esc(ctx.name)} — open its context map in the Domain Navigator">${esc(name)}</a>`
+  : `<span class="rel-plain">${esc(name)}</span>`);
+
+/* ---- Level-0 vocabulary shared by the organization tree and the sheets ---- */
+const flowMechanism = (f, phase) => (f.perPhase.length ? f.perPhase.find(p => p.phase === phase) || null : f.mechanism);
+const dependsOn = d => `${d.from} depends on ${d.to}`;
+const reverseDependency = (a, d) => a.dependencies.find(x => x.from === d.to && x.to === d.from) || null;
+const isPartnership = (a, d) => {
+  const back = reverseDependency(a, d);
+  return !!back && d.patterns.includes("Partnership") && back.patterns.includes("Partnership");
+};
+/* context-map patterns: the side of the dependency each one qualifies */
+const PATTERN_INFO = {
+  CS:                ["downstream", "Customer–Supplier: the upstream plans for what this downstream needs"],
+  Conformist:        ["downstream", "Conformist: the downstream takes the upstream's model as it is, without translating"],
+  ACL:               ["downstream", "Anti-Corruption Layer: the downstream translates the upstream's model into its own"],
+  OHS:               ["upstream", "Open Host Service: the upstream offers one protocol to all its consumers"],
+  SharedKernel:      ["both", "Shared Kernel: the two systems share a part of their model"],
+  PublishedLanguage: ["both", "Published Language: a documented exchange language owned by neither side"],
+  Partnership:       ["both", "Partnership: the two teams adapt to each other and succeed or fail together"],
+};
+const CRITICALITY_INFO = { critical: "is down too", degraded: "keeps running with reduced service", tolerant: "shows no user-visible impact" };
+function patternChips(d) {
+  return d.patterns.map(p => {
+    const info = PATTERN_INFO[p];
+    const side = info ? (info[0] === "downstream" ? `downstream side (${d.from})` : info[0] === "upstream" ? `upstream side (${d.to})` : "both sides") : "";
+    return `<span class="pattern-tag" title="${esc(info ? `${side} — ${info[1]}` : "unknown pattern")}">${esc(p)}</span>`;
+  }).join(" ");
+}
+/* Level-0 item behind a selection key ("system:ERP", "dependency:ERP->CRM",
+   "area:…", "person:…", "externalSystem:…"), read from the parsed organization */
+function orgItemOf(a, key) {
+  if (!isOrgArch(a) || !key) return null;
+  const i = key.indexOf(":"), kind = key.slice(0, i), name = key.slice(i + 1);
+  const pool = { system: a.systems, externalSystem: a.externalSystems, person: a.persons, area: a.areas, dependency: a.dependencies }[kind];
+  const item = pool && pool.find(x => (kind === "dependency" ? x.id : x.name) === name);
+  return item ? { kind, name, item } : null;
+}
+const orgKindOf = (a, name) => (a.systems.some(s => s.name === name) ? "system"
+  : a.externalSystems.some(x => x.name === name) ? "externalSystem"
+  : a.persons.some(p => p.name === name) ? "person" : null);
+/* a name of the organization as a link that selects it (tree, canvas, sheet) */
+function orgLink(a, name, kind) {
+  kind = kind || orgKindOf(a, name);
+  if (!kind) return `<span class="rel-plain">${esc(name)}</span>`;
+  return `<button class="arch-link" data-archsel="${esc(kind + ":" + name)}">${archSwatch(kind)}${esc(name)}</button>`;
+}
+const dependencyLink = (d, text) =>
+  `<button class="arch-link dep" data-archsel="dependency:${esc(d.id)}" title="${esc(dependsOn(d))} — open the dependency">${esc(text || dependsOn(d))}</button>`;
 
 /* Architecture view tree: the system in focus, element counts keyed by the
    canvas colours, the fold-level hint, then the systems and containers as
@@ -282,8 +428,9 @@ function renderArchTree() {
     tree.innerHTML = `<div class="tree-empty">No .arch file loaded — list one in <code class="inline">ARCH_FILES</code> (top of app.js).</div>`;
     return;
   }
-  const sys = a.system, n = a.counts, dorg = archDomainOrg(a);
-  const multi = a.systems.length > 1;   // a landscape (scripts/merge-arch.mjs)
+  if (archModeOf(a) === "landscape") { renderOrgTree(tree, a); return; }
+  const sys = a.system || { description: "" }, n = a.counts, dorg = archDomainOrg(a);
+  const multi = isOrgArch(a) || a.systems.length > 1;   // an organization, or a landscape (scripts/merge-arch.mjs)
   const info = (lead, name, count, title, depth) =>
     `<li><div class="tree-info" style="--indent:${(depth || 0) * 16}px"${title ? ` title="${esc(title)}"` : ""}>${lead}<span class="row-name">${esc(name)}</span>${count != null ? `<span class="row-count">${esc(count)}</span>` : ""}</div></li>`;
   const desc = multi ? a.description : sys.description || a.description;
@@ -293,6 +440,7 @@ function renderArchTree() {
       <p class="arch-source">${a.domainSource
         ? `domain-source <code class="inline">${esc(a.domainSource)}</code> · ${dorg ? "linked — double-click a card to open what it realizes" : "not loaded"}`
         : "no domain-source"}</p>
+      ${isOrgArch(a) && hasLandscape(a) ? `<p class="arch-source">C4 view of the organization's systems — <button class="arch-link" data-archmode="landscape">back to the landscape</button></p>` : ""}
     </div>
     <ul class="arch-legend">
       <li><div class="tree-group-label" style="--indent:0px">Elements</div></li>`;
@@ -321,6 +469,112 @@ function renderArchTree() {
       const title = [c.technology, c.description].filter(Boolean).join(" — ");
       html += pick("container", c.name, count, title, 1);
     }
+  }
+  html += `</ul>`;
+  tree.innerHTML = html;
+}
+
+/* Organization tree (level 0, landscape mode): the organization and how its
+   concept names resolved, what the readers could not read, then the areas
+   with their systems, the external systems, the persons, the dependencies
+   and the phases. Rows select like the C4 rows (`data-archsel`); the selected
+   system unfolds its main concepts (links into the Domain Navigator), the
+   selected dependency its flows (a row jumps to the flow in the sheet). */
+function renderOrgTree(tree, a) {
+  const n = a.counts, res = archResolution(a), sum = res.summary;
+  const plural = (k, one, many) => `${k} ${k === 1 ? one : many || one + "s"}`;
+  const group = label => `<li><div class="tree-group-label" style="--indent:0px">${label}</div></li>`;
+  const pick = (kind, id, label, count, title, depth) => {
+    const key = `${kind}:${id}`;
+    return `<li><button class="tree-row arch-row${state.archSel === key ? " selected" : ""}" data-archsel="${esc(key)}" style="--indent:${depth * 16}px"${title ? ` title="${esc(title)}"` : ""}>${kind === "dependency" ? "" : archSwatch(kind)}<span class="row-name">${label}</span>${count != null && count !== "" ? `<span class="row-count">${esc(count)}</span>` : ""}</button></li>`;
+  };
+  /* the main concepts of the selected system, source of truth first */
+  const conceptRows = (holder, depth) => [["masters", "●", "source of truth (masters)"], ["handles", "○", "handled, not mastered"]]
+    .map(([site, mark, tip]) => (holder[site] || []).map(ref =>
+      `<li><div class="tree-info tree-concept" style="--indent:${depth * 16}px"><span class="concept-mark ${site}" title="${tip}">${mark}</span>${conceptHtml(a, ref)}</div></li>`).join("")).join("");
+  const systemRow = (s, depth) => {
+    const marks = [s.detail === "inline" ? "C4" : "", s.hotspots.length ? `${s.hotspots.length} hot` : ""].filter(Boolean).join(" · ");
+    const title = [s.technology, s.description].filter(Boolean).join(" — ");
+    return pick("system", s.name, esc(s.name), marks, title, depth)
+      + (state.archSel === "system:" + s.name ? conceptRows(s, depth + 1) : "");
+  };
+
+  /* how the concept names resolved */
+  let resolution;
+  if (!res.sources.length) resolution = `no <code class="inline">domain-source</code> — concept names are plain text`;
+  else if (!res.orgs.length) resolution = `domain-source ${res.sources.map(s => `<code class="inline">${esc(s)}</code>`).join(", ")} not loaded — concept names are plain text`;
+  else {
+    const c = sum ? sum.counts : { resolved: 0, ambiguous: 0, acknowledged: 0, unresolved: 0 };
+    const out = c.acknowledged + (res.missing.length ? 0 : c.unresolved);
+    const tip = sum ? `${sum.total} concept references: ${c.resolved} resolve to ${sum.distinct.resolved} domain elements`
+      + (sum.acknowledged.length ? `; acknowledged by a // NOTE: ${sum.acknowledged.map(k => `${k.name} ×${k.uses}`).join(", ")}` : "")
+      + (c.unresolved && !res.missing.length ? `; ${c.unresolved} unresolved` : "") : "";
+    resolution = `<span title="${esc(tip)}"><b>${c.resolved}</b> concepts linked · <b>${out}</b> not in the domain model${c.ambiguous ? ` · <b>${c.ambiguous}</b> ambiguous` : ""}</span>`
+      + (res.missing.length ? `<br>not loaded: ${res.missing.map(s => `<code class="inline">${esc(s)}</code>`).join(", ")}` : "");
+  }
+  let html = `<div class="arch-head">
+      <div class="arch-name">${badge(ORG_BADGE)}<span>${esc(a.name)}</span></div>
+      ${a.description ? `<p class="arch-desc">${esc(a.description)}</p>` : ""}
+      <p class="arch-source">organization · ${plural(n.systems, "system")} · ${plural(n.dependencies || 0, "dependency", "dependencies")} · ${plural(n.flows || 0, "flow")}${n.hotspots ? ` · ${plural(n.hotspots, "hotspot")}` : ""}</p>
+      <p class="arch-source arch-resolution">${resolution}</p>
+    </div>
+    <ul class="arch-legend">`;
+
+  /* what the readers could not read, link or decide */
+  const problems = (a.issues || []).map(p => ({ line: p.line, text: p.message }))
+    .concat(sum && !res.missing.length ? sum.problems.map(p => ({ line: p.line, text: p.message })) : [])
+    .concat(sum ? sum.domainProblems.map(p => ({ line: 0, text: p.message })) : []);
+  if (problems.length) {
+    html += group(`Problems (${problems.length})`)
+      + problems.slice(0, 40).map(p => `<li><div class="tree-problem">${p.line ? `<span class="tree-problem-line">line ${esc(p.line)}</span> ` : ""}${esc(p.text)}</div></li>`).join("")
+      + (problems.length > 40 ? `<li><div class="tree-problem">… and ${problems.length - 40} more</div></li>` : "");
+  }
+
+  html += group("Areas and systems");
+  for (const area of a.areas) {
+    const members = a.systems.filter(s => s.area === area.name);
+    html += pick("area", area.name, esc(area.name), members.length, area.description, 0);
+    for (const s of members) html += systemRow(s, 1);
+  }
+  const known = new Set(a.areas.map(x => x.name));
+  const loose = a.systems.filter(s => !known.has(s.area));
+  if (loose.length && a.areas.length) html += `<li><div class="tree-info" style="--indent:0px"><span class="row-name tree-muted">no area</span></div></li>`;
+  for (const s of loose) html += systemRow(s, a.areas.length ? 1 : 0);
+
+  if (a.externalSystems.length) {
+    html += group("External systems");
+    for (const x of a.externalSystems)
+      html += pick("externalSystem", x.name, esc(x.name), "", x.description, 0)
+        + (state.archSel === "externalSystem:" + x.name ? conceptRows(x, 1) : "");
+  }
+  if (a.persons.length) {
+    html += group("Persons");
+    for (const p of a.persons)
+      html += pick("person", p.name, esc(p.name), a.systems.filter(s => s.usedBy.includes(p.name)).length || "", p.description, 0);
+  }
+
+  if (a.dependencies.length) {
+    html += `<li><div class="tree-group-label" style="--indent:0px" title="A → B reads “A depends on B”: A is downstream, B upstream">Dependencies · A → B: A depends on B</div></li>`;
+    for (const d of a.dependencies) {
+      const nums = d.flows.map(f => f.number);
+      const title = [dependsOn(d), d.patterns.join(", "), d.criticality ? "criticality " + d.criticality : "",
+        d.mutual ? (isPartnership(a, d) ? "Partnership (both directions)" : "mutual dependency") : "", d.description].filter(Boolean).join(" — ");
+      html += pick("dependency", d.id,
+        `${esc(d.from)} <span class="sm-arrow" aria-label="depends on">→</span> ${esc(d.to)}${d.mutual ? ` <span class="dep-mutual" title="${isPartnership(a, d) ? "Partnership" : "mutual dependency"}: the opposite dependency exists too">⇄</span>` : ""}`,
+        nums.length ? "#" + (nums.length > 1 && nums[nums.length - 1] - nums[0] === nums.length - 1 ? `${nums[0]}–${nums[nums.length - 1]}` : nums.join(",")) : "no flow",
+        title, 0);
+      if (state.archSel === "dependency:" + d.id)
+        for (const f of d.flows)
+          html += `<li><button class="tree-row arch-row tree-flow" data-flowjump="${esc(f.number)}" style="--indent:16px" title="${esc(`flow ${f.number} — ${f.sender} → ${f.receiver}`)}"><span class="flow-num">${esc(f.number)}</span><span class="row-name">${esc(f.label)}</span></button></li>`;
+    }
+  }
+
+  if (a.phases.length) {
+    html += group("Phases · in order");
+    a.phases.forEach((p, i) => {
+      html += `<li><div class="tree-info" style="--indent:0px"><span class="flow-num phase">${i + 1}</span><span class="row-name">${esc(p.name)}</span></div>
+        ${p.description ? `<div class="tree-hint tree-phase-desc">${esc(p.description)}</div>` : ""}</li>`;
+    });
   }
   html += `</ul>`;
   tree.innerHTML = html;
@@ -851,25 +1105,24 @@ function renderArchView(target) {
     return;
   }
   state.archId = a.id;
+  if (archModeOf(a) === "landscape" && renderLandscapeView(target, a)) return;
   const show = state.archShow;
   const n = a.counts;
   const opts = [["persons", "persons"], ["externalSystems", "external systems"], ["channels", "channels"], ["edgeLabels", "edge labels"]];
   target.innerHTML = `<div class="diagram-wrap">
-    <div class="diagram-bar">
+    <div class="diagram-bar arch-bar">
       ${badge(ARCH_BADGE)}<span class="diagram-title">${esc(archTitle(a))}</span>
       <span class="diagram-sub">${esc(a.id)}.arch · ${a.systems.length > 1 ? `${n.systems} systems · ` : ""}${n.containers} containers · ${n.components} components · ${n.connectors} connectors</span>
       <span class="spacer"></span>
+      ${archModeSwitch(a, "c4")}
       <div class="diagram-opts">${opts.map(([key, label]) =>
         `<label class="diag-opt"><input type="checkbox" data-archopt="${key}"${show[key] ? " checked" : ""}/>${esc(label)}</label>`).join("")}
       </div>
     </div>
-    <div class="arch-body">
-      <div id="flow" class="flow-host"></div>
-      <aside id="arch-details" class="arch-details" hidden></aside>
-    </div>
+    ${archBodyHtml("c4")}
   </div>`;
   const file = SpecyArchDiagrams.architectureDiagram(a, show, { domainOrg: archDomainOrg(a) });
-  archView = { arch: a, file, mount: null };
+  archView = { arch: a, file, mount: null, mode: "c4" };
   archView.mount = mountDiagram(document.getElementById("flow"), file, {
     storagePrefix: file.model.id,
     interactive: true,
@@ -884,18 +1137,184 @@ function renderArchView(target) {
     onSelect: ref => {
       const el = ref && archView && archView.file.model.elements.find(e => e.id === ref.elementId);
       const key = el ? `${el.type}:${el.data.name}` : null;
+      /* the echo of the focus that unfolded a system (below): back to the system */
+      const unfold = archView && archView.unfold;
+      if (unfold && el && el.id === unfold.via) {
+        archView.unfold = null;
+        archView.mount.focus({ elementId: unfold.system });
+        return;
+      }
       if (key !== state.archSel) selectArchElement(key, { focus: false });
     },
   });
   // keep the selection across re-renders (toggles, tab switches)
   if (state.archSel) {
     if (archElementOf(state.archSel)) selectArchElement(state.archSel, { focus: true });
-    else state.archSel = null;
+    else selectArchElement(null);
+  }
+  /* "Open C4 view" of a system detailed inline: a system group opens folded
+     (level 1), and focusing a group does not unfold it — focusing its first
+     container does (the engine opens the groups around a focused element);
+     onSelect then hands the selection back to the system. */
+  const unfold = state.archUnfold;
+  state.archUnfold = null;
+  if (unfold && unfold === state.archSel && archView.mount && archView.mount.focus) {
+    const sys = a.systems.find(s => "system:" + s.name === unfold), sysEl = archElementOf(unfold);
+    const member = sys && file.diagram.nodes.find(n => sysEl && n.parentId === "node-" + sysEl.id);
+    if (member) {
+      const pending = archView.unfold = { via: member.data.modelRef.elementId, system: sysEl.id };
+      archView.mount.focus({ elementId: pending.via });
+      setTimeout(() => { if (archView && archView.unfold === pending) archView.unfold = null; }, 2000);   // no echo came
+    }
   }
 }
 
+/* The canvas and, beside it, the details of the selection: a drag handle
+   (`data-archresize`) sets the panel's width, kept per kind of panel — the
+   C4 details ("c4") and the wider level-0 sheet ("sheet"). */
+const archBodyHtml = kind => `<div class="arch-body">
+      <div id="flow" class="flow-host"></div>
+      <div class="arch-resizer" data-archresize role="separator" aria-orientation="vertical" tabindex="0"
+           title="Drag to resize the panel · double-click to reset" hidden></div>
+      <aside id="arch-details" class="arch-details${kind === "sheet" ? " sheet" : ""}" data-panel="${kind}" hidden></aside>
+    </div>`;
+/* Landscape | C4 switch of the diagram bar — organization files only */
+function archModeSwitch(a, mode) {
+  if (!isOrgArch(a) || !hasLandscape(a)) return "";
+  const btn = (m, label, title) =>
+    `<button class="arch-mode-btn${m === mode ? " active" : ""}" data-archmode="${m}" title="${esc(title)}"${m === mode ? ` aria-pressed="true"` : ""}>${label}</button>`;
+  return `<div class="arch-mode" role="group" aria-label="View">${
+    btn("landscape", "Landscape", "Level 0 — the systems by area, what each one masters, and who depends on whom")}${
+    btn("c4", "C4", "Levels 1–3 — the systems detailed inline with their containers and components, the others as black boxes")}</div>`;
+}
+
+/* How the landscape encodes its edges (SpecyArchDiagrams.LANDSCAPE_LEGEND),
+   printed as line samples. The converter owns the encoding; this reads a
+   list or a keyed map of { label, stroke | color, strokeDasharray | dash,
+   strokeWidth | width, description } tolerantly. */
+function landscapeLegendHtml() {
+  const legend = SpecyArchDiagrams.LANDSCAPE_LEGEND;
+  if (!legend || typeof legend !== "object") return "";
+  const items = Array.isArray(legend) ? legend
+    : Object.entries(legend).map(([key, v]) => (v && typeof v === "object" ? Object.assign({ key }, v) : { key, label: String(v) }));
+  return items.filter(it => it && typeof it === "object").map(it => {
+    const st = Object.assign({}, it, it.style && typeof it.style === "object" ? it.style : {});
+    const stroke = st.stroke || st.color || "#F65D60";
+    const dash = st.strokeDasharray || st.dash || (st.dashed ? "6 4" : "");
+    const width = Math.min(Number(st.strokeWidth || st.width) || 1.8, 6);
+    const label = it.label || it.title || it.key || "";
+    const tip = it.description || it.meaning || "";
+    return `<span class="land-legend-item"${tip ? ` title="${esc(tip)}"` : ""}><svg width="28" height="8" viewBox="0 0 28 8" aria-hidden="true"><line x1="1" y1="4" x2="27" y2="4" stroke="${esc(stroke)}" stroke-width="${width}"${dash ? ` stroke-dasharray="${esc(dash)}"` : ""}/></svg>${esc(label)}</span>`;
+  }).join("");
+}
+
+/* Organization view (level 0): the landscape — systems grouped by area with
+   their main concepts, one "depends on" edge per dependency labelled with its
+   numbered flows — drawn by SpecyArchDiagrams.landscapeDiagram, and the sheet
+   of the selection beside it. Returns false when the converter fails: the
+   caller then shows the C4 view. */
+function renderLandscapeView(target, a) {
+  const D = SpecyArchDiagrams;
+  const res = archResolution(a);
+  const show = Object.assign({ externalSystems: true, persons: true, edgeLabels: true, concepts: true },
+    D.LANDSCAPE_DEFAULT_SHOW || {}, state.landShow);
+  let file = null;
+  try {
+    file = D.landscapeDiagram(a, show, { resolution: res.orgs.length ? res.summary : null });
+    if (!file || !file.model || !file.diagram) throw new Error("no DiagramFile returned");
+  } catch (e) {
+    console.error("landscape conversion failed for " + a.id + ".arch — showing the C4 view:", e);
+    landscapeFailed.add(a.id);
+    renderTree();
+    return false;
+  }
+  const n = a.counts;
+  const drawn = typeof D.landscapeCountVisible === "function" ? D.landscapeCountVisible(a, show) : null;
+  const opts = [["externalSystems", "external systems"], ["persons", "persons"], ["edgeLabels", "edge labels"], ["concepts", "concepts"]];
+  const legend = landscapeLegendHtml();
+  target.innerHTML = `<div class="diagram-wrap">
+    <div class="diagram-bar arch-bar">
+      ${badge(ORG_BADGE)}<span class="diagram-title">${esc(a.name)}</span>
+      <span class="diagram-sub">${esc(a.id)}.arch · ${n.systems} systems${a.areas.length ? ` in ${a.areas.length} areas` : ""} · ${n.dependencies} dependencies · ${n.flows} flows${drawn != null ? ` · ${drawn} cards` : ""}</span>
+      <span class="spacer"></span>
+      ${archModeSwitch(a, "landscape")}
+      <div class="diagram-opts">${opts.map(([key, label]) =>
+        `<label class="diag-opt"><input type="checkbox" data-landopt="${key}"${show[key] ? " checked" : ""}/>${esc(label)}</label>`).join("")}
+      </div>
+    </div>
+    <div class="land-legend">
+      <span class="land-legend-text"><b>An arrow means “depends on”</b>, not “sends data to”: A <span class="sm-arrow">→</span> B reads “A depends on B”, so changing B may affect A. Data may travel either way — each numbered flow states its own direction.</span>
+      ${legend ? `<span class="land-legend-items">${legend}</span>` : ""}
+    </div>
+    ${archBodyHtml("sheet")}
+  </div>`;
+  const host = document.getElementById("flow");
+  archView = { arch: a, file, mount: null, mode: "landscape" };
+  archView.mount = mountDiagram(host, file, {
+    storagePrefix: typeof D.landscapeModelIdOf === "function" ? D.landscapeModelIdOf(a) : file.model.id,
+    interactive: true,
+    wheel: "pan",
+    fitView: true,
+    logo: false,
+    // double-click a system: the first bounded context it realizes
+    onNavigate: (ref, node) => {
+      const d = node && node.data && node.data.domainRef;
+      if (d && INDEX[d.id]) goto(d.id);
+    },
+    // a click on a card selects it: the sheet and the tree follow
+    onSelect: ref => {
+      if (!archView || archView.file !== file) return;
+      const el = ref && file.model.elements.find(e => e.id === ref.elementId);
+      const key = el ? archKeyOf(el) : null;
+      if (key === state.archSel) return;
+      /* cards deselect when an edge or a tree row takes over: a selection
+         that is no card (a dependency, a hidden kind) stays; the canvas
+         background closes it (below) */
+      if (!key && state.archSel && !archElementOf(state.archSel)) return;
+      selectArchElement(key, { focus: false });
+    },
+  });
+  /* the engine reports card selections only: an edge click selects its
+     dependency, a click on the empty canvas closes a sheet that is no card's.
+     Listened to on the way down (capture): the engine keeps canvas clicks
+     from bubbling. */
+  host.addEventListener("click", e => {
+    if (!archView || archView.file !== file || !e.target || !e.target.closest) return;
+    const g = e.target.closest(".react-flow__edge[data-id]");
+    if (g) {
+      const edge = file.diagram.edges.find(x => x.id === g.getAttribute("data-id"));
+      const dep = edge && landscapeDependencyOf(a, edge);
+      if (dep) selectArchElement("dependency:" + dep.id, { focus: false });
+    } else if (e.target.classList && e.target.classList.contains("react-flow__pane")) {
+      if (state.archSel && !archElementOf(state.archSel)) selectArchElement(null);
+    }
+  }, true);
+  // keep the selection across re-renders (toggles, mode and tab switches, Back)
+  if (state.archSel) selectArchElement(orgItemOf(a, state.archSel) ? state.archSel : null, { focus: true });
+  return true;
+}
+/* the dependency an edge of the landscape stands for (relation id = dependency id) */
+function landscapeDependencyOf(a, edge) {
+  const d = edge.data || {};
+  const ids = (d.relationIds || []).concat(d.modelRef && d.modelRef.relationId ? [d.modelRef.relationId] : []);
+  return a.dependencies.find(x => ids.includes(x.id)) || null;
+}
+/* Marks the edge of the selected dependency. The engine owns the edge
+   elements, so this is a stylesheet rule keyed by the edge id, never a class
+   on its DOM. */
+function markArchEdge(key) {
+  let style = document.getElementById("arch-edge-mark");
+  const depId = key && key.startsWith("dependency:") && archView && archView.mode === "landscape" ? key.slice("dependency:".length) : null;
+  const edge = depId && archView.file.diagram.edges.find(e => { const d = landscapeDependencyOf(archView.arch, e); return d && d.id === depId; });
+  if (!edge) { if (style) style.remove(); return; }
+  if (!style) { style = document.createElement("style"); style.id = "arch-edge-mark"; document.head.appendChild(style); }
+  const sel = `.flow-host .react-flow__edge[data-id="${String(edge.id).replace(/["\\]/g, "\\$&")}"]`;
+  style.textContent = `${sel} path:not(.react-flow__edge-interaction) { stroke-width: 3.6px !important; }
+${sel} { filter: drop-shadow(0 0 3px rgba(246, 94, 94, 0.7)); }`;
+}
+
 /* ---- Architecture selection: tree row / canvas click → details panel ---- */
-let archView = null;   // { arch, file, mount } of the mounted architecture diagram
+let archView = null;   // { arch, file, mount, mode: "c4" | "landscape" } of the mounted architecture diagram
 
 const ARCH_KIND_TITLE = {
   system: "System", container: "Container", component: "Component",
@@ -913,6 +1332,15 @@ const archKeyOf = el => `${el.type}:${el.data.name}`;
    details panel, and — from the tree or the panel — frame it in the canvas. */
 function selectArchElement(key, { focus } = {}) {
   state.archSel = key;
+  const landscape = !!archView && archView.mode === "landscape";
+  if (landscape) {
+    /* the organization tree unfolds the selection (a system's concepts, a
+       dependency's flows): re-render it, keeping the keyboard focus on its row */
+    const active = document.activeElement && document.activeElement.closest ? document.activeElement.closest("#tree [data-archsel]") : null;
+    const activeKey = active && active.dataset.archsel;
+    renderTree();
+    if (activeKey) for (const b of document.querySelectorAll("#tree [data-archsel]")) if (b.dataset.archsel === activeKey) { b.focus({ preventScroll: true }); break; }
+  }
   let row = null;
   for (const b of document.querySelectorAll("#tree [data-archsel]")) {
     const on = b.dataset.archsel === key;
@@ -921,8 +1349,333 @@ function selectArchElement(key, { focus } = {}) {
   }
   if (row && !focus) row.scrollIntoView({ block: "nearest" });
   const el = archElementOf(key);
-  renderArchDetails(el);
+  if (landscape) renderOrgSheet(key);
+  else renderArchDetails(el);
   if (focus && el && archView && archView.mount && archView.mount.focus) archView.mount.focus({ elementId: el.id });
+  markArchEdge(key);
+  syncArchHash();
+}
+
+/* ---- Deep link of the architecture view: `#arch:<stem>` — plus `/c4` for
+   the C4 view of an organization file, plus `/<kind>:<name>` for the
+   selection (`#arch:retail-media/system:ERP`). Kept current with
+   replaceState, so that Back returns to this exact place after a concept
+   link was followed into the Domain Navigator. ---- */
+function archHash() {
+  const a = curArch();
+  if (!a) return "#arch:";
+  return "#arch:" + a.id + (isOrgArch(a) && archModeOf(a) === "c4" ? "/c4" : "") + (state.archSel ? "/" + state.archSel : "");
+}
+function syncArchHash() {
+  if (state.view === "arch" && curArch()) history.replaceState(null, "", archHash());
+}
+/* what the "back to …" link of the Domain Navigator names */
+function archReturn() {
+  const a = curArch();
+  if (!a) return null;
+  const sel = orgItemOf(a, state.archSel);
+  const name = sel ? (sel.kind === "dependency" ? dependsOn(sel.item) : sel.name) : state.archSel ? state.archSel.slice(state.archSel.indexOf(":") + 1) : "";
+  return { hash: archHash(), label: (name ? name + " · " : "") + archTitle(a) + " — architecture" };
+}
+
+/* ---- Details panel: show / hide, and its width (drag handle) ---- */
+const ARCH_PANEL_KEY = "specy-navigator:arch-panel-width";
+const archPanelWidth = (() => {
+  try { return Object.assign({}, JSON.parse(localStorage.getItem(ARCH_PANEL_KEY) || "{}")); } catch (e) { return {}; }
+})();
+function applyArchPanelWidth(aside) {
+  const w = Number(archPanelWidth[aside.dataset.panel]);
+  aside.style.flexBasis = aside.style.width = w > 0 ? w + "px" : "";
+}
+function setArchPanelWidth(aside, width, keep = true) {
+  if (width > 0) archPanelWidth[aside.dataset.panel] = Math.round(width); else delete archPanelWidth[aside.dataset.panel];
+  applyArchPanelWidth(aside);
+  if (!keep) return;   // mid-drag
+  try { localStorage.setItem(ARCH_PANEL_KEY, JSON.stringify(archPanelWidth)); } catch (e) { /* private mode: the width lasts the session */ }
+}
+function showArchPanel(aside, html) {
+  const bar = aside.previousElementSibling;
+  if (html == null) { aside.hidden = true; aside.innerHTML = ""; }
+  else { aside.innerHTML = html; applyArchPanelWidth(aside); aside.hidden = false; aside.scrollTop = 0; }
+  if (bar && bar.hasAttribute("data-archresize")) bar.hidden = aside.hidden;
+}
+
+/* ================= Level-0 sheets (organization files) =================
+   What the organization file says of the selection, read from the parsed
+   shape (arch-parser.js): a system, an external system, a dependency, a
+   person or an area. Every concept name goes through conceptHtml. */
+/* the head stays in view while the sheet scrolls, and then names the selection */
+const sheetHead = (eyebrow, name) => `<div class="arch-details-head">
+    <p class="eyebrow">${esc(eyebrow)}</p>
+    <span class="sheet-head-name" aria-hidden="true">${esc(name)}</span>
+    <button class="arch-details-close" data-archclose title="Close">×</button>
+  </div>`;
+const safeUrl = url => (/^https?:\/\//i.test(String(url || "")) ? String(url) : "");
+
+function mechanismHtml(m) {
+  if (!m || (m.over == null && m.mode == null))
+    return `<span class="mech-open" title="No mechanism stated: how this flow is carried is not decided yet">undecided</span>`;
+  const mode = m.mode ? `<span class="mech-mode ${esc(m.mode)}" title="${m.mode === "manual" ? "A person performs the transfer" : "No person performs the transfer"}">${esc(m.mode)}</span>` : "";
+  return m.over ? `<span class="mech-over">${esc(m.over)}</span>${mode ? ` <span class="mech-tail"><span class="mech-sep">·</span> ${mode}</span>` : ""}` : mode;
+}
+
+/* The flow table of a sheet: number, label, the concepts carried (`X as Y`:
+   X in the sender's model becomes Y in the receiver's), then the mechanism —
+   one column per phase when the organization declares phases, a mechanism
+   stated once spanning them all, an open phase reading "undecided".
+   `groups` = [{ head: html | "", flows }]; `opts.direction` adds the
+   sender → receiver column, `opts.hotspots` (flow number → names) the marks. */
+function flowTableHtml(a, groups, opts = {}) {
+  const phases = a.phases || [];
+  const ncols = 3 + (opts.direction ? 1 : 0) + Math.max(1, phases.length);
+  const row = f => {
+    const carried = f.carries.map(c =>
+      `<div class="fl-carried">${conceptHtml(a, c.concept)}${c.as
+        ? ` <span class="fl-as" title="${esc(`${c.concept.raw} in ${f.sender}'s model becomes ${c.as.raw} in ${f.receiver}'s`)}">as</span> ${conceptHtml(a, c.as)}` : ""}</div>`).join("");
+    let mech;
+    if (f.perPhase.length && phases.length)
+      mech = phases.map(p => `<td class="fl-mech" data-label="${esc(p.name)}">${mechanismHtml(flowMechanism(f, p.name))}</td>`).join("");
+    else if (f.perPhase.length)   // phases the organization does not declare
+      mech = `<td class="fl-mech" data-label="Mechanism">${f.perPhase.map(p => `<div><span class="rel-note">${esc(p.phase)}:</span> ${mechanismHtml(p)}</div>`).join("")}</td>`;
+    else
+      mech = `<td class="fl-mech${phases.length > 1 ? " fl-every" : ""}" colspan="${Math.max(1, phases.length)}" data-label="${phases.length ? "Every phase" : "Mechanism"}"${
+        phases.length && f.mechanism ? ` title="Stated once: the same in every phase"` : ""}>${mechanismHtml(f.mechanism)}</td>`;
+    const hot = ((opts.hotspots && opts.hotspots.get(f.number)) || [])
+      .map(h => `<span class="hot-mark" title="Concerned by hotspot ${esc(h)}">${esc(h)}</span>`).join("");
+    return `<tr data-flow="${esc(f.number)}">
+      <td class="fl-n"><span class="flow-num" title="flow ${esc(f.number)}">${esc(f.number)}</span></td>
+      <td class="fl-label">${esc(f.label)}${f.description ? `<div class="row-sub">${esc(f.description)}</div>` : ""}${hot ? `<div class="fl-hot">${hot}</div>` : ""}</td>
+      ${opts.direction ? `<td class="fl-dir" data-label="Data goes">${orgLink(a, f.sender)} <span class="sm-arrow">→</span> ${orgLink(a, f.receiver)}</td>` : ""}
+      <td class="fl-carries" data-label="Carries">${carried}</td>
+      ${mech}
+    </tr>`;
+  };
+  return `<table class="sm-table flow-table${opts.direction ? " with-direction" : ""}">
+    <thead><tr><th class="fl-n">#</th><th class="fl-label">Flow</th>${opts.direction ? `<th class="fl-dir">Data goes</th>` : ""}<th class="fl-carries">Carries</th>${
+      phases.length ? phases.map(p => `<th class="fl-mech"${p.description ? ` title="${esc(p.description)}"` : ""}>${esc(p.name)}</th>`).join("") : `<th class="fl-mech">Mechanism</th>`}</tr></thead>
+    <tbody>${groups.map(g => (g.head ? `<tr class="flow-group"><td colspan="${ncols}">${g.head}</td></tr>` : "") + g.flows.map(row).join("")).join("")}</tbody>
+  </table>`;
+}
+
+/* System (or external system) sheet */
+function systemSheetHtml(a, sys, kind) {
+  const ext = kind === "externalSystem";
+  const of = v => v || [];
+  let html = sheetHead(ext ? "External system · outside the organization" : "System", sys.name);
+  html += `<h2 class="arch-details-title">${esc(sys.name)}</h2>`;
+  if (sys.technology) html += `<p class="sheet-product" title="The product that implements this system"><span class="rel-note">product</span> ${esc(sys.technology)}</p>`;
+
+  const chips = [];
+  if (sys.status) chips.push(`<span class="chip ${/final|agreed|done|live/i.test(sys.status) ? "ok" : "warn"}" title="Status of the system's target definition">status: ${esc(sys.status)}</span>`);
+  if (sys.area) chips.push(`<span class="chip">area ${orgLink(a, sys.area, a.areas.some(x => x.name === sys.area) ? "area" : null)}</span>`);
+  if (!ext) chips.push(sys.detail === "inline" ? `<span class="chip info" title="Its containers and components are described in this file">detailed inline</span>`
+    : sys.detail === "file" ? `<span class="chip info">detailed in ${esc(sys.detailedIn)}</span>`
+    : `<span class="chip" title="Not detailed: everything known about it is at level 0">black box</span>`);
+  html += `<div class="chips">${chips.join("")}</div>`;
+  html += sys.description
+    ? `<p class="arch-details-desc"><span class="sheet-label">Purpose</span>${esc(sys.description)}</p>`
+    : `<p class="arch-details-desc sheet-missing">No purpose stated.</p>`;
+
+  const actions = [];
+  if (sys.detail === "inline")
+    actions.push(`<button class="diagram-open" data-archmode="c4" data-sel="system:${esc(sys.name)}" title="Its containers and components, in the C4 view of this file">Open C4 view ↗</button>`);
+  const detailFile = sys.detailedIn ? ARCHS.find(x => x.id === String(sys.detailedIn).split("/").pop().replace(/\.arch$/, "")) : null;
+  if (detailFile) actions.push(`<button class="diagram-open" data-archfile="${esc(detailFile.id)}">Open ${esc(detailFile.id)}.arch ↗</button>`);
+  const contexts = archContexts(a, sys.contexts);
+  for (const c of contexts)
+    if (c.ctx && INDEX["ctx:" + c.ctx.id]) actions.push(`<button class="diagram-open" data-goto="ctx:${esc(c.ctx.id)}">Open context “${esc(c.ctx.name)}” ↗</button>`);
+  if (actions.length) html += `<div class="sheet-actions">${actions.join("")}</div>`;
+
+  /* who uses it, contacts, documents, bounded contexts */
+  const rows = [];
+  if (!ext) rows.push(["used by", of(sys.usedBy).length ? sys.usedBy.map(p => orgLink(a, p, a.persons.some(x => x.name === p) ? "person" : null)).join(", ")
+    : `<span class="rel-note">nobody stated</span>`]);
+  if (of(sys.contacts).length) rows.push(["contacts", `<ul class="sheet-list">${sys.contacts.map(c => `<li>${esc(c)}</li>`).join("")}</ul>`]);
+  if (of(sys.documents).length) rows.push(["documents", `<ul class="sheet-list">${sys.documents.map(d => {
+    const url = safeUrl(d.url);
+    return `<li>${url ? `<a class="ref doc" href="${esc(url)}" target="_blank" rel="noopener">${esc(d.label || url)} ↗</a>`
+      : `${esc(d.label)}${d.url && d.url !== d.label ? ` <code class="inline">${esc(d.url)}</code>` : ""}`}</li>`;
+  }).join("")}</ul>`]);
+  rows.push(["bounded contexts", contexts.length
+    ? contexts.map(c => contextLink(c.name, c.ctx)).join(", ")
+    : `<span class="rel-note">realizes none${ext ? "" : " — its concept names are looked up in the whole domain model"}</span>`]);
+  for (const [k, v] of Object.entries(sys.meta || {}))
+    if (!["status", "contacts", "documents"].includes(k)) rows.push([k, `<span class="rel-plain">${esc(v)}</span>`]);
+  html += `<p class="card-caption">${ext ? "Bounded contexts" : "Users, contacts and documents"}</p><div class="card"><table class="rel-table">` +
+    rows.map(([k, v]) => `<tr><td class="rel-name">${esc(k)}</td><td>${v}</td></tr>`).join("") + `</table></div>`;
+
+  /* main entities: source of truth, then merely handled */
+  const sourceLink = name => (orgKindOf(a, name) ? orgLink(a, name) : (c => contextLink(name, c.ctx))(archContexts(a, [name])[0]));
+  const conceptLine = (ref, site) => {
+    const x = conceptResolution(a, ref);
+    let note = "";
+    if (x.status === "resolved") {
+      note = `${esc(x.kindLabel)} · ${contextLink(x.context, INDEX["ctx:" + x.contextId] && INDEX["ctx:" + x.contextId].ctx)}`;
+      if (x.sourcedFrom) note += site === "handles"
+        ? ` — a read-only copy sourced from ${sourceLink(x.sourcedFrom)}`
+        : x.sourcedFrom === sys.name ? ` — the domain model holds it as a read-only copy sourced from this system`
+        : ` — a read-only copy sourced from ${sourceLink(x.sourcedFrom)}`;
+    }
+    return `<li><span class="concept-mark ${site}">${site === "masters" ? "●" : "○"}</span><span>${conceptHtml(a, ref, { bare: x.status === "resolved", reason: true })}${note ? ` <span class="rel-note">${note}</span>` : ""}</span></li>`;
+  };
+  const masters = of(sys.masters), handles = of(sys.handles);
+  html += `<p class="card-caption">Main entities</p><div class="card">`;
+  if (masters.length) html += `<div class="sheet-sub" title="System of record: where an instance is created and where its truth lives"><span class="concept-mark masters">●</span>Source of truth for <span class="rel-note">· masters (${masters.length})</span></div>
+    <ul class="concept-list">${masters.map(r => conceptLine(r, "masters")).join("")}</ul>`;
+  if (handles.length) html += `<div class="sheet-sub" title="Other main concepts it holds: copies, projections, documents it receives and works on"><span class="concept-mark handles">○</span>Also handles <span class="rel-note">· not the source of truth (${handles.length})</span></div>
+    <ul class="concept-list">${handles.map(r => conceptLine(r, "handles")).join("")}</ul>`;
+  if (!masters.length && !handles.length) html += `<ul class="card-rows"><li><span class="row-sub">None stated — what it receives and sends is in its flows.</span></li></ul>`;
+  html += `</div>`;
+
+  /* hotspots */
+  const hotspots = of(sys.hotspots);
+  const hotOf = new Map();   // flow number → hotspot names
+  for (const h of hotspots) for (const num of h.flows) { if (!hotOf.has(num)) hotOf.set(num, []); hotOf.get(num).push(h.name); }
+  if (hotspots.length) {
+    const flowChip = num => {
+      const f = a.flows.find(x => x.number === num);
+      return `<button class="flow-num jump" data-flowjump="${esc(num)}" title="${esc(f ? `flow ${num} — ${f.label} (${f.sender} → ${f.receiver}) · show it below` : `flow ${num} — not declared`)}">${esc(num)}</button>`;
+    };
+    html += `<p class="card-caption">Hotspots (${hotspots.length})</p><div class="card"><ul class="card-rows hotspots">` + hotspots.map(h =>
+      `<li><span class="row-title">${esc(h.name)}</span>
+        ${h.description ? `<div class="hot-desc">${esc(h.description)}</div>` : ""}
+        ${h.flows.length || h.concepts.length ? `<div class="hot-concerns"><span class="rel-note">concerns</span> ${h.flows.length ? `<span class="rel-note">flows</span> ${h.flows.map(flowChip).join(" ")}` : ""}${
+          h.concepts.length ? ` ${h.flows.length ? `<span class="rel-note">·</span> ` : ""}${h.concepts.map(r => conceptHtml(a, r)).join(", ")}` : ""}</div>` : ""}</li>`).join("") +
+      `</ul></div>`;
+  }
+
+  /* flows by the direction of the data, grouped by peer system, each group
+     naming the dependency it belongs to (the two directions are independent) */
+  const depById = new Map(a.dependencies.map(d => [d.id, d]));
+  const grouped = (flows, peerOf, word) => {
+    const groups = [], peers = [];
+    for (const f of flows) {
+      const peer = peerOf(f), key = peer + "|" + f.dependency;
+      let g = groups.find(x => x.key === key);
+      if (!g) { groups.push(g = { key, peer, dep: depById.get(f.dependency), flows: [] }); if (!peers.includes(peer)) peers.push(peer); }
+      g.flows.push(f);
+    }
+    groups.sort((x, y) => peers.indexOf(x.peer) - peers.indexOf(y.peer));
+    for (const g of groups)
+      g.head = `<span class="fl-peer"><span class="rel-note">${word}</span> ${orgLink(a, g.peer)}</span>`
+        + (g.dep ? `<span class="fl-dep">${dependencyLink(g.dep)} ${patternChips(g.dep)}</span>` : "");
+    return groups;
+  };
+  const inbound = a.flows.filter(f => f.receiver === sys.name), outbound = a.flows.filter(f => f.sender === sys.name);
+  for (const [title, hint, flows, peerOf, word] of [
+    ["Inbound flows", `data ${sys.name} receives`, inbound, f => f.sender, "from"],
+    ["Outbound flows", `data ${sys.name} sends`, outbound, f => f.receiver, "to"]]) {
+    html += `<p class="card-caption">${title} (${flows.length}) <span class="caption-hint">— ${esc(hint)}</span></p>`;
+    html += flows.length
+      ? `<div class="card flow-card">${flowTableHtml(a, grouped(flows, peerOf, word), { hotspots: hotOf })}</div>`
+      : `<div class="card"><ul class="card-rows"><li><span class="row-sub">None.</span></li></ul></div>`;
+  }
+
+  /* dependencies: what it needs, and what a change to it may affect */
+  const upstream = a.dependencies.filter(d => d.from === sys.name), downstream = a.dependencies.filter(d => d.to === sys.name);
+  const depItem = (d, peer) => `<span class="dep-item">${orgLink(a, peer)}${d.criticality ? ` <span class="chip crit ${esc(d.criticality)}" title="${esc(`If ${d.to} is down, ${d.from} ${CRITICALITY_INFO[d.criticality] || d.criticality}`)}">${esc(d.criticality)}</span>` : ""}
+      <button class="arch-link dep quiet" data-archsel="dependency:${esc(d.id)}" title="${esc(dependsOn(d))} — open the dependency">${d.flows.length} flow${d.flows.length === 1 ? "" : "s"}</button></span>`;
+  if (upstream.length || downstream.length) {
+    html += `<p class="card-caption">Dependencies</p><div class="card"><table class="rel-table">
+      <tr><td class="rel-name">depends on</td><td>${upstream.map(d => depItem(d, d.to)).join("") || `<span class="rel-note">nothing</span>`}</td></tr>
+      <tr><td class="rel-name" title="Read backwards: the systems a change to ${esc(sys.name)} may affect">depended on by</td><td>${downstream.map(d => depItem(d, d.from)).join("") || `<span class="rel-note">nothing</span>`}</td></tr>
+    </table></div>`;
+  }
+  return html;
+}
+
+/* Dependency sheet: "A depends on B", its patterns, the pair it forms, its
+   criticality, and its flows with the direction of each */
+function dependencySheetHtml(a, d) {
+  const back = reverseDependency(a, d), partners = isPartnership(a, d);
+  let html = sheetHead("Dependency", dependsOn(d));
+  html += `<h2 class="arch-details-title dep-title">${orgLink(a, d.from)} <span class="dep-verb">depends on</span> ${orgLink(a, d.to)}</h2>`;
+  const chips = [patternChips(d)];
+  if (partners) chips.push(`<span class="chip info">Partnership</span>`);
+  else if (back) chips.push(`<span class="chip warn">mutual dependency</span>`);
+  if (d.criticality) chips.push(`<span class="chip crit ${esc(d.criticality)}">criticality: ${esc(d.criticality)}</span>`);
+  html += `<div class="chips">${chips.filter(Boolean).join("")}</div>`;
+  if (d.description) html += `<p class="arch-details-desc">${esc(d.description)}</p>`;
+  html += `<p class="sheet-reading">${esc(d.from)} is <b>downstream</b>, ${esc(d.to)} <b>upstream</b>: ${esc(d.from)} cannot do its job without what ${esc(d.to)} holds or does, so changing ${esc(d.to)} may affect ${esc(d.from)}. The arrow is the need, not the data: each flow below states where its data goes.</p>`;
+
+  const side = s => d.patterns.filter(p => PATTERN_INFO[p] && PATTERN_INFO[p][0] === s);
+  const explain = ps => ps.map(p => `<div class="pattern-line"><span class="pattern-tag">${esc(p)}</span> <span class="rel-note">${esc(PATTERN_INFO[p][1])}</span></div>`).join("");
+  const ctxOf = name => {
+    const s = a.systems.find(x => x.name === name) || a.externalSystems.find(x => x.name === name);
+    const cs = s ? archContexts(a, s.contexts) : [];
+    return cs.length ? ` <span class="rel-note">· realizes ${cs.map(c => contextLink(c.name, c.ctx)).join(", ")}</span>` : "";
+  };
+  const unknown = d.patterns.filter(p => !PATTERN_INFO[p]);
+  const rows = [
+    ["downstream", `${orgLink(a, d.from)}${ctxOf(d.from)}${explain(side("downstream"))}`],
+    ["upstream", `${orgLink(a, d.to)}${ctxOf(d.to)}${explain(side("upstream"))}`],
+  ];
+  if (side("both").length) rows.push(["both sides", explain(side("both"))]);
+  if (unknown.length) rows.push(["patterns", unknown.map(p => `<code class="inline">${esc(p)}</code>`).join(" ") + ` <span class="rel-note">unknown</span>`]);
+  if (!d.patterns.length) rows.push(["patterns", `<span class="rel-note">none stated — nobody has decided who adapts to whom, or the two systems realize the same bounded context</span>`]);
+  rows.push(["pair", partners
+    ? `<b>Partnership</b> <span class="rel-note">— written on both dependencies; the opposite one:</span> ${dependencyLink(back)}`
+    : back ? `<b>Mutual dependency</b> <span class="rel-note">— two independent relations, each with its own patterns and flows; the opposite one:</span> ${dependencyLink(back)}`
+    : `<span class="rel-plain">one-way</span> <span class="rel-note">— ${esc(d.to)} does not depend on ${esc(d.from)}</span>`]);
+  rows.push(["criticality", d.criticality
+    ? `<span class="chip crit ${esc(d.criticality)}">${esc(d.criticality)}</span> <span class="rel-note">if ${esc(d.to)} is down, ${esc(d.from)} ${esc(CRITICALITY_INFO[d.criticality] || "— unknown level")}</span>`
+    : `<span class="rel-note">unstated — nobody has said yet what ${esc(d.from)} suffers when ${esc(d.to)} is down</span>`]);
+  for (const [k, v] of Object.entries(d.meta || {})) rows.push([k, `<span class="rel-plain">${esc(v)}</span>`]);
+  html += `<p class="card-caption">Relation</p><div class="card"><table class="rel-table">` +
+    rows.map(([k, v]) => `<tr><td class="rel-name">${esc(k)}</td><td>${v}</td></tr>`).join("") + `</table></div>`;
+
+  html += `<p class="card-caption">Flows (${d.flows.length}) <span class="caption-hint">— numbered, with the direction of the data</span></p>`;
+  html += d.flows.length
+    ? `<div class="card flow-card">${flowTableHtml(a, [{ head: "", flows: d.flows }], { direction: true })}</div>`
+    : `<div class="card"><ul class="card-rows"><li><span class="row-sub">No flow details this dependency yet.</span></li></ul></div>`;
+  return html;
+}
+
+function personSheetHtml(a, p) {
+  const uses = a.systems.filter(s => s.usedBy.includes(p.name));
+  return sheetHead("Person", p.name) + `<h2 class="arch-details-title">${esc(p.name)}</h2>`
+    + (p.description ? `<p class="arch-details-desc">${esc(p.description)}</p>` : "")
+    + `<p class="card-caption">Uses (${uses.length})</p><div class="card"><ul class="card-rows">`
+    + (uses.map(s => `<li>${orgLink(a, s.name, "system")}${s.technology ? ` <span class="rel-note">${esc(s.technology)}</span>` : ""}${s.description ? `<div class="row-sub">${esc(s.description)}</div>` : ""}</li>`).join("")
+      || `<li><span class="row-sub">No system states this person in its used-by.</span></li>`)
+    + `</ul></div>`;
+}
+
+function areaSheetHtml(a, area) {
+  const members = a.systems.filter(s => s.area === area.name);
+  return sheetHead("Area", area.name) + `<h2 class="arch-details-title">${esc(area.name)}</h2>`
+    + (area.description ? `<p class="arch-details-desc">${esc(area.description)}</p>` : "")
+    + `<p class="sheet-reading">An area groups systems as the organization chart does. It is neither the set of their users nor a bounded context.</p>`
+    + `<p class="card-caption">Systems (${members.length})</p><div class="card"><ul class="card-rows">`
+    + (members.map(s => `<li>${orgLink(a, s.name, "system")}${s.technology ? ` <span class="rel-note">${esc(s.technology)}</span>` : ""}${s.description ? `<div class="row-sub">${esc(s.description)}</div>` : ""}</li>`).join("")
+      || `<li><span class="row-sub">No system sits in this area.</span></li>`)
+    + `</ul></div>`;
+}
+
+function renderOrgSheet(key) {
+  const aside = document.getElementById("arch-details");
+  if (!aside) return;
+  const a = archView && archView.arch, sel = orgItemOf(a, key);
+  showArchPanel(aside, !sel ? null
+    : sel.kind === "dependency" ? dependencySheetHtml(a, sel.item)
+    : sel.kind === "person" ? personSheetHtml(a, sel.item)
+    : sel.kind === "area" ? areaSheetHtml(a, sel.item)
+    : systemSheetHtml(a, sel.item, sel.kind));
+}
+/* Shows a flow in the open sheet (a hotspot's "concerns", a flow row of the
+   tree); a flow the sheet does not list opens its dependency first. */
+function jumpToFlow(number) {
+  const find = () => [...document.querySelectorAll("#arch-details tr[data-flow]")].find(r => r.dataset.flow === String(number));
+  let row = find();
+  if (!row && archView && archView.mode === "landscape") {
+    const f = (archView.arch.flows || []).find(x => x.number === Number(number));
+    if (f) { selectArchElement("dependency:" + f.dependency, { focus: false }); row = find(); }
+  }
+  if (!row) return;
+  row.scrollIntoView({ block: "center" });
+  row.classList.remove("flash");
+  void row.offsetWidth;   // restart the animation
+  row.classList.add("flash");
 }
 
 /* The element and everything drawn inside it (a system's containers and
@@ -943,7 +1696,7 @@ function archDescendants(elementId) {
 function renderArchDetails(el) {
   const aside = document.getElementById("arch-details");
   if (!aside) return;
-  if (!el || !archView) { aside.hidden = true; aside.innerHTML = ""; return; }
+  if (!el || !archView) { showArchPanel(aside, null); return; }
   const { file, arch } = archView;
   const d = el.data || {};
   const byId = new Map(file.model.elements.map(e => [e.id, e]));
@@ -973,6 +1726,9 @@ function renderArchDetails(el) {
     const action = (node.data.actions || [])[0];
     html += `<button class="diagram-open arch-details-open" data-goto="${esc(domainRef.id)}">${esc(action ? action.label : "Open in the domain")} ↗</button>`;
   }
+  // a system of an organization file: its level-0 sheet is in the landscape
+  if (el.type === "system" && orgItemOf(arch, archKeyOf(el)) && hasLandscape(arch))
+    html += `<button class="diagram-open arch-details-open" data-archmode="landscape" data-sel="${esc(archKeyOf(el))}" title="Purpose, main entities, hotspots and flows — in the landscape view">Open system sheet ↗</button>`;
 
   // contracts
   const bodyRows = (node && node.data.body && node.data.body.rows) || [];
@@ -1031,9 +1787,7 @@ function renderArchDetails(el) {
       rows.map(r => flowRow(r, dir)).join("") + `</ul></div>`;
   }
 
-  aside.innerHTML = html;
-  aside.hidden = false;
-  aside.scrollTop = 0;
+  showArchPanel(aside, html);
 }
 
 /* One read-only statechart per `[data-sm-host]` placeholder rendered by
@@ -1060,6 +1814,7 @@ function mountStateMachines(container, hit) {
 function renderDetail() {
   const target = document.getElementById("detail");
   unmountDiagrams();
+  markArchEdge(null);
   document.getElementById("main").classList.toggle("diagram-mode", state.view === "diagram" || state.view === "arch");
   if (state.view === "diagram") { renderDiagramView(target); return; }
   if (state.view === "arch") { renderArchView(target); return; }
@@ -1078,7 +1833,12 @@ function renderDetail() {
   } else {
     html = renderContextDetail(hit.ctx);
   }
-  target.innerHTML = `<div class="main-inner">${html}</div>`;
+  /* arrived from the Architecture diagram (a concept link, a card's menu or
+     double-click): a way back to that exact place — the browser's Back
+     button does the same */
+  const back = state.returnTo
+    ? `<a class="return-link" href="${esc(state.returnTo.hash)}" title="Back to where you were in the Architecture diagram">← ${esc(state.returnTo.label)}</a>` : "";
+  target.innerHTML = `<div class="main-inner">${back}${html}</div>`;
   if (hit && hit.el && (hit.el.stateMachines || []).length) mountStateMachines(target, hit);
   document.getElementById("main").scrollTop = 0;
 }
@@ -1125,6 +1885,18 @@ function renderAll() {
 function goto(id) {
   const hit = INDEX[id];
   if (!hit) return;
+  /* leaving the Architecture diagram pushes a history entry — its own entry
+     holds the current `#arch:…` deep link, so Back returns there — and
+     remembers the place for the "back to …" link; elsewhere the entry is
+     replaced, as before */
+  const back = state.view === "arch" ? archReturn() : null;
+  if (back) state.returnTo = back;
+  selectById(id, hit);
+  if (back) history.pushState(null, "", "#" + id);
+  else history.replaceState(null, "", "#" + id);
+  renderAll();
+}
+function selectById(id, hit) {
   if (hit.req || hit.set) {
     state.view = "req";
     state.reqSetId = hit.set.id;
@@ -1136,9 +1908,43 @@ function goto(id) {
     if (hit.mod) state.expanded.add("mod:" + hit.mod.id);
     state.selected = id;
   }
-  history.replaceState(null, "", "#" + id);
-  renderAll();
 }
+
+/* ---- Deep links: applies a location hash to the state (no rendering, no
+   history). `#arch:<stem>[/c4][/<kind>:<name>]` opens the Architecture
+   diagram; any INDEX id (`ctx:…`, `mod:…`, an element id, `req:…`) opens
+   its navigator. Returns false when the hash names nothing known. ---- */
+function currentHash() {
+  try { return decodeURIComponent(location.hash.slice(1)); } catch (e) { return location.hash.slice(1); }
+}
+function applyHash(hash) {
+  if (hash.startsWith("arch:")) {
+    if (!ARCHS.length) return false;
+    const rest = hash.slice("arch:".length), cut = rest.indexOf("/");
+    const a = ARCHS.find(x => x.id === (cut < 0 ? rest : rest.slice(0, cut)));
+    let tail = a && cut >= 0 ? rest.slice(cut + 1) : "";
+    const c4 = tail === "c4" || tail.startsWith("c4/");
+    if (c4) tail = tail.slice(3);
+    state.view = "arch";
+    state.archId = (a || ARCHS[0]).id;
+    if (a && isOrgArch(a)) state.archMode[a.id] = c4 ? "c4" : "landscape";
+    state.archSel = tail || null;
+    return true;
+  }
+  const hit = hash && INDEX[hash];
+  if (!hit) return false;
+  selectById(hash, hit);
+  return true;
+}
+/* Back / Forward, a hash typed in the address bar, and the plain `#…` links
+   of a diagram card's "⋯" menu (the app's own links go through goto) */
+window.addEventListener("hashchange", () => {
+  const back = state.view === "arch" ? archReturn() : null;
+  if (!applyHash(currentHash())) return;
+  if (state.view === "arch") state.returnTo = null;
+  else if (back) state.returnTo = back;
+  renderAll();
+});
 
 /* ---- Events ---- */
 document.addEventListener("click", e => {
@@ -1154,13 +1960,39 @@ document.addEventListener("click", e => {
     }
     if (state.view === "arch") {
       if (!ARCHS.some(a => a.id === state.archId)) state.archId = ARCHS.length ? ARCHS[0].id : null;
-      if (state.archId) history.replaceState(null, "", "#arch:" + state.archId);
+      syncArchHash();
     }
+    state.returnTo = null;   // a tab click starts a new path
     state.filter = "";
     document.getElementById("tree-filter").value = "";
     renderAll();
     return;
   }
+  /* organization files: Landscape | C4 switch, "Open C4 view" / "Open system
+     sheet" (`data-sel` = the selection to arrive on; else it is kept when
+     the other view has it) */
+  const mode = e.target.closest("[data-archmode]");
+  if (mode) {
+    const a = curArch();
+    if (a && isOrgArch(a)) {
+      state.archMode[a.id] = mode.dataset.archmode === "c4" ? "c4" : "landscape";
+      if (mode.dataset.sel) state.archSel = mode.dataset.sel;
+      if (mode.dataset.sel && state.archMode[a.id] === "c4") state.archUnfold = mode.dataset.sel;   // arrive on its containers
+      syncArchHash();
+      renderAll();
+    }
+    return;
+  }
+  const archFile = e.target.closest("[data-archfile]");   // a system detailed in its own, loaded, .arch file
+  if (archFile && ARCHS.some(a => a.id === archFile.dataset.archfile)) {
+    state.archId = archFile.dataset.archfile;
+    state.archSel = null;
+    history.pushState(null, "", archHash());
+    renderAll();
+    return;
+  }
+  const flowJump = e.target.closest("[data-flowjump]");
+  if (flowJump) { e.preventDefault(); jumpToFlow(flowJump.dataset.flowjump); return; }
   const archSel = e.target.closest("[data-archsel]");
   if (archSel) { e.preventDefault(); selectArchElement(archSel.dataset.archsel, { focus: true }); return; }
   if (e.target.closest("[data-archclose]")) { selectArchElement(null); return; }
@@ -1207,7 +2039,7 @@ document.getElementById("context-select").addEventListener("change", e => {
   if (state.view === "arch") {
     state.archId = e.target.value;
     state.archSel = null;
-    history.replaceState(null, "", "#arch:" + state.archId);
+    syncArchHash();
   } else if (state.view === "req") {
     state.reqSetId = e.target.value;
     state.reqSelected = "reqset:" + e.target.value;
@@ -1225,15 +2057,54 @@ document.getElementById("tree-filter").addEventListener("input", e => {
   renderTree();
 });
 
-/* Diagram header toggles: domain categories (data-diagopt) and
-   architecture kinds / edge labels (data-archopt) */
+/* Diagram header toggles: domain categories (data-diagopt), architecture
+   kinds / edge labels (data-archopt) and the landscape's (data-landopt) */
 document.addEventListener("change", e => {
   const ds = e.target && e.target.dataset;
   if (!ds) return;
   if (ds.diagopt) state.diagramShow[ds.diagopt] = e.target.checked;
   else if (ds.archopt) state.archShow[ds.archopt] = e.target.checked;
+  else if (ds.landopt) state.landShow[ds.landopt] = e.target.checked;
   else return;
   renderDetail();
+});
+
+/* Details panel width: drag the handle between the canvas and the panel
+   (arrow keys when it has the focus); a double-click returns to the default */
+document.addEventListener("pointerdown", e => {
+  const bar = e.target.closest && e.target.closest("[data-archresize]");
+  const aside = bar && bar.nextElementSibling;
+  if (!aside || e.button > 0) return;
+  e.preventDefault();
+  const body = bar.parentElement;
+  const move = ev => {
+    const r = body.getBoundingClientRect();
+    setArchPanelWidth(aside, Math.min(Math.max(r.right - ev.clientX, 300), Math.max(300, r.width - 200)), false);
+  };
+  const up = () => {
+    bar.removeEventListener("pointermove", move);
+    bar.removeEventListener("pointerup", up);
+    bar.removeEventListener("pointercancel", up);
+    document.body.classList.remove("arch-resizing");
+    setArchPanelWidth(aside, Number(archPanelWidth[aside.dataset.panel]) || 0);
+  };
+  try { bar.setPointerCapture(e.pointerId); } catch (err) { /* no capture: the handle still tracks while hovered */ }
+  document.body.classList.add("arch-resizing");
+  bar.addEventListener("pointermove", move);
+  bar.addEventListener("pointerup", up);
+  bar.addEventListener("pointercancel", up);
+});
+document.addEventListener("dblclick", e => {
+  const bar = e.target.closest && e.target.closest("[data-archresize]");
+  if (bar && bar.nextElementSibling) setArchPanelWidth(bar.nextElementSibling, 0);
+});
+document.addEventListener("keydown", e => {
+  const bar = e.target.closest && e.target.closest("[data-archresize]");
+  const aside = bar && bar.nextElementSibling;
+  if (!aside || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
+  e.preventDefault();
+  const max = Math.max(300, bar.parentElement.getBoundingClientRect().width - 200);
+  setArchPanelWidth(aside, Math.min(Math.max(aside.getBoundingClientRect().width + (e.key === "ArrowLeft" ? 32 : -32), 300), max));
 });
 
 /* ---- Boot: load .domain, .sysreq and .arch files, then honor a deep link ---- */
@@ -1267,24 +2138,8 @@ document.addEventListener("change", e => {
     }
   }
   buildIndex();
-  const hash = decodeURIComponent(location.hash.slice(1));
-  const hit = hash && INDEX[hash];
-  if (hash.startsWith("arch:") && ARCHS.length) {
-    state.view = "arch";
-    const id = hash.slice("arch:".length);
-    state.archId = ARCHS.some(a => a.id === id) ? id : ARCHS[0].id;
-    state.expanded.add("mod:" + ctx().modules[0].id);
-  } else if (hit && (hit.req || hit.set)) {
-    state.view = "req";
-    state.reqSetId = hit.set.id;
-    state.reqSelected = hash;
-  } else if (hit) {
-    state.orgId = hit.org.id;
-    state.ctxId = hit.ctx.id;
-    if (hit.mod) state.expanded.add("mod:" + hit.mod.id);
-    state.selected = hash;
-  } else {
-    state.expanded.add("mod:" + ctx().modules[0].id);
-  }
+  /* nothing to open, or the Architecture diagram: the Domain Navigator keeps
+     its first module unfolded */
+  if (!applyHash(currentHash()) || state.view === "arch") state.expanded.add("mod:" + ctx().modules[0].id);
   renderAll();
 })();

@@ -3,7 +3,7 @@
 ---
 name: architecture-build-code
 version: v1
-description: "Input: a `.arch` model + a stack-binding artifact → Output: stack-specific scaffolding (the C4 level-4 replacement). Generates container/service skeletons, interface stubs from the Thrift-typed contracts, port wiring from connectors, and channel publish/subscribe glue for every element of a Specy `.arch` software-architecture model (system, containers, components, interfaces, structs/enums/unions/typedefs/exceptions, operations, connectors, channels, environments). Use this skill whenever the user wants to scaffold, generate, wire, or implement code FROM an existing `.arch` model — turn a `.arch` into a Java/Spring, TypeScript/NestJS, or Clojure project skeleton, generate gRPC/REST/Thrift interface stubs, wire Kafka channels, or stand up container/service modules and their ports. Also trigger when the user says \"scaffold the architecture\", \"generate the service skeletons\", \"stub the interfaces\", \"wire the connectors\", \"build the project from the .arch\", or \"realize the C4 level 4\". This is the inverse of `architecture-extract-from-code`. Do NOT use this for domain building blocks (entities, aggregates, value-type validation, invariants, reactions) — that is `domain-build-code`, which generates the business logic this skill's components delegate to. If no `.arch` exists yet, delegate to `architecture-design` first; if no stack-binding artifact exists, generate a default one (see below) and ask the user to confirm it."
+description: "Input: a `.arch` model + a stack-binding artifact → Output: stack-specific scaffolding (the C4 level-4 replacement). Generates container/service skeletons, interface stubs from the Thrift-typed contracts, port wiring from connectors, and channel publish/subscribe glue for every element of a Specy `.arch` software-architecture model (system, containers, components, interfaces, structs/enums/unions/typedefs/exceptions, operations, connectors, channels, environments). Also accepts a level-0 `organization` file — scaffolds each system it details (inline or through `detailed-in`), generates nothing for black-box systems, and lets each dependency shape the adapters toward the other system. Use this skill whenever the user wants to scaffold, generate, wire, or implement code FROM an existing `.arch` model — turn a `.arch` into a Java/Spring, TypeScript/NestJS, or Clojure project skeleton, generate gRPC/REST/Thrift interface stubs, wire Kafka channels, or stand up container/service modules and their ports. Also trigger when the user says \"scaffold the architecture\", \"generate the service skeletons\", \"stub the interfaces\", \"wire the connectors\", \"build the project from the .arch\", or \"realize the C4 level 4\". This is the inverse of `architecture-extract-from-code`. Do NOT use this for domain building blocks (entities, aggregates, value-type validation, invariants, reactions) — that is `domain-build-code`, which generates the business logic this skill's components delegate to. If no `.arch` exists yet, delegate to `architecture-design` first; if no stack-binding artifact exists, generate a default one (see below) and ask the user to confirm it."
 user-invocable: true
 ---
 
@@ -35,6 +35,11 @@ This skill is the inverse of `architecture-extract-from-code`.
   1. one or more `.arch` files (the Specy software-architecture model). The grammar is available at
      `grammar/architecture.ebnf` and the concept reference at
      `references/SOFTWARE-ARCHITECTURE-METAMODEL.md` (load them when you need to resolve a construct).
+     A file is rooted at `architecture` (one system) or at `organization` (level 0: several systems and
+     the dependencies between them). From an `organization` file, code is generated for the systems it
+     **details** — inline, or through `detailed-in "<file>.arch"`, a path you follow and never search
+     for — each exactly as a single-system file would be. A **black-box** system (no containers, no
+     `detailed-in`) generates nothing.
   2. a **stack-binding artifact** — the C4-level-4 replacement. It maps the logical, tech-agnostic
      `.arch` to a concrete stack: **type → language type** (e.g. `struct → Java record`,
      `string → java.lang.String`, `list<T> → List<T>`) and **protocol → framework** (e.g.
@@ -71,7 +76,11 @@ This skill is the inverse of `architecture-extract-from-code`.
    - **containers** and their `technology`, container-level ports, and contained components;
    - **connectors** (`connect A.Port -> B over "<protocol>" <style>`) — build the dependency graph;
    - **channels** (`channel c on <Broker> { carries … }`) and each component's `publishes`/`subscribes`;
-   - **environments** and their `deploy … replicas …` placements.
+   - **environments** and their `deploy … replicas …` placements;
+   - under an `organization` root: the **systems to build** — those detailed inline or through
+     `detailed-in`; black boxes are skipped — and, for each, the **dependencies** it has on other systems
+     with their patterns, `criticality` and flows (`carries … as …`, `to`, `manual` / `automated`). Parse
+     the hierarchy above once per system to build.
 4. **Resolve the topology before emitting code.** For every `requires` (required port), find the connector
    that binds it to a `provides` of the same interface. Flag any unwired required port. Use the connector's
    protocol + style to pick the adapter shape from the binding (see Phase 2). Decide one runnable module per
@@ -86,7 +95,9 @@ specialized by the chosen stack's heuristic and the bindings. Generate in depend
 contracts), then **components** (service skeletons that `provides`/`requires` those interfaces), then
 **connectors** (clients for required ports + transport endpoints for provided ports, per protocol/style),
 then **channels** (producers/consumers per broker), then **containers** (module/project descriptor +
-wiring/composition root), then **environments** (deployment manifests).
+wiring/composition root), then **environments** (deployment manifests). Under an `organization` root, do
+this once per detailed system: level 0 adds no artefact of its own, it only shapes the adapters a system
+has toward the others (see the level-0 rows of the contract).
 
 ### Phase 3 — Traceability & gaps
 
@@ -100,7 +111,10 @@ wiring/composition root), then **environments** (deployment manifests).
    unmapped type or protocol, an unwired required port, an `// UNCLEAR` marker), emit a compiling stub
    annotated with `// UNCLEAR: <reason>` and list it in `build-code.report`.
 8. Write `build-code.report`: stack + binding used, files generated (count per element kind), every
-   unwired required port, every unmapped type/protocol, and every `// UNCLEAR` / `// NOTE` marker.
+   unwired required port, every unmapped type/protocol, and every `// UNCLEAR` / `// NOTE` marker. From
+   an `organization` file, also list the black-box systems skipped, every `manual` or undecided flow of a
+   generated system (no code stands behind it), every `automated` flow no connector realizes, and the
+   hotspots of the generated systems.
 
 ---
 
@@ -113,6 +127,7 @@ artifact**; this table fixes the *shape*.
 | `.arch` element | Code artefact |
 |---|---|
 | **`architecture` (root)** | The workspace/repository root. `domain-source` / `requirements-source` are recorded as provenance comments and used to resolve `realizes`/`satisfies`/imports. |
+| **`organization` (root, level 0)** | A workspace holding one project per **detailed** system, each generated exactly as the `system` of a single-system file — from its inline detail, or from the file its `detailed-in` names (follow the path, never search). The organization file prevails for a system's description, `realizes` and metadata. `domain-source`(s) are provenance, as on `architecture`, and resolve the concept references. Nothing is generated for the organization itself. |
 | **`system`** | The project/solution that aggregates all container modules; shared contracts (system-scope interfaces and types) live in a shared/contracts module. |
 | **`person`** | No code — a documented actor. May appear as the left side of a connector (an inbound client/UI), generated only if that connector targets one of our provided ports. |
 | **`externalSystem`** | An **outbound client** for each interface it `provides` (we call it) and an **inbound endpoint/handler** for each interface it `consumes` (it calls us). Opaque: no internal decomposition. `realizes` records the upstream domain context. |
@@ -136,6 +151,14 @@ artifact**; this table fixes the *shape*.
 | **`channel`** (`channel c on <Broker> { carries M… }`) | A named topic/queue on the broker container. Generate, via the binding's broker framework: a **producer** for each `publishes M to c` and a **consumer/listener** for each `subscribes c`, typed by the carried message types (often imported domain events). The channel is the contract; producers/consumers are decoupled. |
 | **`environment`** (`environment e { deploy C replicas n … }`) | A **deployment manifest** (compose/k8s/Helm-style per binding) placing each container with its replica hint. Placement + replicas only — no infra/networking detail. |
 | **`node`**, **`resource`** | Nothing by themselves. They are placement and residency facts; the deployment view is consumed by the stack binding, which may emit IaC templates from them later, so generated service code is unaffected. A `deploy` inside a node goes into its environment's manifest like one written directly under the environment. |
+| **black-box `system`** (in an `organization`: no containers, no `detailed-in`) | **Nothing** — it has no code of ours. It only appears at the far end of a detailed system's connectors, where, as for an `externalSystem`, the half on our side is generated. |
+| **connector to another system** (`connect SyncWorker -> CRM …`, `connect CRM -> DeliveryReporting.DeliveryQueries …`) | As a connector to an `externalSystem`: generate the half that belongs to the system being built. When the other end is a system detailed inline (`System.Container[.Interface]`), its half is generated in that system's project. A bare system name is a black-box end: nothing is generated on its side here (a system detailed in its own file gets its half from that file's connectors). |
+| **`dependency A -> B`** and its **`flow`s** (A detailed) | No artefact of their own. An `automated` flow reaches code through the connector(s) between A and B that realize it, generated as above and annotated `// from: dependency A -> B, flow N`. A **`manual`** flow — or one whose mechanism is still undecided — generates **nothing** and is listed in the report. A flow with per-phase mechanisms is generated when it is `automated` in at least one listed phase, annotated with those phases; the phases in which it stays `manual` or undecided are listed in the report. An `automated` flow that no connector realizes generates nothing either: report it, never invent its contract. What the dependency adds is the shape of **A's adapters toward B** (in an inline detail, the connectors whose other end names `B`; in a `detailed-in` file, those to the `externalSystem` named `B`), by A's pattern: |
+| ↳ **`ACL`** on the dependency | An **anti-corruption adapter stub** in A, wrapping the transport client (or the endpoint, for what B pushes): one translation stub per `carries X as Y` pair of the dependency's flows, from the sender's `X` to the receiver's `Y`, its body left `// UNCLEAR: mapping not specified`. `X` and `Y` take the domain types they resolve to (the `domain-build-code` output); a name that does not resolve takes the contract type that carries it across the connector, flagged `// UNCLEAR`. A carried concept without `as` passes through untranslated. |
+| ↳ **`Conformist`** on the dependency | No translation layer: A's client (or its endpoint, for what B pushes) hands B's contract types to A's components as they are. Do not generate a mapper or a second set of types. |
+| ↳ any other pattern (`CS`, `OHS`, `SharedKernel`, `PublishedLanguage`, `Partnership`), or none | A `// pattern:` comment on the adapter; no code. |
+| **`criticality`** | Resilience scaffolding on A's adapter toward B (a timeout, retry or fallback hook) **only where the chosen stack heuristic already has a place for it**; otherwise a `// criticality: <level>` comment and nothing more. Absent ⇒ unstated ⇒ nothing. |
+| **`area`**, **`phase`**, **`used-by`**, **`masters`** / **`handles`**, **`hotspot`** | Nothing by themselves. The hotspots of a generated system are listed in `build-code.report` next to its manual flows — they say where the generated integration is known to be fragile. |
 | **`satisfies [REQ-…, NFR-…]`** | A traceability comment/annotation on the generated artefact (see below). |
 | **`realizes …`** | A `// realizes:` comment; for `module` it also marks the domain-delegation seam. |
 
@@ -166,6 +189,10 @@ Datastore/broker/cache containers (a `technology` with no components) contribute
 (connection settings, topic declarations) under the relevant consumer modules and under `deploy/`, not a
 service module. The exact folder/package conventions come from the chosen stack's heuristic file.
 
+Under an `organization` root, `<root>` is the workspace and each detailed system gets this tree under
+`<root>/<System>/`; an anti-corruption adapter stub sits beside the client or endpoint it wraps, in
+`adapters/outbound/` or `adapters/inbound/`.
+
 ---
 
 ## Traceability
@@ -184,8 +211,9 @@ in the report.
 ## Conventions
 
 - **`// UNCLEAR:`** — the model or the binding under-specifies this artefact (operation with no domain
-  backing, unmapped type/protocol, unwired required port, ambiguous connector target). Emit a compiling
-  stub and flag it; never invent contracts or business logic.
+  backing, unmapped type/protocol, unwired required port, ambiguous connector target, the translation
+  behind a level-0 `carries X as Y`). Emit a compiling stub and flag it; never invent contracts or
+  business logic.
 - **`// NOTE:`** — an infrastructure/wiring decision you made that isn't in the model or binding (e.g. a
   default serialization, a chosen client library), so the human can review it.
 - Names: keep the model's `PascalCase` type/interface/container/component names and its `camelCase`

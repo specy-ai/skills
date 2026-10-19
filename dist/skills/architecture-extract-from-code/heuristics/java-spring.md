@@ -90,3 +90,18 @@
 | Spring Data repositories, Flyway/Liquibase migrations writing to that datasource | `stores`, only for records that match a struct the `.arch` declares |
 
 Each node and resource gets a `// source:`; `provider`, `region` and `zone` are written only when a file states them.
+
+## Cross-system integration (level 0 — organization runs only)
+
+| Source signal | Level-0 inference |
+|---|---|
+| `@FeignClient`, a `WebClient` / `RestClient` / `RestTemplate` bean, a gRPC stub or a vendor SDK bean whose base URL or config key points at another system | an integration with that system: one `automated` flow per business exchange. Its dependency follows the need, not the call — a read makes the caller depend on the callee; a push of the caller's own records makes the callee depend on the caller; a request for the callee to act on the caller's behalf makes the caller depend on it, with a flow `to` the callee |
+| `@KafkaListener` / `@RabbitListener` on a topic or queue another system publishes; a `@RestController` registered as that system's webhook | `dependency Subscriber -> Publisher`; flow in the default direction |
+| Spring Integration SFTP / file adapters, a Spring Batch job reading another system's export, a `@Scheduled` import | a flow `over "SFTP file"` / `over "scheduled import"`, `automated` |
+| A second `DataSource` bean, or native queries across schemas, on another system's database | a flow `over "shared database" automated` |
+| A MapStruct `@Mapper` or a hand-written `*Mapper` / `*Translator` between the peer's DTO and a type of our own | `carries X as Y`; `ACL` when it sits in a layer of its own (an `acl` / `anticorruption` / per-peer adapter package) |
+| The peer's generated models or shared library types used in `@Entity` classes and services, with no mapper | `Conformist` |
+| Resilience4j / Spring Cloud CircuitBreaker `@CircuitBreaker(fallbackMethod = …)`, `@FeignClient(fallback = …)` | `criticality degraded` |
+| The exchange only goes through a listener container or an outbox table | `criticality tolerant` |
+
+Patterns, criticality and `as` are written only when the signal is present, and an `ACL` or a criticality cue counts only in the code of the downstream system — the one that needs the other. The direction rule (Phase 2, step 22) and the rest of the evidence rules (*Level-0 inference* table) are in the skill.

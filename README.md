@@ -4,16 +4,17 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-da7756.svg)](https://github.com/specy-ai/skills)
-[![Skills](https://img.shields.io/badge/skills-8-success.svg)](#skills)
+[![Skills](https://img.shields.io/badge/skills-11-success.svg)](#skills)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#contributing)
 
 ![Specy domain metamodel](./specy-DDD-metamodel.png)
 
-Specy is a Domain-Driven Design toolkit that ships as a **Claude Code plugin** (`specy`). Its agent skills work across three structured DSLs:
+Specy is a Domain-Driven Design toolkit that ships as a **Claude Code plugin** (`specy`). Its agent skills work across four structured DSLs:
 
 - **`.prd`** — product requirements (the *why* and *what*)
 - **`.sysreq`** — system requirements in EARS syntax (the formal *what*)
 - **`.domain`** — the domain model in DDD notation (the *how*)
+- **`.arch`** — the software architecture in a C4-inspired notation (the *with what*: systems, containers, components, contracts)
 
 A companion parser/CLI additionally renders a `.domain` model to **JSON, YAML, or Markdown**.
 
@@ -28,7 +29,7 @@ Specy fixes this by making domain knowledge **explicit, comprehensive, traceable
 
 ### The Bi-Directional Chain of Truth
 Specy captures the structure, behavior, and interactions of your software in a unified model. Define it once, and every element stays linked along a continuous, bi-directional pipeline:
-Product Vision (.prd) ⇄ Testable Requirements (.sysreq) ⇄ Domain Model (.domain) ⇄ Generated Code
+Product Vision (.prd) ⇄ Testable Requirements (.sysreq) ⇄ Domain Model (.domain) ⇄ Software Architecture (.arch) ⇄ Generated Code
 Because the chain works both ways, your code always reflects your intent, and your documentation never goes out of date.
 
 ### Specy vs. Raw LLM Prompts
@@ -50,6 +51,7 @@ Then, in Claude Code:
 ```
 specy:prd-design          # capture product requirements from an idea or brief
 specy:domain-design       # model a domain from requirements or prose
+specy:architecture-design # design a C4-inspired architecture (.arch) from a .sysreq + .domain
 specy:domain-build-code   # generate code (Java/Spring, TS/NestJS, Clojure) from a .domain
 specy:domain-extract-from-code   # reverse-engineer a .domain from an existing codebase
 ```
@@ -107,7 +109,7 @@ The same model can also be rendered to JSON/YAML/Markdown, explored conversation
 
 ## Skills
 
-Specy ships as a single Claude Code plugin — **`specy`** — providing 8 AI-assisted skills: 7 **core**
+Specy ships as a single Claude Code plugin — **`specy`** — providing 11 AI-assisted skills: 10 **core**
 skills named after their input→output artefact, plus 1 **auxiliary** skill. Each is invoked as
 `specy:<name>`.
 
@@ -120,6 +122,9 @@ skills named after their input→output artefact, plus 1 **auxiliary** skill. Ea
 | `specy:domain-build-code` | `.domain` + target stack | source code |
 | `specy:domain-extract-from-code` | codebase | `.domain` (+ refactoring report) |
 | `specy:domain-refactor` | extracted `.domain` (+ refactoring report) | `.refactored.domain` + rationale |
+| `specy:architecture-design` | `.sysreq` (incl. NFRs) / `.domain` / prose | `.arch` |
+| `specy:architecture-build-code` | `.arch` + stack-binding artifact | source code (scaffolding) |
+| `specy:architecture-extract-from-code` | codebase, or several systems | `.arch` per system (+ level-0 `organization` file) |
 | `specy:domain-dialogue` *(aux)* | `.domain` | — (read-only conversation) |
 
 ### `specy:prd-design` — Product Requirements
@@ -181,6 +186,38 @@ obsession, flag-driven illegal states, generic events, missing temporal/error pa
 `domain-extract-from-code` (faithful but flawed) to a clean target model. Maps every change to the smell
 it resolves and flags rules a domain expert should confirm.
 
+### `specy:architecture-design` — Software Architecture
+
+**Input:** a `.sysreq` (incl. NFRs) and/or a `.domain`, or prose; for a landscape, interview notes or an integration inventory. **Output:** a `.arch` file.
+
+Designs a C4-inspired architecture that `satisfies` the requirements and `realizes` the domain model.
+Interactive 9-phase conversation (Landscape, System Context, Containers, Components, Contracts,
+Ports & Connectors, Channels, Deployment, Traceability), or one-shot from `.sysreq` + `.domain`. At
+level 0 it maps an organization's system landscape — systems, what each one masters, dependencies,
+flows — with or without a domain model; a context map between bounded contexts is `specy:domain-design`.
+
+### `specy:architecture-build-code` — Architecture Scaffolding
+
+**Input:** a `.arch` model + a stack-binding artifact. **Output:** stack-specific scaffolding (the C4 level-4 replacement).
+
+Generates one runnable module per container, service classes per component, interface stubs from the
+Thrift-typed contracts, port wiring from connectors, and publish/subscribe glue from channels, for
+**Java/Spring, TypeScript/NestJS, Clojure**. Operation bodies are stubs that delegate to the business
+logic `specy:domain-build-code` generates. Accepts a level-0 `organization` file (scaffolds each detailed
+system, nothing for black boxes); without a stack binding it proposes a default one. The inverse of
+`specy:architecture-extract-from-code`.
+
+### `specy:architecture-extract-from-code` — Architecture from Code
+
+**Input:** a codebase, or several systems (repositories, a monorepo, or single-system `.arch` files). **Output:** a `.arch` file per system + `.meta.json` + notes report; for several systems, one level-0 `organization` file.
+
+Reverse-engineers the architecture from source: containers and components, their provided/required
+interfaces and typed contracts, channels, external systems, connectors with protocol + style, the
+deployment view, and the `realizes` bridge to domain modules when a `.domain` exists. From several
+systems it also recovers level 0 — dependencies and flows backed by integration code; `masters`,
+patterns and criticality only where evidenced. Stack-specific heuristics for Java/Spring,
+TypeScript/NestJS, Clojure. For business entities from code, use `specy:domain-extract-from-code`.
+
 ### `specy:domain-dialogue` — Domain Exploration *(auxiliary)*
 
 **Input:** existing `.domain` files. **Output:** none — a read-only conversation.
@@ -191,7 +228,7 @@ change is warranted, it points back to `specy:domain-design` to evolve the model
 
 ## Two Approaches
 
-Specy supports two complementary approaches to domain modeling. Both converge on the same artifact — the `.domain` file — and once it exists, the other skills can operate on it (explore and generate code).
+Specy supports two complementary approaches to domain modeling. Both converge on the same artifact — the `.domain` file — and once it exists, the other skills can operate on it (explore, design the architecture, and generate code).
 
 ```
      Top-down (greenfield)                Bottom-up (brownfield)
@@ -200,8 +237,8 @@ Specy supports two complementary approaches to domain modeling. Both converge on
                                                    │
                                                    ▼
  Business vision                          specy:domain-extract-from-code → .domain
-          │                                        │
-          ▼                                        ▼
+          │                               specy:architecture-extract-from-code → .arch
+          ▼                                        │
  specy:prd-design → .prd                  specy:domain-refactor → .refactored.domain
           │                                        │
           ▼                                        ▼
@@ -211,7 +248,11 @@ Specy supports two complementary approaches to domain modeling. Both converge on
  specy:domain-design → .domain ◄────────► specy:domain-design (evolve)
           │                                        │
           ▼                               (implement + re-extract)
- specy:domain-build-code → code
+ specy:architecture-design → .arch
+          │
+          ▼
+ specy:architecture-build-code → code (scaffolding)
+ specy:domain-build-code → code (business logic)
 ```
 
 ### Top-down: from product vision to domain model
@@ -221,7 +262,8 @@ Start with *why* (product vision, personas, jobs-to-be-done) and progressively f
 1. **`specy:prd-design`** — capture the product vision: problem statement, personas, goals, hypotheses, features, user stories, and releases into a `.prd` file.
 2. **`specy:sysreq-design`** — formalize testable system requirements in EARS syntax from the PRD, producing a `.sysreq` file with traceability back to features.
 3. **`specy:domain-design`** — build the domain model from requirements: entities, aggregates, commands, events, operations, state machines, invariants, reactions. Each construct traces back to specific requirements via `satisfies`.
-4. **`specy:domain-build-code`** — generate idiomatic source code for every building block of the `.domain`, for a chosen stack.
+4. **`specy:architecture-design`** — design the software architecture that `satisfies` the requirements (NFRs in particular) and `realizes` the domain model: persons and external systems, containers, components with typed interfaces, connectors, channels, and a deployment view, in a `.arch` file. For several systems, a level-0 `organization` file maps the landscape first.
+5. **`specy:architecture-build-code`** and **`specy:domain-build-code`** — generate the code: the former scaffolds containers, components, interface stubs and wiring from the `.arch`; the latter generates idiomatic source code for every building block of the `.domain`, for a chosen stack.
 
 This is the **greenfield** path — no code exists yet. Knowledge flows from intent to structure to code.
 
@@ -229,7 +271,7 @@ This is the **greenfield** path — no code exists yet. Knowledge flows from int
 
 Start with *what exists* (source code) and extract the implicit business knowledge into an explicit, verifiable model. Then explore it, challenge it, and evolve it.
 
-1. **`specy:domain-extract-from-code`** — reverse-engineer source code into `.domain` files. The extracted model is faithful to the implementation but carries its design debt, and becomes the source of truth for the other skills. (Use **`specy:sysreq-extract-from-code`** to recover EARS requirements from code.)
+1. **`specy:domain-extract-from-code`** — reverse-engineer source code into `.domain` files. The extracted model is faithful to the implementation but carries its design debt, and becomes the source of truth for the other skills. (Use **`specy:sysreq-extract-from-code`** to recover EARS requirements from code, and **`specy:architecture-extract-from-code`** to recover the `.arch` — containers, components, contracts, connectors — and, from several codebases, the organization's system landscape.)
 2. **`specy:domain-refactor`** — redesign the extracted model from first principles into proper DDD, fixing the smells flagged in `refactoring.report` (anemic/god entities, primitive obsession, flag-driven illegal states, generic events). Produces a `<domain>.refactored.domain` plus a rationale mapping each fix to the smell it resolves — never overwriting the extracted file.
 3. **`specy:domain-dialogue`** — explore and question the domain model through conversation. Surface gaps, trace behaviors, challenge assumptions.
 4. **`specy:domain-design`** — when a change is needed, evolve the model. **`specy:domain-build-code`** then regenerates the affected code.
@@ -239,7 +281,7 @@ This is the **brownfield** path — code already exists. Knowledge flows from im
 
 ## Metamodels
 
-Specy organizes business knowledge into three layers, each with its own metamodel, file format, and grammar. Together they form a **traceability chain** from product vision down to domain implementation.
+Specy organizes business knowledge into four layers, each with its own metamodel, file format, and grammar. Together they form a **traceability chain** from product vision down to the domain model and the software architecture that realizes it.
 
 ![Specy metamodels comparison](./metamodel-comparison.svg)
 
@@ -334,6 +376,149 @@ A `.domain` file captures the full domain model for a bounded context: the struc
 
 </details>
 
+### Software Architecture (`.arch`)
+
+**Purpose:** Describe *how the software is structured* to realize the domain model and satisfy the system requirements — a C4-inspired model with Thrift-typed contracts, ports and connectors, first-class async channels, and a lightweight deployment view. C4's level 4 (code) is out of scope: code is generated per stack through a separate stack-binding artifact.
+
+A `.arch` file has one of two roots. **`architecture`** describes one system in focus across C4 levels 1–3: the persons and external systems around it, its containers (separately deployable units identified by a free-form technology), the components inside them, the typed interfaces they provide and require, the connectors that wire those ports with a protocol and an interaction style, the channels that carry messages, and the environments containers deploy to. **`organization`** describes a system landscape at level 0: the systems an organization runs, grouped by area, the domain concepts each one masters, the dependencies between them (`A -> B` reads "A depends on B", with context-map patterns and a criticality), and the numbered flows of domain concepts along each dependency, timed by the phases of an integration roadmap. A system of an organization may stay a black box, or be detailed inline or in its own `architecture` file (`detailed-in`).
+
+**Traceability:** `requirements-source` links to the `.sysreq` file and any element can `satisfies [REQ-XXX-001]` (NFRs drive architecture); `domain-source` links to the `.domain` file(s): a system `realizes context`, a component `realizes module "…"`, value types and events are imported with `import value type X from domain` / `import event X from domain`, and level-0 concept references (`masters`, `handles`, `carries`) resolve to domain elements.
+
+![Specy software architecture metamodel](./specy-Arch-metamodel.svg)
+
+<details>
+<summary><b>Architecture key concepts</b></summary>
+
+| Concept | Description |
+|---------|-------------|
+| Organization | Root of a level-0 file: the systems an organization runs, with its areas, phases, persons, external systems and dependencies |
+| Area | Grouping of systems as the organization chart sees them (a department); no runtime meaning |
+| Phase | Stage of the integration roadmap during which a flow's mechanism holds; declaration order is chronological |
+| System (level 0) | A system named after its role, with its product (`technology`), area, users, mastered and handled concepts, hotspots; a black box or detailed in levels 1–3 |
+| Dependency | Directed `A -> B`: A depends on B, with context-map patterns (CS, Conformist, ACL, OHS, SharedKernel, PublishedLanguage, Partnership) and a criticality |
+| Flow | Numbered exchange along a dependency: the concepts it carries (`X as Y` when translated), its direction, its mechanism (medium, manual/automated), once or per phase |
+| Hotspot | Known point of fragility or effort in operating a system; concerns flows (by number) and concepts |
+| Concept Reference | A domain type name, optionally qualified by context (`Finance.Invoice`), resolved to exactly one element of the domain sources |
+| System | The software system in focus (level 1): contains containers, shared contracts, channels, connectors, environments |
+| Person | A human role that interacts with the system — a source or sink of interactions, never a container |
+| External System | Opaque system outside the boundary; provides and consumes interfaces, participates in connectors and channels |
+| Bounded Context | Optional grouping tag over components — the DDD model boundary projected onto the architecture |
+| Container | Separately runnable or deployable unit (level 2), identified by a free-form technology string |
+| Component | Logical unit inside a container (level 3): realizes domain modules, provides/requires interfaces, publishes/subscribes to channels |
+| Interface / Operation | First-class contract owning its operations: ordinaled typed arguments, a return type, `throws`; style default, `safe`, `oneway`, `streaming` |
+| Struct, Enum, Typedef, Union, Exception | Thrift-inspired named types with field ordinals and `optional`/`required` markers; exceptions realize domain error events |
+| Connector | Directed wire from a required port to a provided port, `over` a protocol, `sync` / `async` / `streaming` |
+| Channel | Named topic or queue on a broker container that `carries` message types (usually imported domain events) |
+| Environment | Deployment stage: nodes (provider, region, zone), resources (where data lives, tenancy, stored structs) and `deploy` placements with replicas |
+
+</details>
+
+One system in focus (`architecture` root), trimmed from [`examples/url-shortener/url-shortener.arch`](./examples/url-shortener/url-shortener.arch):
+
+```
+architecture Sniplink :: "Sniplink URL-shortening platform — software architecture" {
+  domain-source       "url-shortener.domain"
+  requirements-source  "url-shortener.sysreq"
+
+  person Publisher :: "A registered user who shortens URLs, manages links, and reads analytics"
+
+  externalSystem GoogleSafeBrowsing
+      :: "Google Safe Browsing — external URL threat-intelligence API"
+      realizes module "Link Safety Scanning" {
+    provides ThreatLookup
+  }
+
+  system Sniplink :: "The Sniplink platform: link shortening, redirect, analytics, safety, API"
+      satisfies [REQ-NFR-008, REQ-NFR-009, REQ-NFR-020] {
+
+    import value type Slug           from domain
+    import event LinkShortened   from domain   // emitted on successful creation
+
+    exception SlugTaken         :: "Requested custom slug is already in use" {
+      1: required string requestedSlug
+      2: optional string suggestedAlternative
+    }
+
+    interface LinkCommands :: "Write side of link lifecycle"
+        satisfies [REQ-LNK-001, REQ-LNK-008] {
+      createShortLink(1: required DestinationUrl target, 2: optional Slug customSlug)
+        returns ShortLinkDTO throws (SlugTaken, UnsafeDestination)
+    }
+
+    container EdgeApi :: "Edge HTTP service: link write-side, public API, custom domains"
+        technology "Clojure/Ring + Reitit"
+        satisfies [REQ-NFR-005, REQ-NFR-008] {
+      component LinkController :: "HTTP edge for link lifecycle commands & queries"
+          realizes module "Link Shortening", module "Link Management" {
+        boundedContext LinkShortening
+        provides LinkCommands
+        requires SafetyScanning            // must scan before shortening (REQ-LNK-008)
+        publishes LinkShortened to linkEvents
+      }
+    }
+    container EventBus    :: "Event broker for first-class async channels" technology "Kafka"
+
+    channel linkEvents on EventBus :: "Link lifecycle + safety-flag fan-out" {
+      carries LinkShortened, LinkDeactivated, UrlFlaggedAsUnsafe
+    }
+
+    connect LinkController.SafetyScanning -> SafetyScanner over "gRPC" sync
+    connect SafetyScanner.ThreatLookup -> GoogleSafeBrowsing.ThreatLookup over "HTTPS/REST" async
+
+    environment production :: "Multi-AZ production deployment" {
+      node euWest :: "Primary EU region" provider "AWS" region "eu-west-1" {
+        deploy EdgeApi replicas 3
+      }
+    }
+  }
+}
+```
+
+A system landscape (`organization` root), trimmed from [`examples/retail-media/retail-media.arch`](./examples/retail-media/retail-media.arch), whose concept names resolve against [`retail-media.domain`](./examples/retail-media/retail-media.domain):
+
+```
+organization RetailMediaCo
+    :: "A retail-media network selling on-site and off-site advertising for a group of retailers" {
+  domain-source "retail-media.domain"
+
+  phase Phase1 :: "Go-live of the finance stack; flows without a ready-made connector run on manual files"
+  phase Phase2 :: "Most manual steps automated, mostly through APIs"
+
+  area FinanceOffice  :: "Accounting, treasury, supplier spend and group reporting"
+  person FinanceStaff     :: "Accountants, treasurers and the group controller"
+
+  externalSystem Banks :: "The company's banks: execute payment files, publish account statements" {
+    masters BankStatement
+  }
+
+  system ERP :: "Financial accounting, reporting, analysis and tax under local and group accounting standards"
+      technology "NetSuite"
+      realizes context Finance {
+    area FinanceOffice
+    used-by FinanceStaff
+    masters Customer, Vendor, Item, Invoice, JournalEntry, Payment
+    handles BankStatement             // received from CashManagement (flow 6)
+    hotspot MonthEndClose
+        :: "Until phase 2 the monthly close waits on six manual file imports, and one late export delays it; the payroll journal stays manual after that"
+        concerns 1, 2, 3, 6, 16, 18
+  }
+
+  dependency ERP -> CRM : ACL, OHS :: "Billing needs the CRM's products, accounts and billing schedule" {
+    flow 2 "Accounts" carries Account as Customer {
+      phase Phase1 over "CSV file export/import" manual
+      phase Phase2 automated            // only known to be automated so far
+    }
+  }
+
+  dependency CashManagement -> Banks : PublishedLanguage criticality degraded :: "ISO 20022 formats, owned by neither side" {
+    flow 10 "Payment files (pain.001)" carries PaymentOrder to Banks over "EBICS" automated
+    flow 11 "Account statements (camt.053)" carries BankStatement over "EBICS" automated
+  }
+}
+```
+
+The Navigator in [`ui/`](./ui/README.md) renders an `architecture` file as a foldable C4 diagram and an `organization` file as a landscape of its systems — see `ui/README.md`.
+
 ## Folder Structure
 
 ```
@@ -349,18 +534,24 @@ specy-skill/
 │   │   ├── domain-build-code/    # specy:domain-build-code source (main.md + heuristics/)
 │   │   ├── domain-extract-from-code/   # specy:domain-extract-from-code source (main.md + heuristics/)
 │   │   ├── domain-refactor/      # specy:domain-refactor source
+│   │   ├── architecture-design/  # specy:architecture-design source
+│   │   ├── architecture-build-code/    # specy:architecture-build-code source (main.md + heuristics/)
+│   │   ├── architecture-extract-from-code/   # specy:architecture-extract-from-code source (main.md + heuristics/)
 │   │   └── domain-dialogue/      # specy:domain-dialogue source (auxiliary)
 │   ├── grammars/                 # Canonical EBNF grammars (source of truth)
 │   │   ├── domain.ebnf           # Domain model grammar (.domain)
+│   │   ├── architecture.ebnf     # Software architecture grammar (.arch)
 │   │   ├── prd.ebnf              # Product requirements grammar (.prd)
 │   │   └── sysreq.ebnf           # System requirements grammar (.sysreq)
 │   ├── metamodels/               # Metamodel documentation
 │   │   ├── DOMAIN-METAMODEL.md
+│   │   ├── SOFTWARE-ARCHITECTURE-METAMODEL.md
 │   │   ├── PRODUCT-REQ-METAMODEL.md
 │   │   └── SYSTEM-REQ-METAMODEL.md
 │   ├── tree-sitters/             # Tree-sitter parser generators + build script
 │   │   ├── build.sh
 │   │   ├── tree-sitter-specy-domain/
+│   │   ├── tree-sitter-specy-architecture/
 │   │   ├── tree-sitter-specy-prd/
 │   │   └── tree-sitter-specy-sysreq/
 │   └── langium/                  # Langium-based LSP server + parser CLI
@@ -377,14 +568,20 @@ specy-skill/
 │       ├── domain-build-code/    # SKILL.md + heuristics/ + grammar/ + references/
 │       ├── domain-extract-from-code/   # SKILL.md + heuristics/ + grammars/
 │       ├── domain-refactor/      # SKILL.md + grammar/ + references/
+│       ├── architecture-design/  # SKILL.md + grammar/ + references/
+│       ├── architecture-build-code/    # SKILL.md + heuristics/ + grammar/ + references/
+│       ├── architecture-extract-from-code/   # SKILL.md + heuristics/ + grammars/ + references/
 │       └── domain-dialogue/      # SKILL.md (auxiliary)
 │
 ├── examples/                     # Example Specy projects
 │   ├── business-loan/            # .prd, .sysreq, .domain
-│   ├── url-shortener/            # .prd, .sysreq, .domain
+│   ├── url-shortener/            # .prd, .sysreq, .domain, .arch (one system in focus)
+│   ├── retail-media/             # Organization landscape: .domain + level-0 .arch
 │   ├── ride-now/                 # Multi-context ride-sharing (.prd, .sysreq, .domain)
 │   ├── ecommerce/                # Orders example (.domain, v2 format)
 │   └── uber-old/                 # Legacy ride-sharing example (superseded by ride-now)
+│
+├── ui/                           # Navigator: browses .domain / .sysreq files, renders .arch diagrams (see ui/README.md)
 │
 ├── hooks/                        # Git hooks
 │   └── pre-commit                # Ensures dist/ stays in sync with src/
@@ -411,7 +608,9 @@ specy-skill/
 
 **`src/langium/`** — [Langium](https://langium.org/)-based LSP server and parser CLI for the `.domain` DSL. Provides editor diagnostics, AST access, and a `parse` command that emits JSON, YAML, or Markdown. See [LSP Server](#lsp-server) below.
 
-**`examples/`** — Complete example projects demonstrating Specy files across different domains.
+**`examples/`** — Complete example projects demonstrating Specy files across different domains. `url-shortener/` carries a single-system `.arch`; `retail-media/` an `organization` landscape with its `.domain`.
+
+**`ui/`** — The Specy Navigator, a static HTML prototype that browses `.domain` and `.sysreq` files and renders a `.arch` file as a foldable C4 diagram (or, for an `organization` file, as a landscape of its systems). See [`ui/README.md`](./ui/README.md).
 
 ## Prerequisites
 
@@ -457,14 +656,17 @@ ln -sf /path/to/specy/dist/skills/domain-design ~/.claude/skills/domain-design
 The typical workflow follows the traceability chain:
 
 ```
-1. specy:prd-design                Define the product (problem, personas, features)        → .prd
-2. specy:sysreq-design             Formalize testable requirements from the PRD            → .sysreq
-3. specy:domain-design             Build the domain model from requirements                → .domain
-4. specy:domain-build-code         Generate code from the domain model                     → code
-   specy:domain-extract-from-code  Reverse-engineer a domain model from existing code      → .domain
-   specy:domain-refactor           Redesign an extracted model from first principles       → .refactored.domain
-   specy:sysreq-extract-from-code  Recover EARS requirements from existing code            → .sysreq
-5. specy:domain-dialogue           Explore and question a domain model                     → (read-only)
+1. specy:prd-design                     Define the product (problem, personas, features)        → .prd
+2. specy:sysreq-design                  Formalize testable requirements from the PRD            → .sysreq
+3. specy:domain-design                  Build the domain model from requirements                → .domain
+4. specy:architecture-design            Design the architecture from requirements + domain      → .arch
+5. specy:architecture-build-code        Scaffold containers, components, contracts from .arch   → code
+   specy:domain-build-code              Generate code from the domain model                     → code
+   specy:domain-extract-from-code       Reverse-engineer a domain model from existing code      → .domain
+   specy:architecture-extract-from-code Reverse-engineer the architecture from existing code    → .arch
+   specy:domain-refactor                Redesign an extracted model from first principles       → .refactored.domain
+   specy:sysreq-extract-from-code       Recover EARS requirements from existing code            → .sysreq
+6. specy:domain-dialogue                Explore and question a domain model                     → (read-only)
 ```
 
 | Workflow | What to run |
@@ -472,8 +674,11 @@ The typical workflow follows the traceability chain:
 | Define product requirements | `specy:prd-design` |
 | Formalize system requirements (EARS) | `specy:sysreq-design` after the PRD is done |
 | Build a domain model from requirements | `specy:domain-design` after requirements are written |
+| Design the software architecture | `specy:architecture-design` after the domain model (and NFRs) are written |
+| Scaffold code from an architecture model | `specy:architecture-build-code` with a stack-binding artifact |
 | Generate code from a domain model | `specy:domain-build-code` with a target stack |
 | Reverse-engineer a domain model from code | `specy:domain-extract-from-code` in your project |
+| Reverse-engineer the architecture from code | `specy:architecture-extract-from-code` in your project, or across several repositories |
 | Redesign an extracted model into proper DDD | `specy:domain-refactor` on the extracted `.domain` |
 | Recover EARS requirements from code | `specy:sysreq-extract-from-code` in your project |
 | Explore and question a domain model | `specy:domain-dialogue` in a project with `*.domain` files |
@@ -593,4 +798,4 @@ The pre-commit hook blocks commits if `dist/` is out of date with `src/`.
 ./src/tree-sitters/build.sh
 ```
 
-Requires `tree-sitter` CLI. Builds all three grammars and runs smoke tests against `examples/`.
+Requires `tree-sitter` CLI. Builds all four grammars (`prd`, `sysreq`, `domain`, `architecture`) and runs smoke tests against every example file in `examples/`, including the two `.arch` files.

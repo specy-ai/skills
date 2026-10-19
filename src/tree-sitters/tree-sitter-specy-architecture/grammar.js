@@ -1,7 +1,8 @@
 // =============================================================================
 // Tree-sitter grammar for Specy Software Architecture (.arch)
 // C4-inspired (Context / Container / Component), Thrift-inspired typed
-// contracts, ports + connectors, first-class async channels.
+// contracts, ports + connectors, first-class async channels, plus level 0
+// (Organization): systems, the dependencies between them and their flows.
 // Faithful translation of src/grammars/architecture.ebnf.
 // =============================================================================
 
@@ -15,10 +16,12 @@ module.exports = grammar({
   rules: {
 
     // =========================================================================
-    // Top-level
+    // Top-level — two alternative roots:
+    //   architecture — one system in focus (levels 1 to 3)
+    //   organization — several systems and their dependencies (level 0)
     // =========================================================================
 
-    source_file: $ => repeat($.architecture_def),
+    source_file: $ => repeat(choice($.architecture_def, $.organization_def)),
 
     architecture_def: $ => seq(
       'architecture',
@@ -47,6 +50,218 @@ module.exports = grammar({
     requirements_source_decl: $ => seq('requirements-source', $.string_literal),
 
     // =========================================================================
+    // Level 0 — Organization: systems, areas, phases, dependencies, flows
+    //
+    // Every rule of this section is reachable from organization_def alone. A
+    // system or an external system declared in an organization has its OWN rule
+    // (organization_system_def, organization_external_system_def), so
+    // architecture_def, system_def and external_system_def accept exactly what
+    // they accepted before level 0: no level-0 clause, no dependency, no phase.
+    //
+    // The level-0 words are contextual, not reserved. Lowercase ones are
+    // keywords of the `word` token: where the parser does not expect them they
+    // are lexed as identifiers. The PascalCase pattern tokens are lexed as such
+    // only after the `:` of a dependency; everywhere else they are type names.
+    // =========================================================================
+
+    organization_def: $ => seq(
+      'organization',
+      field('name', $.type_name),
+      optional($.description),
+      optional($.metadata_block),
+      '{',
+      repeat($._organization_member),
+      '}',
+    ),
+
+    _organization_member: $ => choice(
+      $.domain_source_decl,
+      $.requirements_source_decl,
+      $.phase_def,
+      $.area_def,
+      $.person_def,
+      $.organization_external_system_def,
+      $.organization_system_def,
+      $.dependency_def,
+    ),
+
+    phase_def: $ => seq(
+      'phase',
+      field('name', $.type_name),
+      optional($.description),
+      optional($.metadata_block),
+    ),
+
+    area_def: $ => seq(
+      'area',
+      field('name', $.type_name),
+      optional($.description),
+      optional($.metadata_block),
+    ),
+
+    // external_system_def plus the concepts it masters.
+    organization_external_system_def: $ => seq(
+      'externalSystem',
+      field('name', $.type_name),
+      optional($.description),
+      optional($.metadata_block),
+      optional($.realizes_decl),
+      optional(seq(
+        '{',
+        repeat(choice($.provides_clause, $.consumes_clause, $.masters_clause)),
+        '}',
+      )),
+    ),
+
+    // No body: a black box. Level-0 clauses first, then the members of
+    // system_def (inline detail, levels 2 to 3).
+    organization_system_def: $ => seq(
+      'system',
+      field('name', $.type_name),
+      optional($.description),
+      optional($.metadata_block),
+      optional($.technology_decl),
+      optional($.satisfies_decl),
+      optional($.realizes_decl),
+      optional(seq(
+        '{',
+        repeat($._level0_clause),
+        repeat($._system_member),
+        '}',
+      )),
+    ),
+
+    // used-by / masters / handles may be repeated; area and detailed-in at most
+    // once — a validation rule, not a grammar rule.
+    _level0_clause: $ => choice(
+      $.area_ref,
+      $.used_by_clause,
+      $.masters_clause,
+      $.handles_clause,
+      $.hotspot_def,
+      $.detailed_in_decl,
+    ),
+
+    area_ref: $ => seq('area', field('name', $.type_name)),
+
+    used_by_clause: $ => seq(
+      'used-by',
+      $.type_name,
+      repeat(seq(',', $.type_name)),
+    ),
+
+    masters_clause: $ => seq(
+      'masters',
+      $.concept_ref,
+      repeat(seq(',', $.concept_ref)),
+    ),
+
+    handles_clause: $ => seq(
+      'handles',
+      $.concept_ref,
+      repeat(seq(',', $.concept_ref)),
+    ),
+
+    detailed_in_decl: $ => seq('detailed-in', $.string_literal),
+
+    hotspot_def: $ => seq(
+      'hotspot',
+      field('name', $.type_name),
+      $.description,
+      optional($.metadata_block),
+      optional($.concerns_clause),
+    ),
+
+    concerns_clause: $ => seq(
+      'concerns',
+      $._concern_ref,
+      repeat(seq(',', $._concern_ref)),
+    ),
+
+    _concern_ref: $ => choice($.flow_number, $.concept_ref),
+
+    // [Context.]Concept
+    concept_ref: $ => seq(
+      optional(seq(field('context', $.type_name), '.')),
+      field('name', $.type_name),
+    ),
+
+    // =========================================================================
+    // Dependency — `A -> B`: A (downstream) depends on B (upstream)
+    // =========================================================================
+
+    dependency_def: $ => seq(
+      'dependency',
+      field('downstream', $.type_name),
+      '->',
+      field('upstream', $.type_name),
+      optional(seq(
+        ':',
+        $._dependency_pattern,
+        repeat(seq(',', $._dependency_pattern)),
+      )),
+      optional($.criticality_decl),
+      optional($.description),
+      optional($.metadata_block),
+      optional(seq(
+        '{',
+        repeat($.flow_def),
+        '}',
+      )),
+    ),
+
+    // Same node names as the context-map patterns of the .domain parser.
+    _dependency_pattern: $ => choice(
+      $.downstream_pattern,
+      $.upstream_pattern,
+      $.symmetric_pattern,
+    ),
+
+    downstream_pattern: $ => choice('CS', 'Conformist', 'ACL'),
+    upstream_pattern: $ => 'OHS',
+    symmetric_pattern: $ => choice('SharedKernel', 'PublishedLanguage', 'Partnership'),
+
+    criticality_decl: $ => seq('criticality', $.criticality),
+
+    criticality: $ => choice('critical', 'degraded', 'tolerant'),
+
+    // =========================================================================
+    // Flow — a numbered movement of domain concepts along a dependency
+    // =========================================================================
+
+    flow_def: $ => seq(
+      'flow',
+      field('number', $.flow_number),
+      field('label', $.string_literal),
+      optional($.description),
+      optional($.metadata_block),
+      'carries',
+      $.carried_concept,
+      repeat(seq(',', $.carried_concept)),
+      optional(seq('to', field('receiver', $.type_name))),
+      optional(choice($.mechanism, $.phased_mechanisms)),
+    ),
+
+    flow_number: $ => token(/\d+/),
+
+    carried_concept: $ => seq(
+      field('concept', $.concept_ref),
+      optional(seq('as', field('becomes', $.concept_ref))),
+    ),
+
+    mechanism: $ => choice(
+      seq('over', field('medium', $.string_literal), optional($.transfer_mode)),
+      $.transfer_mode,
+    ),
+
+    transfer_mode: $ => choice('manual', 'automated'),
+
+    // At least one entry; an entry always states a mechanism.
+    phased_mechanisms: $ => seq('{', repeat1($.phased_mechanism), '}'),
+
+    phased_mechanism: $ => seq('phase', field('phase', $.type_name), $.mechanism),
+
+    // =========================================================================
     // Level 1 — System Context: persons and external systems
     // =========================================================================
 
@@ -71,7 +286,8 @@ module.exports = grammar({
     ),
 
     // =========================================================================
-    // System — the one software system in focus
+    // System — the one software system in focus of an `architecture` file
+    // (a system declared in an organization is organization_system_def)
     // =========================================================================
 
     system_def: $ => seq(

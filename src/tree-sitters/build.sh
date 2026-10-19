@@ -40,7 +40,9 @@ EXAMPLES=(
   "examples/url-shortener/url-shortener.sysreq"
   "examples/url-shortener/url-shortener.domain"
   "examples/ecommerce/v2/orders.domain"
+  "examples/retail-media/retail-media.domain"
   "examples/url-shortener/url-shortener.arch"
+  "examples/retail-media/retail-media.arch"
 )
 
 RED='\033[0;31m'

@@ -91,3 +91,18 @@
 | next.jdbc / HoneySQL writes or Migratus migrations against that datasource | `stores`, only for records that match a struct the `.arch` declares |
 
 Each node and resource gets a `// source:`; `provider`, `region` and `zone` are written only when a file states them.
+
+## Cross-system integration (level 0 — organization runs only)
+
+| Source signal | Level-0 inference |
+|---|---|
+| `clj-http` / `hato` calls, or a vendor SDK client, whose base URL or config key points at another system | an integration with that system: one `automated` flow per business exchange. Its dependency follows the need, not the call — a read makes the caller depend on the callee; a push of the caller's own records makes the callee depend on the caller; a request for the callee to act on the caller's behalf makes the caller depend on it, with a flow `to` the callee |
+| A `jackdaw` consumer on a topic another system publishes; a route registered as that system's webhook | `dependency Subscriber -> Publisher`; flow in the default direction |
+| A `chime` / scheduled go-loop job that pulls another system's export; an SFTP client (`clj-ssh`) | a flow `over "SFTP file"` / `over "scheduled import"`, `automated` |
+| A second `next.jdbc` datasource on another system's database | a flow `over "shared database" automated` |
+| Translation functions between the peer's map shape and our own (`order->shipment`, `->invoice`) | `carries X as Y`; `ACL` when they sit in a namespace of their own (an `acl` / `anticorruption` / per-peer adapter namespace) |
+| The peer's map shape or specs passed as they are into our core namespaces and persistence | `Conformist` |
+| A `diehard` circuit breaker or fallback around the call | `criticality degraded` |
+| The exchange only goes through a topic consumer or an outbox table | `criticality tolerant` |
+
+Patterns, criticality and `as` are written only when the signal is present, and an `ACL` or a criticality cue counts only in the code of the downstream system — the one that needs the other. The direction rule (Phase 2, step 22) and the rest of the evidence rules (*Level-0 inference* table) are in the skill.

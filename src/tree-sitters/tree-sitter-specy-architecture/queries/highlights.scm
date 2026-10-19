@@ -13,6 +13,7 @@
 ; ---------------------------------------------------------------------------
 
 "architecture" @keyword.type
+"organization" @keyword.type
 "system" @keyword.type
 "person" @keyword.type
 "externalSystem" @keyword.type
@@ -29,6 +30,14 @@
 "environment" @keyword.type
 "node" @keyword.type
 "resource" @keyword.type
+
+; Level 0 — `phase` and `area` both declare (organization scope) and reference
+; (flow block, system clause)
+(phase_def "phase" @keyword.type)
+(area_def "area" @keyword.type)
+"dependency" @keyword.type
+"flow" @keyword.type
+"hotspot" @keyword.type
 
 ; ---------------------------------------------------------------------------
 ; Structural / clause keywords
@@ -50,6 +59,13 @@
 "instantiates" @keyword
 "tenancy" @keyword
 "stores" @keyword
+(area_ref "area" @keyword)
+(phased_mechanism "phase" @keyword)
+"used-by" @keyword
+"masters" @keyword
+"handles" @keyword
+"concerns" @keyword
+"criticality" @keyword
 "meta" @keyword
 "import" @keyword
 
@@ -62,6 +78,7 @@
 "over" @keyword.operator
 "on" @keyword.operator
 "to" @keyword.operator
+"as" @keyword.operator
 "from" @keyword.operator
 "satisfies" @keyword.operator
 "realizes" @keyword.operator
@@ -75,6 +92,7 @@
 
 (domain_source_decl "domain-source" @keyword.import)
 (requirements_source_decl "requirements-source" @keyword.import)
+(detailed_in_decl "detailed-in" @keyword.import)
 (import_decl "domain" @keyword.import)
 
 ; ---------------------------------------------------------------------------
@@ -97,6 +115,12 @@
 ; ---------------------------------------------------------------------------
 
 (architecture_def name: (type_name) @type.definition)
+(organization_def name: (type_name) @type.definition)
+(phase_def name: (type_name) @type.definition)
+(area_def name: (type_name) @type.definition)
+(organization_system_def name: (type_name) @type.definition)
+(organization_external_system_def name: (type_name) @type.definition)
+(hotspot_def name: (type_name) @type.definition)
 (system_def name: (type_name) @type.definition)
 (person_def name: (type_name) @type.definition)
 (external_system_def name: (type_name) @type.definition)
@@ -158,6 +182,16 @@
 (requiredness) @attribute
 (connector_style) @constant
 (tenancy) @constant
+(criticality) @constant
+(transfer_mode) @constant
+
+; ---------------------------------------------------------------------------
+; Context-map patterns on a dependency (same captures as the .domain parser)
+; ---------------------------------------------------------------------------
+
+(downstream_pattern) @constant
+(upstream_pattern) @constant
+(symmetric_pattern) @constant
 
 ; ---------------------------------------------------------------------------
 ; Requirement IDs
@@ -171,6 +205,7 @@
 
 (ordinal) @number
 (integer) @number
+(flow_number) @number
 (number) @number
 
 ; ---------------------------------------------------------------------------
@@ -179,6 +214,7 @@
 
 (string_literal) @string
 (description (string_literal) @string.special)
+(flow_def label: (string_literal) @string.special)
 (boolean) @boolean
 (null_literal) @constant.builtin
 

@@ -20,9 +20,13 @@ organization Acme :: "Acme Corp" {
     context Ordering (ord) :: "Order lifecycle" {
         // --- models: two subdomains ---
         models OrderTaking, Pricing
+        // Each entry states this context's own position and pattern:
+        // Ordering is downstream of Catalog (Product is a read-only copy behind
+        // CatalogProjector), downstream of Payments, upstream of Billing.
         map {
-            upstream Catalog : OHS
+            downstream Catalog : ACL
             downstream Payments : ACL
+            upstream Billing : OHS
             symmetric Shipping : Partnership
         }
 
@@ -383,7 +387,7 @@ organization Acme :: "Acme Corp" {
         requirements-source "specy/billing.sysreq"
         models Invoicing
         map {
-            upstream Ordering : OHS
+            downstream Ordering : Conformist
         }
     }
 

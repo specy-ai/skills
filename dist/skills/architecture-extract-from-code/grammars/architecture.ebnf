@@ -2,17 +2,26 @@
 // Specy — Software Architecture Grammar (.arch)
 // C4-inspired (Context / Container / Component), Thrift-inspired typed contracts,
 // ports + connectors, first-class async channels. Level 4 (code) is out of scope.
+// Level 0 (Organization) sits above C4's level 1: the systems of an organization,
+// the dependencies between them and the flows of domain concepts they carry.
 // EBNF (ISO 14977 style)
 // =============================================================================
 
 // -----------------------------------------------------------------------------
 // Top-level structure
 //
-// One file describes ONE software system in focus, surrounded by the persons
-// and external systems it interacts with (the C4 System Context view).
+// A file has one of two roots:
+//   architecture — ONE software system in focus, surrounded by the persons and
+//                  external systems it interacts with: levels 1 to 3 (the C4
+//                  System Context view and below).
+//   organization — SEVERAL systems of one organization, the dependencies between
+//                  them and the flows along each dependency: level 0 (the C4
+//                  System Landscape view). A system may be detailed inline.
+// `organization` is an alternative root, not a wrapper around `architecture`.
+// One root per file is a validation rule.
 // -----------------------------------------------------------------------------
 
-architectureFile  = { comment | architectureDef } ;
+architectureFile  = { comment | architectureDef | organizationDef } ;
 
 architectureDef   = "architecture" , ( typeName | stringLiteral ) , [ description ] , [ metadataBlock ] , "{"
                   , { comment | architectureMember }
@@ -26,11 +35,176 @@ architectureMember = domainSourceDecl
 
 // -----------------------------------------------------------------------------
 // Provenance — paths the satisfies / realizes / import references resolve against
+// (and, under `organization`, the level-0 concept references). domain-source
+// may be repeated: one .domain file per bounded context.
 // -----------------------------------------------------------------------------
 
 domainSourceDecl       = "domain-source" , stringLiteral ;
 
 requirementsSourceDecl = "requirements-source" , stringLiteral ;
+
+// -----------------------------------------------------------------------------
+// Level 0 — Organization: the system landscape. The systems an organization
+// runs, grouped in areas, what each one masters and handles, the dependencies
+// between them and the numbered flows of domain concepts along each dependency.
+//
+// Level 0 exists only under `organization`. Every production of this section is
+// reachable from organizationDef alone, and a system or an external system
+// declared in an organization has its OWN production (organizationSystemDef,
+// organizationExternalSystemDef) instead of an extended systemDef /
+// externalSystemDef. architectureDef and everything below it are therefore
+// unchanged: an `architecture` file accepts no level-0 clause, no dependency
+// and no phase.
+//
+// The words introduced here — organization, phase, area, used-by, masters,
+// handles, hotspot, concerns, detailed-in, dependency, criticality, critical,
+// degraded, tolerant, flow, as, manual, automated and the pattern names — are
+// keywords only in the positions below; elsewhere they remain ordinary
+// identifiers and type names (as do `to`, `over` and `carries`).
+// -----------------------------------------------------------------------------
+
+organizationDef   = "organization" , typeName , [ description ] , [ metadataBlock ] , "{"
+                  , { comment | organizationMember }
+                  , "}" ;
+
+// Members come in any order. At most one requirements-source and at least one
+// system are validation rules.
+organizationMember = domainSourceDecl
+                   | requirementsSourceDecl
+                   | phaseDef
+                   | areaDef
+                   | personDef
+                   | organizationExternalSystemDef
+                   | organizationSystemDef
+                   | dependencyDef ;
+
+// Phase — a stage of the integration roadmap during which a flow's mechanism
+// holds. Declaration order is chronological order.
+phaseDef          = "phase" , typeName , [ description ] , [ metadataBlock ] ;
+
+// Area — a grouping of systems as the business sees its landscape (declared
+// here, then referenced by a system's area clause). Carries no runtime meaning.
+areaDef           = "area" , typeName , [ description ] , [ metadataBlock ] ;
+
+// External system of an organization — outside the organization. It is
+// externalSystemDef plus the concepts it masters.
+organizationExternalSystemDef
+                  = "externalSystem" , typeName , [ description ] , [ metadataBlock ] , [ realizesDecl ]
+                  , [ "{" , { comment | providesClause | consumesClause | mastersClause } , "}" ] ;
+
+// System of an organization — described from the outside. Without a body it is
+// a black box. In a body the level-0 clauses come first; the members after them
+// are those of systemDef and detail the system inline (levels 2 to 3).
+// The name is a typeName only: dependencies and connectors refer to it.
+// Validation rules, not grammar: the description (the system's purpose) is
+// required; area and detailed-in appear at most once; a system is detailed
+// inline or by detailed-in, not both. used-by, masters and handles may be
+// repeated: their lists merge.
+organizationSystemDef
+                  = "system" , typeName , [ description ] , [ metadataBlock ]
+                  , [ technologyDecl ] , [ satisfiesDecl ] , [ realizesDecl ]
+                  , [ "{" , { comment | level0Clause } , { comment | systemMember } , "}" ] ;
+
+level0Clause      = areaRef
+                  | usedByClause
+                  | mastersClause
+                  | handlesClause
+                  | hotspotDef
+                  | detailedInDecl ;
+
+areaRef           = "area" , typeName ;
+
+// The persons who work with the system.
+usedByClause      = "used-by" , typeName , { "," , typeName } ;
+
+// masters: the concepts the system is the system of record for.
+// handles: the other main concepts it holds.
+mastersClause     = "masters" , conceptRef , { "," , conceptRef } ;
+
+handlesClause     = "handles" , conceptRef , { "," , conceptRef } ;
+
+// Path of a single-system .arch file whose system in focus has the same name.
+detailedInDecl    = "detailed-in" , stringLiteral ;
+
+// Hotspot — a known point of fragility or effort in operating the system. The
+// description is required. It may concern flows (by number) and domain concepts.
+hotspotDef        = "hotspot" , typeName , description , [ metadataBlock ] , [ concernsClause ] ;
+
+concernsClause    = "concerns" , concernRef , { "," , concernRef } ;
+
+concernRef        = flowNumber | conceptRef ;
+
+// Concept reference — a domain type name, optionally qualified by its bounded
+// context: Invoice | Finance.Invoice. Resolved against the domain sources.
+conceptRef        = [ typeName , "." ] , typeName ;
+
+// -----------------------------------------------------------------------------
+// Dependency — `A -> B` reads "A depends on B": A is downstream, B upstream.
+// The direction is that of the need, not of the call: a connector realizing a
+// dependency may point either way. Either end may be an
+// external system. Patterns, criticality, description and body are all optional.
+// -----------------------------------------------------------------------------
+
+dependencyDef     = "dependency" , typeName , "->" , typeName
+                  , [ ":" , dependencyPattern , { "," , dependencyPattern } ]
+                  , [ criticalityDecl ]
+                  , [ description ] , [ metadataBlock ]
+                  , [ "{" , { comment | flowDef } , "}" ] ;
+
+// The context-map patterns of .domain, under the same production names. Each
+// pattern belongs to one side, so the order in which they are written does not
+// matter.
+//   downstreamPattern — the downstream system's (left of ->)
+//   upstreamPattern   — the upstream system's (right of ->)
+//   symmetricPattern  — both systems'
+// Which patterns may be combined is a validation rule (at most one per side;
+// Partnership stands on both dependencies of a mutual pair and excludes the
+// one-sided patterns). SeparateWays is the absence of a dependency and is
+// never written.
+dependencyPattern = downstreamPattern | upstreamPattern | symmetricPattern ;
+
+downstreamPattern = "CS" | "Conformist" | "ACL" ;
+
+upstreamPattern   = "OHS" ;
+
+symmetricPattern  = "SharedKernel" | "PublishedLanguage" | "Partnership" ;
+
+// What happens to the downstream system when the upstream one is unavailable.
+// Absent: unstated, which is not `tolerant`.
+criticalityDecl   = "criticality" , criticality ;
+
+criticality       = "critical" | "degraded" | "tolerant" ;
+
+// -----------------------------------------------------------------------------
+// Flow — one numbered, named movement of domain concepts along a dependency.
+// Data goes from the upstream system to the downstream one unless `to` names
+// the receiving end. `X as Y`: X in the sender's model becomes Y in the
+// receiver's. The mechanism is stated once (it then holds in every phase), or
+// per phase in a block, or not at all (undecided).
+// -----------------------------------------------------------------------------
+
+flowDef           = "flow" , flowNumber , stringLiteral , [ description ] , [ metadataBlock ]
+                  , "carries" , carriedConcept , { "," , carriedConcept }
+                  , [ "to" , typeName ]
+                  , [ mechanism | phasedMechanisms ] ;
+
+// Unsigned. Unique within the organization: a validation rule.
+flowNumber        = digit , { digit } ;
+
+carriedConcept    = conceptRef , [ "as" , conceptRef ] ;
+
+// How the concepts travel: the medium (`over`, as on a connector) and whether a
+// person performs the transfer. At least one of the two is stated.
+mechanism         = ( "over" , stringLiteral , [ transferMode ] )
+                  | transferMode ;
+
+transferMode      = "manual" | "automated" ;
+
+// At least one entry; an entry always states a mechanism. A phase listed at
+// most once and declared by the organization are validation rules.
+phasedMechanisms  = "{" , { comment } , phasedMechanism , { comment | phasedMechanism } , "}" ;
+
+phasedMechanism   = "phase" , typeName , mechanism ;
 
 // -----------------------------------------------------------------------------
 // Level 1 — System Context: persons and external systems
@@ -42,7 +216,9 @@ externalSystemDef = "externalSystem" , typeName , [ description ] , [ metadataBl
                   , [ "{" , { comment | providesClause | consumesClause } , "}" ] ;
 
 // -----------------------------------------------------------------------------
-// System — the one software system in focus
+// System — the one software system in focus of an `architecture` file.
+// (A system declared in an organization is organizationSystemDef; it shares
+// systemMember.)
 // -----------------------------------------------------------------------------
 
 systemDef         = "system" , ( typeName | stringLiteral ) , [ description ] , [ metadataBlock ] , [ satisfiesDecl ] , [ realizesDecl ] , "{"
@@ -207,6 +383,9 @@ connectorDef      = "connect" , connectorRef , "->" , connectorRef
                   , [ description ] , [ metadataBlock ] ;
 
 // e.g. WebApp | LinkController.LinkCommands | Analytics.AnalyticsIngest
+// In a system detailed inline in an organization, an endpoint in another system
+// is written System.Container[.Interface], and a bare system name targets that
+// system as a black box: CRM | CampaignHub.CampaignApi.DeliveryQueries
 connectorRef      = typeName , { "." , typeName } ;
 
 connectorStyle    = "sync" | "async" | "streaming" ;
@@ -259,8 +438,11 @@ storesClause      = "stores" , typeName , { "," , typeName } ;
 
 realizesDecl      = "realizes" , realizesRef , { "," , realizesRef } ;
 
-// module / context names are quoted multi-word strings in .domain; value types,
-// events, and interfaces are PascalCase type names there.
+// module / context names are PascalCase type names in .domain (`module LinkShortening`,
+// `context Finance`): cite them bare — the name concept references qualify by at
+// level 0 (`Finance.Invoice`). A string literal ("Link Shortening") is accepted for
+// readability and matched ignoring case and spaces; prefer the bare name. Value
+// types, events, and interfaces are PascalCase type names there too.
 realizesRef       = ( "module" , domainName )
                   | ( "context" , domainName )
                   | ( "interface" , typeName )

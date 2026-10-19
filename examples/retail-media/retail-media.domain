@@ -1,0 +1,765 @@
+// =============================================================================
+// RetailMediaCo — Domain model (.domain), companion of retail-media.arch
+// The bounded contexts whose concepts the systems of the landscape master,
+// handle and carry. A fictional retail-media network selling advertising on
+// the websites and apps of a group of retailers.
+//
+// Reading guide:
+//   context   — a comment names the systems of retail-media.arch realizing it
+//   map       — written by a context about itself: inside Finance,
+//               `downstream Sales : ACL` reads "Finance is downstream of Sales
+//               and protects itself with an Anti-Corruption Layer"
+//   aggregate — a concept the context owns. Every aggregate has at least one
+//               inner entity (`entities { … }`), written on one line right
+//               under it; only Campaign's LineItem is spelled out
+//   read-only entity — a copy of a concept owned elsewhere: by another context
+//               (Sales' Invoice comes from Finance) or by a system outside any
+//               context (the ad server, the banks)
+//
+// A teaching example, not a full model: a few fields per concept; operations,
+// states and events on SalesOrder, Campaign and Invoice only; amounts as plain
+// decimals. Two things are deliberate:
+//   - `Account` is defined twice: an advertiser in Sales, a bank account in
+//     Treasury. A system realizing one of the two contexts names its own;
+//     from anywhere else the name is qualified (Sales.Account).
+//   - three names of retail-media.arch have no definition here — the clean
+//     room's segments, the e-signature envelopes, the identity provider's
+//     users — and the .arch acknowledges each of them with a `// NOTE:`.
+// =============================================================================
+
+organization RetailMediaCo :: "A retail-media network selling on-site and off-site advertising for a group of retailers" {
+
+  // ══ SALES — realized by the CRM ═════════════════════════════════════════
+
+  context Sales :: "Selling advertising to brands and agencies: accounts, pipeline, rate card, signed orders and contracts" {
+    map {
+      upstream Finance : OHS            // one published protocol, from which Finance bills
+      downstream Finance : Conformist   // invoices and master data as Finance defines them
+      symmetric Campaign : Partnership
+    }
+
+    module Selling :: "From a prospect to a signed sales order" {
+
+      enum OpportunityStage :: "How far a deal is in the pipeline" {
+        prospecting
+        proposal
+        negotiation
+        won
+        lost
+      }
+
+      enum AdFormat :: "Where and how an ad is shown" {
+        sponsoredProduct
+        onsiteDisplay
+        offsiteDisplay
+      }
+
+      // --- Aggregates: what Sales owns ---
+
+      // The advertiser side. Treasury also defines an `Account`: a bank account.
+      aggregate Account :: "A brand or a media agency that buys advertising" {
+        identity id : uuid
+        fields {
+          legalName : string required
+          isAgency : boolean :: "True for a media agency buying on behalf of brands"
+          billingCountry : string
+          creditLimit : decimal min(0) optional
+        }
+        entities { Contact }
+      }
+      entity Contact :: "A person at the advertiser or agency" { identity id : uuid  fields { fullName : string required  email : string } }
+
+      aggregate Opportunity :: "A deal being negotiated with an account" {
+        identity id : uuid
+        fields {
+          accountId : uuid required
+          stage : OpportunityStage
+          expectedAmount : decimal min(0)
+          expectedCloseDate : date
+        }
+        entities { OpportunityLine }
+      }
+      entity OpportunityLine :: "An ad product proposed" { identity id : uuid  fields { adProductSku : string required  proposedBudget : decimal min(0) } }
+
+      aggregate AdProduct :: "A sellable advertising product of the rate card" {
+        identity sku : string
+        fields {
+          name : string required
+          format : AdFormat
+          pricingUnit : string :: "What a unit price buys: a thousand impressions, a click, a day"
+          active : boolean default(true)
+        }
+        entities { RateCardPrice }
+      }
+      entity RateCardPrice :: "The list price on one retailer's site" { identity id : uuid  fields { retailer : string required  unitPrice : decimal min(0) } }
+
+      aggregate SalesOrder :: "An account's commitment to buy ad products over a flight" {
+        identity id : string
+        fields {
+          accountId : uuid required
+          currency : string
+          totalNetAmount : decimal min(0)
+          flightStart : date
+          flightEnd : date
+          signedOn : date optional
+        }
+        entities { OrderLine }
+        references {
+          lines : OrderLine 1..N
+        }
+        operations {
+          "Send the order for signature" on SendSalesOrderForSignature :: "The account manager sends the order to the advertiser" {
+            unsafe
+            precondition hasLines {
+              isNotEmpty(lines)
+            } rejects "A sales order must sell at least one ad product"
+            emits SalesOrderSentForSignature
+          }
+          "Record the signature" on RecordSalesOrderSignature :: "The advertiser has signed: the order can be booked and billed" {
+            unsafe
+            sets SalesOrder { signedOn = command.signedOn }
+            emits SalesOrderSigned
+          }
+        }
+        states {
+          machine SalesOrderLifecycle :: "From an order sent out to a signed commitment" {
+            state awaitingSignature
+            state signed
+            [*] --> awaitingSignature on "Send the order for signature"
+            awaitingSignature --> signed on "Record the signature"
+          }
+        }
+      }
+      entity OrderLine :: "One ad product sold on the order" { identity id : uuid  fields { adProductSku : string required  netAmount : decimal min(0) } }
+
+      aggregate Contract :: "The framework agreement signed with an account: terms, rebates, validity" {
+        identity contractNumber : string
+        fields {
+          accountId : uuid required
+          startDate : date
+          endDate : date optional
+          volumeRebatePercent : decimal min(0) max(100)
+        }
+        entities { Signatory }
+      }
+      entity Signatory :: "A person who signs for one of the parties" { identity id : uuid  fields { fullName : string required  signedOn : date optional } }
+
+      // --- Read-only entity: a copy of what Finance owns ---
+
+      // Conformist: Finance's names and fields, nothing translated.
+      read-only entity Invoice :: "An invoice as Finance issued it, shown to account managers" {
+        sourced-from Finance
+        synced-via asynchronous-projection
+        identity id : string
+        fields {
+          invoiceNumber : string
+          salesOrderId : string
+          totalAmount : decimal
+          dueDate : date
+          paidOn : date optional
+        }
+      }
+
+      // --- Commands and events ---
+
+      command SendSalesOrderForSignature { identity commandId : uuid  fields { salesOrderId : string required } }
+      command RecordSalesOrderSignature { identity commandId : uuid  fields { salesOrderId : string required  signedOn : date required } }
+
+      event SalesOrderSentForSignature :: "A sales order was sent to the advertiser for signature" {
+        about SalesOrder
+        caused-by SendSalesOrderForSignature
+        fields {
+          salesOrderId : string
+        }
+      }
+
+      event SalesOrderSigned :: "A sales order was signed: Campaign books it, Finance bills it" {
+        about SalesOrder
+        caused-by RecordSalesOrderSignature
+        fields {
+          salesOrderId : string
+          signedOn : date
+        }
+      }
+    }
+  }
+
+  // ══ CAMPAIGN — realized by CampaignHub, built in-house ══════════════════
+
+  context Campaign :: "Running signed sales orders as campaigns on the media platforms and consolidating their delivery" {
+    map {
+      symmetric Sales : Partnership
+    }
+
+    module Booking :: "Creates campaigns and line items from signed sales orders" {
+
+      value Flight :: "The period during which ads run" {
+        fields {
+          startDate : date
+          endDate : date
+        }
+        invariants {
+          startsBeforeItEnds :: "A flight ends on or after the day it starts" {
+            startDate <= endDate
+            enforcement rejection
+          }
+        }
+      }
+
+      // --- Read-only entities: copies of what Sales owns ---
+
+      // Kept under Sales' name: only the part of a sales order that booking needs.
+      read-only entity SalesOrder :: "A signed sales order to deliver" {
+        sourced-from Sales
+        synced-via asynchronous-projection
+        identity id : string
+        fields {
+          advertiserName : string
+          flight : Flight
+          budget : decimal
+        }
+      }
+
+      read-only entity AdProduct :: "An ad product a line item can deliver" {
+        sourced-from Sales
+        synced-via asynchronous-projection
+        identity sku : string
+        fields {
+          name : string
+          format : string
+          pricingUnit : string
+        }
+      }
+
+      // --- Aggregate: what the booking component owns ---
+
+      aggregate Campaign :: "The delivery of one signed sales order on the media platforms" {
+        identity id : uuid
+        fields {
+          salesOrderId : string required immutable
+          name : string required
+          flight : Flight
+          budget : decimal min(0)
+        }
+        entities {
+          LineItem
+        }
+        references {
+          lineItems : LineItem 1..N
+        }
+        operations {
+          "Book the campaign" on BookCampaign :: "Create the campaign and its line items from a signed sales order" {
+            unsafe
+            emits CampaignBooked
+          }
+          "Launch the campaign" on LaunchCampaign :: "Push the campaign to the ad server so that it starts delivering" {
+            unsafe
+            precondition hasLineItems {
+              isNotEmpty(lineItems)
+            } rejects "A campaign needs at least one line item to deliver"
+            emits CampaignLaunched
+          }
+        }
+        states {
+          machine CampaignLifecycle :: "From booking to delivery" {
+            state booked
+            state live
+            [*] --> booked on "Book the campaign"
+            booked --> live on "Launch the campaign"
+          }
+        }
+      }
+
+      entity LineItem :: "One ad product of the campaign, with its own flight and budget" {
+        identity id : uuid
+        fields {
+          adProductSku : string required
+          flight : Flight
+          budget : decimal min(0)
+          placement : string optional :: "Where the ad shows: search results, category page, home page"
+        }
+      }
+
+      // --- Commands and events ---
+
+      command BookCampaign { identity commandId : uuid  fields { salesOrderId : string required } }
+      command LaunchCampaign { identity commandId : uuid  fields { campaignId : uuid required } }
+
+      event CampaignBooked :: "A campaign was created from a signed sales order" {
+        about Campaign
+        caused-by BookCampaign
+        fields {
+          campaignId : uuid
+          salesOrderId : string
+        }
+      }
+
+      event CampaignLaunched :: "A campaign started delivering on the ad server" {
+        about Campaign
+        caused-by LaunchCampaign
+        fields {
+          campaignId : uuid
+          launchedOn : date
+        }
+      }
+    }
+
+    module Delivery :: "Consolidates platform delivery into billable reports" {
+      depends on { Booking }   // LineItem, SalesOrder
+
+      // Mastered by the ad server, a system outside any context: `sourced-from`
+      // names the system (OnsiteAds in retail-media.arch), not a context.
+      read-only entity PlatformDelivery :: "What the ad server measured for one line item on one day" {
+        sourced-from OnsiteAds
+        synced-via synchronous-query
+        identity id : string
+        fields {
+          lineItemId : uuid
+          deliveryDate : date
+          impressions : long
+          clicks : long
+          mediaSpend : decimal
+        }
+      }
+
+      aggregate DeliveryReport :: "The consolidated, billable delivery of one sales order over a period" {
+        identity id : uuid
+        fields {
+          salesOrderId : string required
+          periodEnd : date
+          impressions : long min(0)
+          billableAmount : decimal min(0)
+        }
+        entities { DeliveryLine }
+      }
+      entity DeliveryLine :: "The delivery of one line item" { identity id : uuid  fields { lineItemId : uuid required  billableAmount : decimal min(0) } }
+    }
+  }
+
+  // ══ FINANCE — realized by the ERP ═══════════════════════════════════════
+
+  context Finance :: "Accounting, invoicing, payables and reporting under local and group accounting standards" {
+    map {
+      downstream Sales : ACL             // accounts, ad products and billing schedules become customers, items and invoices
+      downstream Treasury : Conformist   // bank statements as Treasury holds them
+      downstream Spend : CS              // Spend posts bills in Finance's own model: Finance is its customer
+      downstream People : ACL            // payroll runs become journal entries
+    }
+
+    module Accounting :: "Master data, receivables, payables and the general ledger" {
+
+      // --- Master data ---
+
+      aggregate Subsidiary :: "A legal entity of the group that keeps its own books" {
+        identity code : string
+        fields {
+          legalName : string required
+          country : string
+          baseCurrency : string
+        }
+        entities { AccountingPeriod }
+      }
+      entity AccountingPeriod :: "A month of the books" { identity id : uuid  fields { periodEnd : date required  closed : boolean default(false) } }
+
+      aggregate TaxCode :: "A tax treatment applied to invoice and bill lines" {
+        identity code : string
+        fields {
+          label : string required
+          country : string
+          reverseCharge : boolean default(false)
+        }
+        entities { TaxRate }
+      }
+      entity TaxRate :: "The rate of a tax code from a given day" { identity id : uuid  fields { percent : decimal min(0) max(100)  validFrom : date } }
+
+      // Created from a Sales account (flow 2 of retail-media.arch): Finance masters its own concept.
+      aggregate Customer :: "A party the company invoices" {
+        identity customerNumber : string
+        fields {
+          legalName : string required
+          subsidiaryCode : string
+          paymentTermsDays : int min(0)
+          taxRegistrationNumber : string optional
+        }
+        entities { BillingAddress }
+      }
+      entity BillingAddress :: "Where a customer's invoices are sent" { identity id : uuid  fields { street : string  city : string  country : string } }
+
+      aggregate Vendor :: "A supplier the company buys from and pays" {
+        identity vendorNumber : string
+        fields {
+          legalName : string required
+          subsidiaryCode : string
+          paymentTermsDays : int min(0)
+        }
+        entities { RemittanceDetail }
+      }
+      entity RemittanceDetail :: "A bank account a vendor is paid on" { identity id : uuid  fields { iban : string required  currency : string } }
+
+      // Created from a Sales ad product (flow 1).
+      aggregate Item :: "A billable article of the chart of products" {
+        identity itemCode : string
+        fields {
+          name : string required
+          revenueLedgerAccount : string
+          taxCode : string
+        }
+        entities { ItemPrice }
+      }
+      entity ItemPrice :: "The unit price of an item in one currency" { identity id : uuid  fields { currency : string required  unitPrice : decimal min(0) } }
+
+      // --- Receivables ---
+
+      // The owning definition; Sales keeps a read-only copy of it.
+      aggregate Invoice :: "A demand for payment sent to a customer for the advertising delivered" {
+        identity id : string
+        fields {
+          invoiceNumber : string required unique :: "The legal number printed on the invoice"
+          customerNumber : string required
+          salesOrderId : string optional :: "The sales order the invoice bills"
+          totalAmount : decimal min(0)
+          dueDate : date
+          paidOn : date optional
+        }
+        entities { InvoiceLine }
+        operations {
+          "Issue the invoice" on IssueInvoice :: "Number the invoice and send it to the customer" {
+            unsafe
+            precondition billsSomething {
+              totalAmount > 0
+            } rejects "An invoice must bill a positive amount"
+            emits InvoiceIssued
+          }
+          "Record the customer payment" on RecordInvoicePayment :: "Match a payment received on a bank statement to the invoice" {
+            unsafe
+            sets Invoice { paidOn = command.paidOn }
+            emits InvoicePaid
+          }
+        }
+        states {
+          machine InvoiceLifecycle :: "From issue to payment" {
+            state issued
+            final paid
+            [*] --> issued on "Issue the invoice"
+            issued --> paid on "Record the customer payment"
+          }
+        }
+      }
+      entity InvoiceLine :: "One item billed on the invoice" { identity id : uuid  fields { itemCode : string required  netAmount : decimal min(0) } }
+
+      // --- Payables ---
+
+      // Created from an approved supplier invoice of Spend (flow 12).
+      aggregate VendorBill :: "A supplier invoice posted to accounts payable" {
+        identity billNumber : string
+        fields {
+          vendorNumber : string required
+          totalAmount : decimal min(0)
+          dueDate : date
+          approvedForPayment : boolean default(false)
+        }
+        entities { VendorBillLine }
+      }
+      entity VendorBillLine :: "One expense booked" { identity id : uuid  fields { expenseLedgerAccount : string required  netAmount : decimal min(0) } }
+
+      aggregate VendorCredit :: "A credit owed by a vendor, deducted from what the company pays it" {
+        identity creditNumber : string
+        fields {
+          vendorNumber : string required
+          totalAmount : decimal min(0)
+          issuedOn : date
+        }
+        entities { VendorCreditLine }
+      }
+      entity VendorCreditLine :: "One expense reversed" { identity id : uuid  fields { expenseLedgerAccount : string required  netAmount : decimal min(0) } }
+
+      // Treasury turns each payment into a payment order (flows 7 to 9).
+      aggregate Payment :: "An outgoing payment that settles vendor bills" {
+        identity paymentNumber : string
+        fields {
+          vendorNumber : string required
+          amount : decimal min(0)
+          currency : string
+          valueDate : date
+        }
+        entities { BillSettlement }
+      }
+      entity BillSettlement :: "The share settling one bill" { identity id : uuid  fields { billNumber : string required  settledAmount : decimal min(0) } }
+
+      // --- General ledger ---
+
+      aggregate JournalEntry :: "A balanced set of debits and credits posted to the general ledger" {
+        identity entryNumber : string
+        fields {
+          subsidiaryCode : string required
+          postingDate : date
+          origin : string :: "What the entry records: an invoice, a vendor bill, an expense report, a payroll run"
+          memo : string optional
+        }
+        entities { JournalLine }
+        references {
+          lines : JournalLine 2..N
+        }
+        invariants {
+          balanced :: "Debits equal credits" {
+            sum(lines.debit) = sum(lines.credit)
+            enforcement rejection
+          }
+        }
+      }
+      entity JournalLine :: "One debit or credit" { identity id : uuid  fields { ledgerAccount : string required  debit : decimal min(0)  credit : decimal min(0) } }
+
+      // A value type: computed from the ledger, with no identity, so no system
+      // of record. Group consolidation handles it; no system masters it.
+      value TrialBalance :: "The closing balances of a subsidiary's ledger accounts for a period" {
+        fields {
+          subsidiaryCode : string
+          periodEnd : date
+          lines : list<TrialBalanceLine>
+        }
+      }
+      value TrialBalanceLine :: "The balance of one ledger account" { fields { ledgerAccount : string  debit : decimal min(0)  credit : decimal min(0) } }
+
+      // --- Commands and events ---
+
+      command IssueInvoice { identity commandId : uuid  fields { invoiceId : string required } }
+      command RecordInvoicePayment { identity commandId : uuid  fields { invoiceId : string required  paidOn : date required } }
+
+      event InvoiceIssued :: "An invoice was issued to a customer" {
+        about Invoice
+        caused-by IssueInvoice
+        fields {
+          invoiceId : string
+          totalAmount : decimal
+          dueDate : date
+        }
+      }
+
+      event InvoicePaid :: "An invoice was paid in full" {
+        about Invoice
+        caused-by RecordInvoicePayment
+        fields {
+          invoiceId : string
+          paidOn : date
+        }
+      }
+    }
+  }
+
+  // ══ TREASURY — realized by the cash-management platform ═════════════════
+
+  context Treasury :: "Cash positioning, payment execution and bank connectivity" {
+    map {
+      downstream Finance : ACL   // Finance's payments become payment orders
+      downstream Spend : ACL     // approved expense reports become payment orders
+      downstream People : ACL    // payroll runs become payment orders
+    }
+
+    module CashAndPayments :: "Bank accounts, payment orders, cash positions and bank statements" {
+
+      enum PaymentScheme :: "The payment rail an order goes through" {
+        sepaCreditTransfer
+        domesticTransfer
+        internationalTransfer
+      }
+
+      value Iban :: "An international bank account number" { fields { value : string minLength(15) maxLength(34) } }
+
+      // A homonym on purpose: Sales' Account is an advertiser, this one is a bank account.
+      aggregate Account :: "A bank account the company holds" {
+        identity id : uuid
+        fields {
+          iban : Iban
+          bankIdentifierCode : string
+          currency : string
+          subsidiaryCode : string
+          active : boolean default(true)
+        }
+        entities { SigningMandate }
+      }
+      entity SigningMandate :: "Who may approve payments" { identity id : uuid  fields { approverRole : string required  approvalLimit : decimal min(0) } }
+
+      aggregate PaymentOrder :: "An instruction to a bank to pay, built from a Finance payment, an expense report or a payroll run" {
+        identity id : uuid
+        fields {
+          debitAccountId : uuid required
+          scheme : PaymentScheme
+          currency : string
+          totalAmount : decimal min(0)
+          requestedExecutionDate : date
+        }
+        entities { PaymentInstruction }
+      }
+      entity PaymentInstruction :: "One transfer to one beneficiary" { identity id : uuid  fields { beneficiaryIban : Iban required  amount : decimal min(0) } }
+
+      aggregate CashPosition :: "The cash available across bank accounts on a given day" {
+        identity id : uuid
+        fields {
+          positionDate : date
+          currency : string
+          totalBalance : decimal
+        }
+        entities { AccountBalance }
+      }
+      entity AccountBalance :: "The closing balance of one bank account" { identity id : uuid  fields { accountId : uuid required  closingBalance : decimal } }
+
+      // Mastered by the banks, an external system (Banks in retail-media.arch):
+      // Treasury reads it, and nothing in this model can change it.
+      read-only entity BankStatement :: "A bank's statement of one account for one day" {
+        sourced-from Banks
+        synced-via asynchronous-projection
+        identity statementReference : string
+        fields {
+          accountIban : Iban
+          statementDate : date
+          openingBalance : decimal
+          closingBalance : decimal
+        }
+      }
+    }
+  }
+
+  // ══ SPEND — realized by the spend platform and the expense tool ═════════
+
+  context Spend :: "Capturing, approving and archiving supplier invoices, credit notes and employee expenses" {
+    map {
+      downstream Finance : Conformist   // vendors, subsidiaries and tax codes as Finance defines them
+      downstream People : Conformist    // employees and approvers as People defines them
+    }
+
+    module SpendApproval :: "From a received document to an approved one" {
+
+      // --- Read-only entities: Conformist copies, with upstream's names and fields ---
+
+      read-only entity Vendor :: "A supplier, as Finance defines it" {
+        sourced-from Finance
+        synced-via asynchronous-projection
+        identity vendorNumber : string
+        fields {
+          legalName : string
+          subsidiaryCode : string
+          paymentTermsDays : int
+        }
+      }
+
+      read-only entity Subsidiary :: "A legal entity of the group, as Finance defines it" {
+        sourced-from Finance
+        synced-via asynchronous-projection
+        identity code : string
+        fields {
+          legalName : string
+          country : string
+          baseCurrency : string
+        }
+      }
+
+      read-only entity TaxCode :: "A tax treatment, as Finance defines it" {
+        sourced-from Finance
+        synced-via asynchronous-projection
+        identity code : string
+        fields {
+          label : string
+          country : string
+          reverseCharge : boolean
+        }
+      }
+
+      read-only entity Employee :: "An employee who submits or approves, as People defines it" {
+        sourced-from People
+        synced-via asynchronous-projection
+        identity employeeNumber : string
+        fields {
+          fullName : string
+          managerEmployeeNumber : string optional
+          costCenter : string
+        }
+      }
+
+      // --- Aggregates: what Spend owns ---
+
+      aggregate SupplierInvoice :: "An invoice received from a supplier, captured and routed for approval" {
+        identity id : uuid
+        fields {
+          vendorNumber : string required
+          supplierReference : string :: "The supplier's own invoice number"
+          totalAmount : decimal min(0)
+          receivedOn : date
+          approved : boolean default(false)
+        }
+        entities { ApprovalStep }
+      }
+      entity ApprovalStep :: "One employee's decision" { identity id : uuid  fields { approverEmployeeNumber : string required  decidedOn : date optional } }
+
+      aggregate CreditNote :: "A supplier's credit against an invoice it sent earlier" {
+        identity id : uuid
+        fields {
+          vendorNumber : string required
+          creditedInvoiceId : uuid optional
+          totalAmount : decimal min(0)
+          receivedOn : date
+        }
+        entities { CreditNoteLine }
+      }
+      entity CreditNoteLine :: "One amount credited, and why" { identity id : uuid  fields { reason : string required  netAmount : decimal min(0) } }
+
+      aggregate ExpenseReport :: "The expenses an employee claims for reimbursement" {
+        identity id : uuid
+        fields {
+          employeeNumber : string required
+          submittedOn : date
+          totalAmount : decimal min(0)
+          approvedByEmployeeNumber : string optional
+        }
+        entities { ExpenseLine }
+      }
+      entity ExpenseLine :: "One expense of the report" { identity id : uuid  fields { category : string required  amount : decimal min(0) } }
+    }
+  }
+
+  // ══ PEOPLE — realized by the HRMS and the payroll provider ══════════════
+  // No map: People is only ever upstream, and offers no open host service,
+  // so it has no entry to write. The contexts downstream of it write theirs.
+
+  context People :: "Employee records, variable pay and payroll" {
+
+    module EmploymentAndPay :: "Who works here and what they are paid" {
+
+      aggregate Employee :: "A person employed by the company" {
+        identity employeeNumber : string
+        fields {
+          fullName : string required
+          workEmail : string
+          hiredOn : date
+          managerEmployeeNumber : string optional
+          costCenter : string
+        }
+        entities { JobAssignment }
+      }
+      entity JobAssignment :: "A position held from a given day" { identity id : uuid  fields { jobTitle : string required  startDate : date } }
+
+      aggregate VariablePay :: "A bonus or commission awarded to an employee for a period" {
+        identity id : uuid
+        fields {
+          employeeNumber : string required
+          periodEnd : date
+          targetAmount : decimal min(0)
+          awardedAmount : decimal min(0) optional
+        }
+        entities { BonusComponent }
+      }
+      entity BonusComponent :: "One objective and the amount it earned" { identity id : uuid  fields { objective : string required  amount : decimal min(0) } }
+
+      aggregate PayrollRun :: "The monthly computation of pay for one country" {
+        identity id : uuid
+        fields {
+          country : string required
+          payPeriodEnd : date
+          totalGross : decimal min(0)
+          totalNet : decimal min(0)
+        }
+        entities { Payslip }
+      }
+      entity Payslip :: "What one employee is paid by the run" { identity id : uuid  fields { employeeNumber : string required  netPay : decimal min(0) } }
+    }
+  }
+}

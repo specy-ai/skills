@@ -10,7 +10,14 @@
    levels are the C4 zoom levels: system folded = L1 context, containers
    folded = L2 containers, everything open = L3 components. Nodes carry no
    position and only a width: the engine lays the nested groups out itself
-   (`layout.engine "dagre"`) and derives the edge sides (`handles: "auto"`). */
+   (`layout.engine "dagre"`) and derives the edge sides (`handles: "auto"`).
+     - landscapeDiagram(arch, show, opts) → the level-0 overview of an
+   `organization` file, same metamodel and layout contract: areas are
+   `er-group`s (kind "area"), each system one card (role, product, mastered
+   and handled concepts), each dependency one directed edge downstream →
+   upstream labelled with its flow numbers. Its canvas-only styles (the
+   `area` group, the system card, the handle offsets that keep two opposite
+   edges apart) are in arch-landscape.css. */
 
 "use strict";
 
@@ -29,6 +36,8 @@ const SpecyArchDiagrams = (() => {
     container:      { label: "Container",       color: "#f7f9fc", border: "#9fb1d6" },
     component:      { label: "Component",       color: "#ffffff", border: "#3a3f46" },
     channel:        { label: "Channel",         color: "#f6efe2", border: "#b7a480" },
+    /* level 0 (landscapeDiagram): the group of an area — arch-landscape.css `.group-node--kind-area` */
+    area:           { label: "Area",            color: "#f8f5ee", border: "#b7a480" },
   };
 
   const LAYOUT = { engine: "dagre", rankdir: "TB", nodesep: 40, ranksep: 90, handles: "auto" };
@@ -102,6 +111,42 @@ const SpecyArchDiagrams = (() => {
     };
   }
 
+  /* ---- the model and the diagram under construction: `add` makes one
+     model element and its node; ids come from the name, a clash is prefixed
+     with the type ---- */
+  function sheet(modelId) {
+    const elements = [], relations = [];
+    const nodes = [], edges = [];
+    const usedIds = new Set();
+    const parentOf = new Map();     // node id → parent node id
+
+    const uniqueId = (name, type) => {
+      const base = String(name).replace(/[^\w.-]+/g, "-") || type;
+      let id = base;
+      if (usedIds.has(id)) id = `${type}-${base}`;
+      for (let i = 2; usedIds.has(id); i++) id = `${type}-${base}-${i}`;
+      usedIds.add(id);
+      return id;
+    };
+
+    /* `display` is shared by the element and its node, `extra` only lands on
+       the element (raw .arch data), `nodeProps` and `link` only on the node;
+       without `nodeProps` the element is kept in the model and not drawn */
+    function add(type, name, display, extra, nodeProps, link) {
+      const id = uniqueId(name, type);
+      const nodeId = "node-" + id;
+      elements.push({ id, type, data: Object.assign({}, display, extra || {}) });
+      if (!nodeProps) return { elementId: id, nodeId: null };
+      const node = Object.assign({ id: nodeId }, nodeProps, {
+        data: Object.assign({ modelRef: { modelId, elementId: id } }, display, link || {}),
+      });
+      if (node.parentId) { node.extent = "parent"; parentOf.set(nodeId, node.parentId); }
+      nodes.push(node);
+      return { elementId: id, nodeId };
+    }
+    return { elements, relations, nodes, edges, parentOf, add };
+  }
+
   /* ============ Architecture diagram ============ */
 
   function architectureDiagram(arch, show, opts) {
@@ -116,20 +161,14 @@ const SpecyArchDiagrams = (() => {
     const systems = list(arch.systems && arch.systems.length ? arch.systems : [arch.system || {}]);
     const resolveDomain = domainResolver(opts.domainOrg);
 
-    const elements = [], relations = [];
-    const nodes = [], edges = [];
-    const usedIds = new Set();
+    const { elements, relations, nodes, edges, parentOf, add } = sheet(modelId);
     const byName = new Map();       // .arch name → { elementId, nodeId, kind, visible }
-    const parentOf = new Map();     // node id → parent node id
-
-    const uniqueId = (name, type) => {
-      const base = String(name).replace(/[^\w.-]+/g, "-") || type;
-      let id = base;
-      if (usedIds.has(id)) id = `${type}-${base}`;
-      for (let i = 2; usedIds.has(id); i++) id = `${type}-${base}-${i}`;
-      usedIds.add(id);
-      return id;
-    };
+    /* An `organization` file (level 0) holds several systems whose member
+       names are local to them: its elements are also kept by path
+       (`container:System/Container`), and its connector ends, which the
+       parser resolved, are looked up there instead of by bare name. */
+    const org = arch.root === "organization";
+    const scoped = new Map();       // `kind:path` → the same entries as byName
 
     /* domainRef + declared "Open …" action for the first resolvable ref */
     function domainLink(elementId, refs) {
@@ -143,32 +182,25 @@ const SpecyArchDiagrams = (() => {
       return hit ? { domainRef: { id: hit.id }, actions: [{ label: hit.label, navigate: true }] } : {};
     }
 
-    /* one model element + its node; `display` is shared by both, `extra`
-       only lands on the element (raw .arch data), `nodeProps` only on the node */
-    function add(type, name, display, extra, nodeProps, link) {
-      const id = uniqueId(name, type);
-      const nodeId = "node-" + id;
-      elements.push({ id, type, data: Object.assign({}, display, extra || {}) });
-      const node = Object.assign({ id: nodeId }, nodeProps, {
-        data: Object.assign({ modelRef: { modelId, elementId: id } }, display, link || {}),
-      });
-      if (node.parentId) { node.extent = "parent"; parentOf.set(nodeId, node.parentId); }
-      nodes.push(node);
-      return { elementId: id, nodeId };
-    }
-    const register = (name, entry) => { if (name && !byName.has(name)) byName.set(name, entry); };
+    const register = (name, entry, path) => {
+      if (name && !byName.has(name)) byName.set(name, entry);
+      if (path && !scoped.has(path)) scoped.set(path, entry);
+    };
 
     /* ---- persons (top level; first in the name index on a name clash) ---- */
     for (const p of list(arch.persons)) {
-      if (!show.persons) { register(p.name, { kind: "person", visible: false }); continue; }
+      if (!show.persons) { register(p.name, { kind: "person", visible: false }, "person:" + p.name); continue; }
       const r = add("person", p.name,
         { name: p.name, kind: "person", kindLabel: KIND_LEGEND.person.label, subtitle: p.description || "" },
         null, { type: "er-concept", style: { width: WIDTH.person } });
-      register(p.name, Object.assign({ kind: "person", visible: true }, r));
+      register(p.name, Object.assign({ kind: "person", visible: true }, r), "person:" + p.name);
     }
 
     const containerNode = new Map();   // container → node id
     const channelNode = new Map();     // channel name → { elementId, nodeId }
+    const systemOf = new Map();        // container → name of its system
+    /* a channel is looked up by name; in an organization file, within its system */
+    const channelKey = (sysName, name) => (org ? sysName + "/" + name : name);
     const allContainers = [];
     for (const sys of systems) {
       const containers = list(sys.containers);
@@ -185,13 +217,22 @@ const SpecyArchDiagrams = (() => {
             { description: sys.description || "", satisfies: list(sys.satisfies),
               realizes: realizesText(sys.realizes), boundedContexts: list(sys.boundedContexts).map(b => b.name) },
             { type: "er-group" }, domainLink(sysName, sys.realizes))
-        : add("system", sysName,
+        : !org
+        ? add("system", sysName,
             { name: sysName, kind: "system", kindLabel: KIND_LEGEND.system.label,
               subtitle: sys.description || "" },
             { description: sys.description || "", satisfies: list(sys.satisfies) },
-            { type: "er-concept", style: { width: WIDTH.concept } });
+            { type: "er-concept", style: { width: WIDTH.concept } })
+        /* organization file: a system not detailed here is a black box — its
+           role, the product behind it, and the context it realizes */
+        : add("system", sysName,
+            { name: sysName, kind: "system", kindLabel: KIND_LEGEND.system.label,
+              subtitle: sys.technology || "" },
+            { description: sys.description || "", satisfies: list(sys.satisfies), technology: sys.technology || "",
+              realizes: realizesText(sys.realizes), detail: sys.detail || "none" },
+            { type: "er-concept", style: { width: WIDTH.concept } }, domainLink(sysName, sys.realizes));
       // a connector end naming a whole system lands on its box
-      register(sysName, Object.assign({ kind: "system", visible: true }, sysNode));
+      register(sysName, Object.assign({ kind: "system", visible: true }, sysNode), "system:" + sysName);
 
       /* ---- containers: group iff it has members (components, or hosted channels) ---- */
       const channelsOn = new Map();
@@ -220,8 +261,9 @@ const SpecyArchDiagrams = (() => {
               { type: "er-concept", parentId: sysNode.nodeId, style: { width: WIDTH.concept } }, domainLink(c.name, c.realizes));
         containerNode.set(c, r.nodeId);
         byContainerName.set(c.name, r.nodeId);
+        systemOf.set(c, sysName);
         allContainers.push(c);
-        register(c.name, Object.assign({ kind: "container", visible: true }, r));
+        register(c.name, Object.assign({ kind: "container", visible: true }, r), `container:${sysName}/${c.name}`);
       }
 
       /* ---- components (inside their container) ---- */
@@ -236,10 +278,11 @@ const SpecyArchDiagrams = (() => {
               row("publishes", publishesText(k.publishes)), row("subscribes", k.subscribes),
               row("realizes", realizesText(k.realizes)), row("satisfies", k.satisfies),
             ]),
-          }, { description: k.description || "", container: c.name, boundedContext: k.boundedContext || "" },
+          }, Object.assign({ description: k.description || "", container: c.name, boundedContext: k.boundedContext || "" },
+            org ? { system: sysName } : null),
           { type: "er-concept", parentId: containerNode.get(c), style: { width: WIDTH.concept } },
           domainLink(k.name, k.realizes));
-          register(k.name, Object.assign({ kind: "component", visible: true }, r));
+          register(k.name, Object.assign({ kind: "component", visible: true }, r), `component:${sysName}/${c.name}/${k.name}`);
         }
       }
 
@@ -252,19 +295,19 @@ const SpecyArchDiagrams = (() => {
           body: kv([row("carries", ch.carries)]),
         }, { description: ch.description || "", broker: ch.broker || "" },
         { type: "er-concept", parentId: byContainerName.get(ch.broker) || sysNode.nodeId, style: { width: WIDTH.concept } });
-        if (!channelNode.has(ch.name)) channelNode.set(ch.name, r);
+        if (!channelNode.has(channelKey(sysName, ch.name))) channelNode.set(channelKey(sysName, ch.name), r);
       }
     }
 
     /* ---- external systems (top level, after the system so they rank below it) ---- */
     for (const x of list(arch.externalSystems)) {
-      if (!show.externalSystems) { register(x.name, { kind: "externalSystem", visible: false }); continue; }
+      if (!show.externalSystems) { register(x.name, { kind: "externalSystem", visible: false }, "externalSystem:" + x.name); continue; }
       const r = add("externalSystem", x.name, {
         name: x.name, kind: "externalSystem", kindLabel: KIND_LEGEND.externalSystem.label, align: "left",
         subtitle: x.description || "",
         body: kv([row("provides", x.provides), row("consumes", x.consumes), row("realizes", realizesText(x.realizes))]),
       }, null, { type: "er-concept", style: { width: WIDTH.concept } }, domainLink(x.name, x.realizes));
-      register(x.name, Object.assign({ kind: "externalSystem", visible: true }, r));
+      register(x.name, Object.assign({ kind: "externalSystem", visible: true }, r), "externalSystem:" + x.name);
     }
 
     /* ============ relations + edges ============ */
@@ -304,7 +347,7 @@ const SpecyArchDiagrams = (() => {
       data.description = description || "";
       data.points = [];
       const edge = { id: "edge-" + rel.id, source: srcNode, target: tgtNode, type: "er-edge",
-        markerEnd: "url(#er-arrow)", style: Object.assign({}, EDGE_STYLE[style] || EDGE_STYLE.sync), data };
+        markerEnd: "er-arrow", style: Object.assign({}, EDGE_STYLE[style] || EDGE_STYLE.sync), data };   // bare marker id: see LANDSCAPE_ARROW
       edges.push(edge);
       if (key) { edgeByKey.set(key, edge); partsOf.set(edge, part ? [part] : []); }
     }
@@ -318,8 +361,18 @@ const SpecyArchDiagrams = (() => {
       for (let i = 1; i < parts.length - 1; i++) if (byName.has(parts[i])) at = i;
       return { name: parts[at], entry: byName.get(parts[at]), iface: parts.slice(at + 1).join(".") };
     }
+    /* organization file: the parser resolved each end within its system
+       (`kind`, `system`, `container`, `component`, `interface`) */
+    function scopedEndpoint(ep) {
+      const path = ep.kind === "component" ? `component:${ep.system}/${ep.container}/${ep.component}`
+        : ep.kind === "container" ? `container:${ep.system}/${ep.container}`
+        : ep.kind === "system" ? `system:${ep.system}`
+        : ep.kind ? `${ep.kind}:${ep.name}` : "";
+      return { name: ep.name, entry: scoped.get(path), iface: ep.interface || "" };
+    }
+    const endOf = org ? scopedEndpoint : endpoint;
     for (const c of systems.flatMap(sys => list(sys.connectors))) {
-      const from = endpoint(c.from), to = endpoint(c.to);
+      const from = endOf(c.from), to = endOf(c.to);
       const src = from.entry, tgt = to.entry;
       if (!src || !tgt) {
         if (!src) report.unresolved.push({ id: c.id, side: "from", name: from.name });
@@ -354,7 +407,8 @@ const SpecyArchDiagrams = (() => {
       let p = 0, s = 0;
       for (const c of allContainers) {
         for (const k of list(c.components)) {
-          const comp = byName.get(k.name);
+          const sysName = systemOf.get(c);
+          const comp = org ? scoped.get(`component:${sysName}/${c.name}/${k.name}`) : byName.get(k.name);
           if (!comp || comp.kind !== "component") continue;
           const perChannel = new Map();
           for (const pub of list(k.publishes)) {
@@ -363,7 +417,7 @@ const SpecyArchDiagrams = (() => {
             if (!evs.includes(pub.event)) evs.push(pub.event);
           }
           for (const [chName, messages] of perChannel) {
-            const ch = channelNode.get(chName);
+            const ch = channelNode.get(channelKey(sysName, chName));
             if (!ch) { report.unresolved.push({ id: `publishes ${k.name} → ${chName}`, side: "to", name: chName }); continue; }
             const rel = { id: "p" + (++p), type: "publishes", sourceElementId: comp.elementId, targetElementId: ch.elementId, data: { messages } };
             relations.push(rel);
@@ -371,7 +425,7 @@ const SpecyArchDiagrams = (() => {
               cap("publishes " + messages.join(", "), LABEL_MAX), `publishes ${messages.join(", ")} to ${chName}`);
           }
           for (const chName of list(k.subscribes)) {
-            const ch = channelNode.get(chName);
+            const ch = channelNode.get(channelKey(sysName, chName));
             if (!ch) { report.unresolved.push({ id: `subscribes ${k.name} → ${chName}`, side: "to", name: chName }); continue; }
             const rel = { id: "s" + (++s), type: "subscribes", sourceElementId: comp.elementId, targetElementId: ch.elementId, data: {} };
             relations.push(rel);
@@ -403,7 +457,318 @@ const SpecyArchDiagrams = (() => {
         + (show.channels ? list(sys.channels).length : 0), 0);
   }
 
-  return { architectureDiagram, modelIdOf, countVisible, DEFAULT_SHOW, KIND_LEGEND };
+  /* ============ Landscape diagram (level 0 — an `organization` file) ============
+     The overview of the organization: its systems grouped by area, what each
+     one masters and handles, and the dependencies between them. A dependency
+     `A -> B` is one edge from A (downstream) to B (upstream): the arrowhead is
+     on the system depended upon. Two opposite dependencies stay two edges. */
+
+  /* Toggle map of the landscape's diagram bar; `concepts` are the masters /
+     handles rows of the cards */
+  const LANDSCAPE_DEFAULT_SHOW = { externalSystems: true, persons: false, edgeLabels: true, concepts: true };
+
+  const landscapeModelIdOf = arch => `${arch.id}-landscape`;
+
+  /* Areas side by side (LR); inside an area the systems stack along their
+     dependencies (TB): a dependency inside an area runs up or down, one
+     between two areas runs sideways, so the two kinds leave a card by
+     different sides. The gaps are sized for the edge labels (one line, at
+     most LANDSCAPE_LABEL_MAX characters, at mid-edge). A system with no
+     dependency inside its area goes to the area's shelf, one column wide. */
+  const LANDSCAPE_LAYOUT = { engine: "dagre", rankdir: "LR", nodesep: 90, ranksep: 170, handles: "auto" };
+  const AREA_LAYOUT = { rankdir: "TB", nodesep: 90, ranksep: 110, shelfColumns: 1 };
+  const LANDSCAPE_WIDTH = { card: 250, person: 190 };
+  /* Every card of the landscape carries this class (React Flow copies a
+     node's `className` onto its wrapper): arch-landscape.css offsets its
+     source and target handles, which keeps the two edges of a mutual pair
+     apart — the engine draws both between the same two points otherwise.
+     A card whose first row is `masters` also says so, for the row to be set
+     heavier than the others. */
+  const LANDSCAPE_CARD_CLASS = "landscape-card";
+  const MASTERS_CLASS = "landscape-card--masters";
+
+  /* kind → label and colours of what the landscape draws, for the host
+     legend: here a system is a card, where KIND_LEGEND.system is the dashed
+     boundary of the C4 view (arch-landscape.css `.er-node--kind-system`) */
+  const LANDSCAPE_KIND_LEGEND = {
+    area:           KIND_LEGEND.area,
+    system:         { label: "System", color: "#f1f5fb", border: "#3573c3" },
+    externalSystem: KIND_LEGEND.externalSystem,
+    person:         KIND_LEGEND.person,
+  };
+
+  const CONCEPT_MAX = 6;            // names in a masters / handles row, then "+ N more"
+  const HOTSPOT_MAX = 2;            // hotspot names on a card
+  const ACTION_MAX = 12;            // "Open <Concept>" actions of a card: covers both full rows
+  const LANDSCAPE_LABEL_MAX = 30;   // characters of an edge label
+
+  /* How a dependency is drawn. Two independent channels, nothing else:
+     the stroke width says `critical`, the colour says Partnership. */
+  const NAVY = "#172741";
+  const DEPENDENCY_STYLE = { stroke: ACCENT, strokeWidth: 1.8 };
+  const CRITICAL_WIDTH = 3.6;
+  const LANDSCAPE_LEGEND = [
+    { key: "dependency", label: "depends on",
+      description: "A → B: A depends on B. The arrowhead is on the system depended upon (upstream); the label gives the flow numbers, then the flow labels.",
+      style: Object.assign({}, DEPENDENCY_STYLE) },
+    { key: "critical", label: "critical dependency",
+      description: "criticality critical: when the system depended upon is down, the dependent one is down.",
+      style: Object.assign({}, DEPENDENCY_STYLE, { strokeWidth: CRITICAL_WIDTH }) },
+    { key: "partnership", label: "Partnership",
+      description: "One of the two dependencies of a Partnership pair. A pair is always two edges, one per direction.",
+      style: Object.assign({}, DEPENDENCY_STYLE, { stroke: NAVY }) },
+  ];
+  /* The arrowhead, as the bare id of the engine's marker: React Flow wraps a
+     string `markerEnd` into `url('#…')` itself, so the `url(#er-arrow)` form
+     ends up as a reference to nothing and no head is drawn. A direction that
+     does not show would defeat the whole diagram. */
+  const LANDSCAPE_ARROW = "er-arrow";
+  const dependencyStyle = (d, partnership) => Object.assign({}, DEPENDENCY_STYLE,
+    partnership ? { stroke: NAVY } : null, d.criticality === "critical" ? { strokeWidth: CRITICAL_WIDTH } : null);
+
+  /* a list capped as `a, b, c, + N more` */
+  const capped = (items, max) => (items.length > max ? items.slice(0, max).concat(`+ ${items.length - max} more`) : items);
+
+  /* flow numbers as text: a run of three or more becomes a range (`1–3`) */
+  function numberRanges(numbers) {
+    const ns = [...new Set(numbers.filter(n => typeof n === "number"))].sort((a, b) => a - b);
+    const out = [];
+    for (let i = 0; i < ns.length;) {
+      let j = i;
+      while (j + 1 < ns.length && ns[j + 1] === ns[j] + 1) j++;
+      if (j - i >= 2) out.push(`${ns[i]}–${ns[j]}`);
+      else for (let k = i; k <= j; k++) out.push(String(ns[k]));
+      i = j + 1;
+    }
+    return out.join(", ");
+  }
+
+  /* `1–3 · Ad products, Accounts, …`: the flow numbers, then as many whole
+     flow labels as fit LANDSCAPE_LABEL_MAX; a first label too long is cut */
+  function flowsLabel(flows) {
+    const numbers = numberRanges(flows.map(f => f.number));
+    const names = flows.map(f => f.label).filter(Boolean);
+    if (!names.length) return numbers;
+    let text = (numbers ? numbers + " · " : "") + names[0];
+    const room = more => LANDSCAPE_LABEL_MAX - (more ? 3 : 0);   // `, …` after the last label kept
+    if (text.length > room(names.length > 1)) return cap(text, LANDSCAPE_LABEL_MAX);
+    for (let i = 1; i < names.length; i++) {
+      const next = text + ", " + names[i];
+      if (next.length > room(i < names.length - 1)) return text + ", …";
+      text = next;
+    }
+    return text;
+  }
+
+  /* the full list behind an edge label: one line per flow, `<n>. <label> — <concepts>` */
+  const carriedText = c => (c.as ? `${c.concept.raw} as ${c.as.raw}` : c.concept.raw);
+  const flowLine = f => `${f.number}. ${f.label || "(unnamed)"} — ${list(f.carries).map(carriedText).join(", ")}`;
+
+  /* the areas, each name once (a second declaration of a name is a defect of
+     the file, not a second group) */
+  const landscapeAreas = arch => list(arch.areas).filter((a, i, all) => a.name && all.findIndex(x => x.name === a.name) === i);
+
+  function landscapeDiagram(arch, show, opts) {
+    show = Object.assign({}, LANDSCAPE_DEFAULT_SHOW, show || {});
+    opts = opts || {};
+    const report = opts.report || {};
+    for (const k of ["unresolved", "dropped", "merged", "domainRefs", "concepts"]) report[k] = [];
+
+    const modelId = landscapeModelIdOf(arch);
+    const { elements, relations, nodes, edges, add } = sheet(modelId);
+
+    /* ---- domain links: a concept resolves through the resolveAll() summary
+       of arch-concepts.js; without it concepts are plain names ---- */
+    const resolution = opts.resolution && typeof opts.resolution.of === "function" ? opts.resolution : null;
+    const resolved = ref => {
+      const x = resolution ? resolution.of(ref) : null;
+      return x && x.status === "resolved" && x.id ? x : null;
+    };
+    /* the bounded contexts the references resolved into, by name (the summary
+       carries no index of the contexts themselves) */
+    const contexts = new Map();
+    for (const r of list(resolution && resolution.references)) {
+      const x = r.resolution;
+      for (const d of !x ? [] : x.status === "resolved" ? [x] : list(x.candidates))
+        if (d.context && d.contextId && !contexts.has(norm(d.context))) contexts.set(norm(d.context), { id: d.contextId, name: d.context });
+    }
+    /* what a card links to: double-click opens the first context the system
+       realizes that resolves; the ⋯ menu opens each resolved concept, masters first */
+    function domainLinks(holder) {
+      const refs = list(holder.masters).concat(list(holder.handles));
+      let ctx = null;
+      for (const name of list(holder.contexts)) {
+        /* by name; a context named by its shortname is known from the
+           references the system resolved in its own contexts */
+        const own = refs.map(resolved).find(x => x && x.via === "own-context" && x.contextId);
+        const hit = contexts.get(norm(name)) || (list(holder.contexts).length === 1 && own ? { id: own.contextId, name: own.context } : null);
+        report.domainRefs.push({ elementId: holder.name, ref: `context ${name}`, resolved: hit ? "ctx:" + hit.id : null });
+        if (hit && !ctx) ctx = hit;
+      }
+      const actions = ctx ? [{ label: `Open context "${ctx.name}"`, navigate: true }] : [];
+      const seen = new Set();
+      for (const [site, items] of [["masters", holder.masters], ["handles", holder.handles]]) {
+        for (const ref of list(items)) {
+          const x = resolved(ref);
+          report.concepts.push({ elementId: holder.name, site, ref: ref.raw, resolved: x ? x.id : null });
+          if (!x || seen.has(x.id) || seen.size >= ACTION_MAX) continue;
+          seen.add(x.id);
+          actions.push({ label: `Open ${ref.raw}`, href: "#" + encodeURI(x.id) });
+        }
+      }
+      return Object.assign(ctx ? { domainRef: { id: "ctx:" + ctx.id } } : {}, actions.length ? { actions } : {});
+    }
+
+    /* ---- cards ---- */
+    const names = refs => list(refs).map(r => r.raw);
+    /* The rows of a card: the concepts it is the source of truth for
+       (`masters`, first and set heavier by the stylesheet), the other main
+       concepts it holds (`handles`), and — with the persons shown — who works
+       with it. `nodeProps` carries the card's classes. */
+    function cardBody(holder) {
+      const masters = show.concepts ? capped(names(holder.masters), CONCEPT_MAX) : [];
+      return {
+        body: kv([row("masters", masters), show.concepts ? row("handles", capped(names(holder.handles), CONCEPT_MAX)) : null,
+          show.persons ? row("used by", list(holder.usedBy)) : null]),
+        nodeProps: { type: "er-concept", className: LANDSCAPE_CARD_CLASS + (masters.length ? " " + MASTERS_CLASS : ""),
+          style: { width: LANDSCAPE_WIDTH.card } },
+      };
+    }
+    const facts = (x, more) => Object.assign({ description: x.description || "", technology: "", area: "", detail: "none", status: "" }, more);
+
+    const ends = new Map();           // system / external system name → { elementId, nodeId, kind, visible }
+    const landed = (name, entry) => { if (name && !ends.has(name)) ends.set(name, entry); };
+
+    function systemCard(s, parentId) {
+      const hotspots = list(s.hotspots).map(h => h.name).filter(Boolean);
+      const card = cardBody(s);
+      const display = {
+        name: s.name, kind: "system",
+        kindLabel: s.detail && s.detail !== "none" ? "System · detailed" : KIND_LEGEND.system.label,
+        align: "left", subtitle: s.technology || "",
+        attributes: hotspots.length ? [`hotspot${hotspots.length > 1 ? "s" : ""}: ${capped(hotspots, HOTSPOT_MAX).join(", ")}`] : [],
+        body: card.body,
+      };
+      if (s.detail === "inline") display.emphasis = true;   // it opens into containers and components (C4 view)
+      const raw = facts(s, {
+        technology: s.technology || "", area: s.area || "", detail: s.detail || "none", detailedIn: s.detailedIn || "",
+        status: s.status || "", usedBy: list(s.usedBy), contexts: list(s.contexts),
+        masters: names(s.masters), handles: names(s.handles),
+        hotspots: list(s.hotspots).map(h => ({ name: h.name, description: h.description || "", flows: list(h.flows), concepts: names(h.concepts) })),
+        contacts: list(s.contacts), documents: list(s.documents),
+      });
+      const r = add("system", s.name, display, raw, Object.assign(card.nodeProps, parentId ? { parentId } : null), domainLinks(s));
+      landed(s.name, Object.assign({ kind: "system", visible: true }, r));
+    }
+
+    /* ---- areas (groups, open), each followed by its systems; an area no
+       system sits in stays in the model and is not drawn ---- */
+    const areas = landscapeAreas(arch);
+    const areaNames = new Set(areas.map(a => a.name));
+    const systems = list(arch.systems);
+    for (const a of areas) {
+      const members = systems.filter(s => s.area === a.name);
+      const display = { name: a.name, kind: "area", kindLabel: KIND_LEGEND.area.label, subtitle: a.description || "" };
+      const raw = facts(a, { area: a.name, systems: members.map(s => s.name) });
+      if (!members.length) { add("area", a.name, display, raw, null); continue; }
+      const g = add("area", a.name,
+        Object.assign(display, { level: 3, foldedWidth: foldedWidthFor(a.name, FOLDED_WIDTH.container, 7.4) }),
+        raw, { type: "er-group" }, { layout: Object.assign({}, AREA_LAYOUT) });
+      for (const s of members) systemCard(s, g.nodeId);
+    }
+    /* ---- systems in no (declared) area: top level ---- */
+    for (const s of systems) if (!s.area || !areaNames.has(s.area)) systemCard(s, null);
+
+    /* ---- external systems: outside the areas ---- */
+    for (const x of list(arch.externalSystems)) {
+      if (!show.externalSystems) { landed(x.name, { kind: "externalSystem", visible: false }); continue; }
+      const card = cardBody(x);
+      const r = add("externalSystem", x.name,
+        { name: x.name, kind: "externalSystem", kindLabel: KIND_LEGEND.externalSystem.label, align: "left", body: card.body },
+        facts(x, { contexts: list(x.contexts), masters: names(x.masters), handles: names(x.handles) }),
+        card.nodeProps, domainLinks(x));
+      landed(x.name, Object.assign({ kind: "externalSystem", visible: true }, r));
+    }
+
+    /* ---- persons: cards beside the landscape, tied to nothing — who uses a
+       system is a row of its card. One edge per use (about as many as there
+       are dependencies) would take over the layout and pull the areas apart:
+       the picture stays the one of the dependencies, the same with and
+       without the persons. ---- */
+    if (show.persons) {
+      for (const p of list(arch.persons))
+        add("person", p.name,
+          { name: p.name, kind: "person", kindLabel: KIND_LEGEND.person.label, subtitle: p.description || "" },
+          facts(p, { uses: systems.filter(s => list(s.usedBy).includes(p.name)).map(s => s.name) }),
+          { type: "er-concept", style: { width: LANDSCAPE_WIDTH.person } });
+    }
+
+    /* ---- dependencies: one relation and one edge each, downstream →
+       upstream; nothing is merged, a mutual pair is two edges ---- */
+    for (const d of list(arch.dependencies)) {
+      const src = ends.get(d.from), tgt = ends.get(d.to);
+      if (!src || !tgt) {
+        if (!src) report.unresolved.push({ id: d.id, side: "from", name: d.from });
+        if (!tgt) report.unresolved.push({ id: d.id, side: "to", name: d.to });
+        continue;
+      }
+      if (!src.visible || !tgt.visible) {
+        report.dropped.push({ id: d.id, reason: `hidden ${(!src.visible ? src : tgt).kind}` });
+        continue;
+      }
+      if (src.nodeId === tgt.nodeId) { report.dropped.push({ id: d.id, reason: "self loop" }); continue; }
+      const flows = list(d.flows);
+      const patterns = list(d.patterns);
+      const partnership = patterns.includes("Partnership");
+      const facets = { patterns, criticality: d.criticality || null, mutual: !!d.mutual, partnership };
+      relations.push({ id: d.id, type: "dependency", sourceElementId: src.elementId, targetElementId: tgt.elementId,
+        data: Object.assign({ from: d.from, to: d.to, description: d.description || "" }, facets, {
+          flows: flows.map(f => ({ number: f.number, label: f.label || "", sender: f.sender, receiver: f.receiver,
+            carries: list(f.carries).map(c => ({ concept: c.concept.raw, as: c.as ? c.as.raw : null })) })),
+        }) });
+      const data = { modelRef: { modelId, relationId: d.id }, relationIds: [d.id] };
+      const label = flowsLabel(flows);
+      if (label && show.edgeLabels) data.label = label;
+      data.description = flows.map(flowLine).join("\n");
+      data.points = [];
+      Object.assign(data, facets);
+      edges.push({ id: "edge-" + d.id, source: src.nodeId, target: tgt.nodeId, type: "er-edge",
+        markerEnd: LANDSCAPE_ARROW, style: dependencyStyle(d, partnership), data });
+    }
+
+    /* The engine's layout (dagre) walks the edges in the order given, and
+       where two systems depend on each other it is the first edge walked that
+       decides which one comes first: the dependencies of mutual pairs go
+       first, so that partners land in neighbouring ranks instead of at the
+       two ends of a chain. The relations keep the order of the file. */
+    const pairOf = e => [e.source, e.target].sort().join("\u0000");
+    const perPair = new Map();
+    for (const e of edges) perPair.set(pairOf(e), (perPair.get(pairOf(e)) || 0) + 1);
+    const walked = edges.map((e, i) => [e, i])
+      .sort((a, b) => perPair.get(pairOf(b[0])) - perPair.get(pairOf(a[0])) || a[1] - b[1]).map(x => x[0]);
+
+    const name = `${arch.name} — system landscape`;
+    return {
+      version: 1,
+      model: { id: modelId, name, metamodel: "software-architecture", elements, relations },
+      diagram: { id: modelId + "#landscape", name, layout: Object.assign({}, LANDSCAPE_LAYOUT), nodes, edges: walked },
+    };
+  }
+
+  /* number of nodes the landscape draws with this toggle map */
+  function landscapeCountVisible(arch, show) {
+    show = Object.assign({}, LANDSCAPE_DEFAULT_SHOW, show || {});
+    const systems = list(arch.systems);
+    return systems.length
+      + landscapeAreas(arch).filter(a => systems.some(s => s.area === a.name)).length
+      + (show.externalSystems ? list(arch.externalSystems).length : 0)
+      + (show.persons ? list(arch.persons).length : 0);
+  }
+
+  return { architectureDiagram, modelIdOf, countVisible, DEFAULT_SHOW, KIND_LEGEND,
+    landscapeDiagram, landscapeModelIdOf, landscapeCountVisible, LANDSCAPE_DEFAULT_SHOW, LANDSCAPE_LEGEND,
+    LANDSCAPE_KIND_LEGEND,
+    LANDSCAPE_LIMITS: { concepts: CONCEPT_MAX, hotspots: HOTSPOT_MAX, actions: ACTION_MAX, label: LANDSCAPE_LABEL_MAX } };
 })();
 
 /* Node (scripts/check-arch-export.mjs loads this file through vm; the

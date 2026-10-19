@@ -1,0 +1,427 @@
+// =============================================================================
+// RetailMediaCo — Organization landscape (.arch, level 0)
+// A fictional retail-media network selling advertising on the websites and
+// apps of a group of retailers. Bought software everywhere except CampaignHub,
+// built in-house and therefore opened to levels 2–3 in this same file.
+//
+// Reading guide:
+//   phases, areas, persons — the roadmap, the landscape's groups, its users
+//   systems      — level 0: purpose (::), product (technology), area, users,
+//                  concepts mastered / handled, hotspots
+//   CampaignHub  — level 0 and levels 2–3 side by side
+//   dependencies — `A -> B` reads "A depends on B" (A downstream, B upstream),
+//                  with context-map patterns, detailed by numbered flows
+//
+// An arrow means "depends on", not "sends data to": read backwards, it answers
+// "if I change this system, which ones are affected?". By default data goes from
+// the upstream system to the downstream one — the receiver depends on the
+// source — unless a flow names its receiver with `to`.
+// =============================================================================
+
+organization RetailMediaCo
+    :: "A retail-media network selling on-site and off-site advertising for a group of retailers" {
+
+  // Concept names resolve against the bounded contexts of this file (Sales,
+  // Campaign, Finance, Treasury, Spend, People): a system's own contexts
+  // (`realizes context`) first, then the whole file, where a read-only copy
+  // never competes with the definition it copies.
+  domain-source "retail-media.domain"
+
+  // Chronological. A phase changes how a flow is carried, never whether it exists.
+  phase Phase1 :: "Go-live of the finance stack; flows without a ready-made connector run on manual files"
+  phase Phase2 :: "Most manual steps automated, mostly through APIs"
+
+  // Areas group systems as the organization chart does; their names differ
+  // from the bounded contexts on purpose.
+  area AdOperations   :: "Campaign operations and advertiser self-service"
+  area Commercial     :: "Selling advertising to brands and agencies"
+  area FinanceOffice  :: "Accounting, treasury, supplier spend and group reporting"
+  area HumanResources :: "Personnel administration, payroll and employee expenses"
+  area Workplace      :: "Tools every employee uses"
+
+  person Advertiser       :: "A brand or media agency buying retail-media campaigns"
+  person CampaignManagers :: "People who set up, monitor and report on campaigns"
+  person AccountManagers  :: "People who sell campaigns and get contracts signed"
+  person FinanceStaff     :: "Accountants, treasurers and the group controller"
+  person HrStaff          :: "HR administrators and payroll officers"
+  person AllEmployees     :: "Every employee of the company"
+
+  // Outside the organization. The banks master their statements; the Treasury
+  // context holds them as a read-only entity sourced-from Banks.
+  externalSystem Banks :: "The company's banks: execute payment files, publish account statements" {
+    masters BankStatement
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // SYSTEMS — named after their role; the product goes in `technology`.
+  // `masters` = system of record; `handles` = other main concepts it holds.
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // --- Ad operations -------------------------------------------------------
+
+  system OnsiteAds :: "Serves sponsored-product and display ads on the retailers' websites and apps"
+      technology "Criteo Retail Media" {
+    area AdOperations
+    used-by CampaignManagers, Advertiser
+    masters PlatformDelivery          // read-only entity of Campaign, sourced-from OnsiteAds
+    handles Campaign
+  }
+
+  system CleanRoom :: "Matches advertisers' customer lists with shopper data without exposing personal data"
+      technology "LiveRamp" {
+    area AdOperations
+    used-by CampaignManagers, Advertiser
+    masters AudienceSegment           // NOTE: no domain element yet; the clean room stays a black box
+  }
+
+  // --- Commercial ----------------------------------------------------------
+
+  system CRM :: "Manages advertisers and agencies, the sales pipeline, the rate card and signed sales orders"
+      technology "Salesforce Sales Cloud"
+      realizes context Sales {
+    area Commercial
+    used-by AccountManagers
+    masters Account, Opportunity, SalesOrder, AdProduct, Contract
+    handles Invoice                   // Sales.Invoice: a read-only copy of the ERP's invoices
+  }
+
+  system ESignature :: "Collects electronic signatures on contracts and insertion orders"
+      technology "DocuSign" {
+    area Commercial
+    used-by AccountManagers, Advertiser
+    masters Envelope                  // NOTE: the e-signature product's own concept; no domain element
+  }
+
+  // --- Finance office ------------------------------------------------------
+
+  system ERP :: "Financial accounting, reporting, analysis and tax under local and group accounting standards"
+      meta { status    = "target finalized"
+             contacts  = "ERP product owner (Finance); integration partner lead; tax manager"
+             documents = "ERP online help <https://wiki.example.com/finance/erp-help>; Integration design <https://wiki.example.com/finance/erp-integrations>" }
+      technology "NetSuite"
+      realizes context Finance {
+    area FinanceOffice
+    used-by FinanceStaff
+    masters Customer, Vendor, Item, Invoice, JournalEntry, Payment
+    masters VendorBill, VendorCredit, Subsidiary, TaxCode
+    handles BankStatement             // received from CashManagement (flow 6)
+    hotspot MonthEndClose
+        :: "Until phase 2 the monthly close waits on six manual file imports, and one late export delays it; the payroll journal stays manual after that"
+        concerns 1, 2, 3, 6, 16, 18
+    hotspot InvoiceStatusDrift
+        :: "Until phase 2 invoice status is keyed twice, and collections chase invoices already paid"
+        concerns 4, Invoice
+  }
+
+  system CashManagement :: "Cash positioning, payment execution and bank connectivity"
+      technology "Kyriba"
+      realizes context Treasury {
+    area FinanceOffice
+    used-by FinanceStaff
+    masters Account, PaymentOrder, CashPosition   // Treasury's Account is a bank account: a homonym of the CRM's
+    handles BankStatement
+    hotspot BankFormatUpgrades
+        :: "Each bank's move to a new ISO 20022 version means re-certifying payment and statement files"
+        concerns 10, 11
+  }
+
+  system SpendPlatform :: "Captures, approves and archives supplier invoices and credit notes"
+      technology "Basware"
+      realizes context Spend {
+    area FinanceOffice                // run by the finance office…
+    used-by FinanceStaff, AllEmployees // …while every employee approves invoices in it
+    masters SupplierInvoice, CreditNote
+    handles Vendor, TaxCode           // Spend's read-only copies of the ERP's masters
+  }
+
+  system GroupConsolidation :: "Consolidates the subsidiaries' accounts into the group financial statements"
+      technology "OneStream" {
+    area FinanceOffice
+    used-by FinanceStaff
+    handles TrialBalance              // a Finance value type: no system of record
+  }
+
+  // --- Human resources -----------------------------------------------------
+
+  system HRMS :: "Employee records, organization, roles and variable pay"
+      technology "Workday HCM"
+      realizes context People {
+    area HumanResources
+    used-by HrStaff, AllEmployees
+    masters Employee, VariablePay
+  }
+
+  system Payroll :: "Computes monthly payroll and statutory declarations, country by country"
+      technology "ADP"
+      realizes context People {       // same context as HRMS
+    area HumanResources
+    used-by HrStaff
+    masters PayrollRun
+  }
+
+  system ExpenseManagement :: "Employees submit expense reports, managers approve them, finance reimburses them"
+      technology "SAP Concur"
+      realizes context Spend {
+    area HumanResources
+    used-by AllEmployees, FinanceStaff
+    masters ExpenseReport
+  }
+
+  // --- Workplace -----------------------------------------------------------
+
+  system IAM :: "One identity, single sign-on and access rights for every employee"
+      technology "Microsoft Entra ID" {
+    area Workplace
+    used-by AllEmployees
+    masters User                      // NOTE: no Identity context in the domain model yet
+  }
+
+  system Analytics :: "Management dashboards across sales and finance"
+      technology "Power BI" {
+    area Workplace
+    used-by AllEmployees
+    // No `realizes context`: bare names are looked up in the whole domain model.
+    // Account names two different concepts (Sales, Treasury), hence the qualified
+    // form. Invoice also exists as the CRM's read-only copy, but a copy never
+    // competes with its original: the bare name designates Finance.Invoice.
+    handles Sales.Account, Invoice
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // CampaignHub — built in-house, detailed inline: level-0 clauses first,
+  // then the ordinary members of levels 2–3, whose names are local to it.
+  // ═══════════════════════════════════════════════════════════════════════
+
+  system CampaignHub
+      :: "Turns signed sales orders into campaigns on the media platforms and consolidates their delivery for billing"
+      meta { status    = "candidate"
+             contacts  = "Campaign operations lead; CampaignHub tech lead"
+             documents = "Runbook <https://wiki.example.com/ops/campaign-hub>; Delivery API <https://wiki.example.com/ops/campaign-hub/api>" }
+      realizes context Campaign {
+    area AdOperations
+    used-by CampaignManagers
+    masters Campaign, DeliveryReport
+    handles SalesOrder, AdProduct, PlatformDelivery   // Campaign's read-only copies
+    hotspot DeliveryDiscrepancies
+        :: "Ad-server and hub delivery figures differ until the reporting window closes; early invoices get credited"
+        concerns 30, DeliveryReport
+
+    struct DeliveryReportDTO :: "Consolidated delivery of one sales order over a period" {
+      1: required string  salesOrderId
+      2: required long    impressions
+      3: required decimal billableAmount
+      4: required date    periodEnd
+    }
+
+    interface DeliveryQueries :: "Read side of consolidated delivery" {
+      safe deliveryForOrder(1: required string salesOrderId, 2: required date periodEnd)
+        returns DeliveryReportDTO
+    }
+
+    container CampaignApi :: "Booking and delivery API" technology "Kotlin/Spring Boot" {
+      provides DeliveryQueries
+      component Booking :: "Creates campaigns and line items from signed sales orders"
+          realizes module Booking
+      component DeliveryReporting :: "Consolidates platform delivery into billable reports"
+          realizes module Delivery {
+        provides DeliveryQueries
+      }
+    }
+    container SyncWorker :: "Pulls signed orders from the CRM, drives the ad server, pulls delivery back"
+        technology "Kotlin"
+    container Console    :: "Campaign managers' console" technology "TypeScript/React SPA"
+    container CampaignDb :: "Campaigns, line items and delivery reports" technology "PostgreSQL"
+
+    // A connector is written in the system owning its consumer end, or, when
+    // the consumer is a person or a black-box system, here at the provider.
+    // A bare peer-system name targets that system as a black box.
+    connect CampaignManagers -> Console over "HTTPS" sync
+    connect Console -> CampaignApi over "REST/JSON" sync
+    connect CampaignApi -> CampaignDb over "JDBC" sync
+    // realizes flow 26
+    connect Console -> IAM over "OpenID Connect" sync
+    // realizes flow 27
+    connect SyncWorker -> CRM over "Salesforce Pub/Sub API" async
+    // realizes flow 28: the CRM, a black box, is the consumer
+    connect CRM -> DeliveryReporting.DeliveryQueries over "REST/JSON" sync
+    // realizes flows 29 and 30
+    connect SyncWorker -> OnsiteAds over "Criteo Retail Media API" sync
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // DEPENDENCIES — `A -> B : patterns criticality`. CS | Conformist | ACL
+  // qualify the downstream side, OHS the upstream side, SharedKernel |
+  // PublishedLanguage both. Two opposite dependencies are a mutual dependency,
+  // or a Partnership when both carry `Partnership`; either way they stay two
+  // edges. `criticality critical | degraded | tolerant` says what A suffers
+  // when B is down; without it, nobody has said yet.
+  // Flow numbers are unique and never reused.
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // --- Finance <-> Sales: a mutual dependency ------------------------------
+
+  dependency ERP -> CRM : ACL, OHS :: "Billing needs the CRM's products, accounts and billing schedule" {
+    // `as`: what the CRM sends becomes, in the ERP's model, an Item, a Customer, an Invoice.
+    flow 1 "Ad products" carries AdProduct as Item {
+      phase Phase1 over "CSV file export/import" manual
+      phase Phase2 over "Salesforce REST API, custom integration" automated
+    }
+    flow 2 "Accounts" carries Account as Customer {
+      phase Phase1 over "CSV file export/import" manual
+      phase Phase2 automated            // only known to be automated so far
+    }
+    flow 3 "Billing schedule" carries SalesOrder as Invoice {
+      phase Phase1 over "CSV file export/import" manual
+      phase Phase2 automated
+    }
+  }
+
+  // Conformist: the CRM takes the ERP's concepts as they are — no `as` here.
+  dependency CRM -> ERP : Conformist :: "Sales sees invoice status and master data as the ERP defines them" {
+    flow 4 "Invoice status" carries Invoice {
+      phase Phase1 over "double entry" manual
+      phase Phase2 over "NetSuite REST API, custom integration" automated
+    }
+    flow 5 "Master data and lists of values" carries Subsidiary, TaxCode {
+      phase Phase1 manual
+      phase Phase2 over "NetSuite REST API, custom integration" automated
+    }
+  }
+
+  // --- Finance <-> Treasury: a mutual dependency ---------------------------
+
+  dependency ERP -> CashManagement : Conformist criticality tolerant {
+    flow 6 "Bank statements" carries BankStatement {
+      phase Phase1 over "CSV file export/import" manual
+      phase Phase2 over "treasury platform's built-in ERP connector" automated
+    }
+  }
+
+  dependency CashManagement -> ERP : ACL :: "Treasury turns the ERP's payments into its own payment orders" {
+    // Same in both phases: the mechanism is stated once.
+    flow 7 "SEPA payments"          carries Payment as PaymentOrder over "built-in ERP connector" automated
+    flow 8 "Domestic payments"      carries Payment as PaymentOrder over "built-in ERP connector" automated
+    flow 9 "International payments" carries Payment as PaymentOrder over "built-in ERP connector" automated
+  }
+
+  // --- Treasury -> Banks: outside the organization -------------------------
+
+  dependency CashManagement -> Banks : PublishedLanguage criticality degraded :: "ISO 20022 formats, owned by neither side" {
+    // Flow 10 goes against the default direction: treasury depends on the banks, yet sends them the payment files.
+    flow 10 "Payment files (pain.001)" carries PaymentOrder to Banks over "EBICS" automated
+    flow 11 "Account statements (camt.053)" carries BankStatement over "EBICS" automated
+  }
+
+  // --- Finance <-> Spend: a mutual dependency ------------------------------
+
+  // CS: the spend platform posts bills in the ERP's own model — the ERP is its customer.
+  dependency ERP -> SpendPlatform : CS {
+    flow 12 "Supplier invoices and credit notes" carries SupplierInvoice as VendorBill, CreditNote as VendorCredit
+      over "spend platform's built-in ERP connector" automated
+  }
+
+  dependency SpendPlatform -> ERP : Conformist {
+    flow 13 "Vendors" carries Vendor over "spend platform's built-in ERP connector" automated
+    flow 14 "Master data: subsidiaries, tax codes" carries Subsidiary, TaxCode
+      over "spend platform's built-in ERP connector" automated
+  }
+
+  dependency GroupConsolidation -> ERP : Conformist criticality tolerant {
+    flow 15 "Financial reporting" carries TrialBalance {
+      phase Phase1 over "file export/import" manual
+      // Phase2 not listed: undecided, so tools show flow 15 as open for Phase2.
+    }
+  }
+
+  // --- Finance and Treasury depend on expenses and payroll -----------------
+
+  dependency ERP -> ExpenseManagement : CS {
+    flow 16 "Approved expenses" carries ExpenseReport as JournalEntry {
+      phase Phase1 over "CSV file export/import" manual
+      phase Phase2 automated
+    }
+  }
+
+  dependency CashManagement -> ExpenseManagement : ACL {
+    flow 17 "Expense reimbursements" carries ExpenseReport as PaymentOrder over "SFTP file" automated
+  }
+
+  dependency ERP -> Payroll : ACL {
+    // Manual in both phases: the payroll provider offers no journal export API.
+    flow 18 "Payroll journal" carries PayrollRun as JournalEntry over "file export/import" manual
+  }
+
+  dependency CashManagement -> Payroll : ACL {
+    // Flow 19 (salary advances) was retired: numbers are never reused.
+    flow 20 "Salary payments" carries PayrollRun as PaymentOrder over "SFTP file" automated
+  }
+
+  // --- People and identity -------------------------------------------------
+
+  // HRMS and Payroll realize the same context: no boundary is crossed, so no pattern.
+  dependency Payroll -> HRMS {
+    flow 21 "Employees" carries Employee over "HRMS payroll connector" automated
+    flow 22 "Variable pay" carries VariablePay {
+      phase Phase1 over "CSV file export/import" manual
+      phase Phase2 over "HRMS payroll connector" automated
+    }
+  }
+
+  dependency ExpenseManagement -> HRMS : Conformist {
+    flow 23 "Employees and approvers" carries Employee over "HRMS outbound connector" automated
+  }
+
+  dependency IAM -> HRMS : ACL :: "Joiners, movers and leavers drive accounts and access rights" {
+    flow 24 "Joiners, movers and leavers" carries Employee as User over "HR-driven provisioning" automated
+  }
+
+  dependency CRM -> IAM : Conformist criticality critical {
+    flow 25 "Users and single sign-on" carries User over "SAML 2.0 and SCIM" automated
+  }
+
+  dependency CampaignHub -> IAM : Conformist criticality critical {
+    flow 26 "Users and single sign-on" carries User over "OpenID Connect" automated
+  }
+
+  // --- Ad operations <-> Sales: a Partnership, written on both dependencies --
+
+  // The two teams plan the integration together and adapt to each other.
+  dependency CampaignHub -> CRM : Partnership :: "Campaigns are booked from signed sales orders" {
+    flow 27 "Signed sales orders" carries SalesOrder, AdProduct over "Salesforce Pub/Sub API" automated
+  }
+
+  dependency CRM -> CampaignHub : Partnership :: "Account managers show advertisers the hub's delivery figures" {
+    flow 28 "Campaign delivery" carries DeliveryReport over "CampaignHub delivery API" automated
+  }
+
+  // --- Media platforms and e-signature -------------------------------------
+
+  // The hub drives the ad server through the vendor's API: it depends on the
+  // ad server, and sends it the campaigns (flow 29, against the default direction).
+  // Degraded: campaigns are still booked while the ad server is down, and pushed later.
+  dependency CampaignHub -> OnsiteAds : ACL, OHS criticality degraded {
+    flow 29 "Campaign set-up" carries Campaign to OnsiteAds over "Criteo Retail Media API" automated
+    flow 30 "Delivery statistics" carries PlatformDelivery over "Criteo Retail Media API" automated
+  }
+
+  dependency OnsiteAds -> CleanRoom : Conformist {
+    flow 31 "Audience segments" carries AudienceSegment over "clean-room activation connector" automated
+  }
+
+  dependency CRM -> ESignature : ACL, OHS criticality degraded {
+    // Data goes both ways: one flow per direction.
+    flow 32 "Contracts sent for signature" carries Contract as Envelope to ESignature
+      over "DocuSign eSignature REST API" automated
+    flow 33 "Signed contracts" carries Envelope as Contract over "DocuSign Connect webhook" automated
+  }
+
+  // --- Reporting: no pattern yet — nobody has decided who adapts to whom ---
+
+  dependency Analytics -> ERP criticality tolerant {
+    flow 34 "Invoices and journal entries" carries Invoice, JournalEntry over "scheduled dataset refresh" automated
+  }
+
+  dependency Analytics -> CRM {
+    flow 35 "Accounts and sales orders" carries Account, SalesOrder over "scheduled dataset refresh" automated
+  }
+}

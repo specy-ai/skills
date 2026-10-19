@@ -86,3 +86,18 @@
 | TypeORM entities, Prisma models, migrations persisted to that datasource | `stores`, only for records that match a struct the `.arch` declares |
 
 Each node and resource gets a `// source:`; `provider`, `region` and `zone` are written only when a file states them.
+
+## Cross-system integration (level 0 — organization runs only)
+
+| Source signal | Level-0 inference |
+|---|---|
+| `HttpService` / `axios`, a generated client or a vendor SDK provider whose base URL or config key points at another system | an integration with that system: one `automated` flow per business exchange. Its dependency follows the need, not the call — a read makes the caller depend on the callee; a push of the caller's own records makes the callee depend on the caller; a request for the callee to act on the caller's behalf makes the caller depend on it, with a flow `to` the callee |
+| `@EventPattern` / `@MessagePattern` on a topic another system publishes; a BullMQ `@Processor` on its queue; a controller registered as that system's webhook | `dependency Subscriber -> Publisher`; flow in the default direction |
+| A `@Cron` / `@Interval` job that pulls another system's export; an SFTP client (`ssh2-sftp-client`) | a flow `over "SFTP file"` / `over "scheduled import"`, `automated` |
+| A second TypeORM `DataSource` (named connection) or Prisma client on another system's database | a flow `over "shared database" automated` |
+| A `*Mapper` / `*Translator` provider between the peer's DTO and a class of our own | `carries X as Y`; `ACL` when it sits in a module of its own (an anti-corruption or per-peer adapter module) |
+| The peer's generated types or shared package types used in entities and services, with no mapper | `Conformist` |
+| An `opossum` or `cockatiel` circuit breaker / fallback policy around the call | `criticality degraded` |
+| The exchange only goes through a queue or broker transport, or an outbox table | `criticality tolerant` |
+
+Patterns, criticality and `as` are written only when the signal is present, and an `ACL` or a criticality cue counts only in the code of the downstream system — the one that needs the other. The direction rule (Phase 2, step 22) and the rest of the evidence rules (*Level-0 inference* table) are in the skill.

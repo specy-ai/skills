@@ -1,0 +1,132 @@
+/* Specy Navigator — canvas-only styles of the level-0 landscape diagram
+   (arch-to-diagram.js `landscapeDiagram`). The Specy Diagram Engine renders
+   into the light DOM and ships styles for the C4 kinds only (group kinds
+   `system` / `container`, card kinds `person`, `externalSystem`,
+   `container`, `component`, `channel`); the kinds level 0 adds are styled
+   here, in the same visual language:
+     - `.group-node--kind-area`  the group of an area
+     - `.er-node--kind-system`   a system drawn as one card (the landscape's
+                                 systems, and the black-box systems of the C4
+                                 view of an organization file)
+     - `.landscape-card`         the class the converter puts on every system
+                                 and external-system card of the landscape
+                                 (React Flow copies a node's `className`
+                                 onto its wrapper)
+   Colours mirror `KIND_LEGEND` in arch-to-diagram.js. Nothing here styles
+   the host page. */
+
+/* The bundle injects its own styles after this sheet, so a rule that must
+   beat one of its single-class rules (`.group-node`, `.er-node`) names two
+   classes; the hover / selection accent the bundle then loses is restated. */
+
+/* ---- area: a department's systems. Warm and solid, where the system
+   boundary of the C4 view is blue and dashed ---- */
+.group-node.group-node--kind-area {
+  border: 1.5px solid var(--ds-beige-400, #b7a480);
+  border-radius: 12px;
+  background: #f8f5ee;
+}
+.group-node.group-node--kind-area:hover,
+.react-flow__node.selected .group-node.group-node--kind-area,
+.react-flow__node.is-highlighted .group-node.group-node--kind-area { border-color: var(--node-accent); }
+.group-node--kind-area .group-node__header {
+  background: var(--ds-beige-100, #f6efe2);
+  border-bottom-color: #e4d9c3;
+  border-radius: 10px 10px 0 0;
+}
+.group-node--kind-area .group-node__title { font-size: 12pt; }
+.group-node--kind-area .group-node__kind,
+.group-node--kind-area .group-node__subtitle { color: var(--ds-beige-700, #625845); }
+.group-node.group-node--kind-area.group-node--l1 { background: var(--ds-beige-100, #f6efe2); }
+.group-node--kind-area.group-node--l1 .group-node__header { background: transparent; border-radius: 10px; }
+
+/* ---- system card: the tint and border of the C4 system boundary ---- */
+.node-shell.er-node--kind-system {
+  background: #f1f5fb;
+  --node-border-color: var(--ds-blue-400, #5b7bb5);
+}
+.node-shell.er-node--kind-system:hover,
+.react-flow__node.selected .node-shell.er-node--kind-system { --node-border-color: var(--node-accent); }
+
+/* ---- the cards of the landscape ---- */
+/* the product, under the role name */
+.landscape-card .er-node__subtitle { font-size: 8.5pt; color: var(--fg-muted, #4b5d6c); }
+/* hotspots: one sober line, upright, in the accent's dark shade */
+.landscape-card .er-node__attributes { font-style: normal; color: var(--ds-red-500, #a13e3e); }
+/* the rows. `masters` — what the system is the source of truth for — comes
+   first and reads heavier than `handles` and `used by` under it; the
+   converter flags the cards that have that row (`landscape-card--masters`) */
+.landscape-card .er-node__body--kv { margin-top: 6px; gap: 3px; }
+.landscape-card--masters .er-node__body--kv-row:first-child dt,
+.landscape-card--masters .er-node__body--kv-row:first-child dd { color: var(--ds-blue-700, #172741); font-weight: 600; }
+
+/* ---- two opposite dependencies stay two edges ----
+   The engine attaches an edge to the middle of the side that faces the other
+   card, the same point for the outgoing and the incoming handle of a side: a
+   dependency A → B and its opposite B → A would be drawn on one curve, two
+   labels on one spot. Each handle is moved off the middle instead, outgoing
+   ones clockwise and incoming ones counter-clockwise, so that every edge
+   keeps to one side of the line between its two cards, as traffic does: the
+   two edges of a pair run parallel.
+     --dep-side  offset along a left / right side: sideways, the two labels
+                 of a pair end up one above the other, 2 × 16px apart
+     --dep-end   offset along a top / bottom side: up and down, the two
+                 labels end up side by side, hence 2 × 78px (a label is at
+                 most 30 characters, LANDSCAPE_LABEL_MAX in the converter)
+     --dep-in    up and down, an edge also starts that far inside its card
+                 (the card covers the stretch): its label, at mid-length,
+                 sits half of it towards its source. Below a card with
+                 several neighbours the labels alternate — outgoing ones
+                 higher, incoming ones lower — instead of meeting on one line
+   The same holds for a card reduced to its name (group level 2) and for a
+   folded area (level 1), whose aggregated edges go one per direction. */
+.landscape-card .node-shell { --dep-side: 16px; --dep-end: 78px; --dep-in: 20px; }
+.landscape-card .er-node--compact { --dep-side: 7px; --dep-in: 0px; }
+.group-node--kind-area.group-node--l1 { --dep-side: 9px; --dep-end: 44px; --dep-in: 0px; }
+
+.landscape-card .react-flow__handle[data-handleid="source-right"],
+.landscape-card .react-flow__handle[data-handleid="target-left"],
+.group-node--kind-area.group-node--l1 > .react-flow__handle[data-handleid="source-right"],
+.group-node--kind-area.group-node--l1 > .react-flow__handle[data-handleid="target-left"] { top: calc(50% + var(--dep-side)); }
+.landscape-card .react-flow__handle[data-handleid="source-left"],
+.landscape-card .react-flow__handle[data-handleid="target-right"],
+.group-node--kind-area.group-node--l1 > .react-flow__handle[data-handleid="source-left"],
+.group-node--kind-area.group-node--l1 > .react-flow__handle[data-handleid="target-right"] { top: calc(50% - var(--dep-side)); }
+.landscape-card .react-flow__handle[data-handleid="source-top"],
+.landscape-card .react-flow__handle[data-handleid="target-bottom"],
+.group-node--kind-area.group-node--l1 > .react-flow__handle[data-handleid="source-top"],
+.group-node--kind-area.group-node--l1 > .react-flow__handle[data-handleid="target-bottom"] { left: calc(50% + var(--dep-end)); }
+.landscape-card .react-flow__handle[data-handleid="source-bottom"],
+.landscape-card .react-flow__handle[data-handleid="target-top"],
+.group-node--kind-area.group-node--l1 > .react-flow__handle[data-handleid="source-bottom"],
+.group-node--kind-area.group-node--l1 > .react-flow__handle[data-handleid="target-top"] { left: calc(50% - var(--dep-end)); }
+.landscape-card .react-flow__handle[data-handleid="source-top"] { top: calc(1px + var(--dep-in)); }
+.landscape-card .react-flow__handle[data-handleid="source-bottom"] { bottom: calc(1px + var(--dep-in)); }
+
+/* ---- edge labels: read as text, over their edge ----
+   The engine stacks cards (3000) over edges (2000) over edge labels (1500),
+   so an edge strikes its own label through, and it sets the labels in the
+   accent colour, italic, at 10px. On a landscape canvas a label carries
+   flow numbers and names: it goes between the cards and the edges, where it
+   hides the stretch of edge under it, and takes the text colour. (The label
+   styles are inline: only `!important` reaches them.) */
+.react-flow:has(.landscape-card) .react-flow__edgelabel-renderer > div {
+  z-index: 2500;
+  color: var(--ds-blue-700, #172741) !important;
+  font-style: normal !important;
+}
+
+/* ---- arrowheads: the colour of their edge, and large enough to give the
+   direction at overview zoom ----
+   The engine's `er-arrow` marker is three stroke widths long and filled
+   with the accent colour whatever the edge. On a landscape canvas (the
+   marker's <svg> is the sibling just before the canvas) the head is scaled
+   from its tip and takes the stroke of the edge that carries it: a
+   Partnership dependency is navy. Where `:has()` or `context-stroke` is not
+   supported the engine's head stays as it is. */
+svg:has(+ .diagram-wrapper .landscape-card) #er-arrow { overflow: visible; }
+svg:has(+ .diagram-wrapper .landscape-card) #er-arrow path {
+  fill: context-stroke;
+  transform: scale(1.7);
+  transform-origin: 10px 5px;
+}

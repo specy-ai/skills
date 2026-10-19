@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-Specy is a DDD toolkit that captures business knowledge in structured DSL files (`.domain`, `.prd`, `.sysreq`). This repo contains the AI skill definitions, packaged as a single Claude Code **plugin** named `specy`. The 8 skills (invoked as `specy:<name>`) are: 7 core — `prd-design`, `sysreq-design`, `sysreq-extract-from-code`, `domain-design`, `domain-build-code`, `domain-extract-from-code`, `domain-refactor` — plus 1 auxiliary — `domain-dialogue`. Skills are assembled from modular templates into self-contained `dist/skills/<name>/SKILL.md` files.
+Specy is a DDD toolkit that captures business knowledge in structured DSL files (`.prd`, `.sysreq`, `.domain`, `.arch`). This repo contains the AI skill definitions, packaged as a single Claude Code **plugin** named `specy`. The 11 skills (invoked as `specy:<name>`) are: 7 core — `prd-design`, `sysreq-design`, `sysreq-extract-from-code`, `domain-design`, `domain-build-code`, `domain-extract-from-code`, `domain-refactor` — 3 architecture — `architecture-design`, `architecture-extract-from-code`, `architecture-build-code` — plus 1 auxiliary — `domain-dialogue`. Skills are assembled from modular templates into self-contained `dist/skills/<name>/SKILL.md` files.
 
 ## Build Commands
 
@@ -45,8 +45,8 @@ SKILL.md (a plugin can't reference files outside its own directory).
 
 ### Source of Truth
 
-- **Domain grammar**: `src/grammars/domain.ebnf` is the single canonical grammar. It gets copied to `dist/skills/domain-extract-from-code/grammars/` (and the other domain skills) by the build script.
-- **Metamodels**: `src/metamodels/DOMAIN-METAMODEL.md` documents the v3 domain metamodel concepts and constraints.
+- **Grammars**: `src/grammars/*.ebnf` are the canonical grammars (`domain.ebnf`, `architecture.ebnf`, `prd.ebnf`, `sysreq.ebnf`, `data-operation.ebnf`). The build script copies each into the skills that need it (e.g. `dist/skills/domain-extract-from-code/grammars/`). The tree-sitter grammars under `src/tree-sitters/` are faithful translations of the EBNF files and must be updated with them.
+- **Metamodels**: `src/metamodels/*.md` document each layer's concepts and constraints (`DOMAIN-METAMODEL.md` for the v3 domain model, `SOFTWARE-ARCHITECTURE-METAMODEL.md` for `.arch`, incl. its level 0). They are published verbatim on specy.ai, so their heading texts are stable anchors: add headings, do not rename them.
 - **Skill templates**: `src/skills/{skill}/main.md` — always edit here, never in `dist/`.
 
 ### Key Distinction: src/ vs dist/
@@ -74,6 +74,18 @@ organization > context (with context map) > module > entities/aggregates/values/
 
 Key v3 constructs: entity (with `identity`, `duplicate detection`, `states { machine }`), aggregate, value, command, query, event, external/error/temporal events, three service types (domain/application/infrastructure), reaction (reactive rule: `triggered-by` event / `effects` command), invariant (with enforcement), precondition/postcondition on operations, agreement/reconciliation, interface.
 
+A context map entry is written by a context about itself: inside `X`, `downstream Y : ACL` means X is downstream of Y and protects itself with an ACL.
+
+### Specy Software Architecture DSL (`.arch`)
+
+A `.arch` file has one of two roots:
+```
+architecture  > system (one, in focus) > container > component     // C4 levels 1–3, Thrift-typed contracts, ports, connectors, channels, deployment
+organization  > area / phase / person / externalSystem / system / dependency > flow   // level 0: the system landscape
+```
+
+Level 0: a `system` states its purpose (`::`), product (`technology`), `area`, `used-by`, the concepts it `masters` (source of truth) and `handles`, and its `hotspot`s. `dependency A -> B` reads "A depends on B" — the direction of the need, not of the call — with context-map patterns (`CS | Conformist | ACL` downstream, `OHS` upstream, `SharedKernel | PublishedLanguage | Partnership` both; `Partnership` is written on both dependencies of a mutual pair) and a `criticality`. A `flow` carries numbered domain concepts (`carries X as Y`, `to` when data goes to the upstream side) with a mechanism `over "…" manual | automated`, once or per `phase`. Concept names resolve against the `domain-source`(s) (`Context.Concept` when ambiguous; `// NOTE:` acknowledges a name with no domain element yet). The worked example is `examples/retail-media/`; the Navigator in `ui/` renders both roots (see `ui/README.md`).
+
 ## Development Workflow
 
 1. Edit templates and fragments in `src/skills/`
@@ -88,11 +100,11 @@ Setup hooks after clone: `git config core.hooksPath hooks/`
 
 ## Tree-Sitter Parsers
 
-Three parsers in `src/tree-sitters/`: specy-domain, specy-prd, specy-sysreq. `src/tree-sitters/build.sh` generates, builds, and smoke-tests them against files in `examples/`.
+Four parsers in `src/tree-sitters/`: specy-domain, specy-prd, specy-sysreq, specy-architecture. `src/tree-sitters/build.sh` generates, builds, and smoke-tests them against files in `examples/`.
 
 ## Examples
 
-`examples/` contains complete Specy projects (business-loan, url-shortener, uber, ecommerce) used both as documentation and as tree-sitter smoke test inputs.
+`examples/` contains complete Specy projects (business-loan, url-shortener, ride-now, ecommerce, retail-media — an organization-level `.arch` landscape with its `.domain`) used both as documentation and as tree-sitter smoke test inputs. Examples are fictional: no client names, no people, no e-mail addresses.
 
 ## DSL Conventions
 
@@ -100,12 +112,12 @@ Three parsers in `src/tree-sitters/`: specy-domain, specy-prd, specy-sysreq. `sr
 - Operation labels: string literals in business language, not identifiers
 - Every definition must have a `// source: path/to/file.ext` comment for traceability
 - `// UNCLEAR:` — grammar genuinely cannot express the condition (business-critical)
-- `// NOTE:` — infrastructure concern omitted or gap flagged
+- `// NOTE:` — infrastructure concern omitted or gap flagged; at `.arch` level 0 it also acknowledges a concept name that has no domain element yet
 
 ## Design Review Panels
 
-- `TEAM.md` — 7-panellist review for language/grammar/skill changes (Simplicity, DDD Fidelity, Readability, Machine Reasoning, Cross-File Coherence, Skill Experience, Provocateur)
-- `UX_TEAM.md` — 6-panellist review for interface/visualization changes
+- `CORE_TEAM.md` — 7-panellist review for language/grammar/skill changes (Simplicity, DDD Fidelity, Readability, Machine Reasoning, Cross-File Coherence, Skill Experience, Provocateur)
+- `UX_TEAM.md` — 6-panellist review for interface/visualization changes (not in the repo yet)
 - Both follow: Present → Respond → Rebut → Synthesise → Verdict
 
 ## Grammar Gaps

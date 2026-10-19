@@ -80,6 +80,7 @@ modelsClause     = "models" , typeName , { "," , typeName } ;
 // (metamodel: Context map patterns)
 // -----------------------------------------------------------------------------
 
+// Each entry states the DECLARING context's own position and pattern: inside X, "downstream Y : ACL" = X is downstream of Y and applies an ACL.
 contextMapBlock  = "map" , "{" , { comment | contextRelation } , "}" ;
 
 contextRelation  = upstreamRelation

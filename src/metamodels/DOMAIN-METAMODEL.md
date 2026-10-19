@@ -136,7 +136,7 @@ Relations:
 
 A context map pattern defines the behavioral constraints that govern how two bounded contexts interact. The pattern determines who controls the shared model, how translation happens, and what coupling is accepted. Each pattern imposes specific obligations on message handling, model evolution, and dependency management.
 
-Patterns are grouped by the position of the bounded context in the relationship: upstream (the context that provides), downstream (the context that consumes), or symmetric (both contexts share responsibility).
+Patterns are grouped by the position of the bounded context in the relationship: upstream (the context that provides), downstream (the context that consumes), or symmetric (both contexts share responsibility). In a context's `map`, each entry states the declaring context's own position and its own pattern: inside context `X`, `downstream Y : ACL` means that `X` is downstream of `Y` and protects itself with an Anti-Corruption Layer, and `upstream Y : OHS` means that `X` is upstream of `Y` and offers it an Open Host Service.
 
 The classification of the subdomains on each side informs the choice of pattern: a context that depends on a context or product serving a generic subdomain usually conforms to it or protects itself with an Anti-Corruption Layer, while a context modeling a core subdomain is rarely a Conformist.
 
