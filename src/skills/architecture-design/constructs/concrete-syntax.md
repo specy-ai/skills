@@ -92,10 +92,19 @@ architecture ShortLinkPlatform :: "URL shortening platform — architecture" {
     connect LinkController -> LinkDb over "JDBC" sync
     connect LinkController -> Analytics.AnalyticsIngest over "HTTPS" async
 
-    // DEPLOYMENT VIEW — lightweight: environment + placement + replica hint.
-    environment production :: "Multi-AZ production" {
-      deploy Api replicas 3
-      deploy EventBus, LinkDb
+    // DEPLOYMENT VIEW — placement + residency facts: environments, the nodes
+    // containers run on, the resources where data lives, replica hints.
+    environment production :: "Live traffic" {
+      node euWest :: "Primary region" provider "AWS" region "eu-west-1" {
+        node k8sProd :: "Workload cluster" zone "eu-west-1a" {   // nodes nest
+          deploy Api replicas 3
+        }
+        // a provisioned instance of the LinkDb container: where link data lives
+        resource linkDb :: "Managed Postgres" instantiates LinkDb technology "RDS Postgres 16" tenancy dedicated {
+          stores ShortLinkDTO                  // structs of this file or of the system's .dataop
+        }
+      }
+      deploy EventBus                          // directly under the environment: node unstated
     }
   }
 }
@@ -104,7 +113,7 @@ architecture ShortLinkPlatform :: "URL shortening platform — architecture" {
 ### Syntax rules that bite
 
 - **Descriptions** use `::` then a string literal. **Metadata** uses `meta { key = value }`. Comments use `//`.
-- **Names**: `system`, `container`, `component`, `interface`, and every named type (`struct`, `enum`, `typedef`, `union`, `exception`) are `PascalCase`. Operations, struct/union fields, enum members, channels, and environments are `camelCase`. Primitives are lowercase.
+- **Names**: `system`, `container`, `component`, `interface`, and every named type (`struct`, `enum`, `typedef`, `union`, `exception`) are `PascalCase`. Operations, struct/union fields, enum members, channels, environments, nodes, and resources are `camelCase`. Primitives are lowercase.
 - **Primitives** (lowercase): `string`, `int`/`integer`, `long`, `double`, `decimal`, `boolean`, `date`, `datetime`, `time`, `instant`, `duration`, `uuid`, `binary`. `void` is a return type only. Containers: `list<T>`, `set<T>`, `map<K, V>`.
 - **Thrift fields & args** always carry an `<ordinal>: required|optional <type> <name> [= default]`. Ordinals start at 1 and never repeat within a struct/exception/operation.
 - **Operation styles** prefix the name: bare = request-response (command), `safe` = query (no mutation), `oneway` = event emission (must `returns void`), `streaming` = result stream.
@@ -112,6 +121,7 @@ architecture ShortLinkPlatform :: "URL shortening platform — architecture" {
 - **`satisfies [ID, …]`** takes a bracketed list of requirement identifiers (`REQ-…`, `NFR-…`). NFRs in particular belong on the elements that address them.
 - **Ports vs connectors**: `provides` / `requires` declare ports; a separate `connect A.Port -> B over "<protocol>" <sync|async|streaming>` wires a required port to a provided port. A required port is unsatisfied until a connector binds it.
 - **Async** is modeled with `channel <name> on <BrokerContainer> { carries <MsgTypes> }` plus component `publishes <Msg> to <chan>` / `subscribes <chan>` — never as an anonymous arrow.
+- **Deployment view**: an `environment` holds `deploy` clauses and `node`s; a `node <name> [provider "…"] [region "…"] [zone "…"] { … }` holds nested nodes, `deploy` clauses and `resource`s; a `resource <name> [instantiates <Container>] [technology "…"] [tenancy shared|dedicated] [{ stores <Struct>, … }]` sits on a node. Description and `meta` come right after the name; a node's attributes come in any order, each at most once; a resource's clauses come in the order shown. Nodes and resources are optional.
 - **Provenance is mandatory** when inputs come from files: `domain-source` and `requirements-source` at the top of the `architecture` block make both traceability bridges machine-resolvable.
 
 When in doubt about syntax, re-read `grammar/architecture.ebnf` and the `examples/url-shortener/url-shortener.arch` model — it exercises every construct.

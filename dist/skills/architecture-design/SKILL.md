@@ -40,7 +40,7 @@ Detect which mode fits. A `.sysreq` with NFRs plus a `.domain` calls for one-sho
 ## Cardinal Rules
 
 1. **The metamodel is the schema.** Every concept, relation, and syntax rule comes from `references/SOFTWARE-ARCHITECTURE-METAMODEL.md` and `grammar/architecture.ebnf`. Read them before writing anything. Do not invent concepts or syntax the metamodel does not define. C4 level 4 (code) is **out of scope** — stop at components.
-2. **Architecture is logical, not infrastructure.** Containers carry a coarse free-form `technology` string; components carry responsibilities and contracts. Do **not** model infra nodes, networking, regions, or capacity — the deployment view records only environment + placement + replica hint.
+2. **Architecture is logical, not infrastructure.** Containers carry a coarse free-form `technology` string; components carry responsibilities and contracts. The deployment view records placement and residency facts only: environments, the nodes containers run on (provider, region, zone), the resources where data lives (what they instantiate, their tenancy, the structs they store) and replica hints. Do **not** model capacity, networking, or an inventory of running instances — a `.arch` is not a CMDB.
 3. **Trace both bridges.** When a `.sysreq` is provided, set `requirements-source` and put `satisfies` (incl. NFR ids) on every element that addresses a requirement. When a `.domain` is provided, set `domain-source`, `realizes` the right domain elements, and `import` domain value types and events rather than re-declaring them. Allow orphans, but flag them.
 4. **Contracts are first-class and wire-safe.** Interfaces *own* their operations. Every struct/exception field and every operation argument carries a Thrift ordinal and a `required`/`optional` marker. Ordinals start at 1, never repeat within a type. Pick the right operation style — bare (command), `safe` (query), `oneway` (event, returns `void`), `streaming`.
 5. **Ports and connectors over arrows.** Components/containers `provides` and `requires` interfaces (ports); a separate `connect … -> … over "<protocol>" <style>` wires each required port to a provided port. A required port is unsatisfied until a connector binds it. Keep transport on the connector, not inline.
@@ -53,7 +53,7 @@ Detect which mode fits. A `.sysreq` with NFRs plus a `.domain` calls for one-sho
 
 Before producing any architecture content:
 
-1. Read `references/SOFTWARE-ARCHITECTURE-METAMODEL.md` in full. This defines every concept (Architecture root, System, Person, External System, Bounded Context, Container, Component, Interface, Operation, Argument, the Thrift type system — Struct, Field, Enum, Typedef, Union, Exception, domain imports — Ports & Connectors, Channels, Deployment view), all relations, the satisfies/realizes traceability bridges, and the C4 / domain mapping tables.
+1. Read `references/SOFTWARE-ARCHITECTURE-METAMODEL.md` in full. This defines every concept (Architecture root, System, Person, External System, Bounded Context, Container, Component, Interface, Operation, Argument, the Thrift type system — Struct, Field, Enum, Typedef, Union, Exception, domain imports — Ports & Connectors, Channels, Deployment view — Environment, Node, Resource), all relations, the satisfies/realizes traceability bridges, and the C4 / domain mapping tables.
 2. Read `grammar/architecture.ebnf` to ground the exact concrete syntax (declaration order, optional clauses, Thrift field shape, connector reference form).
 3. If a `.domain` file is provided, read `references/DOMAIN-METAMODEL.md` to understand what you are realizing — modules and contexts are **quoted multi-word names**; value types, events, and interfaces are **PascalCase**. This distinction governs how you write `realizes` and `import` references.
 4. If a `.sysreq` file is provided, read `references/SYSTEM-REQ-METAMODEL.md` to understand requirement structure, EARS patterns, and NFR categories — NFRs in particular drive architecture.
@@ -152,13 +152,29 @@ Challenge if: async fan-out is modelled as a bare connector instead of a channel
 
 ### Phase 7 — Deployment view
 
-Record where containers run.
+Record where containers run and where their data lives.
 
-Ask: "What environments exist (e.g. `production`)? Which containers deploy there, and what is the replica hint for the load-bearing ones?"
+Ask:
+- "What environments exist (e.g. `production`)? Which containers deploy there, and what is the replica hint for the load-bearing ones?"
+- "Where do they run — which provider, region, zone? Do those places nest, a cluster inside a region?" Each place is a `node`.
+- "Which data stores and brokers are provisioned rather than deployed by us — a managed database, a topic, a bucket, a cache, a secret store? Which container does each one instantiate? Is it dedicated to this system or shared with others? Which structs does it store?" Each is a `resource` on a node.
+- "Does an NFR or a constraint — data residency, GDPR, sovereignty, fault isolation — make where something runs or is stored a requirement?" Those are the facts worth recording.
 
-Produce: `environment <name> { deploy <Container> [replicas N] … }`.
+Produce (nodes and resources are optional; an environment of bare `deploy` clauses is still valid):
 
-Challenge if: infra detail is creeping in (nodes, regions, networking, capacity) — keep it to placement + replica hint only.
+```
+environment <name> [:: "…"] {
+  node <name> [:: "…"] [provider "…"] [region "…"] [zone "…"] {
+    node <name> [zone "…"] { deploy <Container> [replicas N] }      // nodes nest
+    deploy <Container> [replicas N]
+    resource <name> [:: "…"] [instantiates <Container>] [technology "…"] [tenancy shared|dedicated]
+        [{ stores <Struct>, … }]
+  }
+  deploy <Container> [replicas N]                                   // on no stated node
+}
+```
+
+Challenge if: capacity, networking or an instance inventory is creeping in (instance sizes, subnets, security groups, autoscaling rules, one entry per running pod) — keep it to placement and residency facts; a region or zone that no rule or NFR asks about is noise; a resource `stores` structs no residency, retention or tenancy question needs; a container is both `deploy`ed and instantiated by a resource in the same environment.
 
 ### Phase 8 — Traceability
 
@@ -245,7 +261,7 @@ NFRs are the architecture's reason for being. Every NFR with structural conseque
 
 ### No Infrastructure Creep
 
-The deployment view is placement + replica hint only. If you find yourself modelling nodes, subnets, regions, or capacity, stop — that is out of scope.
+The deployment view holds placement and residency facts: environments, nodes with their provider, region and zone, resources with what they instantiate, their tenancy and the structs they store, and replica hints. If you find yourself modelling capacity, subnets, networking, or every running instance, stop — that is out of scope.
 
 ### Over-Engineering Detection
 
@@ -351,10 +367,19 @@ architecture ShortLinkPlatform :: "URL shortening platform — architecture" {
     connect LinkController -> LinkDb over "JDBC" sync
     connect LinkController -> Analytics.AnalyticsIngest over "HTTPS" async
 
-    // DEPLOYMENT VIEW — lightweight: environment + placement + replica hint.
-    environment production :: "Multi-AZ production" {
-      deploy Api replicas 3
-      deploy EventBus, LinkDb
+    // DEPLOYMENT VIEW — placement + residency facts: environments, the nodes
+    // containers run on, the resources where data lives, replica hints.
+    environment production :: "Live traffic" {
+      node euWest :: "Primary region" provider "AWS" region "eu-west-1" {
+        node k8sProd :: "Workload cluster" zone "eu-west-1a" {   // nodes nest
+          deploy Api replicas 3
+        }
+        // a provisioned instance of the LinkDb container: where link data lives
+        resource linkDb :: "Managed Postgres" instantiates LinkDb technology "RDS Postgres 16" tenancy dedicated {
+          stores ShortLinkDTO                  // structs of this file or of the system's .dataop
+        }
+      }
+      deploy EventBus                          // directly under the environment: node unstated
     }
   }
 }
@@ -363,7 +388,7 @@ architecture ShortLinkPlatform :: "URL shortening platform — architecture" {
 ### Syntax rules that bite
 
 - **Descriptions** use `::` then a string literal. **Metadata** uses `meta { key = value }`. Comments use `//`.
-- **Names**: `system`, `container`, `component`, `interface`, and every named type (`struct`, `enum`, `typedef`, `union`, `exception`) are `PascalCase`. Operations, struct/union fields, enum members, channels, and environments are `camelCase`. Primitives are lowercase.
+- **Names**: `system`, `container`, `component`, `interface`, and every named type (`struct`, `enum`, `typedef`, `union`, `exception`) are `PascalCase`. Operations, struct/union fields, enum members, channels, environments, nodes, and resources are `camelCase`. Primitives are lowercase.
 - **Primitives** (lowercase): `string`, `int`/`integer`, `long`, `double`, `decimal`, `boolean`, `date`, `datetime`, `time`, `instant`, `duration`, `uuid`, `binary`. `void` is a return type only. Containers: `list<T>`, `set<T>`, `map<K, V>`.
 - **Thrift fields & args** always carry an `<ordinal>: required|optional <type> <name> [= default]`. Ordinals start at 1 and never repeat within a struct/exception/operation.
 - **Operation styles** prefix the name: bare = request-response (command), `safe` = query (no mutation), `oneway` = event emission (must `returns void`), `streaming` = result stream.
@@ -371,6 +396,7 @@ architecture ShortLinkPlatform :: "URL shortening platform — architecture" {
 - **`satisfies [ID, …]`** takes a bracketed list of requirement identifiers (`REQ-…`, `NFR-…`). NFRs in particular belong on the elements that address them.
 - **Ports vs connectors**: `provides` / `requires` declare ports; a separate `connect A.Port -> B over "<protocol>" <sync|async|streaming>` wires a required port to a provided port. A required port is unsatisfied until a connector binds it.
 - **Async** is modeled with `channel <name> on <BrokerContainer> { carries <MsgTypes> }` plus component `publishes <Msg> to <chan>` / `subscribes <chan>` — never as an anonymous arrow.
+- **Deployment view**: an `environment` holds `deploy` clauses and `node`s; a `node <name> [provider "…"] [region "…"] [zone "…"] { … }` holds nested nodes, `deploy` clauses and `resource`s; a `resource <name> [instantiates <Container>] [technology "…"] [tenancy shared|dedicated] [{ stores <Struct>, … }]` sits on a node. Description and `meta` come right after the name; a node's attributes come in any order, each at most once; a resource's clauses come in the order shown. Nodes and resources are optional.
 - **Provenance is mandatory** when inputs come from files: `domain-source` and `requirements-source` at the top of the `architecture` block make both traceability bridges machine-resolvable.
 
 When in doubt about syntax, re-read `grammar/architecture.ebnf` and the `examples/url-shortener/url-shortener.arch` model — it exercises every construct.
@@ -399,8 +425,8 @@ Before delivering the final `.arch` file, verify:
 | Async fan-out modelled as channels | `channel … on broker { carries … }` + publishes/subscribes |
 | `satisfies` populated incl. architecture-driving NFRs | NFRs land on the elements that address them |
 | Every domain module realized by ≥1 component | No dropped modules |
-| Deployment view is placement + replicas only | No infra creep |
-| Naming conventions respected | PascalCase types; camelCase ops/fields/channels/environments; lowercase primitives |
+| Deployment view is placement + residency facts only | Nodes carry provider / region / zone; resources instantiate a data-store or broker container and `stores` declared structs; no capacity, networking or instance inventory |
+| Naming conventions respected | PascalCase types; camelCase ops/fields/channels/environments/nodes/resources; lowercase primitives |
 
 Report any failures to the user before writing the final file.
 
@@ -411,7 +437,7 @@ Report any failures to the user before writing the final file.
 1. **Respond in the user's language.** Match the language of the input.
 2. **Architecture language, not domain language.** Say "the RedirectEdge container provides the RedirectApi interface" not "the ShortLink aggregate enforces …". Domain rules belong in the `.domain`.
 3. **Architecture language, not code language.** Say "this component requires the SafetyScanning interface over gRPC" not "inject a SafetyScanningClient bean". Concrete code belongs downstream in `architecture-build-code`.
-4. **Logical, not infrastructural.** Keep deployment to placement + replicas; push nodes/regions/capacity out of scope.
+4. **Logical, not infrastructural.** Keep deployment to placement and residency facts (nodes, resources, replicas); push capacity, networking and instance inventories out of scope.
 5. **Challenge before accepting.** Test each decomposition, contract, and wiring decision against the quality challenges before writing it.
 6. **Concise turns, rich files.** Keep conversation turns short; the `.arch` file is where the detail goes.
 7. **Always offer next steps.** End every turn with what to explore next: "Want me to verify the port graph?" "Should we check NFR coverage?" "Want the channel topology surfaced?"

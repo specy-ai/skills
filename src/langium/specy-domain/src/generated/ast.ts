@@ -77,6 +77,7 @@ export type SpecyDomainKeywordNames =
     | "contains"
     | "context"
     | "coordination"
+    | "core"
     | "creates"
     | "d"
     | "date"
@@ -119,6 +120,7 @@ export type SpecyDomainKeywordNames =
     | "from"
     | "future"
     | "futureOrPresent"
+    | "generic"
     | "guard"
     | "h"
     | "hours"
@@ -149,6 +151,7 @@ export type SpecyDomainKeywordNames =
     | "min"
     | "minLength"
     | "minutes"
+    | "models"
     | "module"
     | "months"
     | "ms"
@@ -205,6 +208,8 @@ export type SpecyDomainKeywordNames =
     | "status"
     | "step"
     | "string"
+    | "subdomain"
+    | "supporting"
     | "suspend"
     | "symmetric"
     | "synced-via"
@@ -339,10 +344,10 @@ export function isInterfaceRole(item: unknown): item is InterfaceRole {
     return item === 'api' || item === 'spi';
 }
 
-export type KeywordAsIdent = 'about' | 'action' | 'aggregate' | 'agreement' | 'alert' | 'and' | 'api' | 'application' | 'as' | 'boolean' | 'calls' | 'choreography' | 'code' | 'command' | 'compensate' | 'compensation' | 'context' | 'coordination' | 'creates' | 'date' | 'datetime' | 'days' | 'decimal' | 'default' | 'depends' | 'describes' | 'detection' | 'domain' | 'downstream' | 'duration' | 'emits' | 'enforcement' | 'entities' | 'entity' | 'enum' | 'error' | 'escalation' | 'event' | 'every' | 'exists' | 'exposes' | 'external' | 'false' | 'fields' | 'final' | 'for' | 'forall' | 'foreach' | 'from' | 'future' | 'futureOrPresent' | 'guard' | 'hours' | 'id' | 'idempotent' | 'identity' | 'if' | 'immutable' | 'in' | 'infrastructure' | 'instant' | 'int' | 'integer' | 'interface' | 'invariant' | 'invariants' | 'is' | 'list' | 'long' | 'machine' | 'manual' | 'map' | 'max' | 'maxLength' | 'message' | 'meta' | 'min' | 'minLength' | 'minutes' | 'module' | 'months' | 'must' | 'name' | 'not' | 'null' | 'of' | 'offset' | 'on' | 'operations' | 'optional' | 'or' | 'orchestration' | 'ordered' | 'organization' | 'participants' | 'past' | 'pastOrPresent' | 'pattern' | 'postcondition' | 'precondition' | 'predicate' | 'query' | 'range' | 'reaction' | 'reconciliation' | 'reference' | 'references' | 'rejection' | 'rejects' | 'repository' | 'required' | 'requires' | 'resolves' | 'retry' | 'returns' | 'safe' | 'satisfies' | 'schedule' | 'seconds' | 'service' | 'set' | 'sets' | 'spi' | 'state' | 'states' | 'status' | 'step' | 'string' | 'suspend' | 'symmetric' | 'temporal' | 'time' | 'trigger' | 'true' | 'type' | 'unique' | 'unsafe' | 'upstream' | 'uuid' | 'value' | 'void' | 'weeks' | 'when' | 'where' | 'years';
+export type KeywordAsIdent = 'about' | 'action' | 'aggregate' | 'agreement' | 'alert' | 'and' | 'api' | 'application' | 'as' | 'boolean' | 'calls' | 'choreography' | 'code' | 'command' | 'compensate' | 'compensation' | 'context' | 'coordination' | 'core' | 'creates' | 'date' | 'datetime' | 'days' | 'decimal' | 'default' | 'depends' | 'describes' | 'detection' | 'domain' | 'downstream' | 'duration' | 'emits' | 'enforcement' | 'entities' | 'entity' | 'enum' | 'error' | 'escalation' | 'event' | 'every' | 'exists' | 'exposes' | 'external' | 'false' | 'fields' | 'final' | 'for' | 'forall' | 'foreach' | 'from' | 'future' | 'futureOrPresent' | 'generic' | 'guard' | 'hours' | 'id' | 'idempotent' | 'identity' | 'if' | 'immutable' | 'in' | 'infrastructure' | 'instant' | 'int' | 'integer' | 'interface' | 'invariant' | 'invariants' | 'is' | 'list' | 'long' | 'machine' | 'manual' | 'map' | 'max' | 'maxLength' | 'message' | 'meta' | 'min' | 'minLength' | 'minutes' | 'models' | 'module' | 'months' | 'must' | 'name' | 'not' | 'null' | 'of' | 'offset' | 'on' | 'operations' | 'optional' | 'or' | 'orchestration' | 'ordered' | 'organization' | 'participants' | 'past' | 'pastOrPresent' | 'pattern' | 'postcondition' | 'precondition' | 'predicate' | 'query' | 'range' | 'reaction' | 'reconciliation' | 'reference' | 'references' | 'rejection' | 'rejects' | 'repository' | 'required' | 'requires' | 'resolves' | 'retry' | 'returns' | 'safe' | 'satisfies' | 'schedule' | 'seconds' | 'service' | 'set' | 'sets' | 'spi' | 'state' | 'states' | 'status' | 'step' | 'string' | 'subdomain' | 'supporting' | 'suspend' | 'symmetric' | 'temporal' | 'time' | 'trigger' | 'true' | 'type' | 'unique' | 'unsafe' | 'upstream' | 'uuid' | 'value' | 'void' | 'weeks' | 'when' | 'where' | 'years';
 
 export function isKeywordAsIdent(item: unknown): item is KeywordAsIdent {
-    return item === 'value' || item === 'type' || item === 'status' || item === 'id' || item === 'code' || item === 'name' || item === 'message' || item === 'required' || item === 'optional' || item === 'unique' || item === 'immutable' || item === 'ordered' || item === 'state' || item === 'final' || item === 'event' || item === 'command' || item === 'query' || item === 'entity' || item === 'aggregate' || item === 'enum' || item === 'module' || item === 'context' || item === 'organization' || item === 'interface' || item === 'service' || item === 'domain' || item === 'application' || item === 'infrastructure' || item === 'repository' || item === 'reaction' || item === 'invariant' || item === 'agreement' || item === 'reconciliation' || item === 'escalation' || item === 'step' || item === 'machine' || item === 'states' || item === 'fields' || item === 'entities' || item === 'operations' || item === 'invariants' || item === 'references' || item === 'identity' || item === 'satisfies' || item === 'meta' || item === 'map' || item === 'api' || item === 'spi' || item === 'exposes' || item === 'requires' || item === 'describes' || item === 'depends' || item === 'about' || item === 'schedule' || item === 'reference' || item === 'offset' || item === 'instant' || item === 'guard' || item === 'trigger' || item === 'detection' || item === 'compensation' || item === 'coordination' || item === 'participants' || item === 'predicate' || item === 'action' || item === 'when' || item === 'must' || item === 'enforcement' || item === 'rejects' || item === 'precondition' || item === 'postcondition' || item === 'safe' || item === 'unsafe' || item === 'idempotent' || item === 'creates' || item === 'sets' || item === 'emits' || item === 'resolves' || item === 'returns' || item === 'foreach' || item === 'from' || item === 'on' || item === 'as' || item === 'of' || item === 'for' || item === 'calls' || item === 'where' || item === 'upstream' || item === 'downstream' || item === 'symmetric' || item === 'external' || item === 'error' || item === 'temporal' || item === 'not' || item === 'and' || item === 'or' || item === 'in' || item === 'is' || item === 'if' || item === 'every' || item === 'exists' || item === 'forall' || item === 'true' || item === 'false' || item === 'null' || item === 'alert' || item === 'suspend' || item === 'manual' || item === 'retry' || item === 'compensate' || item === 'rejection' || item === 'choreography' || item === 'orchestration' || item === 'string' || item === 'int' || item === 'integer' || item === 'long' || item === 'decimal' || item === 'boolean' || item === 'date' || item === 'datetime' || item === 'time' || item === 'duration' || item === 'uuid' || item === 'void' || item === 'list' || item === 'set' || item === 'default' || item === 'min' || item === 'max' || item === 'range' || item === 'minLength' || item === 'maxLength' || item === 'pattern' || item === 'past' || item === 'future' || item === 'pastOrPresent' || item === 'futureOrPresent' || item === 'months' || item === 'days' || item === 'years' || item === 'hours' || item === 'minutes' || item === 'seconds' || item === 'weeks';
+    return item === 'value' || item === 'type' || item === 'status' || item === 'id' || item === 'code' || item === 'name' || item === 'message' || item === 'required' || item === 'optional' || item === 'unique' || item === 'immutable' || item === 'ordered' || item === 'state' || item === 'final' || item === 'event' || item === 'command' || item === 'query' || item === 'entity' || item === 'aggregate' || item === 'enum' || item === 'module' || item === 'context' || item === 'organization' || item === 'interface' || item === 'service' || item === 'domain' || item === 'application' || item === 'infrastructure' || item === 'repository' || item === 'reaction' || item === 'invariant' || item === 'agreement' || item === 'reconciliation' || item === 'escalation' || item === 'step' || item === 'machine' || item === 'states' || item === 'fields' || item === 'entities' || item === 'operations' || item === 'invariants' || item === 'references' || item === 'identity' || item === 'satisfies' || item === 'meta' || item === 'map' || item === 'api' || item === 'spi' || item === 'exposes' || item === 'requires' || item === 'describes' || item === 'depends' || item === 'about' || item === 'schedule' || item === 'reference' || item === 'offset' || item === 'instant' || item === 'guard' || item === 'trigger' || item === 'detection' || item === 'compensation' || item === 'coordination' || item === 'participants' || item === 'predicate' || item === 'action' || item === 'when' || item === 'must' || item === 'enforcement' || item === 'rejects' || item === 'precondition' || item === 'postcondition' || item === 'safe' || item === 'unsafe' || item === 'idempotent' || item === 'creates' || item === 'sets' || item === 'emits' || item === 'resolves' || item === 'returns' || item === 'foreach' || item === 'from' || item === 'on' || item === 'as' || item === 'of' || item === 'for' || item === 'calls' || item === 'where' || item === 'upstream' || item === 'downstream' || item === 'symmetric' || item === 'external' || item === 'error' || item === 'temporal' || item === 'subdomain' || item === 'models' || item === 'core' || item === 'supporting' || item === 'generic' || item === 'not' || item === 'and' || item === 'or' || item === 'in' || item === 'is' || item === 'if' || item === 'every' || item === 'exists' || item === 'forall' || item === 'true' || item === 'false' || item === 'null' || item === 'alert' || item === 'suspend' || item === 'manual' || item === 'retry' || item === 'compensate' || item === 'rejection' || item === 'choreography' || item === 'orchestration' || item === 'string' || item === 'int' || item === 'integer' || item === 'long' || item === 'decimal' || item === 'boolean' || item === 'date' || item === 'datetime' || item === 'time' || item === 'duration' || item === 'uuid' || item === 'void' || item === 'list' || item === 'set' || item === 'default' || item === 'min' || item === 'max' || item === 'range' || item === 'minLength' || item === 'maxLength' || item === 'pattern' || item === 'past' || item === 'future' || item === 'pastOrPresent' || item === 'futureOrPresent' || item === 'months' || item === 'days' || item === 'years' || item === 'hours' || item === 'minutes' || item === 'seconds' || item === 'weeks';
 }
 
 export type LiteralValue = BooleanLiteral | NumberLiteral | StringLiteral;
@@ -399,6 +404,12 @@ export type StateName = KeywordAsIdent | string;
 
 export function isStateName(item: unknown): item is StateName {
     return isKeywordAsIdent(item) || (typeof item === 'string' && (/[a-zA-Z_][a-zA-Z0-9_]*/.test(item) || /[A-Z][a-zA-Z0-9]*(?!\w)/.test(item)));
+}
+
+export type SubdomainClassification = 'core' | 'generic' | 'supporting';
+
+export function isSubdomainClassification(item: unknown): item is SubdomainClassification {
+    return item === 'core' || item === 'supporting' || item === 'generic';
 }
 
 export type SymmetricPattern = 'Partnership' | 'PublishedLanguage' | 'SeparateWays' | 'SharedKernel';
@@ -771,6 +782,7 @@ export interface ContextDef extends langium.AstNode {
     description?: Description;
     members: Array<Definition | ModuleDef>;
     metadata?: MetadataBlock;
+    models?: ModelsClause;
     name: TypeName;
     requirementsSource?: RequirementsSourceDecl;
     satisfies?: SatisfiesDecl;
@@ -845,7 +857,7 @@ export function isDescribesClause(item: unknown): item is DescribesClause {
 }
 
 export interface Description extends langium.AstNode {
-    readonly $container: AggregateDef | AgreementDef | ApplicationServiceDef | CommandDef | CommandTriggeredOp | ContextDef | DomainServiceDef | EntityDef | EnumDef | EnumValue | ErrorEventDef | EscalationChainDef | EscalationStep | EventDef | ExternalEventDef | FieldDecl | InfrastructureServiceDef | InterfaceDef | InternalOp | InvariantDef | ModuleDef | OperationSignature | OrganizationDef | PostconditionClause | PreconditionClause | QueryDef | ReactionDef | ReadOnlyEntityDef | ReconciliationDef | ReferenceDecl | RepositoryDef | SafeOpDef | ScopedInvariantDef | ServiceCallClause | StateDef | StateMachineDef | TemporalEventDef | TransitionDef | ValueDef | ValueOpDef;
+    readonly $container: AggregateDef | AgreementDef | ApplicationServiceDef | CommandDef | CommandTriggeredOp | ContextDef | DomainServiceDef | EntityDef | EnumDef | EnumValue | ErrorEventDef | EscalationChainDef | EscalationStep | EventDef | ExternalEventDef | FieldDecl | InfrastructureServiceDef | InterfaceDef | InternalOp | InvariantDef | ModuleDef | OperationSignature | OrganizationDef | PostconditionClause | PreconditionClause | QueryDef | ReactionDef | ReadOnlyEntityDef | ReconciliationDef | ReferenceDecl | RepositoryDef | SafeOpDef | ScopedInvariantDef | ServiceCallClause | StateDef | StateMachineDef | SubdomainDecl | TemporalEventDef | TransitionDef | ValueDef | ValueOpDef;
     readonly $type: 'Description';
     text: string;
 }
@@ -1450,7 +1462,7 @@ export function isMatchPattern(item: unknown): item is MatchPattern {
 }
 
 export interface MetadataBlock extends langium.AstNode {
-    readonly $container: AggregateDef | AgreementDef | ApplicationServiceDef | CommandDef | CommandTriggeredOp | ContextDef | DomainServiceDef | EntityDef | EnumDef | ErrorEventDef | EscalationChainDef | EscalationStep | EventDef | ExternalEventDef | InfrastructureServiceDef | InterfaceDef | InternalOp | InvariantDef | ModuleDef | OperationSignature | OrganizationDef | PostconditionClause | PreconditionClause | QueryDef | ReactionDef | ReadOnlyEntityDef | ReconciliationDef | RepositoryDef | SafeOpDef | ScopedInvariantDef | StateDef | StateMachineDef | TemporalEventDef | TransitionDef | ValueDef | ValueOpDef;
+    readonly $container: AggregateDef | AgreementDef | ApplicationServiceDef | CommandDef | CommandTriggeredOp | ContextDef | DomainServiceDef | EntityDef | EnumDef | ErrorEventDef | EscalationChainDef | EscalationStep | EventDef | ExternalEventDef | InfrastructureServiceDef | InterfaceDef | InternalOp | InvariantDef | ModuleDef | OperationSignature | OrganizationDef | PostconditionClause | PreconditionClause | QueryDef | ReactionDef | ReadOnlyEntityDef | ReconciliationDef | RepositoryDef | SafeOpDef | ScopedInvariantDef | StateDef | StateMachineDef | SubdomainDecl | TemporalEventDef | TransitionDef | ValueDef | ValueOpDef;
     readonly $type: 'MetadataBlock';
     entries: Array<MetadataEntry>;
 }
@@ -1472,6 +1484,18 @@ export const MetadataEntry = 'MetadataEntry';
 
 export function isMetadataEntry(item: unknown): item is MetadataEntry {
     return reflection.isInstance(item, MetadataEntry);
+}
+
+export interface ModelsClause extends langium.AstNode {
+    readonly $container: ContextDef;
+    readonly $type: 'ModelsClause';
+    subdomains: Array<TypeName>;
+}
+
+export const ModelsClause = 'ModelsClause';
+
+export function isModelsClause(item: unknown): item is ModelsClause {
+    return reflection.isInstance(item, ModelsClause);
 }
 
 export interface ModuleDef extends langium.AstNode {
@@ -1634,6 +1658,7 @@ export interface OrganizationDef extends langium.AstNode {
     name: TypeName;
     requirementsSource?: RequirementsSourceDecl;
     satisfies?: SatisfiesDecl;
+    subdomains: Array<SubdomainDecl>;
 }
 
 export const OrganizationDef = 'OrganizationDef';
@@ -2208,6 +2233,21 @@ export function isStringLiteralExpr(item: unknown): item is StringLiteralExpr {
     return reflection.isInstance(item, StringLiteralExpr);
 }
 
+export interface SubdomainDecl extends langium.AstNode {
+    readonly $container: OrganizationDef;
+    readonly $type: 'SubdomainDecl';
+    classification: SubdomainClassification;
+    description?: Description;
+    metadata?: MetadataBlock;
+    name: TypeName;
+}
+
+export const SubdomainDecl = 'SubdomainDecl';
+
+export function isSubdomainDecl(item: unknown): item is SubdomainDecl {
+    return reflection.isInstance(item, SubdomainDecl);
+}
+
 export interface SymmetricRelation extends langium.AstNode {
     readonly $container: ContextMapBlock;
     readonly $type: 'SymmetricRelation';
@@ -2486,6 +2526,7 @@ export type SpecyDomainAstType = {
     MatchesExpr: MatchesExpr
     MetadataBlock: MetadataBlock
     MetadataEntry: MetadataEntry
+    ModelsClause: ModelsClause
     ModuleDef: ModuleDef
     MustBlock: MustBlock
     NamedArg: NamedArg
@@ -2542,6 +2583,7 @@ export type SpecyDomainAstType = {
     StatesBlock: StatesBlock
     StringLiteral: StringLiteral
     StringLiteralExpr: StringLiteralExpr
+    SubdomainDecl: SubdomainDecl
     SymmetricRelation: SymmetricRelation
     SyncedViaClause: SyncedViaClause
     TemporalAnchor: TemporalAnchor
@@ -2561,7 +2603,7 @@ export type SpecyDomainAstType = {
 export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
 
     getAllTypes(): string[] {
-        return [AboutClause, AbsoluteAnchor, AggregateDef, AggregateEntitiesDecl, AgreementDef, ApplicationServiceDef, ArgList, ArrayIndex, ArrayLiteral, AssignmentClause, BinaryExpr, BooleanLiteral, BooleanLiteralExpr, CallExpr, CallsBlock, CausedByClause, CollectionType, CommandDef, CommandTriggeredOp, CompensationClause, ConditionClause, ConditionalExpr, Constraint, ContainsExpr, ContextDef, ContextMapBlock, ContextRelation, CreatesClause, Definition, DependsBlock, DescribedByClause, DescribesClause, Description, DomainFile, DomainServiceDef, DotPath, DotPathExpr, DownstreamRelation, DuplicateDetection, DurationLiteral, EffectsClause, EmitsClause, EnforcementStrategy, EntityDef, EnumDef, EnumValue, ErrorEventDef, EscalationAction, EscalationChainDef, EscalationStep, EventDef, EveryExpr, ExposedByClause, ExposesBlock, ExposesClause, Expression, ExternalEventDef, FieldDecl, FieldType, FieldsBlock, ForeachClause, GenericType, GuardBlock, IdentityDecl, IfExpr, InExpr, InfrastructureServiceDef, InterfaceDef, InterfaceMember, InternalOp, InvariantDef, InvariantsBlock, IsDefinedExpr, IsNotDefinedExpr, IsNotNullExpr, IsNullExpr, LiteralValue, MatchPattern, MatchesExpr, MetadataBlock, MetadataEntry, ModuleDef, MustBlock, NamedArg, NamedArgList, NotInExpr, NullLiteralExpr, NumberLiteral, NumberLiteralExpr, OperationBody, OperationClause, OperationDef, OperationSignature, OperationsBlock, OrganizationDef, ParamDecl, ParamList, ParenExpr, ParticipantsClause, PathSegment, PostconditionClause, PreconditionClause, PredicateBlock, PrimitiveType, ProjectedByClause, QuantifierExpr, QueryDef, ReactionDef, ReadOnlyEntityDef, ReadsFromClause, ReconciliationDef, ReconciliationTrigger, RecurringAnchor, ReferenceDecl, ReferencesBlock, RelativeAnchor, RepositoryDef, RequirementsSourceDecl, RequiresBlock, ResolvesClause, ReturnsClause, SafeForeachClause, SafeOpDef, SafeOperationClause, SafeOperationsBlock, SatisfiesDecl, ScopedInvariantDef, ServiceCallClause, SetsClause, Shortname, SignatureOperationsBlock, SourcedFromClause, StateDef, StateMachineDef, StatesBlock, StringLiteral, StringLiteralExpr, SymmetricRelation, SyncedViaClause, TemporalAnchor, TemporalEventDef, TopLevelElement, TransitionDef, TriggeredByClause, UnaryExpr, UpstreamRelation, ValueDef, ValueExpr, ValueList, ValueOpDef, ValueOperationsBlock];
+        return [AboutClause, AbsoluteAnchor, AggregateDef, AggregateEntitiesDecl, AgreementDef, ApplicationServiceDef, ArgList, ArrayIndex, ArrayLiteral, AssignmentClause, BinaryExpr, BooleanLiteral, BooleanLiteralExpr, CallExpr, CallsBlock, CausedByClause, CollectionType, CommandDef, CommandTriggeredOp, CompensationClause, ConditionClause, ConditionalExpr, Constraint, ContainsExpr, ContextDef, ContextMapBlock, ContextRelation, CreatesClause, Definition, DependsBlock, DescribedByClause, DescribesClause, Description, DomainFile, DomainServiceDef, DotPath, DotPathExpr, DownstreamRelation, DuplicateDetection, DurationLiteral, EffectsClause, EmitsClause, EnforcementStrategy, EntityDef, EnumDef, EnumValue, ErrorEventDef, EscalationAction, EscalationChainDef, EscalationStep, EventDef, EveryExpr, ExposedByClause, ExposesBlock, ExposesClause, Expression, ExternalEventDef, FieldDecl, FieldType, FieldsBlock, ForeachClause, GenericType, GuardBlock, IdentityDecl, IfExpr, InExpr, InfrastructureServiceDef, InterfaceDef, InterfaceMember, InternalOp, InvariantDef, InvariantsBlock, IsDefinedExpr, IsNotDefinedExpr, IsNotNullExpr, IsNullExpr, LiteralValue, MatchPattern, MatchesExpr, MetadataBlock, MetadataEntry, ModelsClause, ModuleDef, MustBlock, NamedArg, NamedArgList, NotInExpr, NullLiteralExpr, NumberLiteral, NumberLiteralExpr, OperationBody, OperationClause, OperationDef, OperationSignature, OperationsBlock, OrganizationDef, ParamDecl, ParamList, ParenExpr, ParticipantsClause, PathSegment, PostconditionClause, PreconditionClause, PredicateBlock, PrimitiveType, ProjectedByClause, QuantifierExpr, QueryDef, ReactionDef, ReadOnlyEntityDef, ReadsFromClause, ReconciliationDef, ReconciliationTrigger, RecurringAnchor, ReferenceDecl, ReferencesBlock, RelativeAnchor, RepositoryDef, RequirementsSourceDecl, RequiresBlock, ResolvesClause, ReturnsClause, SafeForeachClause, SafeOpDef, SafeOperationClause, SafeOperationsBlock, SatisfiesDecl, ScopedInvariantDef, ServiceCallClause, SetsClause, Shortname, SignatureOperationsBlock, SourcedFromClause, StateDef, StateMachineDef, StatesBlock, StringLiteral, StringLiteralExpr, SubdomainDecl, SymmetricRelation, SyncedViaClause, TemporalAnchor, TemporalEventDef, TopLevelElement, TransitionDef, TriggeredByClause, UnaryExpr, UpstreamRelation, ValueDef, ValueExpr, ValueList, ValueOpDef, ValueOperationsBlock];
     }
 
     protected override computeIsSubtype(subtype: string, supertype: string): boolean {
@@ -2914,6 +2956,7 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                         { name: 'description' },
                         { name: 'members', defaultValue: [] },
                         { name: 'metadata' },
+                        { name: 'models' },
                         { name: 'name' },
                         { name: 'requirementsSource' },
                         { name: 'satisfies' },
@@ -3414,6 +3457,14 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     ]
                 };
             }
+            case ModelsClause: {
+                return {
+                    name: ModelsClause,
+                    properties: [
+                        { name: 'subdomains', defaultValue: [] }
+                    ]
+                };
+            }
             case ModuleDef: {
                 return {
                     name: ModuleDef,
@@ -3530,7 +3581,8 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                         { name: 'metadata' },
                         { name: 'name' },
                         { name: 'requirementsSource' },
-                        { name: 'satisfies' }
+                        { name: 'satisfies' },
+                        { name: 'subdomains', defaultValue: [] }
                     ]
                 };
             }
@@ -3937,6 +3989,17 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     name: StringLiteralExpr,
                     properties: [
                         { name: 'value' }
+                    ]
+                };
+            }
+            case SubdomainDecl: {
+                return {
+                    name: SubdomainDecl,
+                    properties: [
+                        { name: 'classification' },
+                        { name: 'description' },
+                        { name: 'metadata' },
+                        { name: 'name' }
                     ]
                 };
             }

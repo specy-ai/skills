@@ -729,6 +729,10 @@
           "named": true
         },
         {
+          "type": "models_clause",
+          "named": true
+        },
+        {
           "type": "module_def",
           "named": true
         },
@@ -2174,6 +2178,22 @@
     }
   },
   {
+    "type": "models_clause",
+    "named": true,
+    "fields": {
+      "subdomain": {
+        "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "module_def",
     "named": true,
     "fields": {
@@ -2634,6 +2654,10 @@
         },
         {
           "type": "satisfies_decl",
+          "named": true
+        },
+        {
+          "type": "subdomain_decl",
           "named": true
         }
       ]
@@ -3859,6 +3883,51 @@
     }
   },
   {
+    "type": "subdomain_classification",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "subdomain_decl",
+    "named": true,
+    "fields": {
+      "classification": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "subdomain_classification",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "description",
+          "named": true
+        },
+        {
+          "type": "metadata_block",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "symmetric_pattern",
     "named": true,
     "fields": {}
@@ -4627,6 +4696,10 @@
     "named": false
   },
   {
+    "type": "core",
+    "named": false
+  },
+  {
     "type": "creates",
     "named": false
   },
@@ -4791,6 +4864,10 @@
     "named": false
   },
   {
+    "type": "generic",
+    "named": false
+  },
+  {
     "type": "guard",
     "named": false
   },
@@ -4904,6 +4981,10 @@
   },
   {
     "type": "minutes",
+    "named": false
+  },
+  {
+    "type": "models",
     "named": false
   },
   {
@@ -5137,6 +5218,14 @@
   {
     "type": "string_literal",
     "named": true
+  },
+  {
+    "type": "subdomain",
+    "named": false
+  },
+  {
+    "type": "supporting",
+    "named": false
   },
   {
     "type": "suspend",

@@ -35,6 +35,13 @@ export function modelToMarkdown(model: DomainModel): string {
 function renderOrganization(w: Writer, org: OrganizationModel): void {
     w.heading(1, org.name);
     renderMeta(w, org.description, undefined, org.metadata);
+    if (org.subdomains?.length) {
+        w.line('**Subdomains:**');
+        for (const s of org.subdomains) {
+            w.line(`- ${s.name} \`${s.classification}\`${s.description ? ` — ${s.description}` : ''}`);
+        }
+        w.blank();
+    }
     for (const ctx of org.contexts ?? []) renderContext(w, ctx, 2);
 }
 
@@ -42,6 +49,7 @@ function renderContext(w: Writer, ctx: ContextModel, level: number): void {
     const title = ctx.shortname ? `${ctx.name}  \`(${ctx.shortname})\`` : ctx.name;
     w.heading(level, `${title} Context`);
     renderMeta(w, ctx.description, undefined, ctx.metadata);
+    if (ctx.models?.length) w.line(`**Models:** ${ctx.models.join(', ')}`).blank();
     if (ctx.contextMap) renderContextMap(w, ctx.contextMap);
     for (const mod of ctx.modules ?? []) renderModule(w, mod, level + 1);
     if (ctx.definitions) renderGroups(w, ctx.definitions, level + 2);

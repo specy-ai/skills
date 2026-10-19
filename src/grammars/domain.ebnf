@@ -28,14 +28,34 @@ topLevelElement  = organizationDef
 // Organization  (metamodel: Organization)
 // -----------------------------------------------------------------------------
 
+// Subdomains may be declared before, between or after the bounded contexts; an
+// organization still has at least one bounded context.
 organizationDef  = "organization" , typeName , [ description ] , [ metadataBlock ] , "{"
                  , [ satisfiesDecl ]
                  , [ requirementsSourceDecl ]
-                 , boundedContextDef , { comment | boundedContextDef }
+                 , { comment | subdomainDecl }
+                 , boundedContextDef , { comment | subdomainDecl | boundedContextDef }
                  , "}" ;
 
 // requirements-source may sit on the organization OR on a bounded context.
 requirementsSourceDecl = "requirements-source" , stringLiteral ;
+
+// -----------------------------------------------------------------------------
+// Subdomain  (metamodel: Subdomain)
+//
+// Problem space: a part of the business the organization has to deal with,
+// whether or not software exists for it, classified by its strategic value.
+// A bounded context (solution space) names the subdomains it models with
+// `models`. A subdomain has no body, hence no `satisfies`.
+//
+// `subdomain`, `core`, `supporting`, `generic` and `models` are keywords only in
+// these positions; elsewhere they remain ordinary identifiers.
+// -----------------------------------------------------------------------------
+
+subdomainDecl    = "subdomain" , typeName , subdomainClassification
+                 , [ description ] , [ metadataBlock ] ;
+
+subdomainClassification = "core" | "supporting" | "generic" ;
 
 // -----------------------------------------------------------------------------
 // Bounded Context  (metamodel: Bounded Context)
@@ -44,11 +64,16 @@ requirementsSourceDecl = "requirements-source" , stringLiteral ;
 boundedContextDef = "context" , typeName , [ shortname ] , [ description ] , [ metadataBlock ] , "{"
                   , [ satisfiesDecl ]
                   , [ requirementsSourceDecl ]
+                  , [ modelsClause ]
                   , [ contextMapBlock ]
                   , { comment | moduleDef | definition }
                   , "}" ;
 
 shortname        = "(" , identifier , ")" ;
+
+// The subdomains this context is a model of. Each name must be a subdomain declared
+// by the organization (semantic rules 12 and 13 below).
+modelsClause     = "models" , typeName , { "," , typeName } ;
 
 // -----------------------------------------------------------------------------
 // Context Map — relations between bounded contexts
@@ -1034,4 +1059,10 @@ newline          = "\n" ;
 // 11. Recomputation heuristic: when a temporal event's `offset` or `instant`
 //     depends on a mutable value, some reaction must re-arm it when that value
 //     changes. Absence is a modeling gap, detectable by audit.
+// 12. Every name in a context's `models` clause must be a subdomain declared by
+//     the organization the context belongs to.
+// 13. When an organization declares at least one subdomain, every one of its
+//     bounded contexts states `models` (1..n); a context that does not is
+//     reported. An organization that declares no subdomain is unconstrained, so
+//     models written before subdomains existed stay valid.
 // =============================================================================

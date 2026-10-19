@@ -83,9 +83,18 @@ export interface ContextModel {
     description?: string;
     metadata?: Record<string, unknown>;
     requirementsSource?: string;
+    /** The subdomains this context is a model of. */
+    models?: string[];
     contextMap?: RelationModel[];
     modules?: ModuleModel[];
     definitions?: DefinitionGroups;
+}
+
+export interface SubdomainModel {
+    name: string;
+    classification: string;
+    description?: string;
+    metadata?: Record<string, unknown>;
 }
 
 export interface OrganizationModel {
@@ -93,6 +102,7 @@ export interface OrganizationModel {
     description?: string;
     metadata?: Record<string, unknown>;
     requirementsSource?: string;
+    subdomains?: SubdomainModel[];
     contexts?: ContextModel[];
 }
 
@@ -695,10 +705,20 @@ function normalizeContext(ctx: ast.ContextDef): ContextModel {
         metadata: metaOf(ctx.metadata),
         satisfies: satisfiesOf(ctx.satisfies),
         requirementsSource: ctx.requirementsSource?.path,
+        models: nonEmpty((ctx.models?.subdomains ?? []).map(nameOf)),
         contextMap: normalizeRelations(ctx.contextMap),
         modules: nonEmpty(modules.map(normalizeModule)),
         definitions: groupDefinitions(defs),
     }) as ContextModel;
+}
+
+function normalizeSubdomain(sub: ast.SubdomainDecl): SubdomainModel {
+    return compact({
+        name: nameOf(sub.name),
+        classification: sub.classification,
+        description: descOf(sub.description),
+        metadata: metaOf(sub.metadata),
+    }) as SubdomainModel;
 }
 
 function normalizeOrganization(org: ast.OrganizationDef): OrganizationModel {
@@ -708,6 +728,7 @@ function normalizeOrganization(org: ast.OrganizationDef): OrganizationModel {
         metadata: metaOf(org.metadata),
         satisfies: satisfiesOf(org.satisfies),
         requirementsSource: org.requirementsSource?.path,
+        subdomains: nonEmpty(org.subdomains.map(normalizeSubdomain)),
         contexts: nonEmpty(org.contexts.map(normalizeContext)),
     }) as OrganizationModel;
 }

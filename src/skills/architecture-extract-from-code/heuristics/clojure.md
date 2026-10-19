@@ -79,3 +79,15 @@
 | `:aliases` / env-based config (`environ`, profiles) | one `environment` per profile |
 | `replicas:` in `k8s/*.yaml` / Helm | `deploy Container replicas N` |
 | `docker-compose.yml` services | placement in a `local`/`dev` environment |
+
+### Deployment: nodes and resources
+
+| Source signal | Inference |
+|---|---|
+| Aero `config.edn` `#profile` with `:region` / `:aws-region`, `AWS_REGION` in a k8s manifest, a Terraform `provider` block | `provider` / `region` of the `node` the container runs on |
+| k8s manifests or Helm values per cluster | one `node` per cluster, nested in its region node |
+| next.jdbc / HikariCP `:jdbcUrl` pointing at a managed instance declared in Terraform | a `resource` that `instantiates` the database container; `technology` from the IaC engine and version |
+| Datomic Cloud client config (`:system`, `:region`) | a `resource` with `technology "Datomic Cloud"` on the node of that region |
+| next.jdbc / HoneySQL writes or Migratus migrations against that datasource | `stores`, only for records that match a struct the `.arch` declares |
+
+Each node and resource gets a `// source:`; `provider`, `region` and `zone` are written only when a file states them.

@@ -38,6 +38,8 @@ module.exports = grammar({
     // Organization
     // =========================================================================
 
+    // Subdomains may sit before, between or after the contexts; an organization
+    // still has at least one context.
     organization_def: $ => seq(
       'organization',
       field('name', $.type_name),
@@ -46,11 +48,28 @@ module.exports = grammar({
       '{',
       optional($.satisfies_decl),
       optional($.requirements_source_decl),
-      repeat1($.context_def),
+      repeat($.subdomain_decl),
+      $.context_def,
+      repeat(choice($.subdomain_decl, $.context_def)),
       '}',
     ),
 
     requirements_source_decl: $ => seq('requirements-source', $.string_literal),
+
+    // =========================================================================
+    // Subdomain — problem space, classified by strategic value. A context names
+    // the subdomains it models with `models`. No body, hence no `satisfies`.
+    // =========================================================================
+
+    subdomain_decl: $ => seq(
+      'subdomain',
+      field('name', $.type_name),
+      field('classification', $.subdomain_classification),
+      optional($.description),
+      optional($.metadata_block),
+    ),
+
+    subdomain_classification: $ => choice('core', 'supporting', 'generic'),
 
     // =========================================================================
     // Bounded Context
@@ -65,12 +84,20 @@ module.exports = grammar({
       '{',
       optional($.satisfies_decl),
       optional($.requirements_source_decl),
+      optional($.models_clause),
       optional($.context_map_block),
       repeat(choice($.module_def, $._definition)),
       '}',
     ),
 
     shortname: $ => seq('(', $.identifier, ')'),
+
+    // Each name must be a subdomain declared by the organization (validator).
+    models_clause: $ => seq(
+      'models',
+      field('subdomain', $.type_name),
+      repeat(seq(',', field('subdomain', $.type_name))),
+    ),
 
     // =========================================================================
     // Context Map

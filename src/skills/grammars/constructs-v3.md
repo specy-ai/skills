@@ -9,6 +9,67 @@ Two conventions hold everywhere:
 - **Bodies are ordered slots, not a free-form bag.** The order below is the order
   the parser expects.
 
+## Strategic constructs
+
+### Subdomain
+
+A `subdomain` is a part of the **problem space**: an area of activity the business has to master, whether or not software exists for it. It is declared at organization scope and carries a mandatory classification.
+
+#### Skeleton
+
+```
+organization Name :: "description" {
+    subdomain Name core :: "description"
+    subdomain Name supporting :: "description" meta { key = "value" }
+    subdomain Name generic
+
+    context Name (shortname) :: "description" { ... }
+}
+```
+
+#### Rules
+
+| Rule | Detail |
+|------|--------|
+| Scope | Organization only — after the organization's `satisfies` / `requirements-source`, then before, between or after the contexts. By convention, before the first `context`. |
+| Classification | Required — `core` (where the enterprise differentiates: built in-house by the strongest team, modeled in depth), `supporting` (necessary and specific, not differentiating: built simply or outsourced), `generic` (every business has it: bought or adopted). |
+| Description, metadata | Optional — `:: "…"` and `meta { }`, as on any construct. A subdomain has no body. |
+| Naming | Same form as a context name (`PascalCase`). |
+| Not modeled | Legitimate — typically a generic subdomain served by a bought product, reached through an `spi interface` and an `infrastructure service`. |
+| Keywords | `subdomain`, `core`, `supporting`, `generic` and `models` are keywords only in these positions; elsewhere they stay ordinary identifiers. |
+| No outward links | A subdomain names no capability, team or system. The enterprise-architecture layer points at it (`capability … realized-by <Subdomain>`). |
+
+---
+
+### Bounded Context — `models`
+
+A bounded context is the **solution space**. Its `models` clause names the subdomain(s) it models.
+
+#### Skeleton
+
+```
+context Name (shortname) :: "description" {
+    satisfies [REQ-XXX-001]
+    requirements-source "file.sysreq"
+    models SubdomainA, SubdomainB
+    map { ... }
+    // modules and definitions...
+}
+```
+
+#### Rules
+
+| Rule | Detail |
+|------|--------|
+| Slot order | `satisfies?`, `requirements-source?`, `models?`, `map?`, then modules and definitions. |
+| Form | `models Name {, Name}` — every name resolves to a `subdomain` of the organization. |
+| Cardinality | A context models 1..n subdomains. A subdomain is modeled by 0..n contexts. |
+| When required | Once the organization declares at least one subdomain, every context states `models`; a context without it is reported. An organization with no subdomain is unchanged. |
+| Several contexts, one subdomain | Usually records history — a legacy context next to its replacement. |
+| One context, several subdomains | The context has grown too large. A core subdomain never shares a context with a generic one. |
+
+---
+
 ## Structural constructs
 
 ### Entity

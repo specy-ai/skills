@@ -30,20 +30,24 @@ At the start of the conversation:
 1. List all `specy/*.domain` files.
 2. Read each file but extract only **declarations and block headers** for the overview. Do not analyze or retain field-level details until Phase 2:
    - `organization Name {` declaration
-   - `context Name (shortname) {` declarations
+   - `subdomain Name core|supporting|generic` declarations (organization scope)
+   - `context Name (shortname) {` declarations, with their `models` clause
    - `module Name {` declarations
    - `map { }` context map relations
    - Block opening lines: `entity Name {`, `read-only entity Name {`, `aggregate Name {`, `value Name {`, `enum Name {`, `command Name {`, `query Name {`, `event Name {`, `external event Name {`, `error event Name {`, `temporal event Name {`, `domain service Name {`, `application service Name {`, `infrastructure service Name {`, `repository Name for Type {`, `api interface Name {`, `spi interface Name {`, `reaction Name {`, `invariant Name {`, `agreement Name {`
    - Operation labels inside entities: `"Label" on CommandType` (command-triggered) and `name(params) : Type` (internal) — the only two forms
    - `// UNCLEAR` and `// NOTE` markers
    - Skip field lists, clause bodies, and expression contents.
-3. Display a **behavior-first overview** — what each context *does*, not what it *contains*:
+3. Display a **behavior-first overview** — what each context *does*, not what it *contains*. Strategic design comes first: the subdomains and the contexts that model them, then each context.
    ```
    ## Domain Overview
 
    **{organization name}**
 
+   Subdomains: {name} (core) → {contexts that model it} · {name} (supporting) → {contexts} · {name} (generic) → {contexts, or "no context"}
+
    ### {context name} ({shortname})
+   Models: {subdomain(s)}
    {1-sentence summary of what this context handles}
    {count} operations: {operation labels listed in natural language}
    {count} rules ({count} preconditions, {count} reactions, {count} invariants, {count} agreements) · {count} UNCLEAR · {count} NOTE
@@ -52,10 +56,11 @@ At the start of the conversation:
    {repeat for each bounded context}
 
    ---
-   {total contexts}, {total operations}, {total rules}, {total markers}.
+   {total subdomains} ({core} core, {supporting} supporting, {generic} generic), {total contexts}, {total operations}, {total rules}, {total markers}.
 
    What would you like to explore?
    ```
+   When the organization declares no subdomain, omit the `Subdomains:` and `Models:` lines and the subdomain count.
 4. If no `.domain` files are found, respond:
    ```
    No Specy models found in specy/. Run the `domain-extract-from-code` skill first to extract
@@ -85,18 +90,23 @@ When uncertain which blocks are needed, load broadly rather than narrowly. Loadi
 The domain is a graph. Every conversation turn is a move on this graph. The map below shows the nodes you can be at and the moves available from each.
 
 ```
-Organization ── Context ──┬── Module ──┬── Entity/Aggregate ──┬── Operation ── Clause
-                          │            │                      ├── State Machine
-                          │            │                      └── Structure
-                          │            ├── Agreement/Reconciliation
-                          │            └── Interface
-                          └── Context Map
+Organization ──┬── Subdomain ── (modeled by) ── Context
+               └── Context ──┬── Module ──┬── Entity/Aggregate ──┬── Operation ── Clause
+                             │            │                      ├── State Machine
+                             │            │                      └── Structure
+                             │            ├── Agreement/Reconciliation
+                             │            └── Interface
+                             ├── Subdomain (models)
+                             └── Context Map
 ```
 
 | From | Available moves | What they show |
 |---|---|---|
-| **Organization** | → Context | What this context does (behaviors summary) |
-| **Context** | → Module | Module decomposition and interfaces |
+| **Organization** | → Subdomain | The problem space: each subdomain, its classification (core / supporting / generic), the contexts that model it |
+| | → Context | What this context does (behaviors summary) |
+| **Subdomain** | → Context | The context(s) that model it — none, one, or several (several usually means a legacy context next to its replacement) |
+| **Context** | → Subdomain | The subdomain(s) it `models` — more than one means the context has grown too large |
+| | → Module | Module decomposition and interfaces |
 | | → Context Map | Upstream/downstream/symmetric relations |
 | | → Entity/Aggregate | Behaviors grouped around this entity |
 | | → Rules | Preconditions, reactions, invariants, and agreements |
@@ -122,7 +132,7 @@ Run these 4 tests **in sequence** on every turn before responding.
 
 > What node of the map is the user pointing at? Is there continuity with the previous turn?
 
-- **Identify the scope**: organization, context, module, entity/aggregate, operation, clause, or cross-cutting concept.
+- **Identify the scope**: organization, subdomain, context, module, entity/aggregate, operation, clause, or cross-cutting concept.
 - **Detect continuity**: if the user says "and what about the conditions?", they're drilling into the current operation, not switching context. If they say "now tell me about messaging", they're moving to a different context node.
 - **Cross-context**: if the question spans multiple contexts, note which contexts are involved and address each in turn. Prefix entity names with the context name when crossing a boundary (`Orders.Order`, `Shipping.Shipment`).
 
@@ -132,6 +142,7 @@ Run these 4 tests **in sequence** on every turn before responding.
 
 | Signal | Depth | Response shape |
 |---|---|---|
+| Strategic — "What are the subdomains?", "Which are core?", "Which contexts model X?", "Does any context span several subdomains?" | **Transverse** | Read the `subdomain` declarations and every context's `models`. List each subdomain with its classification and the context(s) that model it. Flag a context that models several subdomains, a context that mixes a core and a generic subdomain, a subdomain no context models (legitimate when a bought product serves it through an SPI; a gap when in-house code does), a context without `models` when subdomains exist, and a core subdomain whose context has a thin model (no aggregate, invariant or state machine). Answer this before any question about a single context. |
 | Broad concept — "How does X work?", "Explain Y", "What does this context do?" | **Breadth** | 1 sentence per behavior, grouped by entity pivot. No field lists, no expression syntax. Citations in parentheses only. **5-10 sentences + offers.** |
 | Specific scenario — "What happens if...?", "Can a user...?", "What if payment fails?" | **Detail** | Trace the full path: trigger → resolves → preconditions → sets → emits. Cite expressions inline. Mention services involved. **As long as needed, no longer.** |
 | Lifecycle — "What states does X go through?", "Show me the flow" | **Transverse** | Read the `states { machine ... }` block inside the entity/aggregate. Present state names, transitions, the operation each transition runs `on`, and the transition's named preconditions. If no explicit state machine, derive from enum values + `sets Entity { status = Y }` transitions + precondition guards. Present in business language. |
@@ -154,6 +165,7 @@ Run these 4 tests **in sequence** on every turn before responding.
 - **Invariant vs reaction vs precondition** → distinguish them. Invariants are safety properties that must always hold (with enforcement: rejection, compensation, or alert). Reactions are reactive rules (`triggered-by` → `guard` → `effects`) and are the **only** way an event causes a command. Preconditions are named guards on specific operations, each with a `rejects` reason. Never present one as another.
 - **Agreements vs invariants** → agreements span multiple aggregates and cannot be verified atomically. They have reconciliation mechanisms. Invariants are within a single entity/aggregate boundary.
 - **No implementation assumptions** → the models describe *what*, not *how*. No databases, APIs, frameworks.
+- **Classification is declared, not inferred** → a subdomain is core, supporting or generic only because the model says so. Never deduce it from how large a context is. If the organization declares no subdomain, the strategic questions are [OUT OF MODEL] — say so and suggest `domain-design` to settle them. A classification-to-confirm marker on a subdomain (`// NOTE:` or `// UNCLEAR:`) is [UNCERTAIN].
 
 ### Test 4 — "Where to next?"
 
@@ -162,12 +174,13 @@ Run these 4 tests **in sequence** on every turn before responding.
 End every response with **2-3 specific offers**. Choose by priority:
 
 1. **UNCLEAR zones** in scope — the dialogue has most value where the model is uncertain
-2. **State machine** — if the entity has a `states { machine ... }` block, offer to trace the lifecycle
-3. **Cross-context dependency** — if the answer crossed or approached a context boundary (context map, external events)
-4. **Related operation** — cascade effects (the reactions `triggered-by` the events it emits), adjacent behaviors
-5. **Agreements** — if multiple aggregates are involved, offer to explore consistency guarantees
-6. **Temporal events** — if time-dependent behavior exists nearby
-7. **Structure** — fields and types, offered last (available on demand, rarely the most interesting)
+2. **Strategic fit** — if the answer touched a context that models several subdomains, mixes a core and a generic subdomain, or models a core subdomain with a thin model
+3. **State machine** — if the entity has a `states { machine ... }` block, offer to trace the lifecycle
+4. **Cross-context dependency** — if the answer crossed or approached a context boundary (context map, external events)
+5. **Related operation** — cascade effects (the reactions `triggered-by` the events it emits), adjacent behaviors
+6. **Agreements** — if multiple aggregates are involved, offer to explore consistency guarantees
+7. **Temporal events** — if time-dependent behavior exists nearby
+8. **Structure** — fields and types, offered last (available on demand, rarely the most interesting)
 
 For confrontation responses, always include: "Use the `domain-design` skill to apply this change to the model."
 
@@ -203,6 +216,12 @@ When Test 2 detects an audit request ("What's missing?"), run this checklist. **
 
 | Check | What to look for |
 |---|---|
+| Contexts without `models` | The organization declares subdomains, but a context does not say which one(s) it models |
+| Subdomains without a context | A subdomain no context `models` — legitimate when a bought product serves it through an `spi interface`; a missing context when in-house code does |
+| Contexts spanning several subdomains | A context whose `models` names more than one subdomain — grown too large |
+| Core and generic in one context | A context that models both a core and a generic subdomain |
+| Thin core | A context modeling a core subdomain with no aggregate, no invariant, no state machine |
+| Classification to confirm | Subdomains carrying a classification-to-confirm marker (`// NOTE:` from extraction, `// UNCLEAR:` from refactoring) |
 | Commands without operation | Commands defined but no operation declares `on` this command |
 | Commands without identity | Commands missing their `identity` field (the correlation id) |
 | Events without consumer | Events emitted but named by no reaction's `triggered-by` |
@@ -322,6 +341,10 @@ No Specy models found in specy/. Run the `domain-extract-from-code` skill first 
 models from your codebase, then come back to explore them.
 ```
 
+### No Subdomains Declared
+
+If the organization declares no `subdomain`, the model is valid and contexts carry no `models`. Strategic questions ("which part is core?") are [OUT OF MODEL]. Describe the contexts as they are, and point to `domain-design` to classify the subdomains with the user.
+
 ### Ambiguous Names
 
 If the same name appears in multiple bounded contexts (e.g., `Order` in both Orders and Fulfillment contexts), always ask the user to clarify which context they mean before answering.
@@ -374,6 +397,67 @@ Two conventions hold everywhere:
 - **`satisfies [...]` is always the first element inside the body braces.**
 - **Bodies are ordered slots, not a free-form bag.** The order below is the order
   the parser expects.
+
+## Strategic constructs
+
+### Subdomain
+
+A `subdomain` is a part of the **problem space**: an area of activity the business has to master, whether or not software exists for it. It is declared at organization scope and carries a mandatory classification.
+
+#### Skeleton
+
+```
+organization Name :: "description" {
+    subdomain Name core :: "description"
+    subdomain Name supporting :: "description" meta { key = "value" }
+    subdomain Name generic
+
+    context Name (shortname) :: "description" { ... }
+}
+```
+
+#### Rules
+
+| Rule | Detail |
+|------|--------|
+| Scope | Organization only — after the organization's `satisfies` / `requirements-source`, then before, between or after the contexts. By convention, before the first `context`. |
+| Classification | Required — `core` (where the enterprise differentiates: built in-house by the strongest team, modeled in depth), `supporting` (necessary and specific, not differentiating: built simply or outsourced), `generic` (every business has it: bought or adopted). |
+| Description, metadata | Optional — `:: "…"` and `meta { }`, as on any construct. A subdomain has no body. |
+| Naming | Same form as a context name (`PascalCase`). |
+| Not modeled | Legitimate — typically a generic subdomain served by a bought product, reached through an `spi interface` and an `infrastructure service`. |
+| Keywords | `subdomain`, `core`, `supporting`, `generic` and `models` are keywords only in these positions; elsewhere they stay ordinary identifiers. |
+| No outward links | A subdomain names no capability, team or system. The enterprise-architecture layer points at it (`capability … realized-by <Subdomain>`). |
+
+---
+
+### Bounded Context — `models`
+
+A bounded context is the **solution space**. Its `models` clause names the subdomain(s) it models.
+
+#### Skeleton
+
+```
+context Name (shortname) :: "description" {
+    satisfies [REQ-XXX-001]
+    requirements-source "file.sysreq"
+    models SubdomainA, SubdomainB
+    map { ... }
+    // modules and definitions...
+}
+```
+
+#### Rules
+
+| Rule | Detail |
+|------|--------|
+| Slot order | `satisfies?`, `requirements-source?`, `models?`, `map?`, then modules and definitions. |
+| Form | `models Name {, Name}` — every name resolves to a `subdomain` of the organization. |
+| Cardinality | A context models 1..n subdomains. A subdomain is modeled by 0..n contexts. |
+| When required | Once the organization declares at least one subdomain, every context states `models`; a context without it is reported. An organization with no subdomain is unchanged. |
+| Several contexts, one subdomain | Usually records history — a legacy context next to its replacement. |
+| One context, several subdomains | The context has grown too large. A core subdomain never shares a context with a generic one. |
+
+---
 
 ## Structural constructs
 

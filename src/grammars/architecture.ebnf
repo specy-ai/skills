@@ -212,14 +212,45 @@ connectorRef      = typeName , { "." , typeName } ;
 connectorStyle    = "sync" | "async" | "streaming" ;
 
 // -----------------------------------------------------------------------------
-// Deployment view — lightweight: environments + container placement + replicas
+// Deployment view — environments, the nodes containers run on, and the
+// resources where data lives: placement and residency facts. Capacity,
+// networking and the inventory of running instances are out of scope.
+// A deploy directly under an environment leaves the node unstated.
 // -----------------------------------------------------------------------------
 
 environmentDef    = "environment" , identifier , [ description ] , [ metadataBlock ] , "{"
-                  , { comment | deployClause }
+                  , { comment | deployClause | nodeDef }
                   , "}" ;
 
 deployClause      = "deploy" , typeName , { "," , typeName } , [ "replicas" , integer ] ;
+
+// Node — where containers run (region, cluster, VM, serverless runtime). Nodes
+// nest. Each attribute appears at most once, in any order (a validation rule).
+nodeDef           = "node" , identifier , [ description ] , [ metadataBlock ] , { nodeAttribute } , "{"
+                  , { comment | nodeDef | deployClause | resourceDef }
+                  , "}" ;
+
+nodeAttribute     = providerDecl | regionDecl | zoneDecl ;
+
+providerDecl      = "provider" , stringLiteral ;
+
+regionDecl        = "region" , stringLiteral ;
+
+zoneDecl          = "zone" , stringLiteral ;
+
+// Resource — a provisioned unit of infrastructure (database instance, topic,
+// bucket, cache, secret store): where data physically lives. `instantiates`
+// names a data-store or broker container of this system; `stores` names structs
+// of this file or of a .dataop model of the same system, resolved by name.
+resourceDef       = "resource" , identifier , [ description ] , [ metadataBlock ]
+                  , [ instantiatesDecl ] , [ technologyDecl ] , [ tenancyDecl ]
+                  , [ "{" , storesClause , "}" ] ;
+
+instantiatesDecl  = "instantiates" , typeName ;
+
+tenancyDecl       = "tenancy" , ( "shared" | "dedicated" ) ;
+
+storesClause      = "stores" , typeName , { "," , typeName } ;
 
 // -----------------------------------------------------------------------------
 // Realizes — traceability link to domain elements (module / interface / event /

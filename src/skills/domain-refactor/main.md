@@ -39,8 +39,10 @@ same bar as `domain-design`.
 
 1. Read `references/DOMAIN-METAMODEL.md` in full (every concept, relation, and the requirement-trace
    mechanism). The grammar is at `grammar/domain.ebnf`.
-2. Read the extracted `specy/*.domain`. Identify the bounded context(s). If the user named one, scope
-   to it; if there is exactly one, take it; otherwise ask which to redesign.
+2. Read the extracted `specy/*.domain`. Identify the bounded context(s) and the subdomains the
+   organization declares — with the `models` of each context and any
+   `// NOTE: classification to confirm` marker. If the user named a context, scope to it; if there is
+   exactly one, take it; otherwise ask which to redesign.
 3. Read `specy/refactoring.report` **if it exists**. If it does not, detect the smells yourself from
    the extracted model using the catalog below — the skill works either way.
 
@@ -58,15 +60,22 @@ behaviour implies (entities, value types, aggregates, fields).
 1. **Read the domain back out of the extracted model.** List the nouns (candidate entities/values),
    verbs (operations/commands), facts (events), lifecycle states, and rules. This is your raw material
    and your ubiquitous-language dictionary.
-2. **Re-derive the structure from first principles.** Decide entity vs value by identity-and-lifecycle,
+2. **Classify the subdomains with the user.** Start from the extracted candidates (or propose them
+   if the model declares none): name each `subdomain` in business words, propose `core`, `supporting`
+   or `generic` with the evidence, and ask the user to confirm or correct each one before you decide
+   any depth. Then check each context's `models`. The classification decides where the redesign effort
+   goes: deepest for core, thin for generic. A classification the user has not confirmed stays in the
+   model under `// UNCLEAR: classification to confirm — {reason}` and goes to the Open questions of the
+   rationale.
+3. **Re-derive the structure from first principles.** Decide entity vs value by identity-and-lifecycle,
    not by what had a table. Draw aggregate boundaries around a *shared consistency rule* (the boundary
    is the transactional scope), keeping them tight. Anchor each aggregate on the behaviour that must
    stay consistent.
-3. **Apply the smell→fix catalog** (next section). For every fix, note which smell it resolves — that
+4. **Apply the smell→fix catalog** (next section). For every fix, note which smell it resolves — that
    mapping is the core of the rationale you write at the end.
-4. **Write `specy/<domain>.refactored.domain`** following the concrete syntax.
-5. **Write `specy/<domain>.refactor-rationale.md`** and give a short chat recap.
-6. **Offer the audit** — propose running `specy:domain-dialogue` on the refactored model to confront and
+5. **Write `specy/<domain>.refactored.domain`** following the concrete syntax.
+6. **Write `specy/<domain>.refactor-rationale.md`** and give a short chat recap.
+7. **Offer the audit** — propose running `specy:domain-dialogue` on the refactored model to confront and
    stress-test it.
 
 ## Smell → fix catalog
@@ -74,6 +83,20 @@ behaviour implies (entities, value types, aggregates, fields).
 Each entry is a common shape in extracted models and its proper DDD treatment. Use the
 `refactoring.report` when present to know which apply; otherwise scan for these.
 
+- **One context spans a core and a generic subdomain** (its `models` names both, or the differentiating
+  rules sit next to the adapter of a bought product and borrow its vocabulary) → **segregate the core**:
+  split the context. The core subdomain keeps a context of its own, modeled in depth. The generic one
+  gets a thin context, often an anti-corruption layer around the product, which the context that models
+  the core reaches through its map (`downstream <GenericContext> : ACL`). When a bought product serves
+  the generic subdomain, it may need no context at all: an `spi interface` and the `infrastructure
+  service` that fulfils it are enough, and leaving that subdomain unmodeled is legitimate. More generally, a context whose
+  `models` names several subdomains has grown too large: look for the seam between them.
+- **A core subdomain's context is anemic** (fields and repositories, no aggregate, no invariant, no state
+  machine, the rules left in application services) → **deepen the core**: this is where the redesign
+  effort goes first. Behaviour-rich aggregates, invariants with their `enforcement`, state machines,
+  error and temporal paths. If the user cannot say what the context decides that competitors do not,
+  question the classification rather than inventing depth. The mirror case, an elaborate model for a
+  generic subdomain, is over-engineering: thin it.
 - **Anemic or god entity** (data bag with no behaviour, or one entity doing everything) → behaviour-rich
   entities with operations, gathered into a **tight aggregate** whose boundary is justified by a shared
   invariant. The aggregate **is** its root — it carries the identity, fields, operations and states
@@ -121,6 +144,8 @@ Each entry is a common shape in extracted models and its proper DDD treatment. U
    with `// NOTE:` and its business justification.
 5. **Push back on rules that look wrong or under-specified.** Propose the corrected rule and mark it
    `// UNCLEAR:` for a domain expert to confirm, rather than faithfully copying a likely bug.
+6. **The classification is the user's statement.** Propose `core`, `supporting` or `generic`, give
+   the reason, ask. Never settle it silently from how much code a context has.
 
 ## Conventions
 
@@ -143,17 +168,20 @@ Write `specy/<domain>.refactored.domain` using the Specy v3 concrete syntax (ful
 
 Write `specy/<domain>.refactor-rationale.md` with:
 
-1. **Decision → smell table** — each major design move, the smell it fixes, and the DDD treatment
+1. **Strategic design** — one row per subdomain: name, classification (`confirmed` or `to confirm`),
+   the context(s) that model it before and after the redesign, and the move made because of it
+   (segregate the core, deepen the core, thin the context of a generic subdomain, none).
+2. **Decision → smell table** — each major design move, the smell it fixes, and the DDD treatment
    applied.
-2. **Lifecycle divergences** — every place you simplified or changed the extracted lifecycle, with the
+3. **Lifecycle divergences** — every place you simplified or changed the extracted lifecycle, with the
    business justification (mirrors the `// NOTE:` markers in the model).
-3. **Open questions** — the `// UNCLEAR:` items: rules you corrected or that need a domain expert to
-   confirm.
+4. **Open questions** — the `// UNCLEAR:` items: rules you corrected or that need a domain expert to
+   confirm, and every subdomain classification the user has not confirmed yet.
 
 Then give a short chat recap (3–6 bullets) of the biggest changes and anything you need confirmed.
 
 ## Then offer
 
 Offer to run **`specy:domain-dialogue`** on `specy/<domain>.refactored.domain` to confront and
-stress-test the redesign (state-machine completeness, aggregate boundaries, missing error/temporal
-paths) before anyone builds against it.
+stress-test the redesign (subdomain classification against model depth, state-machine completeness,
+aggregate boundaries, missing error/temporal paths) before anyone builds against it.

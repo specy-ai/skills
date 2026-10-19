@@ -28,6 +28,8 @@ TopLevelElement:
 // Organization
 // -----------------------------------------------------------------------------
 
+// Subdomains may sit before, between or after the contexts; an organization still
+// has at least one context.
 OrganizationDef:
     'organization' name=TypeName
     description=Description?
@@ -35,11 +37,26 @@ OrganizationDef:
     '{'
         satisfies=SatisfiesDecl?
         requirementsSource=RequirementsSourceDecl?
-        (contexts+=ContextDef)+
+        (subdomains+=SubdomainDecl)*
+        contexts+=ContextDef
+        (subdomains+=SubdomainDecl | contexts+=ContextDef)*
     '}';
 
 RequirementsSourceDecl:
     'requirements-source' path=STRING;
+
+// -----------------------------------------------------------------------------
+// Subdomain — problem space, classified by strategic value. A context names the
+// subdomains it models with `models`. No body, hence no `satisfies`.
+// -----------------------------------------------------------------------------
+
+SubdomainDecl:
+    'subdomain' name=TypeName classification=SubdomainClassification
+    description=Description?
+    metadata=MetadataBlock?;
+
+SubdomainClassification returns string:
+    'core' | 'supporting' | 'generic';
 
 // -----------------------------------------------------------------------------
 // Bounded Context
@@ -53,12 +70,18 @@ ContextDef:
     '{'
         satisfies=SatisfiesDecl?
         requirementsSource=RequirementsSourceDecl?
+        models=ModelsClause?
         contextMap=ContextMapBlock?
         (members+=(ModuleDef | Definition))*
     '}';
 
 Shortname:
     '(' value=Ident ')';
+
+// Each name must be a subdomain declared by the organization: a semantic rule,
+// checked by the validator (see the foot of src/grammars/domain.ebnf).
+ModelsClause:
+    'models' subdomains+=TypeName (',' subdomains+=TypeName)*;
 
 // -----------------------------------------------------------------------------
 // Context Map
@@ -1133,6 +1156,7 @@ KeywordAsIdent returns string:
     | 'creates' | 'sets' | 'emits' | 'resolves' | 'returns' | 'foreach'
     | 'from' | 'on' | 'as' | 'of' | 'for' | 'calls' | 'where'
     | 'upstream' | 'downstream' | 'symmetric' | 'external' | 'error' | 'temporal'
+    | 'subdomain' | 'models' | 'core' | 'supporting' | 'generic'
     | 'not' | 'and' | 'or' | 'in' | 'is' | 'if' | 'every' | 'exists' | 'forall'
     | 'true' | 'false' | 'null'
     | 'alert' | 'suspend' | 'manual' | 'retry' | 'compensate'

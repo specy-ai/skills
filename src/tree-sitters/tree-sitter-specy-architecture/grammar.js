@@ -391,7 +391,7 @@ module.exports = grammar({
     connector_style: $ => choice('sync', 'async', 'streaming'),
 
     // =========================================================================
-    // Deployment view
+    // Deployment view — environments, nodes, resources
     // =========================================================================
 
     environment_def: $ => seq(
@@ -400,7 +400,7 @@ module.exports = grammar({
       optional($.description),
       optional($.metadata_block),
       '{',
-      repeat($.deploy_clause),
+      repeat(choice($.deploy_clause, $.node_def)),
       '}',
     ),
 
@@ -409,6 +409,55 @@ module.exports = grammar({
       $.type_name,
       repeat(seq(',', $.type_name)),
       optional(seq('replicas', $.integer)),
+    ),
+
+    // Each attribute at most once, any order — a validation rule, not a grammar rule.
+    node_def: $ => seq(
+      'node',
+      field('name', $.identifier),
+      optional($.description),
+      optional($.metadata_block),
+      repeat($._node_attribute),
+      '{',
+      repeat(choice($.node_def, $.deploy_clause, $.resource_def)),
+      '}',
+    ),
+
+    _node_attribute: $ => choice(
+      $.provider_decl,
+      $.region_decl,
+      $.zone_decl,
+    ),
+
+    provider_decl: $ => seq('provider', $.string_literal),
+    region_decl: $ => seq('region', $.string_literal),
+    zone_decl: $ => seq('zone', $.string_literal),
+
+    resource_def: $ => seq(
+      'resource',
+      field('name', $.identifier),
+      optional($.description),
+      optional($.metadata_block),
+      optional($.instantiates_decl),
+      optional($.technology_decl),
+      optional($.tenancy_decl),
+      optional(seq(
+        '{',
+        $.stores_clause,
+        '}',
+      )),
+    ),
+
+    instantiates_decl: $ => seq('instantiates', field('container', $.type_name)),
+
+    tenancy_decl: $ => seq('tenancy', $.tenancy),
+
+    tenancy: $ => choice('shared', 'dedicated'),
+
+    stores_clause: $ => seq(
+      'stores',
+      $.type_name,
+      repeat(seq(',', $.type_name)),
     ),
 
     // =========================================================================

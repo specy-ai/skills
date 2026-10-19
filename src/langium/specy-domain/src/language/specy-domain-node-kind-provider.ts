@@ -20,6 +20,8 @@ import { CompletionItemKind, SymbolKind } from 'vscode-languageserver';
 const SYMBOL_KINDS: Record<string, SymbolKind> = {
     // ── Containers ───────────────────────────────────────────────────────
     OrganizationDef: SymbolKind.Namespace,
+    // A subdomain is problem space: a named area, not a container of definitions.
+    SubdomainDecl: SymbolKind.Package,
     ContextDef: SymbolKind.Namespace,
     ModuleDef: SymbolKind.Module,
 

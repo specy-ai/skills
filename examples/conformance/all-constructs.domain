@@ -13,7 +13,13 @@
 organization Acme :: "Acme Corp" {
     requirements-source "specy/acme.sysreq"
 
+    // --- subdomains: the three classifications, with and without description / meta ---
+    subdomain OrderTaking core :: "Turning a customer's intent into a confirmed order"
+    subdomain Pricing supporting
+
     context Ordering (ord) :: "Order lifecycle" {
+        // --- models: two subdomains ---
+        models OrderTaking, Pricing
         map {
             upstream Catalog : OHS
             downstream Payments : ACL
@@ -367,4 +373,20 @@ organization Acme :: "Acme Corp" {
             value Tag { fields { name : string } }
         }
     }
+
+    // --- a subdomain between two contexts ---
+    subdomain Invoicing supporting :: "Billing customers and matching their payments" meta { owner = "Finance" }
+
+    // --- context clause order: satisfies, requirements-source, models (one subdomain), map ---
+    context Billing :: "Invoices and settlement" {
+        satisfies [REQ-ORD-001]
+        requirements-source "specy/billing.sysreq"
+        models Invoicing
+        map {
+            upstream Ordering : OHS
+        }
+    }
+
+    // --- a subdomain after the last context, modeled by none (bought, not built) ---
+    subdomain Identity generic meta { sourcing = "SaaS identity provider" }
 }

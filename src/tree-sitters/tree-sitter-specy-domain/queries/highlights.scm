@@ -18,6 +18,7 @@
 
 "organization" @keyword.type
 "context" @keyword.type
+"subdomain" @keyword.type
 "module" @keyword.type
 "entity" @keyword.type
 "value" @keyword.type
@@ -88,6 +89,13 @@
 
 (state_def "state" @keyword)
 (state_def "final" @keyword)
+
+; ---------------------------------------------------------------------------
+; Strategic design — the problem space a context is a model of
+; ---------------------------------------------------------------------------
+
+(models_clause "models" @keyword.operator)
+(subdomain_classification) @constant
 
 ; ---------------------------------------------------------------------------
 ; Hexagonal wiring — the port/adapter relations
@@ -189,6 +197,7 @@
 
 (organization_def name: (type_name) @type.definition)
 (context_def name: (type_name) @type.definition)
+(subdomain_decl name: (type_name) @type.definition)
 (module_def name: (type_name) @type.definition)
 (enum_def name: (type_name) @type.definition)
 (value_def name: (type_name) @type.definition)

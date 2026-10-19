@@ -74,3 +74,15 @@
 | `.env.production` / `NODE_ENV` profiles | one `environment` per profile |
 | `replicas:` in `k8s/*.yaml` / Helm | `deploy Container replicas N` |
 | `docker-compose.yml` services | placement in a `local`/`dev` environment |
+
+### Deployment: nodes and resources
+
+| Source signal | Inference |
+|---|---|
+| AWS CDK stack `env: { region }`, `serverless.yml` `provider.name` / `provider.region`, `AWS_REGION` | `provider` / `region` of the `node` the container runs on |
+| k8s manifests or Helm values per cluster | one `node` per cluster, nested in its region node |
+| CDK constructs `rds.DatabaseInstance`, `s3.Bucket`, `sqs.Queue`, `elasticache.CfnCacheCluster`, `secretsmanager.Secret`; Terraform equivalents | a `resource` on that node; `technology` from the construct's engine and version |
+| TypeORM / Prisma / Mongoose connection `host` or `url` matching such a resource | the resource `instantiates` the database container |
+| TypeORM entities, Prisma models, migrations persisted to that datasource | `stores`, only for records that match a struct the `.arch` declares |
+
+Each node and resource gets a `// source:`; `provider`, `region` and `zone` are written only when a file states them.

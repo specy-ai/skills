@@ -81,6 +81,7 @@ A role check (`user.isAdmin`, `requirePermission`) is an **authorization mechani
 
 | Element is... | Correct construct |
 |---|---|
+| Package/module cluster sharing a business vocabulary, or a context wrapping a third-party product (problem space) | candidate `subdomain` at organization scope — classification under `// NOTE: classification to confirm` |
 | Has identity + mutable lifecycle | `entity` |
 | Has identity, but its state is owned by another context or an external system (master data) | `read-only entity` (with `sourced-from`) |
 | Cluster of entities that changes as one | `aggregate` — it IS the root; `entities { }` lists the non-root children |
@@ -114,11 +115,12 @@ A role check (`user.isAdmin`, `requirePermission`) is an **authorization mechani
 - **Naming:** `{domain}.domain` — domain name in lowercase. Single unified file per bounded context.
 - **Header:** wrap in `organization Name { context Name (shortname) { module Name { ... } } }` hierarchy. For single-context projects, `module Name { ... }` as top-level is acceptable.
 - **Context map:** when multiple contexts exist, include a `map { }` block with upstream/downstream/symmetric relations.
+- **Subdomains (candidates only):** the `organization` block declares the candidate subdomains, by convention before the first `context` — `subdomain Name core|supporting|generic :: "description"` — each preceded by `// NOTE: classification to confirm — {evidence}`. Code cannot tell where the business differentiates, so a classification is never settled from code. Every context then states `models Name {, Name}`, after `requirements-source` and before `map`. Each `.domain` file declares the subdomains its own contexts model (files stay self-contained, as for shared types). A bare top-level `module` (single-context project, no `organization`) carries no subdomain: list the candidates in `gaps.report` only.
 - **Multiple bounded contexts:** one `.domain` per context.
 - **Encoding:** UTF-8, LF line endings, no trailing whitespace.
 - **Enum values:** always `camelCase`. Convert `UPPER_SNAKE_CASE` from source: `PENDING` → `pending`, `ACCOUNT_CREATED` → `accountCreated`.
 - **Source traceability:** every definition must have a `// source: path/to/file.ext` comment. For operations spanning multiple files, reference the file with business logic.
-- **Order in file:** `organization` → `context` → `map` → `module` (with `exposes` / `requires` / `depends on`) → interfaces (`api` then `spi`) → enums → value objects → domain services → application services → infrastructure services → file-level reactions → file-level invariants → entities/read-only entities/aggregates → repositories → commands → queries → events → external events → error events → temporal events → agreements. Within each section, alphabetical or dependency order.
+- **Order in file:** `organization` → `subdomain`s → `context` → `models` → `map` → `module` (with `exposes` / `requires` / `depends on`) → interfaces (`api` then `spi`) → enums → value objects → domain services → application services → infrastructure services → file-level reactions → file-level invariants → entities/read-only entities/aggregates → repositories → commands → queries → events → external events → error events → temporal events → agreements. Within each section, alphabetical or dependency order.
 - **Section separators:** use `// ===` comment blocks between sections, matching the canonical example.
 - **Field ordering:** identity first, then required, then optional. Within each group, keep source order.
 - **No `null` literal.** The grammar has no `null`. Use `// NOTE:` instead of `sets ... to null`.
@@ -150,7 +152,7 @@ A role check (`user.isAdmin`, `requirePermission`) is an **authorization mechani
 - **Naming:** `{domain}.sysreq` per bounded context — same base name as the `.domain` file.
 - **Requirement ID scheme:** `REQ-{CTX}-{NNN}` where `CTX` is the context shortname in upper case (e.g., context `Orders (ord)` → `REQ-ORD-001`) and `NNN` is a zero-padded 3-digit sequence. The shortname itself is written lower case in the `context` header.
 - **Traceability link:** the `.domain` file declares `requirements-source "{domain}.sysreq"` at context level; each domain construct uses `satisfies [REQ-{CTX}-{NNN}]`.
-- **NOTE promotion:** every `// NOTE:` marker in the `.domain` file becomes an NFR requirement in the `.sysreq` file (classify by category: performance, security, operability, resilience, compliance).
+- **NOTE promotion:** every `// NOTE:` marker in the `.domain` file becomes an NFR requirement in the `.sysreq` file (classify by category: performance, security, operability, resilience, compliance). **Exception:** a `// NOTE: classification to confirm` on a `subdomain` is a strategic question for the user, not a requirement. It goes to `gaps.report` (Strategic Design section), not to the `.sysreq`.
 - **UNCLEAR promotion:** every `// UNCLEAR:` marker becomes a functional requirement with `priority should` and the full business rule description as the EARS statement. The rationale (`::`) explains why the domain grammar cannot express it.
 - **Infrastructure promotion:** every element that failed Decision Test 2 (omitted from `.domain` with `// NOTE: infrastructure`) becomes an NFR in the `.sysreq` file.
 - **Functional requirements:** every operation, precondition, invariant, and reaction in the `.domain` also gets a corresponding EARS requirement. This ensures the `.sysreq` is a complete specification of the bounded context's behavior.
@@ -179,12 +181,14 @@ Three sequential phases. Print a summary at the end of each phase for user valid
    Otherwise (no codegraph, non-JVM corpus) skip this step.
 5. Locate key code areas: models/entities, handlers/services, events, validators/reactions, test suites (integration, acceptance, BDD). With codegraph: the type list of `domain-facts.json` with stereotypes and the `type` records of the insights (sorted by `concept`) ARE this inventory; test suites are still located by hand.
 6. Identify bounded context(s) and propose domain name(s). With codegraph: start from the `module` records' `boundedContextHint` and the import graph (`modules[].imports`); a group of mutually dependent packages (`scc`) is one context or a shared kernel — never split it across two.
+   - **Candidate subdomains.** Propose them from two kinds of evidence only. (a) **Package/module clustering**: top-level packages or modules that share a business vocabulary and import each other far more than they import the rest form one candidate subdomain, named in business words, not after the package. (b) **Wrapped third-party products**: a vendor SDK or client (payment provider, identity verification, e-mail, accounting package) adapted by a context of its own, or by an `infrastructure service` behind an `spi interface`, is a candidate `generic` subdomain. With a context of its own, that context `models` it and is likely an anti-corruption layer; behind an SPI only, no context models it, which is legitimate. Propose `generic` for (b). For (a), propose `core` or `supporting` and say why; code volume and rule density are hints, not evidence of differentiation. Record which candidate each context `models`. Every classification stays **to confirm**: ask the user at step 9, and keep the `// NOTE: classification to confirm — {evidence}` marker on every subdomain the user has not confirmed.
 7. Print reconnaissance summary:
    ```
    ## Reconnaissance Summary
    - Language: {lang}, Framework: {framework}
    - Codegraph: {absent | model {entities}/{edges}, facts {types} types, insights {records} records ({llm} explained, {template} templated, {low-confidence} below 0.5) | plan only: {calls} calls, ~{tokens} prompt tokens}
    - Domain(s) identified: {list}
+   - Candidate subdomains (to confirm): {name} {proposed classification} — evidence: {package cluster | wraps {product}} — modeled by {contexts}
    - Models found: {count} — Handlers/Services: {count} — Events: {count} — Test suites: {count}
    - Mode: {creation | update}
    ```
@@ -193,11 +197,13 @@ Three sequential phases. Print a summary at the end of each phase for user valid
    - If `--full` flag → **full update mode**.
    - If `specy/.meta.json` exists and (`gitSha` is reachable or it carries `codegraph.fingerprints`) → **incremental update mode**.
    - Otherwise → **full update mode**.
-9. Wait for user confirmation.
+9. Wait for user confirmation. Ask explicitly for the classification of each candidate subdomain.
 
 ### Phase 2 — Extraction
 
 **With codegraph**, the inputs of the steps below change, not the steps: "read every class" means "walk the `type` records of the insights, sorted by `concept`, with the matching `domain-facts` dossier open"; "read every handler" means "walk the `operation` records with `origin: llm`" (templated accessors are never operations). The mapping from a block to a construct is the table in `heuristics/codegraph.md` §3; the evidence rules of §4 decide what may be emitted without opening the file. Open the anchored span (`file`, domain-facts `anchor.span`) whenever a predicate, a message or a cardinality must be exact, and whenever confidence is below 0.7. Everything below applies unchanged to a corpus without codegraph.
+
+**Strategic design first, once per organization.** Write the candidate subdomains from Phase 1 into the `organization` block, before the first `context`, each with the classification the user confirmed at Phase 1 step 9, or with the proposed one under `// NOTE: classification to confirm — {evidence}`. State `models` in each context (after `requirements-source`, before `map`), naming the candidate(s) it covers. Every subdomain rests on the Phase 1 evidence (Decision Test 1). A context that maps to no candidate is itself a package cluster: give it a candidate of its own, named after the activity it serves, still to confirm.
 
 For each bounded context:
 
@@ -261,6 +267,8 @@ For each bounded context:
     | **Orphan events** | Events emitted but never consumed by any operation or reaction | Flag as potential missing reactive behavior |
     | **Missing invariants** | Entity has cross-field consistency requirements evident in code but not formalized | Add invariants with enforcement strategy |
     | **Weak aggregate boundaries** | Cross-aggregate mutations without justification or agreement | Propose agreement/reconciliation or redesign boundaries |
+    | **Context spans core and generic** | A context's `models` names a candidate `core` subdomain and a candidate `generic` one (typically business rules next to a vendor adapter) | Segregate the core: give the generic part its own thin context or anti-corruption layer, keep the original context for the differentiating model |
+    | **Anemic core** | A context modeling a candidate `core` subdomain whose entities are anemic: no aggregate, no invariant, no state machine, logic left in services | Deepen the core: put the redesign effort there first, or ask the user whether the subdomain is really core |
     | **Package cycle** (codegraph) | `module` insights records sharing an `scc`: the packages depend on each other | Quote the records' `sharedKernelHint`; propose the inversion or the shared kernel it names |
     | **Type cycle** (codegraph) | `type` records sharing an `scc` across what should be separate aggregates | Split by the cycle's members; usually one of them is a missing value or event |
     | **Concept disagreement** (codegraph) | The insights `concept` and the Decision-Test-4 verdict differ (e.g. `valueType` with an `@Id`) | Record the disagreement; the fact wins, the smell names why the code reads otherwise |
@@ -276,6 +284,7 @@ For each bounded context:
 24. Print extraction summary:
     ```
     ## Extraction — {domain}
+    Subdomains: {n} ({core}/{supporting}/{generic}, {to-confirm} to confirm) | Contexts with `models`: {n}/{n}
     Enums: {n} | Values: {n} | Entities: {n} | Aggregates: {n}
     Domain Services: {n} | App Services: {n} | Infra Services: {n}
     Commands: {n} | Queries: {n} | Events: {n}
@@ -307,13 +316,14 @@ For each bounded context:
 15. Verify every invariant — scoped or file-level — has an `enforcement` strategy.
 16. Verify every command declares an `identity`, and every precondition a `rejects` reason.
 17. Verify every interface declares its role: an `spi interface` has exactly one `describes`; an `api interface` has none and its `exposes` dot-paths resolve to declared operations.
-18. **Requirement traceability:** verify every domain construct has at least one `satisfies [REQ-...]` reference — always as the first element inside its body braces.
-19. **Requirement resolution:** verify every `REQ-{CTX}-{NNN}` referenced in `satisfies` exists in the `.sysreq` file.
-20. **Marker coverage:** verify every `// NOTE` and `// UNCLEAR` in the `.domain` file has a corresponding requirement in the `.sysreq` file.
-21. **Requirement uniqueness:** verify requirement IDs are unique and sequential within each context.
-22. **Test confirmation:** when a test assertion confirms an extracted behaviour (precondition, `sets`, `emits`, service call), treat it as validation. When a test asserts a behaviour absent from the extraction, flag it for review.
-23. Fix obvious errors. For ambiguous cases → `// UNCLEAR`.
-24. Write `specy/gaps.report`:
+18. Verify every subdomain declares `core`, `supporting` or `generic`; when the organization declares a subdomain, every context states `models`, and every name in `models` resolves to a subdomain declared in the same file.
+19. **Requirement traceability:** verify every domain construct has at least one `satisfies [REQ-...]` reference — always as the first element inside its body braces. A `subdomain` has no body and carries none.
+20. **Requirement resolution:** verify every `REQ-{CTX}-{NNN}` referenced in `satisfies` exists in the `.sysreq` file.
+21. **Marker coverage:** verify every `// NOTE` and `// UNCLEAR` in the `.domain` file has a corresponding requirement in the `.sysreq` file — except `// NOTE: classification to confirm` on a subdomain, which must appear in the Strategic Design section of `gaps.report` instead.
+22. **Requirement uniqueness:** verify requirement IDs are unique and sequential within each context.
+23. **Test confirmation:** when a test assertion confirms an extracted behaviour (precondition, `sets`, `emits`, service call), treat it as validation. When a test asserts a behaviour absent from the extraction, flag it for review.
+24. Fix obvious errors. For ambiguous cases → `// UNCLEAR`.
+25. Write `specy/gaps.report`:
     ```
     # Distill Report — {date}
 
@@ -330,6 +340,11 @@ For each bounded context:
     Residual UNCLEAR markers: {n}
     ### {pattern} ({n} occurrences)
     {Why the grammar cannot express it.}
+
+    ## Strategic Design — to confirm
+    | Subdomain | Proposed classification | Evidence | Modeled by | Confirmed |
+    |-----------|-------------------------|----------|------------|-----------|
+    | {name} | {core|supporting|generic} | {package cluster | wraps {product}} | {contexts} | {yes | to confirm} |
 
     ## Requirement Coverage
     Total requirements generated: {n} (functional: {n}, NFR: {n})
@@ -350,10 +365,10 @@ For each bounded context:
     |-------|------------------|----------|----------------------|
     | {smell} | {name} | {high|medium|low} | {REQ-IDs} |
     ```
-25. Print validation summary:
+26. Print validation summary:
     ```
     ## Validation Summary
-    Types: {n}/{n} | Dot-paths: {n}/{n} | Enums: {n}/{n} | Preconditions: {n}/{n} | Services: {n}/{n} | State Machines: {n}/{n} | Aggregates: {n}/{n} | Queries: {n}/{n} | Reactions: {n}/{n} | Interfaces: {n}/{n} | Corrected: {n} | UNCLEAR: {n}
+    Types: {n}/{n} | Dot-paths: {n}/{n} | Enums: {n}/{n} | Preconditions: {n}/{n} | Services: {n}/{n} | State Machines: {n}/{n} | Aggregates: {n}/{n} | Queries: {n}/{n} | Reactions: {n}/{n} | Interfaces: {n}/{n} | Subdomains/`models`: {n}/{n} | Corrected: {n} | UNCLEAR: {n}
     Requirement traceability: {n}/{n} constructs with satisfies | Requirement IDs: {n} unique
     Files written: {list}
     ```
@@ -899,6 +914,67 @@ Two conventions hold everywhere:
 - **`satisfies [...]` is always the first element inside the body braces.**
 - **Bodies are ordered slots, not a free-form bag.** The order below is the order
   the parser expects.
+
+## Strategic constructs
+
+### Subdomain
+
+A `subdomain` is a part of the **problem space**: an area of activity the business has to master, whether or not software exists for it. It is declared at organization scope and carries a mandatory classification.
+
+#### Skeleton
+
+```
+organization Name :: "description" {
+    subdomain Name core :: "description"
+    subdomain Name supporting :: "description" meta { key = "value" }
+    subdomain Name generic
+
+    context Name (shortname) :: "description" { ... }
+}
+```
+
+#### Rules
+
+| Rule | Detail |
+|------|--------|
+| Scope | Organization only — after the organization's `satisfies` / `requirements-source`, then before, between or after the contexts. By convention, before the first `context`. |
+| Classification | Required — `core` (where the enterprise differentiates: built in-house by the strongest team, modeled in depth), `supporting` (necessary and specific, not differentiating: built simply or outsourced), `generic` (every business has it: bought or adopted). |
+| Description, metadata | Optional — `:: "…"` and `meta { }`, as on any construct. A subdomain has no body. |
+| Naming | Same form as a context name (`PascalCase`). |
+| Not modeled | Legitimate — typically a generic subdomain served by a bought product, reached through an `spi interface` and an `infrastructure service`. |
+| Keywords | `subdomain`, `core`, `supporting`, `generic` and `models` are keywords only in these positions; elsewhere they stay ordinary identifiers. |
+| No outward links | A subdomain names no capability, team or system. The enterprise-architecture layer points at it (`capability … realized-by <Subdomain>`). |
+
+---
+
+### Bounded Context — `models`
+
+A bounded context is the **solution space**. Its `models` clause names the subdomain(s) it models.
+
+#### Skeleton
+
+```
+context Name (shortname) :: "description" {
+    satisfies [REQ-XXX-001]
+    requirements-source "file.sysreq"
+    models SubdomainA, SubdomainB
+    map { ... }
+    // modules and definitions...
+}
+```
+
+#### Rules
+
+| Rule | Detail |
+|------|--------|
+| Slot order | `satisfies?`, `requirements-source?`, `models?`, `map?`, then modules and definitions. |
+| Form | `models Name {, Name}` — every name resolves to a `subdomain` of the organization. |
+| Cardinality | A context models 1..n subdomains. A subdomain is modeled by 0..n contexts. |
+| When required | Once the organization declares at least one subdomain, every context states `models`; a context without it is reported. An organization with no subdomain is unchanged. |
+| Several contexts, one subdomain | Usually records history — a legacy context next to its replacement. |
+| One context, several subdomains | The context has grown too large. A core subdomain never shares a context with a generic one. |
+
+---
 
 ## Structural constructs
 
@@ -2518,12 +2594,16 @@ Before writing final files, verify each item. If any fails, fix it.
 - [ ] Every interface declares its role (`api` / `spi`); every SPI has one `describes`, and its provider the matching `described-by`
 - [ ] Every infrastructure-service and repository operation is a signature (no body)
 - [ ] `satisfies [...]` is the first element inside the body braces, never on the header line
+- [ ] Every candidate subdomain declares `core`, `supporting` or `generic`, at organization scope (by convention before the first `context`), and carries `// NOTE: classification to confirm — {evidence}` unless the user confirmed it
+- [ ] Every subdomain rests on evidence: a package/module cluster, or a context wrapping a third-party product
+- [ ] When the organization declares a subdomain, every context states `models` (after `requirements-source`, before `map`), and every name in it resolves to a subdomain declared in the same file
+- [ ] Every unconfirmed classification is listed in the Strategic Design section of `gaps.report`, not promoted to the `.sysreq`
 - [ ] Messages in business language, not technical jargon
 - [ ] `// source:` comment on every definition
 - [ ] Query-only entities annotated with `// NOTE: query-only`
 - [ ] Unreferenced enums annotated with `// NOTE: not referenced`
-- [ ] Every domain construct has `satisfies [REQ-{CTX}-{NNN}]`
-- [ ] Every `// NOTE` in `.domain` has a corresponding requirement in `.sysreq`
+- [ ] Every domain construct has `satisfies [REQ-{CTX}-{NNN}]` (a `subdomain` has no body, hence no `satisfies`)
+- [ ] Every `// NOTE` in `.domain` has a corresponding requirement in `.sysreq` — except `// NOTE: classification to confirm` on a subdomain
 - [ ] Every `// UNCLEAR` in `.domain` has a corresponding requirement in `.sysreq`
 - [ ] Requirement IDs are sequential and unique within each context
 - [ ] `.sysreq` file has correct syntax per SYSTEM-REQ-METAMODEL.md

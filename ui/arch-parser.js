@@ -342,6 +342,10 @@ function parseArch(text, fileStem) {
         walk(sub, { env, sys });
         return;
       }
+      case "node":
+        // a node's deploys (nested nodes included) belong to its environment; resources are skipped
+        if (scope.env) walk(sub, scope);
+        return;
       case "deploy": {
         if (!scope.env) return;
         const rep = h.rest.findIndex(t => t.t === "w" && t.v === "replicas");

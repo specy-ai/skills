@@ -78,3 +78,15 @@
 | Spring profiles (`application-prod.yml`, `application-staging.yml`) | one `environment` per profile |
 | `replicas:` in a `k8s/*.yaml` / Helm `values.yaml` | `deploy Container replicas N` |
 | `docker-compose.yml` services | container placement in a `local`/`dev` environment |
+
+### Deployment: nodes and resources
+
+| Source signal | Inference |
+|---|---|
+| `spring.cloud.aws.region.static`, `AWS_REGION` in a k8s `Deployment`'s `env`, a Terraform `provider "aws"` block | `provider` / `region` of the `node` the container runs on |
+| Helm `values-<cluster>.yaml`, an Argo CD `Application` `destination` | one `node` per target cluster, nested in its region node |
+| `spring.datasource.url` host of a managed instance (`….<region>.rds.amazonaws.com`, a Cloud SQL socket factory) matching a database in Terraform/CloudFormation | a `resource` that `instantiates` the database container; `technology` from the IaC engine and version |
+| `spring.kafka.bootstrap-servers` pointing at a managed cluster (MSK, Confluent Cloud) declared in IaC | a `resource` that `instantiates` the broker container |
+| Spring Data repositories, Flyway/Liquibase migrations writing to that datasource | `stores`, only for records that match a struct the `.arch` declares |
+
+Each node and resource gets a `// source:`; `provider`, `region` and `zone` are written only when a file states them.

@@ -89,6 +89,8 @@ An HTTP framework, a serializer, a retry interceptor are transport mechanisms �
 | A named topic/queue on a broker carrying messages | `channel … on Broker { carries … }` |
 | A directed dependency wire with a transport | `connect A[.Port] -> B[.Port] over "…" <style>` |
 | A runtime placement of containers | `environment { deploy … replicas N }` |
+| A place containers run on — a cloud region, a cluster, a VM, a serverless runtime — named by IaC or manifests | `node name [provider "…"] [region "…"] [zone "…"] { … }` in the environment (nodes nest) |
+| A provisioned database instance, topic, bucket, cache or secret store | `resource name [instantiates Container] [technology "…"] [tenancy shared\|dedicated] [{ stores … }]` on a node |
 | A reference to a domain module/interface/event/value type | `realizes …` / `import … from domain` |
 | A reference to a system requirement / NFR addressed here | `satisfies [REQ-…]` / `satisfies [NFR-…]` |
 
@@ -103,11 +105,11 @@ An HTTP framework, a serializer, a retry interceptor are transport mechanisms �
 - **Encoding:** UTF-8, LF line endings, no trailing whitespace.
 - **Naming conventions:**
   - `PascalCase` — `system`, `container`, `component`, `interface`, `person`, `externalSystem`, `boundedContext`, and every named type (`struct`, `enum`, `typedef`, `union`, `exception`).
-  - `camelCase` — operation names, struct/union field names, enum members, channel names, environment names.
+  - `camelCase` — operation names, struct/union field names, enum members, channel names, environment, node and resource names.
   - Operation names are **technical identifiers** (`createLink`, `resolveSlug`) — not the business-language string labels the domain layer uses.
 - **Primitives are lowercase:** `string`, `int`/`integer`, `long`, `double`, `decimal`, `boolean`, `date`, `datetime`, `time`, `instant`, `duration`, `uuid`, `binary`. `void` is a return type only. Containers: `list<T>`, `set<T>`, `map<K, V>`.
 - **Every named type carries explicit ordinals** on its fields/members, and `required`/`optional` on struct/exception fields and operation arguments.
-- **Source traceability:** every container, component, interface, channel, connector, and named type gets a `// source: path/to/file.ext` comment. For an element synthesised from many files, point at the most representative one.
+- **Source traceability:** every container, component, interface, channel, connector, named type, node, and resource gets a `// source: path/to/file.ext` comment. For an element synthesised from many files, point at the most representative one.
 - **Order in file:** `architecture` → `domain-source` / `requirements-source` → `person`(s) → `externalSystem`(s) → `system {` → named types (typedef → enum → struct → union → exception → imports) → `interface`(s) → `boundedContext`(s) → `container`(s) (each with its `component`s) → `channel`(s) → `connect`(ors) → `environment`(s) → `}`. Use `// ===` section separators, matching the canonical example.
 - **Ports vs connectors:** a `provides`/`requires`/`consumes` line declares a **port**; a `connect …` line **wires** two ports and carries the transport. Keep the transport on the connector, never inline on the port.
 - **Async is first-class:** never draw a `sync` connector across a message broker. Model `channel name on Broker { carries Msg }` and have components `publishes Msg to name` / `subscribes name`.
@@ -199,7 +201,10 @@ Work top-down through the C4 levels.
 
 **Deployment view**
 
-16. From IaC/compose/profiles, emit `environment name { deploy Container [replicas N], … }`. Omit if no placement evidence exists.
+16. From IaC/compose/profiles, emit `environment name { deploy Container [replicas N], … }`. Omit if no placement evidence exists. Then add the **nodes** and **resources** the deployment evidence names, each with a `// source:` comment on the manifest or IaC file:
+    - **Nodes** — where containers run. Kubernetes manifests and Helm values (the cluster a release targets: kubeconfig context, Argo CD `destination`, per-cluster values files), Terraform/CloudFormation/CDK provider and stack settings (`provider "aws" { region = … }`, a CDK stack's `env: { region }`, `availabilityZone`), serverless manifests (`provider.name`, `provider.region`), cloud provider configs (`AWS_REGION`, `GOOGLE_CLOUD_REGION`, an Azure `location`), a docker-compose project (one node). Nest a cluster in its region node; put each `deploy` in the node whose manifest places that container.
+    - **`provider`, `region` and `zone` are extracted facts**: write one only when a file states it (a provider block, an environment variable, an endpoint hostname that embeds the region), never from a naming convention. When a manifest places a container but no file says where the cluster is, keep the node and leave the attribute out, with `// NOTE: region not stated in {file}`.
+    - **Resources** — provisioned data stores and brokers in IaC or charts: `aws_db_instance` / `aws_rds_cluster`, `aws_s3_bucket`, `aws_msk_cluster`, `aws_elasticache_*`, `aws_secretsmanager_secret`, `google_sql_database_instance`, `azurerm_postgresql_flexible_server`, CloudFormation `AWS::RDS::DBInstance`, CDK `rds.DatabaseInstance`, a Helm release of a database or broker chart, a compose service built from a database image. `instantiates` names the data-store or broker container the application connects to (match the connection string or client config to the resource); `technology` is the engine and version the IaC states; `tenancy` only when the IaC or platform config says whether the instance serves this system alone (`dedicated`) or several (`shared`); `stores` only when persistence code (repositories, migrations, table mappings) unambiguously writes a record that matches a declared struct. A container a resource instantiates needs no `deploy` clause in that environment.
 
 17. Write the `.arch` file.
 
@@ -211,7 +216,7 @@ Work top-down through the C4 levels.
     Interfaces: {n} | Operations (cmd/safe/oneway/streaming): {a}/{b}/{c}/{d}
     Types (struct/enum/typedef/union/exception): {…} | Domain imports: {n}
     Channels: {n} | Connectors (sync/async/streaming): {a}/{b}/{c}
-    Environments: {n}
+    Environments: {n} | Nodes: {n} | Resources: {n}
     realizes links: {n} | satisfies links: {n} | UNCLEAR: {n}
     ```
 
@@ -225,7 +230,7 @@ Work top-down through the C4 levels.
 6. Every `connect` endpoint resolves: the container/component/person/externalSystem exists, and any `.Port` it names is actually `provides`d (right side) or `requires`d (left side) by that element.
 7. Every `requires` port is wired by a connector (else `// UNCLEAR`), and no two providers ambiguously satisfy the same required port.
 8. Every `channel` is hosted on a declared broker container; every `publishes … to X` / `subscribes X` names a declared channel; every carried/published type is declared or imported.
-9. Every `environment`'s `deploy` targets a declared container.
+9. Every `deploy`, directly under an environment or inside a node, targets a declared container; every `instantiates` names a declared data-store or broker container; every `stores` names a declared struct (or a struct of the system's `.dataop`); every node and resource carries a `// source:`.
 10. Every `realizes` reference uses the correct citation form: **module/context → quoted string**; **interface/event/value type → bare PascalCase**. When `domain-source` is set, the referenced names should plausibly exist in that `.domain`; flag misses with `// NOTE: domain target {X} not found in {domain-source}`.
 11. Every `satisfies [REQ-…]`/`[NFR-…]` id is well-formed; when `requirements-source` is set, flag ids absent from the `.sysreq` with `// NOTE`.
 12. No `sync` connector crosses a broker (should be a channel); no database modelled as a component.
@@ -388,7 +393,7 @@ During Phase 1, identify the stack, then load the relevant heuristic file.
 
 **Connector inference.** Each cross-boundary call → a `connect … -> … over "<protocol>" <style>`. Synchronous client calls (HTTP/gRPC/JDBC) are `sync`; broker interactions are `async` (or a channel); long-lived streams are `streaming`. External systems appear at connector ends, so the connector set is the *full* dependency graph.
 
-**Deployment inference.** Profiles/compose/k8s/Helm → `environment`s and `deploy … replicas N`.
+**Deployment inference.** Profiles/compose/k8s/Helm → `environment`s and `deploy … replicas N`. Kubernetes cluster targets, Terraform/CloudFormation/CDK provider and stack settings, serverless manifests and cloud provider configs → `node`s, with the `provider` / `region` / `zone` a file states; managed databases, topics, buckets, caches and secret stores declared in IaC or charts → `resource`s on those nodes (see Phase 2, step 16).
 
 **Domain & requirement bridges.** If `specy/*.domain` exists: align components to modules (`realizes module "…"`), reuse value types and events via `import … from domain`, and link interfaces to domain interfaces. If `specy/*.sysreq` exists: attach `satisfies [REQ-…]`/`[NFR-…]`, putting NFRs on the elements that address them (cache → latency, broker/replicas → resilience/availability, ACL component → integration NFR).
 
@@ -502,10 +507,21 @@ connect Registrar -> LinkController.LinkCommands over "REST/JSON" sync
 connect LinkController.SlugAllocation -> SlugAllocator over "gRPC" sync
 connect ClickCollector -> Analytics.AnalyticsIngest over "HTTPS" async
 
+// source: k8s/prod/*.yaml, infra/terraform/main.tf
 environment production :: "Production deployment" {
-  deploy Api replicas 3
-  deploy SlugService replicas 2
-  deploy EventBus, LinkDb
+  // source: infra/terraform/main.tf (provider "aws", region = "eu-west-1")
+  node euWest provider "AWS" region "eu-west-1" {
+    // source: infra/terraform/eks.tf (aws_eks_cluster.prod)
+    node prodCluster :: "EKS workload cluster" {
+      deploy Api replicas 3              // source: k8s/prod/api.yaml (replicas: 3)
+      deploy SlugService replicas 2      // source: k8s/prod/slug.yaml
+    }
+    // source: infra/terraform/rds.tf (aws_db_instance.links, engine_version "16")
+    resource linkDb instantiates LinkDb technology "PostgreSQL 16" tenancy dedicated {
+      stores ShortLinkDTO                // source: services/api/.../LinkRepository.java
+    }
+  }
+  deploy EventBus                        // NOTE: no node evidence — placement unstated
 }
 ```
 
@@ -758,7 +774,7 @@ Before writing final files, verify each item. If any fails, fix it.
 - [ ] Exactly one `system { }` in the file; persons and external systems at `architecture` scope
 - [ ] `domain-source` / `requirements-source` declared when those sibling files exist
 - [ ] `PascalCase` for system/container/component/interface/person/externalSystem/boundedContext and all named types
-- [ ] `camelCase` for operation names, field/member names, channel names, environment names
+- [ ] `camelCase` for operation names, field/member names, channel names, environment, node and resource names
 - [ ] Operation names are technical identifiers (not business-language string labels)
 - [ ] Primitives lowercase; `void` used only as a return type; `double`/`instant`/`binary` used where wire-appropriate
 - [ ] Every struct/exception field and operation argument has a unique ordinal and a `required`/`optional` marker
@@ -770,11 +786,12 @@ Before writing final files, verify each item. If any fails, fix it.
 - [ ] No `sync` connector across a broker; broker hops modelled as channels
 - [ ] Databases/brokers/caches modelled as black-box `container technology "…"`, not components
 - [ ] Every channel hosted on a declared broker; publishes/subscribes name declared channels; carried types declared or imported
-- [ ] Every `environment` deploy targets a declared container
+- [ ] Every `deploy` (under an environment or a node) targets a declared container; every `instantiates` names a declared data-store/broker container; every `stores` names a declared struct
+- [ ] `provider` / `region` / `zone` written only where a file states them; nodes and resources only where IaC or manifests evidence them
 - [ ] `realizes` uses quoted strings for module/context and bare PascalCase for interface/event/value type
 - [ ] `import value type` / `import event` used instead of re-declaring domain concepts where a `.domain` exists
 - [ ] `satisfies [REQ-…]`/`[NFR-…]` attached to the elements that implement/address them; NFRs on the addressing element
-- [ ] `// source:` comment on every container, component, interface, channel, connector, and named type
+- [ ] `// source:` comment on every container, component, interface, channel, connector, named type, node, and resource
 - [ ] No invented operations on an interface whose contract is not recoverable (use `// UNCLEAR`)
 - [ ] `architecture.notes.md` written with confidence table, unwired ports, traceability, and observations
 - [ ] `.arch.meta.json` written

@@ -11,7 +11,8 @@
 //   level 2 — containers (edge API, redirect edge, SPA, broker, databases…)
 //   level 3 — components inside containers, each realizing real domain modules
 //   wiring  — connectors (sync/async) + channels carrying imported domain events
-//   deploy  — one lightweight production environment
+//   deploy  — one production environment: a region node, a managed resource,
+//             placement + replica hints
 // =============================================================================
 
 architecture Sniplink :: "Sniplink URL-shortening platform — software architecture" {
@@ -442,18 +443,28 @@ architecture Sniplink :: "Sniplink URL-shortening platform — software architec
     connect ClickAggregator -> AnalyticsDb over "HTTP/native" sync
 
     // ─────────────────────────────────────────────────────────────────────
-    // DEPLOYMENT VIEW — one lightweight environment: placement + replica hint.
+    // DEPLOYMENT VIEW — placement + replica hints, and the residency facts
+    // rules test: the node a container runs on, the resource data lives in.
     // ─────────────────────────────────────────────────────────────────────
 
     environment production :: "Multi-AZ production deployment" {
-      // Redirect is the hot path — scaled out for 10k req/s peak (REQ-NFR-006).
-      deploy RedirectEdge replicas 8
-      deploy EdgeApi replicas 3
+      // One EU region: where link data physically lives matters under the GDPR constraint.
+      node euWest :: "Primary EU region" provider "AWS" region "eu-west-1" {
+        // Redirect is the hot path — scaled out for 10k req/s peak (REQ-NFR-006).
+        deploy RedirectEdge replicas 8
+        deploy EdgeApi replicas 3
+        // LinkDb is provisioned as a managed instance, not deployed by us.
+        resource linkDb :: "Managed relational instance behind LinkDb"
+            instantiates LinkDb technology "Amazon RDS for PostgreSQL" tenancy dedicated {
+          stores ShortLinkDTO
+        }
+      }
+      // Placement not stated yet: deployed directly under the environment.
       deploy SafetyWorker replicas 2
       deploy AnalyticsService replicas 2
       deploy Console replicas 2
       // Stateful + broker containers: single logical placement here.
-      deploy EventBus, LinkDb, AnalyticsDb, SafetyCache
+      deploy EventBus, AnalyticsDb, SafetyCache
     }
   }
 }

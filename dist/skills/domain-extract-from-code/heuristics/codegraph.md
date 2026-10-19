@@ -164,6 +164,7 @@ under the evidence rules of §4.
 | operation `invariantsEnforced[]` | cross-check against the type's `invariants[]`; an invariant named here but absent there → add it to the type |
 | type `concept: notDomain` / operation `owner: unknown` | omit (`// NOTE: … (infrastructure)`) unless a fact contradicts |
 | module `boundedContextHint` | a `context Name (shortname)` candidate — one `.domain` per context; confirm with the module import graph (few imports across the hint = a boundary) |
+| module `boundedContextHint` clusters, module `spis[]` wrapping a vendor product | a candidate `subdomain` per cluster of hints sharing a vocabulary, and a candidate `generic` one per context that mostly adapts a third-party product — classification always under `// NOTE: classification to confirm — {evidence}` (main skill, Phase 1 step 6) |
 | module `apis` / `spis` / `dependsOn` | `module { exposes { } requires { } depends on { } }` |
 | module `ubiquitousLanguage[]` | the `:: "description"` texts and the glossary in `gaps.report` |
 | module `scc` + `sharedKernelHint` | context-map `shared kernel` when the packages are one context; otherwise a **refactoring note** "package cycle" naming the members and the hint |

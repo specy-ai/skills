@@ -85,15 +85,20 @@ externalDecl     = "external" , ( "struct" | "module" ) , qualifiedName
 // Struct  (metamodel: Struct, Attachment)
 //
 // A named data structure: a mandatory `schema` block (its fields), an optional
-// `state` block (named predicate-states over an instance), and zero or more
-// NESTED operations, which are thereby attached to the struct — inside them `_`
-// is the receiver. `represents` targets a domain entity, value type or enum.
+// `derives from` clause (its lineage), an optional `state` block (named
+// predicate-states over an instance), and zero or more NESTED operations, which
+// are thereby attached to the struct — inside them `_` is the receiver.
+// `represents` targets a domain entity, value type or enum. Each member opens
+// with its own keyword (`schema`, `derives`, `state`, `operation`), so the
+// fixed order below is decided by one token.
 // -----------------------------------------------------------------------------
 
 structDef        = "struct" , typeName , [ representsClause ] , [ description ]
                  , [ metadataBlock ] , "{"
                  , { comment }
                  , schemaBlock
+                 , { comment }
+                 , [ derivesFromClause ]
                  , { comment }
                  , [ stateBlock ]
                  , { comment | operationDef }
@@ -103,6 +108,27 @@ representsClause = "represents" , qualifiedName ;
 
 // The shape: a named map type. Every field is required — no `optional` constraint.
 schemaBlock      = "schema" , "{" , { comment | fieldDecl } , "}" ;
+
+// -----------------------------------------------------------------------------
+// Lineage  (metamodel: Lineage)
+//
+// The struct's data is derived from each listed source: one `derives from` edge
+// per source, stored on the derived struct. A source is a struct of the model
+// or an EXTERNAL struct — the form for a struct described by another model
+// (`catalog.Product`, declared with `external struct`). An external struct has
+// no body, so it can be a source but never a derived struct.
+// `via` names the carrier: a string label — conventionally an `.arch` level-0
+// flow cited by number, `"flow 12"` — or an `.arch` interface or channel.
+// A trailing `?` marks a CANDIDATE lineage: `observed` only (rule 16).
+// Lineage is struct-level: there is no field-by-field mapping.
+// -----------------------------------------------------------------------------
+
+derivesFromClause = "derives" , "from" , "{" , lineageSource
+                  , { "," , lineageSource } , "}" ;
+
+lineageSource    = structRef , [ "?" ] , [ viaClause ] ;
+
+viaClause        = "via" , ( stringLiteral | qualifiedName ) ;
 
 // -----------------------------------------------------------------------------
 // State  (metamodel: State)
@@ -489,7 +515,8 @@ newline          = "\n" ;
 //     the graph's condensation.
 //  3. Module DAG [strict: reject / observed: finding]: the derived module
 //     dependency graph shall be acyclic; it follows from rules 1 and 2 plus the
-//     module of each referenced element (metamodel: Module).
+//     module of each referenced element, lineage sources included (rule 22)
+//     (metamodel: Module).
 //  4. Closed world [both]: an operation shall declare EVERY operation it directly
 //     depends on and EVERY global or receiver field it directly reads or writes.
 //     Undeclared access is a model defect, not a syntax error. Under `observed`
@@ -515,7 +542,9 @@ newline          = "\n" ;
 //     the enclosing module; a qualified name shall resolve to a declared element
 //     (including external declarations) of the named module or struct, or — for
 //     `implements`, `represents` and `corresponds to` — to an element of the
-//     domain model.
+//     domain model, or — for a `via` name — to an interface or a channel of the
+//     software-architecture model, when that model is analysed alongside. A
+//     `via` string is a label and is not resolved.
 // 10. Implicit domain links [both]: when no `implements` / `represents` /
 //     `corresponds to` is declared, a link is presumed where names match,
 //     case-style ignored (metamodel: Convention). An explicit declaration always
@@ -542,9 +571,10 @@ newline          = "\n" ;
 //     predicates and flows are legal only in attached operations.
 // 15. Opaque [strict only]: `opaque` shall not appear in a `strict` model
 //     (metamodel: Type).
-// 16. Uncertain dependency [strict only]: `?` on a dependency shall not appear in
-//     a `strict` model; under `observed` the edge carries the `candidate`
-//     provenance (metamodel: Dependency graph).
+// 16. Uncertain dependency or lineage [strict only]: `?` on a dependency or on a
+//     lineage source shall not appear in a `strict` model; under `observed` the
+//     edge carries the `candidate` provenance (metamodel: Dependency graph,
+//     Lineage).
 // 17. Flow shape [both]: a flow contains at most one `return` step, which is the
 //     last step, and exactly one when the operation has a return type; a guard
 //     appears only on `write` and `raise` steps; every binding name is bound
@@ -561,4 +591,16 @@ newline          = "\n" ;
 //     recorded beside the operation, never a guard on a bind step.
 // 20. Evidence [observed only, advisory]: every declaration should carry a
 //     `// source:` anchor; a missing anchor is a finding.
+// 21. Lineage DAG [strict: reject / observed: finding]: no struct shall derive
+//     from itself, directly or transitively, through `derives from` (metamodel:
+//     Lineage). Under `observed`, candidate edges count: a cycle through one is
+//     still a finding.
+// 22. Lineage sources [both]: every source shall resolve to a struct of the
+//     model or an external struct — never an external module, a global or an
+//     operation — and appear at most once in its clause. The previous-definition
+//     rule (rule 1) does not apply to sources: the lineage graph is checked on
+//     its own. A source in another module is a reference for the derived module
+//     dependency (rule 3). When several models are analysed together, an
+//     external struct is the struct of another model with the same key
+//     (module, symbol) (metamodel: Convention), and lineage continues there.
 // =============================================================================

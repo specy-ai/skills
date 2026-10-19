@@ -1,497 +1,509 @@
-context GeolocationRouting :: "Real-time positioning, proximity queries, ETA, routing, surge zones" {
-    requirements-source "geolocation-routing.sysreq"
+organization RideNow :: "A ride-hailing marketplace connecting urban riders with independent drivers" {
+    // The RideNow organization spans the ride-now .domain files; each file declares
+    // the subdomains its own context models. shared.domain (the Shared Kernel)
+    // keeps the organization implicit.
 
-    enum SurgeZoneStatus { inactive, active }
-    enum DriverAvailability { online, offline, onTrip }
+    subdomain Geolocation core :: "Knowing where every driver is, how long a trip will take and where demand outstrips supply"
+    // Bought, not modeled: reached through the MappingProvider and TrafficDataProvider
+    // infrastructure services, so no context states `models Mapping`.
+    subdomain Mapping generic :: "Maps, geocoding and live traffic data, bought from external providers"
 
-    // -----------------------------------------------------------------
-    // Value types
-    // -----------------------------------------------------------------
+    context GeolocationRouting :: "Real-time positioning, proximity queries, ETA, routing, surge zones" {
+        requirements-source "geolocation-routing.sysreq"
+        models Geolocation
 
-    value GeoCoordinate :: "A point on Earth" {
-        fields {
-            latitude : decimal min(-90) max(90)
-            longitude : decimal min(-180) max(180)
-        }
-    }
+        enum SurgeZoneStatus { inactive, active }
+        enum DriverAvailability { online, offline, onTrip }
 
-    value BoundingBox :: "Rectangular geographic area" {
-        fields {
-            southWest : GeoCoordinate
-            northEast : GeoCoordinate
-        }
-    }
+        // -----------------------------------------------------------------
+        // Value types
+        // -----------------------------------------------------------------
 
-    value Polyline :: "Encoded route path" {
-        fields {
-            encodedPath : string
-            coordinates : list<GeoCoordinate>
-        }
-    }
-
-    // Distance and Duration are co-owned in the Shared context (see shared.domain).
-
-    value ETA :: "Estimated time of arrival between two points" {
-        satisfies [REQ-GEO-011, REQ-GEO-NFR-002]
-        fields {
-            origin : GeoCoordinate
-            destination : GeoCoordinate
-            duration : Duration
-            computedAt : datetime
-        }
-    }
-
-    value Route :: "Computed route with polyline, distance, duration" {
-        satisfies [REQ-GEO-012]
-        fields {
-            origin : GeoCoordinate
-            destination : GeoCoordinate
-            polyline : Polyline
-            distance : Distance
-            duration : Duration
-            computedAt : datetime
-        }
-    }
-
-    value SurgeMultiplier :: "Pricing multiplier during high demand" {
-        satisfies [REQ-GEO-022, REQ-NFR-051]
-        fields { value : decimal min(1.0) max(5.0) }
-        invariants {
-            surgeMultiplierCap :: "Surge multiplier never exceeds 5.0x" {
-                value <= 5.0
-                enforcement rejection
+        value GeoCoordinate :: "A point on Earth" {
+            fields {
+                latitude : decimal min(-90) max(90)
+                longitude : decimal min(-180) max(180)
             }
         }
-    }
 
-    value LocationAccuracy { fields { horizontalAccuracyMeters : decimal min(0) } }
-
-    // -----------------------------------------------------------------
-    // Entities
-    // -----------------------------------------------------------------
-
-    entity DriverPosition :: "Real-time geographic position of a driver" {
-        satisfies [REQ-GEO-001, REQ-GEO-002, REQ-DRV-032]
-
-        identity driverId : uuid
-        fields {
-            position : GeoCoordinate
-            accuracy : LocationAccuracy
-            heading : decimal optional min(0) max(360)
-            speed : decimal optional min(0)
-            availability : DriverAvailability default("offline")
-            recordedAt : datetime
-            receivedAt : datetime
+        value BoundingBox :: "Rectangular geographic area" {
+            fields {
+                southWest : GeoCoordinate
+                northEast : GeoCoordinate
+            }
         }
 
-        operations {
-            "Update driver location" on UpdateDriverLocation {
-                satisfies [REQ-GEO-001, REQ-GEO-002, REQ-GEO-004]
-                unsafe
-
-                precondition locationFreshEnough :: "Discard updates older than 60 seconds" {
-                    now() - updateDriverLocation.recordedAt <= 60s
-                } rejects "This location reading is more than a minute old and no longer describes where the driver is"
-
-                precondition locationAccurateEnough :: "Discard updates with accuracy worse than 100m (REQ-GEO-004)" {
-                    updateDriverLocation.accuracy.horizontalAccuracyMeters <= 100
-                } rejects "This location fix is accurate to worse than 100 metres and cannot be trusted for matching"
-
-                sets DriverPosition {
-                    position = updateDriverLocation.position
-                    accuracy = updateDriverLocation.accuracy
-                    heading = updateDriverLocation.heading
-                    speed = updateDriverLocation.speed
-                    recordedAt = updateDriverLocation.recordedAt
-                    receivedAt = now()
-                }
-
-                postcondition positionStored :: "Projection reflects update with arrival time" {
-                    state_after.position = updateDriverLocation.position
-                    state_after.receivedAt is defined
-                }
-
-                emits DriverLocationUpdated {
-                    driverId = DriverPosition.driverId
-                    position = DriverPosition.position
-                    accuracy = DriverPosition.accuracy
-                    recordedAt = DriverPosition.recordedAt
-                }
+        value Polyline :: "Encoded route path" {
+            fields {
+                encodedPath : string
+                coordinates : list<GeoCoordinate>
             }
+        }
 
-            "Mark driver ineligible on stale position" on MarkPositionStale {
-                satisfies [REQ-GEO-003, REQ-DRV-034]
-                unsafe
+        // Distance and Duration are co-owned in the Shared context (see shared.domain).
 
-                precondition positionIsStale :: "Last update older than 60s" {
-                    now() - DriverPosition.recordedAt > 60s
-                } rejects "The driver's last position is still fresh, so they cannot be declared stale"
-
-                sets DriverPosition { availability = offline }
-
-                emits DriverPositionStale {
-                    driverId = DriverPosition.driverId
-                    lastSeenAt = DriverPosition.recordedAt
-                    detectedAt = now()
-                }
+        value ETA :: "Estimated time of arrival between two points" {
+            satisfies [REQ-GEO-011, REQ-GEO-NFR-002]
+            fields {
+                origin : GeoCoordinate
+                destination : GeoCoordinate
+                duration : Duration
+                computedAt : datetime
             }
+        }
 
-            "Set driver availability" on SetDriverAvailability {
-                satisfies [REQ-DRV-032]
-                unsafe
-                sets DriverPosition { availability = setDriverAvailability.availability }
-                emits DriverAvailabilityChanged {
-                    driverId = DriverPosition.driverId
-                    availability = DriverPosition.availability
-                    changedAt = now()
+        value Route :: "Computed route with polyline, distance, duration" {
+            satisfies [REQ-GEO-012]
+            fields {
+                origin : GeoCoordinate
+                destination : GeoCoordinate
+                polyline : Polyline
+                distance : Distance
+                duration : Duration
+                computedAt : datetime
+            }
+        }
+
+        value SurgeMultiplier :: "Pricing multiplier during high demand" {
+            satisfies [REQ-GEO-022, REQ-NFR-051]
+            fields { value : decimal min(1.0) max(5.0) }
+            invariants {
+                surgeMultiplierCap :: "Surge multiplier never exceeds 5.0x" {
+                    value <= 5.0
+                    enforcement rejection
                 }
             }
         }
 
-        invariants {
-            positionHasTimestamp :: "Every position has a recording timestamp" {
-                recordedAt is defined
-                enforcement rejection
-            }
-        }
-    }
+        value LocationAccuracy { fields { horizontalAccuracyMeters : decimal min(0) } }
 
-    entity SurgeZone :: "Geographic zone where demand/supply imbalance triggers surge" {
-        satisfies [REQ-GEO-020, REQ-GEO-021, REQ-GEO-024]
+        // -----------------------------------------------------------------
+        // Entities
+        // -----------------------------------------------------------------
 
-        identity zoneId : uuid
-        fields {
-            name : string maxLength(200)
-            boundary : BoundingBox
-            status : SurgeZoneStatus default("inactive")
-            currentMultiplier : SurgeMultiplier optional
-            demandSupplyRatio : decimal optional min(0)
-            surgeThreshold : decimal min(0) default(2.0)
-            activatedAt : datetime optional
-            deactivatedAt : datetime optional
-        }
+        entity DriverPosition :: "Real-time geographic position of a driver" {
+            satisfies [REQ-GEO-001, REQ-GEO-002, REQ-DRV-032]
 
-        operations {
-            "Activate surge in zone" on ActivateSurge {
-                satisfies [REQ-GEO-020]
-                unsafe
-                resolves SurgeZone from activateSurge.zoneId
-
-                precondition zoneInactive { SurgeZone.status = inactive }
-                    rejects "Surge is already active in this zone"
-
-                precondition ratioAboveThreshold {
-                    activateSurge.demandSupplyRatio > SurgeZone.surgeThreshold
-                } rejects "Demand in this zone has not risen above its surge threshold"
-
-                sets SurgeZone {
-                    status = active
-                    currentMultiplier = activateSurge.multiplier
-                    demandSupplyRatio = activateSurge.demandSupplyRatio
-                    activatedAt = now()
-                }
-
-                emits SurgeActivated {
-                    zoneId = SurgeZone.zoneId
-                    multiplier = SurgeZone.currentMultiplier
-                    contributingFactor = activateSurge.contributingFactor
-                    demandSupplyRatio = SurgeZone.demandSupplyRatio
-                    activatedAt = SurgeZone.activatedAt
-                }
+            identity driverId : uuid
+            fields {
+                position : GeoCoordinate
+                accuracy : LocationAccuracy
+                heading : decimal optional min(0) max(360)
+                speed : decimal optional min(0)
+                availability : DriverAvailability default("offline")
+                recordedAt : datetime
+                receivedAt : datetime
             }
 
-            "Deactivate surge in zone" on DeactivateSurge {
-                satisfies [REQ-GEO-021]
-                unsafe
-                resolves SurgeZone from deactivateSurge.zoneId
+            operations {
+                "Update driver location" on UpdateDriverLocation {
+                    satisfies [REQ-GEO-001, REQ-GEO-002, REQ-GEO-004]
+                    unsafe
 
-                precondition zoneActive { SurgeZone.status = active }
-                    rejects "Surge is not currently active in this zone"
+                    precondition locationFreshEnough :: "Discard updates older than 60 seconds" {
+                        now() - updateDriverLocation.recordedAt <= 60s
+                    } rejects "This location reading is more than a minute old and no longer describes where the driver is"
 
-                precondition ratioStableBelowThreshold {
-                    deactivateSurge.demandSupplyRatio <= SurgeZone.surgeThreshold
-                } rejects "Demand in this zone is still above its surge threshold"
+                    precondition locationAccurateEnough :: "Discard updates with accuracy worse than 100m (REQ-GEO-004)" {
+                        updateDriverLocation.accuracy.horizontalAccuracyMeters <= 100
+                    } rejects "This location fix is accurate to worse than 100 metres and cannot be trusted for matching"
 
-                precondition belowThresholdAtLeastFiveMinutes {
-                    deactivateSurge.belowThresholdSince <= now() - 5min
-                } rejects "Demand must stay below the threshold for at least five minutes before surge is lifted"
-
-                sets SurgeZone {
-                    status = inactive
-                    currentMultiplier = null
-                    deactivatedAt = now()
-                }
-
-                emits SurgeDeactivated {
-                    zoneId = SurgeZone.zoneId
-                    previousMultiplier = deactivateSurge.previousMultiplier
-                    deactivatedAt = SurgeZone.deactivatedAt
-                }
-            }
-        }
-
-        states {
-            machine SurgeZoneLifecycle :: "Surge lifecycle of a zone" {
-                // UNCLEAR: the previous model declared `start inactive`, but no operation
-                // creates a SurgeZone, so the start transition ([*] --> inactive on <op>)
-                // cannot name the operation that drives it. Zones appear to be created
-                // administratively, outside the modelled behaviour.
-                state inactive {
-                    invariants {
-                        noMultiplierWhileInactive {
-                            SurgeZone.currentMultiplier is null
-                            enforcement rejection
-                        }
+                    sets DriverPosition {
+                        position = updateDriverLocation.position
+                        accuracy = updateDriverLocation.accuracy
+                        heading = updateDriverLocation.heading
+                        speed = updateDriverLocation.speed
+                        recordedAt = updateDriverLocation.recordedAt
+                        receivedAt = now()
                     }
-                }
-                state active {
-                    invariants {
-                        multiplierPresentWhileActive {
-                            SurgeZone.currentMultiplier is defined
-                            enforcement rejection
-                        }
+
+                    postcondition positionStored :: "Projection reflects update with arrival time" {
+                        state_after.position = updateDriverLocation.position
+                        state_after.receivedAt is defined
+                    }
+
+                    emits DriverLocationUpdated {
+                        driverId = DriverPosition.driverId
+                        position = DriverPosition.position
+                        accuracy = DriverPosition.accuracy
+                        recordedAt = DriverPosition.recordedAt
                     }
                 }
 
-                inactive --> active   on "Activate surge in zone"
-                active   --> inactive on "Deactivate surge in zone"
+                "Mark driver ineligible on stale position" on MarkPositionStale {
+                    satisfies [REQ-GEO-003, REQ-DRV-034]
+                    unsafe
+
+                    precondition positionIsStale :: "Last update older than 60s" {
+                        now() - DriverPosition.recordedAt > 60s
+                    } rejects "The driver's last position is still fresh, so they cannot be declared stale"
+
+                    sets DriverPosition { availability = offline }
+
+                    emits DriverPositionStale {
+                        driverId = DriverPosition.driverId
+                        lastSeenAt = DriverPosition.recordedAt
+                        detectedAt = now()
+                    }
+                }
+
+                "Set driver availability" on SetDriverAvailability {
+                    satisfies [REQ-DRV-032]
+                    unsafe
+                    sets DriverPosition { availability = setDriverAvailability.availability }
+                    emits DriverAvailabilityChanged {
+                        driverId = DriverPosition.driverId
+                        availability = DriverPosition.availability
+                        changedAt = now()
+                    }
+                }
+            }
+
+            invariants {
+                positionHasTimestamp :: "Every position has a recording timestamp" {
+                    recordedAt is defined
+                    enforcement rejection
+                }
             }
         }
 
-        invariants {
-            activeZoneHasMultiplier :: "Active zone must have a multiplier" {
-                if status = active { currentMultiplier is defined }
-                enforcement rejection
+        entity SurgeZone :: "Geographic zone where demand/supply imbalance triggers surge" {
+            satisfies [REQ-GEO-020, REQ-GEO-021, REQ-GEO-024]
+
+            identity zoneId : uuid
+            fields {
+                name : string maxLength(200)
+                boundary : BoundingBox
+                status : SurgeZoneStatus default("inactive")
+                currentMultiplier : SurgeMultiplier optional
+                demandSupplyRatio : decimal optional min(0)
+                surgeThreshold : decimal min(0) default(2.0)
+                activatedAt : datetime optional
+                deactivatedAt : datetime optional
             }
-            multiplierWithinCap :: "Multiplier never exceeds platform 5.0x cap" {
-                if currentMultiplier is defined { currentMultiplier.value <= 5.0 }
-                enforcement rejection
+
+            operations {
+                "Activate surge in zone" on ActivateSurge {
+                    satisfies [REQ-GEO-020]
+                    unsafe
+                    resolves SurgeZone from activateSurge.zoneId
+
+                    precondition zoneInactive { SurgeZone.status = inactive }
+                        rejects "Surge is already active in this zone"
+
+                    precondition ratioAboveThreshold {
+                        activateSurge.demandSupplyRatio > SurgeZone.surgeThreshold
+                    } rejects "Demand in this zone has not risen above its surge threshold"
+
+                    sets SurgeZone {
+                        status = active
+                        currentMultiplier = activateSurge.multiplier
+                        demandSupplyRatio = activateSurge.demandSupplyRatio
+                        activatedAt = now()
+                    }
+
+                    emits SurgeActivated {
+                        zoneId = SurgeZone.zoneId
+                        multiplier = SurgeZone.currentMultiplier
+                        contributingFactor = activateSurge.contributingFactor
+                        demandSupplyRatio = SurgeZone.demandSupplyRatio
+                        activatedAt = SurgeZone.activatedAt
+                    }
+                }
+
+                "Deactivate surge in zone" on DeactivateSurge {
+                    satisfies [REQ-GEO-021]
+                    unsafe
+                    resolves SurgeZone from deactivateSurge.zoneId
+
+                    precondition zoneActive { SurgeZone.status = active }
+                        rejects "Surge is not currently active in this zone"
+
+                    precondition ratioStableBelowThreshold {
+                        deactivateSurge.demandSupplyRatio <= SurgeZone.surgeThreshold
+                    } rejects "Demand in this zone is still above its surge threshold"
+
+                    precondition belowThresholdAtLeastFiveMinutes {
+                        deactivateSurge.belowThresholdSince <= now() - 5min
+                    } rejects "Demand must stay below the threshold for at least five minutes before surge is lifted"
+
+                    sets SurgeZone {
+                        status = inactive
+                        currentMultiplier = null
+                        deactivatedAt = now()
+                    }
+
+                    emits SurgeDeactivated {
+                        zoneId = SurgeZone.zoneId
+                        previousMultiplier = deactivateSurge.previousMultiplier
+                        deactivatedAt = SurgeZone.deactivatedAt
+                    }
+                }
+            }
+
+            states {
+                machine SurgeZoneLifecycle :: "Surge lifecycle of a zone" {
+                    // UNCLEAR: the previous model declared `start inactive`, but no operation
+                    // creates a SurgeZone, so the start transition ([*] --> inactive on <op>)
+                    // cannot name the operation that drives it. Zones appear to be created
+                    // administratively, outside the modelled behaviour.
+                    state inactive {
+                        invariants {
+                            noMultiplierWhileInactive {
+                                SurgeZone.currentMultiplier is null
+                                enforcement rejection
+                            }
+                        }
+                    }
+                    state active {
+                        invariants {
+                            multiplierPresentWhileActive {
+                                SurgeZone.currentMultiplier is defined
+                                enforcement rejection
+                            }
+                        }
+                    }
+
+                    inactive --> active   on "Activate surge in zone"
+                    active   --> inactive on "Deactivate surge in zone"
+                }
+            }
+
+            invariants {
+                activeZoneHasMultiplier :: "Active zone must have a multiplier" {
+                    if status = active { currentMultiplier is defined }
+                    enforcement rejection
+                }
+                multiplierWithinCap :: "Multiplier never exceeds platform 5.0x cap" {
+                    if currentMultiplier is defined { currentMultiplier.value <= 5.0 }
+                    enforcement rejection
+                }
             }
         }
-    }
 
-    // -----------------------------------------------------------------
-    // Domain services
-    // -----------------------------------------------------------------
+        // -----------------------------------------------------------------
+        // Domain services
+        // -----------------------------------------------------------------
 
-    domain service ProximityService :: "Spatial queries over real-time driver positions" {
-        satisfies [REQ-GEO-010, REQ-GEO-NFR-001, REQ-GEO-NFR-003]
-        operations {
-            findNearbyDrivers(pickup: GeoCoordinate, radius: Distance, maxResults: int) : list<DriverPosition>
-                :: "Online, eligible drivers within radius, ordered by ETA to pickup" {
-                safe
+        domain service ProximityService :: "Spatial queries over real-time driver positions" {
+            satisfies [REQ-GEO-010, REQ-GEO-NFR-001, REQ-GEO-NFR-003]
+            operations {
+                findNearbyDrivers(pickup: GeoCoordinate, radius: Distance, maxResults: int) : list<DriverPosition>
+                    :: "Online, eligible drivers within radius, ordered by ETA to pickup" {
+                    safe
+                }
             }
         }
-    }
 
-    domain service RoutingService :: "Route and ETA computation" {
-        satisfies [REQ-GEO-011, REQ-GEO-012, REQ-GEO-013, REQ-GEO-015, REQ-GEO-NFR-002]
-        calls { MappingProvider TrafficDataProvider }
-        operations {
-            computeETA(origin: GeoCoordinate, destination: GeoCoordinate) : ETA {
-                safe
-            }
-            computeRoute(origin: GeoCoordinate, destination: GeoCoordinate) : Route {
-                safe
-            }
-            recalculateRoute(rideId: uuid, currentPosition: GeoCoordinate, destination: GeoCoordinate) : Route {
-                safe
-            }
-        }
-    }
-
-    domain service SurgeDetectionService :: "Monitors demand/supply ratio per zone" {
-        satisfies [REQ-GEO-020, REQ-GEO-021, REQ-GEO-022]
-        operations {
-            evaluateZone(zoneId: uuid, requestCount: int, availableDriverCount: int) : void {
-                safe
-            }
-            computeMultiplier(demandSupplyRatio: decimal) : SurgeMultiplier {
-                safe
+        domain service RoutingService :: "Route and ETA computation" {
+            satisfies [REQ-GEO-011, REQ-GEO-012, REQ-GEO-013, REQ-GEO-015, REQ-GEO-NFR-002]
+            calls { MappingProvider TrafficDataProvider }
+            operations {
+                computeETA(origin: GeoCoordinate, destination: GeoCoordinate) : ETA {
+                    safe
+                }
+                computeRoute(origin: GeoCoordinate, destination: GeoCoordinate) : Route {
+                    safe
+                }
+                recalculateRoute(rideId: uuid, currentPosition: GeoCoordinate, destination: GeoCoordinate) : Route {
+                    safe
+                }
             }
         }
-    }
 
-    domain service ETAVarianceMonitor :: "Detects unusual ETA growth during a ride" {
-        satisfies [REQ-GEO-014]
-        operations {
-            checkVariance(rideId: uuid, previousEta: ETA, currentEta: ETA) : boolean
-                :: "True when the remaining ETA has grown by more than five minutes" {
-                safe
-                returns currentEta.duration.seconds - previousEta.duration.seconds > 300
+        domain service SurgeDetectionService :: "Monitors demand/supply ratio per zone" {
+            satisfies [REQ-GEO-020, REQ-GEO-021, REQ-GEO-022]
+            operations {
+                evaluateZone(zoneId: uuid, requestCount: int, availableDriverCount: int) : void {
+                    safe
+                }
+                computeMultiplier(demandSupplyRatio: decimal) : SurgeMultiplier {
+                    safe
+                }
             }
         }
-    }
 
-    // -----------------------------------------------------------------
-    // Infrastructure services (anti-corruption layer to external providers)
-    // -----------------------------------------------------------------
-
-    infrastructure service TrafficDataProvider :: "External traffic data API" {
-        operations {
-            getCurrentTraffic(origin: GeoCoordinate, destination: GeoCoordinate) : void
+        domain service ETAVarianceMonitor :: "Detects unusual ETA growth during a ride" {
+            satisfies [REQ-GEO-014]
+            operations {
+                checkVariance(rideId: uuid, previousEta: ETA, currentEta: ETA) : boolean
+                    :: "True when the remaining ETA has grown by more than five minutes" {
+                    safe
+                    returns currentEta.duration.seconds - previousEta.duration.seconds > 300
+                }
+            }
         }
-    }
 
-    infrastructure service MappingProvider :: "External maps and geocoding API" {
-        operations {
-            computeRoute(origin: GeoCoordinate, destination: GeoCoordinate) : Route
+        // -----------------------------------------------------------------
+        // Infrastructure services (anti-corruption layer to external providers)
+        // -----------------------------------------------------------------
+
+        infrastructure service TrafficDataProvider :: "External traffic data API" {
+            operations {
+                getCurrentTraffic(origin: GeoCoordinate, destination: GeoCoordinate) : void
+            }
         }
-    }
 
-    // -----------------------------------------------------------------
-    // Commands
-    // -----------------------------------------------------------------
-
-    command UpdateDriverLocation {
-        identity correlationId : uuid
-        fields {
-            driverId : uuid
-            position : GeoCoordinate
-            accuracy : LocationAccuracy
-            heading : decimal optional
-            speed : decimal optional
-            recordedAt : datetime
+        infrastructure service MappingProvider :: "External maps and geocoding API" {
+            operations {
+                computeRoute(origin: GeoCoordinate, destination: GeoCoordinate) : Route
+            }
         }
-    }
 
-    command MarkPositionStale {
-        identity correlationId : uuid
-        fields { driverId : uuid }
-    }
+        // -----------------------------------------------------------------
+        // Commands
+        // -----------------------------------------------------------------
 
-    command SetDriverAvailability {
-        identity correlationId : uuid
-        fields {
-            driverId : uuid
-            availability : DriverAvailability
+        command UpdateDriverLocation {
+            identity correlationId : uuid
+            fields {
+                driverId : uuid
+                position : GeoCoordinate
+                accuracy : LocationAccuracy
+                heading : decimal optional
+                speed : decimal optional
+                recordedAt : datetime
+            }
         }
-    }
 
-    command ActivateSurge {
-        identity correlationId : uuid
-        fields {
-            zoneId : uuid
-            multiplier : SurgeMultiplier
-            demandSupplyRatio : decimal
-            contributingFactor : string
+        command MarkPositionStale {
+            identity correlationId : uuid
+            fields { driverId : uuid }
         }
-    }
 
-    command DeactivateSurge {
-        identity correlationId : uuid
-        fields {
-            zoneId : uuid
-            previousMultiplier : SurgeMultiplier
-            demandSupplyRatio : decimal
-            belowThresholdSince : datetime
+        command SetDriverAvailability {
+            identity correlationId : uuid
+            fields {
+                driverId : uuid
+                availability : DriverAvailability
+            }
         }
-    }
 
-    // -----------------------------------------------------------------
-    // Events
-    // -----------------------------------------------------------------
-
-    event DriverLocationUpdated {
-        satisfies [REQ-GEO-001]
-        about DriverPosition
-        caused-by UpdateDriverLocation
-        fields {
-            driverId : uuid
-            position : GeoCoordinate
-            accuracy : LocationAccuracy
-            recordedAt : datetime
+        command ActivateSurge {
+            identity correlationId : uuid
+            fields {
+                zoneId : uuid
+                multiplier : SurgeMultiplier
+                demandSupplyRatio : decimal
+                contributingFactor : string
+            }
         }
-    }
 
-    event DriverPositionStale {
-        satisfies [REQ-GEO-003, REQ-DRV-034]
-        about DriverPosition
-        caused-by MarkPositionStale
-        fields {
-            driverId : uuid
-            lastSeenAt : datetime
-            detectedAt : datetime
+        command DeactivateSurge {
+            identity correlationId : uuid
+            fields {
+                zoneId : uuid
+                previousMultiplier : SurgeMultiplier
+                demandSupplyRatio : decimal
+                belowThresholdSince : datetime
+            }
         }
-    }
 
-    event DriverAvailabilityChanged {
-        about DriverPosition
-        caused-by SetDriverAvailability
-        fields {
-            driverId : uuid
-            availability : DriverAvailability
-            changedAt : datetime
+        // -----------------------------------------------------------------
+        // Events
+        // -----------------------------------------------------------------
+
+        event DriverLocationUpdated {
+            satisfies [REQ-GEO-001]
+            about DriverPosition
+            caused-by UpdateDriverLocation
+            fields {
+                driverId : uuid
+                position : GeoCoordinate
+                accuracy : LocationAccuracy
+                recordedAt : datetime
+            }
         }
-    }
 
-    event SurgeActivated {
-        satisfies [REQ-GEO-020, REQ-GEO-023]
-        about SurgeZone
-        caused-by ActivateSurge
-        fields {
-            zoneId : uuid
-            multiplier : SurgeMultiplier
-            contributingFactor : string
-            demandSupplyRatio : decimal
-            activatedAt : datetime
+        event DriverPositionStale {
+            satisfies [REQ-GEO-003, REQ-DRV-034]
+            about DriverPosition
+            caused-by MarkPositionStale
+            fields {
+                driverId : uuid
+                lastSeenAt : datetime
+                detectedAt : datetime
+            }
         }
-    }
 
-    event SurgeDeactivated {
-        satisfies [REQ-GEO-021]
-        about SurgeZone
-        caused-by DeactivateSurge
-        fields {
-            zoneId : uuid
-            previousMultiplier : SurgeMultiplier
-            deactivatedAt : datetime
+        event DriverAvailabilityChanged {
+            about DriverPosition
+            caused-by SetDriverAvailability
+            fields {
+                driverId : uuid
+                availability : DriverAvailability
+                changedAt : datetime
+            }
         }
-    }
 
-    event ETAVarianceDetected {
-        satisfies [REQ-GEO-014]
-        fields {
-            rideId : uuid
-            previousDuration : Duration
-            newDuration : Duration
-            growthSeconds : int
-            detectedAt : datetime
+        event SurgeActivated {
+            satisfies [REQ-GEO-020, REQ-GEO-023]
+            about SurgeZone
+            caused-by ActivateSurge
+            fields {
+                zoneId : uuid
+                multiplier : SurgeMultiplier
+                contributingFactor : string
+                demandSupplyRatio : decimal
+                activatedAt : datetime
+            }
         }
-    }
 
-    event RouteRecalculated {
-        satisfies [REQ-GEO-015]
-        fields {
-            rideId : uuid
-            newRoute : Route
-            recalculatedAt : datetime
+        event SurgeDeactivated {
+            satisfies [REQ-GEO-021]
+            about SurgeZone
+            caused-by DeactivateSurge
+            fields {
+                zoneId : uuid
+                previousMultiplier : SurgeMultiplier
+                deactivatedAt : datetime
+            }
         }
-    }
 
-    // -----------------------------------------------------------------
-    // Reactions
-    // -----------------------------------------------------------------
-    //
-    // NOTE: the previous model carried two reactions whose effect was to *publish* an
-    // event to another bounded context:
-    //
-    //   reaction notifyDriverManagementOnStale  [REQ-GEO-003, REQ-DRV-034]
-    //       :: "Notify Driver Management when a driver position goes stale"
-    //       trigger DriverPositionStale
-    //       effect  publish DriverPositionStale to DriverManagement
-    //
-    //   reaction emitVarianceAlertOnDriftingEta [REQ-GEO-014]
-    //       :: "Raise variance alert when remaining ETA grows > 5 min"
-    //       trigger ETAVarianceDetected
-    //       guard   event.growthSeconds > 300
-    //       effect  publish ETAVarianceDetected to RideManagement
-    //
-    // A reaction's only legal effect is now a command of THIS context, and cross-context
-    // publication is modelled on the CONSUMING side: DriverManagement already declares
-    // `external event DriverPositionStale from GeolocationRouting` and reacts to it, and
-    // RideManagement declares `external event ETAVarianceDetected from GeolocationRouting`.
-    // The publication edges are therefore expressed there, not here.
-    // UNCLEAR: the `growthSeconds > 300` guard of emitVarianceAlertOnDriftingEta has no
-    // home in the new shape; the same threshold is stated in ETAVarianceMonitor.checkVariance.
+        event ETAVarianceDetected {
+            satisfies [REQ-GEO-014]
+            fields {
+                rideId : uuid
+                previousDuration : Duration
+                newDuration : Duration
+                growthSeconds : int
+                detectedAt : datetime
+            }
+        }
+
+        event RouteRecalculated {
+            satisfies [REQ-GEO-015]
+            fields {
+                rideId : uuid
+                newRoute : Route
+                recalculatedAt : datetime
+            }
+        }
+
+        // -----------------------------------------------------------------
+        // Reactions
+        // -----------------------------------------------------------------
+        //
+        // NOTE: the previous model carried two reactions whose effect was to *publish* an
+        // event to another bounded context:
+        //
+        //   reaction notifyDriverManagementOnStale  [REQ-GEO-003, REQ-DRV-034]
+        //       :: "Notify Driver Management when a driver position goes stale"
+        //       trigger DriverPositionStale
+        //       effect  publish DriverPositionStale to DriverManagement
+        //
+        //   reaction emitVarianceAlertOnDriftingEta [REQ-GEO-014]
+        //       :: "Raise variance alert when remaining ETA grows > 5 min"
+        //       trigger ETAVarianceDetected
+        //       guard   event.growthSeconds > 300
+        //       effect  publish ETAVarianceDetected to RideManagement
+        //
+        // A reaction's only legal effect is now a command of THIS context, and cross-context
+        // publication is modelled on the CONSUMING side: DriverManagement already declares
+        // `external event DriverPositionStale from GeolocationRouting` and reacts to it, and
+        // RideManagement declares `external event ETAVarianceDetected from GeolocationRouting`.
+        // The publication edges are therefore expressed there, not here.
+        // UNCLEAR: the `growthSeconds > 300` guard of emitVarianceAlertOnDriftingEta has no
+        // home in the new shape; the same threshold is stated in ETAVarianceMonitor.checkVariance.
+    }
 }

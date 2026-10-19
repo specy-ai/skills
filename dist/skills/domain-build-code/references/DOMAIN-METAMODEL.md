@@ -5,6 +5,7 @@
 - [Domain model metamodel](#domain-model-metamodel)
   - [Convention](#convention)
   - [Organization](#organization)
+    - [Subdomain](#subdomain)
     - [Bounded Context](#bounded-context)
     - [Context map patterns](#context-map-patterns)
       - [Upstream patterns](#upstream-patterns)
@@ -87,10 +88,35 @@ When the system requirements are loaded from a file, the domain model MUST decla
 
 ## Organization
 
-An organization groups bounded contexts. It serves as the top-level container for the domain model.
+An organization groups bounded contexts. It serves as the top-level container for the domain model. It also declares its subdomains: the problem space its bounded contexts are models of.
 
 Relations:
 - 1..n "has" relation with bounded contexts
+- 0..n "has" relation with subdomains
+
+### Subdomain
+
+A part of the business the organization has to deal with, whether or not software exists for it. A subdomain belongs to the **problem space**: it names what the business has to do (decide whether to lend, recover overdue repayments, verify who a customer is), not how a system does it. A bounded context belongs to the **solution space**: it is a model built to deal with one or more subdomains. Keeping the two apart lets a domain model say what each bounded context is for, and lets the organization see the parts of its business that no model covers.
+
+Every subdomain is classified by its strategic value, and the classification sets how much modeling effort it deserves:
+
+| Classification | What it is | How it is dealt with |
+|---|---|---|
+| **core** | Where the organization differentiates itself: the reason customers choose it | Built in-house by the strongest team, and modeled in depth |
+| **supporting** | Necessary and specific to the organization, but not a differentiator | Built simply, or outsourced |
+| **generic** | A problem every business of the kind has, already solved by products on the market | Bought and integrated, not modeled in depth |
+
+The classification is a strategic judgement and it can change: a core subdomain becomes generic once the market offers it as a product.
+
+The ideal is one bounded context per subdomain. Departures from it are signals, not errors. Several bounded contexts modeling the same subdomain usually record history, such as a legacy system next to its replacement. One bounded context modeling several subdomains has usually grown too large and is a candidate for a split. A subdomain that no bounded context models is legitimate: a generic subdomain served by a bought product is reached through an SPI interface and an infrastructure service, not modeled, and a part of the business that no software serves yet is still a subdomain. Whether every subdomain should eventually be modeled by at least one bounded context is a target-state question that belongs to the enterprise architecture layer (ENTERPRISE-ARCHITECTURE-METAMODEL.md), not a rule of the domain model.
+
+A subdomain has no `satisfies` list: requirements are satisfied by the solution-space elements that model it. It references nothing outside the domain model either. The business capabilities a subdomain realizes and the team that owns it are stated in the enterprise architecture metamodel, which points to subdomains; a domain model never points to capabilities or teams.
+
+**Example.** Lendwell, a consumer and business lender, deals with deciding whether and at what price to lend (`Underwriting`, core: its risk models are why borrowers and partners choose it), recovering overdue repayments (`Collections`, supporting: specific to its loan products but not a differentiator), and verifying who an applicant is (`IdentityVerification`, generic: bought from a certified provider). Its `LoanDecisioning` context states `models Underwriting`. No context models `IdentityVerification`; the provider is reached through an SPI interface.
+
+Relations:
+- 1..1 "belongs to" relation with an organization
+- 0..n "modeled by" relation with bounded contexts
 
 ### Bounded Context
 
@@ -99,6 +125,7 @@ A boundary within which a model is well-defined and its language is consistent. 
 Relations:
 - 0..n "has" relation with modules
 - 1..1 "belongs to" relation with an organization
+- 1..n "models" relation with subdomains declared by its organization: the parts of the problem space this context is a solution for. When the organization declares at least one subdomain, every bounded context shall state the subdomains it models, and a context that states none is reported. An organization that declares no subdomain leaves the relation unstated, so domain models written before subdomains existed remain valid.
 - 0..n relation with other bounded contexts, characterized by position and pattern:
   - **upstream**: Open Host Service (OHS)
   - **downstream**: Customer/Supplier (C/S), Conformist (Conf), or Anti-Corruption Layer (ACL)
@@ -110,6 +137,8 @@ Relations:
 A context map pattern defines the behavioral constraints that govern how two bounded contexts interact. The pattern determines who controls the shared model, how translation happens, and what coupling is accepted. Each pattern imposes specific obligations on message handling, model evolution, and dependency management.
 
 Patterns are grouped by the position of the bounded context in the relationship: upstream (the context that provides), downstream (the context that consumes), or symmetric (both contexts share responsibility).
+
+The classification of the subdomains on each side informs the choice of pattern: a context that depends on a context or product serving a generic subdomain usually conforms to it or protects itself with an Anti-Corruption Layer, while a context modeling a core subdomain is rarely a Conformist.
 
 #### Upstream patterns
 

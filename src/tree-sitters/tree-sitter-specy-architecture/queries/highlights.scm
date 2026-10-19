@@ -27,6 +27,8 @@
 "typedef" @keyword.type
 "channel" @keyword.type
 "environment" @keyword.type
+"node" @keyword.type
+"resource" @keyword.type
 
 ; ---------------------------------------------------------------------------
 ; Structural / clause keywords
@@ -42,6 +44,12 @@
 "connect" @keyword
 "deploy" @keyword
 "replicas" @keyword
+"provider" @keyword
+"region" @keyword
+"zone" @keyword
+"instantiates" @keyword
+"tenancy" @keyword
+"stores" @keyword
 "meta" @keyword
 "import" @keyword
 
@@ -122,11 +130,13 @@
 (collection_type "map" @type.builtin)
 
 ; ---------------------------------------------------------------------------
-; Channels / environments (lowercase identifiers in name position)
+; Channels / environments / nodes / resources (lowercase identifiers in name position)
 ; ---------------------------------------------------------------------------
 
 (channel_def name: (identifier) @namespace)
 (environment_def name: (identifier) @namespace)
+(node_def name: (identifier) @namespace)
+(resource_def name: (identifier) @namespace)
 (publishes_clause channel: (identifier) @namespace)
 (subscribes_clause channel: (identifier) @namespace)
 
@@ -147,6 +157,7 @@
 
 (requiredness) @attribute
 (connector_style) @constant
+(tenancy) @constant
 
 ; ---------------------------------------------------------------------------
 ; Requirement IDs

@@ -29,6 +29,50 @@ context OrderContext {
 
 The `requirements-source` path is relative to the `.domain` file's location.
 
+## Subdomain and `models` syntax
+
+A **subdomain** is the problem space: an area of activity the business has to master. It is declared at organization scope (the grammar accepts it before, between or after the contexts; put it before the first `context`), with a mandatory classification and an optional description and metadata. A **bounded context** is the solution space: its `models` clause names the subdomain(s) it models.
+
+```
+organization Lendwell :: "Consumer and business lending" {
+  subdomain Underwriting core :: "Deciding whether and at what price to lend"
+  subdomain IdentityVerification generic
+  subdomain Collections supporting :: "Recovering overdue repayments" meta { owner = "Risk" }
+
+  context LoanDecisioning (ldn) :: "Credit decisions on loan applications" {
+    requirements-source "loan-decisioning.sysreq"
+    models Underwriting
+    map {
+      downstream IdentityChecks : ACL
+    }
+    // modules and definitions...
+  }
+
+  context IdentityChecks (idc) :: "Thin model around the bought identity-verification product" {
+    models IdentityVerification
+    // ...
+  }
+
+  context Recovery (rec) :: "Dunning and repayment plans" {
+    models Collections
+    // ...
+  }
+}
+```
+
+Key points:
+
+- The classification is one of `core`, `supporting`, `generic`, and it is mandatory:
+  - `core` — where the enterprise differentiates. Built in-house by the strongest team, modeled in depth (aggregates, invariants, state machines).
+  - `supporting` — necessary and specific to the business, but not differentiating. Built simply or outsourced.
+  - `generic` — every business has it. Bought or adopted; its context is often a thin model or an anti-corruption layer around the product.
+- A subdomain name has the same form as a context name. A subdomain has no body.
+- `models Name {, Name}` sits after `satisfies` and `requirements-source` and before `map`. A context models one or more subdomains; a subdomain is modeled by zero, one or several contexts.
+- A subdomain no context models is legitimate: typically a generic subdomain served by a bought product, reached through an `spi interface` and an `infrastructure service`.
+- Once the organization declares at least one subdomain, every context states `models`; a context without it is reported. An organization with no subdomain is unchanged.
+- Several contexts modeling one subdomain usually record history (a legacy context next to its replacement). One context modeling several subdomains has grown too large, and a core subdomain never shares a context with a generic one.
+- Neither `subdomain` nor `models` names a capability, a team or a system. The enterprise-architecture layer points at the subdomain (`capability … realized-by <Subdomain>`).
+
 ## State machine syntax
 
 An entity's lifecycle lives **inside** the entity or aggregate, in a `states { machine ... }` block. Both parsers (tree-sitter and the Langium CLI) accept it, so the model validates cleanly.

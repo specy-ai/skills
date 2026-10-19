@@ -21,7 +21,7 @@ It **satisfies** system requirements (`.sysreq`, including NFRs) and **realizes*
 ## What this metamodel is NOT
 
 - It is **not** the DDD bounded context boundary. C4 *System Context* (a system as a box surrounded by people and external systems) is a different boundary than a DDD *bounded context* (a model/language boundary). This metamodel keeps both: level 1 is the C4 system-context, and bounded context is an optional grouping **below** it (see [Bounded Context](#bounded-context)).
-- It is **not** a deployment/infrastructure model. A lightweight [deployment view](#deployment-view) records environments and container placement, but infra nodes, networking, and capacity are out of scope.
+- It is **not** an infrastructure model or a CMDB. The [deployment view](#deployment-view) records environments, the nodes containers run on and the resources where data lives — the placement and residency facts that architecture rules test. Capacity, networking and the inventory of every running instance are out of scope.
 - It does **not** carry interface versioning or compatibility machinery. Field ordinals and `optional`/`required` give wire-safety; version negotiation and compatibility policy are left to the team.
 
 ## Convention
@@ -372,18 +372,67 @@ Relations:
 
 ## Deployment view
 
-A lightweight mapping of containers to environments. It records **where** containers run and a replica hint — nothing more. Infra nodes, networking, regions, and capacity are out of scope.
+A mapping of containers to environments, with the places they run and the infrastructure their data lives in. It records **where** containers run, a replica hint, and the facts that placement and residency rules test: the provider, region and zone of a node, which resource holds which data, and whether that resource is shared. It is not a CMDB: capacity, networking and the inventory of every running instance are out of scope.
 
 ```
-environment production {
-  deploy Api replicas 3
-  deploy SlugService replicas 2
-  deploy EventBus, LinkDb
+environment production :: "Live traffic" {
+  node euWest :: "Primary region" provider "AWS" region "eu-west-1" {
+    node k8sProd :: "Workload cluster" zone "eu-west-1a" {
+      deploy Api replicas 3
+      deploy SlugService replicas 2
+    }
+    resource linkDb :: "Managed Postgres" instantiates LinkDb technology "RDS Postgres 16" tenancy dedicated {
+      stores Link, Click
+    }
+  }
+  deploy EventBus            // still legal directly under an environment: placement unknown
 }
 ```
 
+Nodes and resources are optional. An environment that only lists `deploy` clauses is still valid, and a `deploy` written directly under an environment places the container in that environment without saying on which node.
+
+The words `node`, `resource`, `provider`, `region`, `zone`, `instantiates`, `tenancy`, `shared`, `dedicated` and `stores` are contextual, not reserved: they remain usable as names elsewhere.
+
+### Environment
+
+A named stage in which containers are deployed: `production`, `staging`. It contains nodes, and deploys directly the containers whose node is not stated.
+
 Relations:
-- An environment 0..n "deploys" relation with containers (each with an optional replica count)
+- 0..n "contains" relation with nodes
+- 0..n "deploys" relation with containers (each with an optional replica count), on no stated node
+
+### Node
+
+A place where containers run inside an environment: a region, a cluster, a virtual machine, a serverless runtime. Nodes nest — a cluster in a region — and a node belongs to exactly one environment, directly or through the node it is nested in.
+
+A node carries the facts that placement and residency rules test: `provider`, `region` and `zone`, free-form strings, each stated at most once and in any order. A fact a node does not state is read from the node that contains it: in the example above, the cluster `k8sProd` runs on AWS in `eu-west-1`.
+
+Relations:
+- 1..1 "belongs to" relation with an environment (directly, or through the node it is nested in)
+- 0..1 "nested in" relation with a node
+- 0..n "hosts" relation with containers (each with an optional replica count, through `deploy`)
+- 0..n "provides" relation with resources
+
+### Resource
+
+A provisioned unit of infrastructure on a node: a database instance, a topic, a bucket, a cache, a secret store. It is where data physically lives, and so the element that residency, retention and tenancy rules are checked against. A resource may:
+
+- **instantiate** a container of this system whose technology is a data store or a broker. The container is the logical element; the resource is its provisioned instance in this environment, and the container needs no `deploy` clause there;
+- name its **technology** as precisely as the provisioned product (`"RDS Postgres 16"`), with the same free-form meaning as a container's;
+- state its **tenancy**: `dedicated` to this system, or `shared` with other systems — the tenant boundary a platform offers;
+- list the structs it **stores**: structs of this `.arch` file, or of a `.dataop` model of the same system, resolved by name.
+
+```
+resource linkDb :: "Managed Postgres" instantiates LinkDb technology "RDS Postgres 16" tenancy dedicated {
+  stores Link, Click
+}
+resource auditExports :: "Object storage for audit exports" technology "S3" tenancy shared
+```
+
+Relations:
+- 1..1 "provided by" relation with a node
+- 0..1 "instantiates" relation with a container (a data store or broker)
+- 0..n "stores" relation with structs
 
 ---
 
@@ -402,7 +451,7 @@ This split keeps a single `.arch` model reusable across stacks. The binding arti
 ## Naming conventions
 
 - `system`, `container`, `component`, `interface`, and all named types (`struct`, `enum`, `typedef`, `union`, `exception`) — `PascalCase`.
-- operations, struct/union fields, enum members, channels, environments — `camelCase`.
+- operations, struct/union fields, enum members, channels, environments, nodes and resources — `camelCase`.
 - Operation names are **technical identifiers**, not the business-language string labels used for domain operations.
 - Every named type carries explicit field/member ordinals.
 
@@ -417,7 +466,7 @@ This split keeps a single `.arch` model reusable across stacks. The binding arti
 | L3 Components | `component` | Plus first-class typed interfaces, ports, channels |
 | L4 Code | *out of scope* | Generated per stack via the separate stack-binding artifact |
 | Relationships (arrows) | `connector` + `channel` | Typed with protocol + interaction style; async is first-class |
-| Deployment diagram | `environment` (lightweight) | Placement + replicas only |
+| Deployment diagram | `environment` + `node` + `resource` | Placement, replicas and residency facts (provider, region, zone, tenancy, stored structs); no capacity, networking or instance inventory |
 
 ## Relationship to the domain metamodel
 

@@ -14,6 +14,7 @@
     - [Struct](#struct)
       - [State](#state)
     - [External declaration](#external-declaration)
+    - [Lineage](#lineage)
   - [Global Binding](#global-binding)
   - [Operation](#operation)
     - [Attachment](#attachment)
@@ -40,7 +41,7 @@ Conditions appear in exactly three places, all written in the same small predica
 
 The Data & Operation model is the "how substrate" beneath the domain model (see DOMAIN-METAMODEL.md). Where the domain model captures business intent — entities, aggregates, commands, events — the Data & Operation model captures the structural skeleton of an implementation: concrete data shapes and the dependency graph of the operations that realize domain behavior. The two models are linked through optional, traceable `implements` relations (see [Traceability to the Domain model](#traceability-to-the-domain-model)).
 
-The model serves two directions. **Designed forward**, by a person or an agent, it is written under the `strict` [conformance level](#conformance-levels): its two graphs (struct references and operation dependencies) are acyclic and its effect declarations are closed-world, so topological ordering, impact analysis, dead-code detection and effect propagation are all decidable by simple graph traversal. **Extracted backward**, from an existing codebase (for instance by lowering a code graph), it is written under the `observed` level: the same syntax, but the rules that real code routinely violates — cycles, unresolved dispatch, types outside the closed type language — are reported as findings instead of rejected. One file format, two confidence levels.
+The model serves two directions. **Designed forward**, by a person or an agent, it is written under the `strict` [conformance level](#conformance-levels): its three graphs (struct references, struct [lineage](#lineage) and operation dependencies) are acyclic and its effect declarations are closed-world, so topological ordering, impact analysis, dead-code detection and effect propagation are all decidable by simple graph traversal. **Extracted backward**, from an existing codebase (for instance by lowering a code graph), it is written under the `observed` level: the same syntax, but the rules that real code routinely violates — cycles, unresolved dispatch, types outside the closed type language — are reported as findings instead of rejected. One file format, two confidence levels.
 
 ## Convention
 
@@ -64,9 +65,10 @@ A model declares its conformance level in its header: `model pricing-engine stri
 |---|---|---|
 | Who writes it | a designer or a design agent | an extraction from code |
 | Struct reference graph | shall be acyclic | cycles are findings |
+| Lineage graph | shall be acyclic; every edge declared | cycles are findings; `derived` and `candidate` edges allowed |
 | Operation dependency graph | shall be acyclic | cycles are findings |
 | Effect declarations | closed-world, complete | complete as far as static analysis could see; blind spots are findings |
-| Uncertain dependency (`?`) | not allowed | allowed |
+| Uncertain dependency or lineage source (`?`) | not allowed | allowed |
 | `opaque` type | not allowed | allowed |
 | External declarations | allowed | allowed |
 | Flow guards on the happy path | never | never — a body's branching that the flow cannot express is a finding, not a guard |
@@ -138,7 +140,7 @@ The trait vocabulary is closed and canonical. It is the level at which this mode
 
 ### Relations as edge kinds
 
-Every relation between declarations is one of six edge kinds. The clauses of the surface syntax each emit exactly one kind, so the relation graph of a model is fully determined by its text.
+Every relation between declarations is one of seven edge kinds. The clauses of the surface syntax each emit exactly one kind, so the relation graph of a model is fully determined by its text.
 
 | Edge kind | From → To | Emitted by |
 |---|---|---|
@@ -148,10 +150,11 @@ Every relation between declarations is one of six edge kinds. The clauses of the
 | `accesses` (read, write, or both) | Invocable → Structural | `reads`, `writes`; a flow's write steps |
 | `throws` | Invocable → error signature | `errors`; a flow's raise steps |
 | `implements` | any → domain element | `implements`, `represents`, `corresponds to`, or the naming presumption |
+| `derives from` | Type → Type (a struct of the model → a struct or an external struct) | `derives from`, one edge per source (see [Lineage](#lineage)) |
 
-An edge may carry a **provenance**: `declared` (written in the model), `derived` (computed from other declared facts, such as a module dependency), or `candidate` (an uncertain dependency marked `?`, see [Dependency graph](#dependency-graph)). Under `strict` every stored edge is `declared`.
+An edge may carry a **provenance**: `declared` (written in the model), `derived` (computed from other declared facts, such as a module dependency, or a lineage implied by a level-0 flow of the architecture model), or `candidate` (an uncertain dependency or lineage source marked `?`, see [Dependency graph](#dependency-graph) and [Lineage](#lineage)). Under `strict` every stored edge is `declared`.
 
-Edges are stored in the outgoing direction only. Inverse views — the callers of an operation, the readers of a global, the operations attached to a struct — are derived and never written.
+Edges are stored in the outgoing direction only. Inverse views — the callers of an operation, the readers of a global, the operations attached to a struct, the structs derived from a struct — are derived and never written.
 
 ## Data
 
@@ -183,6 +186,7 @@ The type language is deliberately closed. Its purpose is to make every data shap
 A struct is a **named data structure**: the model's unit of vocabulary. Arguments, returns, error payloads, and global bindings refer to data shapes by struct name rather than repeating structural types. A struct groups its data shape, the named conditions of an instance, and the operations that belong to it:
 
 - a mandatory **`schema` block** — the fields, each a name and a [type](#type). This is the shape (a map type), the same field-list machinery as an inline map, given a name.
+- an optional **`derives from` clause** — the structs its data is derived from: its [lineage](#lineage).
 - an optional **`state` block** — zero or more named [states](#state), each a boolean predicate over an instance.
 - zero or more **nested operations** — [operations](#operation) written inside the struct, which are thereby [attached](#attachment) to it. Within a nested operation `_` denotes the receiver instance, exactly as it does in a state predicate.
 
@@ -232,6 +236,7 @@ Relations:
 - 0..n "declares" relation with states
 - 0..n "owns" relation with attached operations (nested, or declared elsewhere with `on`)
 - 0..n "references" relation with structs (under `strict`: previously defined ones only, forming a DAG)
+- 0..n "derives from" relation with structs and external structs (one [lineage](#lineage) per source; the lineage graph is a DAG)
 - 0..1 "represents" relation with a domain entity, value type, or enum (implicit by naming or explicit)
 
 #### State
@@ -248,7 +253,7 @@ Relations:
 
 An external declaration names a struct or a module that the model **references but does not describe**: a library type, a platform package, a service owned by another model. It is the closure device — every reference in the model resolves to something declared, and an external declaration is the honest way to declare what lies outside the model's scope.
 
-- `external struct java.util.List` declares a struct with a name and nothing else: no schema, no states, no operations. It can be referenced wherever a struct reference is legal and nothing can be said about its shape — it behaves as a nominal type.
+- `external struct java.util.List` declares a struct with a name and nothing else: no schema, no states, no lineage, no operations. It can be referenced wherever a struct reference is legal and nothing can be said about its shape — it behaves as a nominal type. A struct described by another Data & Operation model is declared the same way, under its own module name (`external struct catalog.Product`); when the two models are analysed together it is identified with that model's struct by its key *(module, symbol)* (see [Convention](#convention)).
 - `external module java.util` declares a module with a name and no declarations. It exists so that external structs have a module to belong to, and so that derived module dependencies on it are visible.
 
 Exactly two things are external-declarable: types and modules. An external *operation* or *global* is deliberately not expressible — a call into a library is a dependency on the library's *module*, recorded by the referencing declaration's derived module dependency, not a fabricated operation with an invented signature.
@@ -258,6 +263,78 @@ External declarations are legal at both conformance levels. A designed model may
 Relations:
 - 1..1 "belongs to" relation with a model or a module
 - 0..n "referenced by" relation with typed declarations (derived)
+- 0..n "source of" relation with structs (derived: the inverse of [lineage](#lineage))
+
+### Lineage
+
+A lineage states that a struct's data is **derived from** data held elsewhere: a reporting table built from orders, a search index over products, the local copy of a read-only entity mastered in another context. It is written in the derived struct, after its schema, as a `derives from` clause listing the sources:
+
+```
+external module catalog
+external struct catalog.Product
+
+module pricing {
+
+  struct Product {
+    schema {
+      productId: string
+      name:      string
+    }
+    derives from { catalog.Product via "flow 12" }
+  }
+
+  struct ProductRevenue {
+    schema {
+      productId: string
+      revenue:   Money
+    }
+    derives from { Product, ordering.Order via OrderEvents }
+  }
+}
+```
+
+Each source is one lineage: a `derives from` edge, stored outgoing from the derived struct (see [Relations as edge kinds](#relations-as-edge-kinds)). A source is either:
+
+- a **struct of the model**, unqualified within its module and qualified across a module boundary (`ordering.Order`, `ordering` being another module of the same model);
+- an **external struct**, which is how a struct described by another model is named (`catalog.Product`, see [External declaration](#external-declaration)). The other model is not named, only the struct's key; when the models are analysed together, the key joins them and the lineage graph continues across the boundary.
+
+A source may name its **carrier** with `via`:
+
+- a string, for a carrier this model has no element to name: conventionally a level-0 flow of the architecture model, cited by its number (`via "flow 12"`, see SOFTWARE-ARCHITECTURE-METAMODEL.md, Flow), or a medium (`via "nightly CSV export"`);
+- a name, for an interface or a channel of the architecture model (`via OrderEvents`), resolved when that model is analysed alongside.
+
+Lineage is **struct-level**. Which field comes from which field is out of scope, as it is in the architecture model: a field mapping would need paths rooted in a source struct, which the [predicate language](#state) does not have, and as soon as a field is computed rather than copied (a revenue summed over order lines) it would need an expression, which nothing in this metamodel has.
+
+**Provenance.** A lineage edge carries the [provenance](#relations-as-edge-kinds) every edge carries:
+
+- Under `strict` every lineage is `declared`. A designer commits to where data comes from, and a tool never adds lineage to a designed model: that `quotePrice` returns a `Money` computed from a `PriceEntry` does not make that `Money` a copy of a `PriceEntry`.
+- Under `observed` an extraction may write a **candidate** lineage, marked `?` like an uncertain dependency: `derives from { Order? }`. The usual evidence is an operation that receives or reads a value of one struct and writes a global or a receiver field that holds another. A [flow](#level-2--flow) makes the inference mechanical: a flow has no expressions, so the value of a `write` step leads back through the bind steps to the names it was made from, and each of those typed by another struct is a candidate source. Two structs are excluded: the written struct itself (an update from its previous value is not a derivation) and the structs its schema references (`Money` in `Invoice.total` is shape, not origin). What the flow shows is evidence of a derivation, not proof of a copy; hence `candidate`, and an evidence comment naming the operation.
+- A lineage is `derived` when it follows from facts declared in other models: a level-0 flow `carries X as Y` into the system this model details, a struct of this model represents `Y`, and a struct of the model or an external struct corresponds to `X`, by `represents` or by naming. Under `observed` a tool may add such an edge. Under `strict` a level-0 flow with no matching declared lineage is a traceability gap, reported by audit.
+
+**Constraints.**
+
+- No struct shall derive from itself, directly or transitively: the lineage graph is a DAG. Under `strict` a cycle is rejected; under `observed` it is a finding, typically a two-way synchronisation, which means two places where the same truth can be changed.
+- A source shall resolve to a struct of the model or to an external struct, never to an external module, a global binding or an operation. A source appears at most once in a clause.
+- An external struct may be a source, never a derived struct: it has no body to write a lineage in, and where its data comes from is said by the model that describes it.
+- `?` on a source shall not appear in a `strict` model.
+- The lineage graph is separate from the struct reference graph: a struct may derive from a struct its schema does not reference, and sources are exempt from the previous-definition rule of the `schema` block. A source in another module is still a reference: it makes the deriving module depend on that module (see [Module](#module)).
+
+**Checks enabled.** Each check is a query over the lineage graph, the [domain links](#traceability-to-the-domain-model) and, where one exists, the enterprise model (ENTERPRISE-ARCHITECTURE-METAMODEL.md, Data package). None is a parse-time rule. Under `observed` each runs on the declared and derived edges, then again with the candidates, so that a result resting on a candidate shows as one.
+
+- **Impact.** The impact set of a struct is every struct that derives from it, directly or transitively, together with every operation that references, reads or writes one of them (the reverse reachability of the [dependency graph](#dependency-graph)). Across models, the walk continues through external structs, matched by key.
+- **Classification propagation.** The Data & Operation model carries no classification; the enterprise model classifies schemas. When it does, a struct derived from a `personal` struct is `personal` unless a decision says otherwise, and a derived struct classified differently with no such decision is reported.
+- **Provenance.** Every struct that has identity (it represents an entity, an aggregate or a read-only entity) and every struct a global binding holds (as its type or as its vector element type) is expected to have a system of record: it represents an entity or an aggregate of the context the model implements, other than a read-only entity, or it derives, directly or transitively, from a struct that does. An external source ends the walk inside the model: it is presumed mastered where it is described, and the walk continues there when that model is analysed alongside. A struct with neither a master nor a lineage is reported: nothing says where its truth lives.
+
+**Traceability.** Two other metamodels state the same fact at a coarser grain:
+
+- The domain model's read-only entity (DOMAIN-METAMODEL.md, Read-only Entity) is a lineage seen from the consumer's side, one hop long, between contexts: `sourced-from` names the upstream context or external system, not a struct. A struct that represents a read-only entity is therefore a derived struct: it should derive from at least one struct, and its sources should belong to the upstream that `sourced-from` names. Both are audited, not presumed. Lineage continues where `sourced-from` stops, since the upstream struct may itself be derived.
+- The architecture model's level-0 flow (SOFTWARE-ARCHITECTURE-METAMODEL.md, Flow) states it between systems and between domain concepts: `flow 2 "Accounts" carries Account as Customer` says that customers are made from accounts. A lineage states it between structs and may cite the flow as its carrier (`via "flow 2"`). When it does, the two should agree: the source corresponds to the concept the flow carries, and the derived struct to the concept it becomes (the `as` target, or the carried concept itself when there is no `as`).
+
+Relations:
+- 1..1 "belongs to" relation with a struct of the model (the derived struct; never an external struct)
+- 1..1 "derives from" relation with a source: a struct of the model or an external struct
+- 0..1 "carried by" relation with a carrier: a label, or an interface or a channel of the architecture model
+- 1..1 "has" relation with a provenance: `declared`, `derived` or `candidate`
 
 ## Global Binding
 
@@ -526,6 +603,7 @@ The Data & Operation model is linked to the domain model through optional, per-e
 | Model | Bounded context / organization | implements | model name matches context shortname |
 | Module | Module | implements | same module name |
 | Struct | Entity, value type, or enum | represents | same name (`Money` ↔ value `Money`) |
+| Lineage | Read-only entity's `sourced-from` | agrees with | none: a struct that represents a read-only entity derives from a struct of the upstream its `sourced-from` names; audited, not presumed (see [Lineage](#lineage)) |
 | Operation | Operation | implements | same name, case-style ignored (`reserveStock` ↔ `ReserveStock`); an attached operation matches an operation owned by the represented entity |
 | Precondition / postcondition | Precondition / postcondition | refines | via the enclosing operation's `implements`; compatibility audited, not presumed |
 | Error signature | Error event | corresponds to | same name |
@@ -539,6 +617,9 @@ A single-module model implementing part of a pricing domain module. The level is
 ```
 model pricing-engine implements pricing {
 
+  external module catalog
+  external struct catalog.Product
+
   module pricing {
 
     struct Money {
@@ -546,6 +627,14 @@ model pricing-engine implements pricing {
         amount:   number
         currency: string
       }
+    }
+
+    struct Product {
+      schema {
+        productId: string
+        name:      string
+      }
+      derives from { catalog.Product via "flow 12" }
     }
 
     struct PriceEntry {
@@ -640,11 +729,11 @@ model pricing-engine implements pricing {
 }
 ```
 
-Reading the graph: `quotePrice` never declares `standardPriceList` or `rounding`, yet its effective reads include both — derived through `findPriceEntry` and `applyVat`. `applyVat` reads `rounding` and depends on `roundHalfUp`: the read is the call through the function-valued global, the dependency is the operation the global initially holds, and the two agree. `UnknownProduct` raised by `quotePrice` is its own declared error even though the underlying failure originates in `findPriceEntry`: every operation declares the full set of errors it can surface. `registerDiscount` is the only operation that can change any state, and the model says so explicitly — its flow, its `writes` and its postcondition all say the same thing from three angles.
+Reading the graph: `quotePrice` never declares `standardPriceList` or `rounding`, yet its effective reads include both — derived through `findPriceEntry` and `applyVat`. `applyVat` reads `rounding` and depends on `roundHalfUp`: the read is the call through the function-valued global, the dependency is the operation the global initially holds, and the two agree. `UnknownProduct` raised by `quotePrice` is its own declared error even though the underlying failure originates in `findPriceEntry`: every operation declares the full set of errors it can surface. `registerDiscount` is the only operation that can change any state, and the model says so explicitly — its flow, its `writes` and its postcondition all say the same thing from three angles. `Product` is the pricing engine's copy of the catalog's product: its lineage names the source by its key, `catalog.Product`, declared external because this model does not describe it, and cites the level-0 flow that carries it. If the pricing domain declares `Product` as a read-only entity sourced from the catalog context, the struct represents it by naming, the provenance check is satisfied through the lineage, and the catalog model, analysed alongside, says which aggregate masters the product.
 
 ## Worked example: an extracted model (observed)
 
-The same syntax, lowered from a Java codebase by static analysis. Everything the `strict` level forbids is legal here and becomes a finding: the opaque field, the uncertain dispatch, the cycle between `bill` and `render`. Every declaration carries its evidence.
+The same syntax, lowered from a Java codebase by static analysis. Everything the `strict` level forbids is legal here and becomes a finding: the opaque field, the uncertain dispatch, the guessed lineage of `Invoice`, the cycle between `bill` and `render`. Every declaration carries its evidence.
 
 ```
 model order-service observed implements ordering {
@@ -706,6 +795,8 @@ model order-service observed implements ordering {
         orderId: string
         total:   Money
       }
+      derives from { Order? }
+      // FINDING: candidate lineage, inferred from `bill`: it receives an Order and writes `invoices`, which holds Invoices
     }
 
     global invoices: vector<Invoice> = []
@@ -731,4 +822,4 @@ model order-service observed implements ordering {
 }
 ```
 
-Three of the findings are what an `observed` validation reports on this file: the cycle, the two `candidate` dependencies, and the loop in `total` that no straight-line flow can show. Tightening the model into `strict` means resolving each — replacing the interface dispatch with the concrete callee or a function-valued global, breaking the cycle, replacing `opaque` with the shape actually used, and lifting the loop into a named operation (`sumSubtotals(lines: vector<OrderLine>): Money`) so the flow can call it. Each of those is a design decision the extraction surfaced rather than made.
+Four of the findings are what an `observed` validation reports on this file: the cycle, the two `candidate` dependencies, the `candidate` lineage of `Invoice`, and the loop in `total` that no straight-line flow can show. Tightening the model into `strict` means resolving each — replacing the interface dispatch with the concrete callee or a function-valued global, breaking the cycle, confirming the lineage (an invoice is made from an order, so the `?` goes) or dropping it, replacing `opaque` with the shape actually used, and lifting the loop into a named operation (`sumSubtotals(lines: vector<OrderLine>): Money`) so the flow can call it. Each of those is a design decision the extraction surfaced rather than made.

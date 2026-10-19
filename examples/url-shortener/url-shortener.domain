@@ -17,8 +17,24 @@ organization Sniplink :: "Sniplink — a URL shortener with auto-channel analyti
   // ApiAccess             -- ACL -->  LinkShortening        (API translates HTTP into domain commands)
   // ApiAccess             -- ACL -->  AutoChannelAnalytics  (API translates HTTP into analytics queries)
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // SUBDOMAINS — the problem space, classified by strategic value
+  // ═══════════════════════════════════════════════════════════════════════
+  // source: url-shortener.prd — automatic channel detection is "the core
+  // differentiator"; shortening and redirecting are what Bitly and TinyURL
+  // already offer.
+
+  subdomain ChannelAnalytics core :: "Telling publishers which channel drives each click, with no manual UTM tagging"
+  subdomain LinkManagement supporting :: "Creating short links, branding them with custom domains and redirecting each click to its destination"
+  subdomain LinkSafety supporting :: "Keeping every click trustworthy: scanning destinations and acting on abuse reports"
+  subdomain Bookmarking supporting :: "Keeping every shortened link findable as a bookmark, alone or in a team's shared collections"
+
   context UrlShortener (urlShortener) :: "The single bounded context of the Sniplink product" {
     requirements-source "url-shortener.sysreq"
+    // NOTE: one context modeling four subdomains is the signal of a context that has
+    // grown too large; kept whole here, with one module per concern, to keep the
+    // example to a single context.
+    models ChannelAnalytics, LinkManagement, LinkSafety, Bookmarking
 
     // ═══════════════════════════════════════════════════════════════════════
     // MODULE: Link Shortening  (was: module "Link Shortening" > "Link Management")

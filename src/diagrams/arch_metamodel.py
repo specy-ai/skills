@@ -12,7 +12,11 @@ B("person", 480, 250, "Person (Actor)", w=300, sub="end user, operator, administ
 B("external", 480, 390, "External System", w=300, sub="opaque; provides and consumes interfaces", anchor="external-system")
 B("system", 100, 460, "System", w=320, kind="hub", sub="the one system in focus", anchor="system")
 B("container", 140, 670, "Container", w=320, kind="hub", sub="technology: a free-form string", anchor="level-2--container")
-B("environment", 140, 890, "Environment", w=320, sub="deploys containers, with replica hints", anchor="deployment-view")
+# --- bottom left: the deployment view (environment → node → resource)
+B("environment", 560, 890, "Environment", w=320, sub="contains nodes; deploys containers, with replica hints", anchor="deployment-view")
+B("node", 560, 1100, "Node", w=320, sub="where containers run; provider, region, zone", anchor="node")
+B("resource", 140, 890, "Resource", w=320, sub="where data lives: instantiates a data store or broker; tenancy; stores structs", anchor="resource")
+
 B("module", 480, 570, "Domain Module", w=300, sub="realizes (many-to-many)", anchor="relationship-to-the-domain-metamodel")
 
 # --- centre: the component hub and what hangs off it
@@ -42,7 +46,13 @@ E("arch", "person", "0..n", src_t=0.35)
 E("arch", "external", "0..n", src_t=0.75)
 E("arch", "system", "1", src_side="bottom", dst_side="top", src_t=0.45, dst_t=0.45)
 E("system", "container", "1..n", src_side="bottom", dst_side="top", src_t=0.45, dst_t=0.45)
-E("container", "environment", "0..n", src_side="bottom", dst_side="top", src_t=0.45, dst_t=0.45)
+E("container", "environment", "0..n", dst_side="top", src_t=0.55, dst_t=0.25)
+# the deployment view: nodes nest, host containers and provide resources; a resource instantiates a container
+E("environment", "node", "0..n", src_side="bottom", dst_side="top")
+E("node", "node", "0..1", src_side="bottom", src_t=0.45, dst_side="bottom", dst_t=0.9)   # nested in
+E("node", "container", "0..n", src_side="left", src_t=0.15, dst_side="right", dst_t=0.9)
+E("node", "resource", "0..n", src_side="left", src_t=0.7, dst_side="bottom", dst_t=0.8)
+E("resource", "container", "0..1", src_side="top", dst_side="bottom")
 E("container", "component", "0..n", src_t=0.3)
 E("component", "module", "0..n", src_side="left", dst_side="right", src_t=0.15, dst_t=0.5)
 E("external", "interface", "0..n", src_t=0.4, dst_t=0.25)

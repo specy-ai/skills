@@ -7,6 +7,7 @@ import type {
     EscalationChainDef,
     EventDef,
     InterfaceDef,
+    OrganizationDef,
     ReadOnlyEntityDef,
     ValueDef,
 } from '../generated/ast.js';
@@ -32,12 +33,47 @@ export function registerValidationChecks(services: SpecyDomainServices): void {
         EscalationChainDef: validator.checkEscalationChainTerminates,
         EventDef: validator.checkEventAboutEntityCarriesItsIdentifier,
         InterfaceDef: validator.checkInterfaceRoleConsistency,
+        OrganizationDef: validator.checkContextsModelDeclaredSubdomains,
         ReadOnlyEntityDef: validator.checkProjectedByRequiresProjection,
     };
     registry.register(checks, validator);
 }
 
 export class SpecyDomainValidator {
+    /**
+     * A bounded context is a model of 1..n subdomains, named with `models`. Each
+     * name must be a subdomain its organization declares. Once an organization
+     * declares any subdomain, a context that states none is reported; an
+     * organization that declares none is left alone, so models written before
+     * subdomains existed stay valid.
+     *
+     * The check sees one file. An organization split across several files declares
+     * each subdomain in the file whose context models it.
+     */
+    checkContextsModelDeclaredSubdomains(org: OrganizationDef, accept: ValidationAcceptor): void {
+        const declared = new Set(org.subdomains.map(s => s.name));
+        for (const ctx of org.contexts) {
+            for (const [index, name] of (ctx.models?.subdomains ?? []).entries()) {
+                if (!declared.has(name)) {
+                    accept(
+                        'error',
+                        `Context "${ctx.name}" models "${name}", which organization "${org.name}" does not declare. ` +
+                            `Declare it with \`subdomain ${name} core | supporting | generic\`.`,
+                        { node: ctx.models!, property: 'subdomains', index },
+                    );
+                }
+            }
+            if (declared.size > 0 && !ctx.models) {
+                accept(
+                    'warning',
+                    `Organization "${org.name}" declares subdomains, so context "${ctx.name}" should state the ` +
+                        'subdomains it is a model of, with `models <Subdomain>, ...`.',
+                    { node: ctx, property: 'name' },
+                );
+            }
+        }
+    }
+
     /**
      * An escalation chain MUST terminate: `retry` and `compensate` can themselves
      * fail forever, so the last step's action must be alert / suspend / manual.

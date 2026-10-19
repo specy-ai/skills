@@ -95,10 +95,30 @@
           ]
         },
         {
-          "type": "REPEAT1",
+          "type": "REPEAT",
           "content": {
             "type": "SYMBOL",
-            "name": "context_def"
+            "name": "subdomain_decl"
+          }
+        },
+        {
+          "type": "SYMBOL",
+          "name": "context_def"
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "subdomain_decl"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "context_def"
+              }
+            ]
           }
         },
         {
@@ -117,6 +137,72 @@
         {
           "type": "SYMBOL",
           "name": "string_literal"
+        }
+      ]
+    },
+    "subdomain_decl": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "subdomain"
+        },
+        {
+          "type": "FIELD",
+          "name": "name",
+          "content": {
+            "type": "SYMBOL",
+            "name": "type_name"
+          }
+        },
+        {
+          "type": "FIELD",
+          "name": "classification",
+          "content": {
+            "type": "SYMBOL",
+            "name": "subdomain_classification"
+          }
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "description"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "metadata_block"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        }
+      ]
+    },
+    "subdomain_classification": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "core"
+        },
+        {
+          "type": "STRING",
+          "value": "supporting"
+        },
+        {
+          "type": "STRING",
+          "value": "generic"
         }
       ]
     },
@@ -204,6 +290,18 @@
           "members": [
             {
               "type": "SYMBOL",
+              "name": "models_clause"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
               "name": "context_map_block"
             },
             {
@@ -247,6 +345,43 @@
         {
           "type": "STRING",
           "value": ")"
+        }
+      ]
+    },
+    "models_clause": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "models"
+        },
+        {
+          "type": "FIELD",
+          "name": "subdomain",
+          "content": {
+            "type": "SYMBOL",
+            "name": "type_name"
+          }
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "SEQ",
+            "members": [
+              {
+                "type": "STRING",
+                "value": ","
+              },
+              {
+                "type": "FIELD",
+                "name": "subdomain",
+                "content": {
+                  "type": "SYMBOL",
+                  "name": "type_name"
+                }
+              }
+            ]
+          }
         }
       ]
     },
