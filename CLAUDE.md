@@ -18,6 +18,9 @@ Specy is a DDD toolkit that captures business knowledge in structured DSL files 
 # Build tree-sitter parsers + run smoke tests against examples/
 ./src/tree-sitters/build.sh    # requires: tree-sitter CLI
 
+# Register the parsers in Neovim (writes ~/.config/nvim/plugin/specy-tree-sitter.lua, then checks it)
+./src/tree-sitters/sync-nvim.sh
+
 # Regenerate the PRD and SysReq metamodel diagrams (repo root specy-*-metamodel.svg)
 ./src/diagrams/build.sh        # requires: python3 + network on first run (fonts, fontTools)
 
@@ -100,7 +103,7 @@ Setup hooks after clone: `git config core.hooksPath hooks/`
 
 ## Tree-Sitter Parsers
 
-Four parsers in `src/tree-sitters/`: specy-domain, specy-prd, specy-sysreq, specy-architecture. `src/tree-sitters/build.sh` generates, builds, and smoke-tests them against files in `examples/`.
+Four parsers in `src/tree-sitters/`: specy-domain, specy-prd, specy-sysreq, specy-architecture. `src/tree-sitters/build.sh` generates, builds, and smoke-tests them against files in `examples/`. `src/tree-sitters/sync-nvim.sh` registers them in Neovim (see `TREE-SITTER.md`); re-run it when a parser is added.
 
 ## Examples
 
