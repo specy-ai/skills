@@ -48,46 +48,44 @@ EOF
 # have <cmd...> — true only if every named command is on PATH
 have() { for c in "$@"; do command -v "$c" >/dev/null 2>&1 || return 1; done; return 0; }
 
-# Per-component results, filled in by run_*; keys map to "OK" | "FAIL" | "SKIP".
-declare -A STATUS
-declare -A REASON
+# Per-component results, filled in by run_*: STATUS_<component> is "OK" | "FAIL" | "SKIP",
+# REASON_<component> says why it was skipped. Plain variables, not associative arrays,
+# because macOS ships bash 3.2. Hyphens in component names become underscores.
+set_result() { local v="${1//-/_}"; printf -v "STATUS_$v" '%s' "$2"; printf -v "REASON_$v" '%s' "${3:-}"; }
+skip() { set_result "$1" SKIP "$2"; printf "${YELLOW}    skipped: %s${RESET}\n" "$2"; }
 
 run_skills() {
   printf "${BOLD}==> skills${RESET}\n"
   if "$ROOT/src/skills/build.sh"; then
-    STATUS[skills]=OK
+    set_result skills OK
   else
-    STATUS[skills]=FAIL
+    set_result skills FAIL
   fi
 }
 
 run_tree-sitters() {
   printf "${BOLD}==> tree-sitters${RESET}\n"
   if ! have tree-sitter; then
-    STATUS[tree-sitters]=SKIP
-    REASON[tree-sitters]="tree-sitter CLI not on PATH"
-    printf "${YELLOW}    skipped: %s${RESET}\n" "${REASON[tree-sitters]}"
+    skip tree-sitters "tree-sitter CLI not on PATH"
     return
   fi
   if "$ROOT/src/tree-sitters/build.sh"; then
-    STATUS[tree-sitters]=OK
+    set_result tree-sitters OK
   else
-    STATUS[tree-sitters]=FAIL
+    set_result tree-sitters FAIL
   fi
 }
 
 run_langium() {
   printf "${BOLD}==> langium${RESET}\n"
   if ! have node npm; then
-    STATUS[langium]=SKIP
-    REASON[langium]="node and/or npm not on PATH"
-    printf "${YELLOW}    skipped: %s${RESET}\n" "${REASON[langium]}"
+    skip langium "node and/or npm not on PATH"
     return
   fi
   if "$ROOT/src/langium/specy-domain/build.sh"; then
-    STATUS[langium]=OK
+    set_result langium OK
   else
-    STATUS[langium]=FAIL
+    set_result langium FAIL
   fi
 }
 
@@ -113,9 +111,10 @@ done
 printf "${BOLD}Summary${RESET}\n"
 fail=0
 for c in "${components[@]}"; do
-  case "${STATUS[$c]:-FAIL}" in
+  status="STATUS_${c//-/_}"; reason="REASON_${c//-/_}"
+  case "${!status:-FAIL}" in
     OK)   printf "  ${GREEN}%-14s OK${RESET}\n" "$c" ;;
-    SKIP) printf "  ${YELLOW}%-14s SKIPPED${RESET} (%s)\n" "$c" "${REASON[$c]:-}" ;;
+    SKIP) printf "  ${YELLOW}%-14s SKIPPED${RESET} (%s)\n" "$c" "${!reason:-}" ;;
     *)    printf "  ${RED}%-14s FAILED${RESET}\n" "$c"; fail=1 ;;
   esac
 done
