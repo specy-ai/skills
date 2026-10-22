@@ -37,14 +37,17 @@ sibling repository `../diagram-engine` with `npm run build` and copied into
 `ui/vendor/` (the bundle is not generated here; if it is missing the diagram
 hosts show a small inline notice instead of a canvas). The bundle exposes
 `window.SpecyDiagramEngine.mount(container, diagramFile, opts) → { unmount(),
-focus(target), exportSvg(opts) }` and reads a **DiagramFile** (`{ version, model, diagram }`) whose shape is the
+focus(target), exportSvg(opts), exportPdf(opts) }` and reads a **DiagramFile** (`{ version, model, diagram }`) whose shape is the
 normative contract `diagram-engine/docs/DERIVED-DIAGRAMS.md`.
 
-Every island carries the engine's top-right **SVG** button (architecture
-diagrams also list *Export as SVG* in their top-left diagram menu): it
-downloads a standalone, native SVG of what the canvas shows — current fold
-levels, highlight and positions, no editing chrome — as `<diagram id>.svg`.
-Hosts can do the same with `handle.exportSvg({ filename })`.
+Every island carries the engine's top-right **SVG** and **PDF** buttons
+(architecture diagrams also list *Export as SVG* and *Export as PDF…* in their
+top-left diagram menu). SVG downloads a standalone, native SVG of what the
+canvas shows — current fold levels, highlight and positions, no editing chrome
+— as `<diagram id>.svg`. PDF opens the browser's print dialog on a page sized
+to the diagram, where "Save as PDF" writes a vector PDF with the real fonts
+embedded, suggested as `<diagram id>.pdf`. Hosts can do the same with
+`handle.exportSvg({ filename })` / `handle.exportPdf({ filename })`.
 
 The Navigator only produces those files: `domain-to-diagram.js` is a pure,
 DOM-free converter (global `SpecyDomainDiagrams`) that turns the parsed domain
