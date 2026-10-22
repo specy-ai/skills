@@ -36,9 +36,15 @@ IIFE bundle vendored as `vendor/specy-diagram-engine.js`. It is built from the
 sibling repository `../diagram-engine` with `npm run build` and copied into
 `ui/vendor/` (the bundle is not generated here; if it is missing the diagram
 hosts show a small inline notice instead of a canvas). The bundle exposes
-`window.SpecyDiagramEngine.mount(container, diagramFile, opts) → { unmount() }`
-and reads a **DiagramFile** (`{ version, model, diagram }`) whose shape is the
+`window.SpecyDiagramEngine.mount(container, diagramFile, opts) → { unmount(),
+focus(target), exportSvg(opts) }` and reads a **DiagramFile** (`{ version, model, diagram }`) whose shape is the
 normative contract `diagram-engine/docs/DERIVED-DIAGRAMS.md`.
+
+Every island carries the engine's top-right **SVG** button (architecture
+diagrams also list *Export as SVG* in their top-left diagram menu): it
+downloads a standalone, native SVG of what the canvas shows — current fold
+levels, highlight and positions, no editing chrome — as `<diagram id>.svg`.
+Hosts can do the same with `handle.exportSvg({ filename })`.
 
 The Navigator only produces those files: `domain-to-diagram.js` is a pure,
 DOM-free converter (global `SpecyDomainDiagrams`) that turns the parsed domain
