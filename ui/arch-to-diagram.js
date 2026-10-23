@@ -17,7 +17,15 @@
    and handled concepts), each dependency one directed edge downstream →
    upstream labelled with its flow numbers. Its canvas-only styles (the
    `area` group, the system card, the handle offsets that keep two opposite
-   edges apart) are in arch-landscape.css. */
+   edges apart) are in arch-landscape.css.
+     - conceptLandscapeDiagram(arch, show, opts) → the same organization at
+   concept granularity: each system is an `er-group` holding one card per
+   concept it `masters` or `handles` (resolved against the domain model
+   through `opts.resolution`, the resolveAll() summary of arch-concepts.js),
+   the systems grouped by area, the same dependency edges between the
+   system nodes — folding the systems gives the landscape back. Optional
+   flow edges, concept to concept; optional group of the domain concepts no
+   system names. Styles: arch-landscape.css (`.concept-card`). */
 
 "use strict";
 
@@ -32,7 +40,7 @@ const SpecyArchDiagrams = (() => {
   const KIND_LEGEND = {
     person:         { label: "Person",          color: "#d6dff0", border: "#9fb1d6" },
     externalSystem: { label: "External system", color: "#ececec", border: "#9a9a9a" },
-    system:         { label: "System",          color: "#ffffff", border: "#b0ada6", dashed: true },
+    system:         { label: "System",          color: "#eef2f9", border: "#5b7bb5", dashed: true },
     container:      { label: "Container",       color: "#f7f9fc", border: "#9fb1d6" },
     component:      { label: "Component",       color: "#ffffff", border: "#3a3f46" },
     channel:        { label: "Channel",         color: "#f6efe2", border: "#b7a480" },
@@ -486,6 +494,9 @@ const SpecyArchDiagrams = (() => {
      heavier than the others. */
   const LANDSCAPE_CARD_CLASS = "landscape-card";
   const MASTERS_CLASS = "landscape-card--masters";
+  /* a system detailed in containers and components: the one card whose
+     eyebrow the Navigator shows (the others say their kind by colour) */
+  const DETAILED_CLASS = "landscape-card--detailed";
 
   /* kind → label and colours of what the landscape draws, for the host
      legend: here a system is a card, where KIND_LEGEND.system is the dashed
@@ -641,10 +652,12 @@ const SpecyArchDiagrams = (() => {
 
     function systemCard(s, parentId) {
       const hotspots = list(s.hotspots).map(h => h.name).filter(Boolean);
+      const detailed = !!s.detail && s.detail !== "none";
       const card = cardBody(s);
+      if (detailed) card.nodeProps.className += " " + DETAILED_CLASS;
       const display = {
         name: s.name, kind: "system",
-        kindLabel: s.detail && s.detail !== "none" ? "System · detailed" : KIND_LEGEND.system.label,
+        kindLabel: detailed ? "Detailed" : KIND_LEGEND.system.label,
         align: "left", subtitle: s.technology || "",
         attributes: hotspots.length ? [`hotspot${hotspots.length > 1 ? "s" : ""}: ${capped(hotspots, HOTSPOT_MAX).join(", ")}`] : [],
         body: card.body,
@@ -703,8 +716,23 @@ const SpecyArchDiagrams = (() => {
           { type: "er-concept", style: { width: LANDSCAPE_WIDTH.person } });
     }
 
-    /* ---- dependencies: one relation and one edge each, downstream →
-       upstream; nothing is merged, a mutual pair is two edges ---- */
+    /* ---- dependencies: one relation and one edge each ---- */
+    addDependencies(arch, ends, show.edgeLabels, modelId, relations, edges, report);
+
+    const name = `${arch.name} — system landscape`;
+    return {
+      version: 1,
+      model: { id: modelId, name, metamodel: "software-architecture", elements, relations },
+      diagram: { id: modelId + "#landscape", name, layout: Object.assign({}, LANDSCAPE_LAYOUT), nodes, edges: walkMutualFirst(edges) },
+    };
+  }
+
+  /* One relation and one edge per dependency, downstream → upstream, between
+     the nodes `ends` maps the system names to (`{ elementId, nodeId, kind,
+     visible }`); nothing is merged, a mutual pair is two edges. Shared by the
+     landscape and the concept landscape, whose system nodes differ (a card
+     there, a group here). */
+  function addDependencies(arch, ends, edgeLabels, modelId, relations, edges, report) {
     for (const d of list(arch.dependencies)) {
       const src = ends.get(d.from), tgt = ends.get(d.to);
       if (!src || !tgt) {
@@ -728,31 +756,26 @@ const SpecyArchDiagrams = (() => {
         }) });
       const data = { modelRef: { modelId, relationId: d.id }, relationIds: [d.id] };
       const label = flowsLabel(flows);
-      if (label && show.edgeLabels) data.label = label;
+      if (label && edgeLabels) data.label = label;
       data.description = flows.map(flowLine).join("\n");
       data.points = [];
       Object.assign(data, facets);
       edges.push({ id: "edge-" + d.id, source: src.nodeId, target: tgt.nodeId, type: "er-edge",
         markerEnd: LANDSCAPE_ARROW, style: dependencyStyle(d, partnership), data });
     }
+  }
 
-    /* The engine's layout (dagre) walks the edges in the order given, and
-       where two systems depend on each other it is the first edge walked that
-       decides which one comes first: the dependencies of mutual pairs go
-       first, so that partners land in neighbouring ranks instead of at the
-       two ends of a chain. The relations keep the order of the file. */
+  /* The engine's layout (dagre) walks the edges in the order given, and
+     where two systems depend on each other it is the first edge walked that
+     decides which one comes first: the dependencies of mutual pairs go
+     first, so that partners land in neighbouring ranks instead of at the
+     two ends of a chain. The relations keep the order of the file. */
+  function walkMutualFirst(edges) {
     const pairOf = e => [e.source, e.target].sort().join("\u0000");
     const perPair = new Map();
     for (const e of edges) perPair.set(pairOf(e), (perPair.get(pairOf(e)) || 0) + 1);
-    const walked = edges.map((e, i) => [e, i])
+    return edges.map((e, i) => [e, i])
       .sort((a, b) => perPair.get(pairOf(b[0])) - perPair.get(pairOf(a[0])) || a[1] - b[1]).map(x => x[0]);
-
-    const name = `${arch.name} — system landscape`;
-    return {
-      version: 1,
-      model: { id: modelId, name, metamodel: "software-architecture", elements, relations },
-      diagram: { id: modelId + "#landscape", name, layout: Object.assign({}, LANDSCAPE_LAYOUT), nodes, edges: walked },
-    };
   }
 
   /* number of nodes the landscape draws with this toggle map */
@@ -765,10 +788,266 @@ const SpecyArchDiagrams = (() => {
       + (show.persons ? list(arch.persons).length : 0);
   }
 
+  /* ============ Concept landscape (level 0): the domain concepts by system ============
+     Every concept a system `masters` or `handles`, as a card inside that
+     system's group; the systems grouped by area as in the landscape; one
+     "depends on" edge per dependency between the system nodes. Folding the
+     systems (Groups 1) gives the landscape back: the engine aggregates the
+     edges. Needs the resolveAll() summary of arch-concepts.js: a reference
+     that resolved is drawn as the domain element (its kind, its context, a
+     link into the Domain Navigator); an acknowledged or unresolved one as a
+     note card named as written. */
+
+  /* Toggle map of the concept landscape's diagram bar: `handled` draws the
+     `handles` cards next to the `masters` ones; `flows` one edge per concept
+     a flow carries, from the sender's card to the receiver's; `unplaced` a
+     group of the domain's entities and aggregates no system names. */
+  const CONCEPT_LANDSCAPE_DEFAULT_SHOW = { externalSystems: true, handled: true, edgeLabels: true, flows: false, unplaced: false };
+
+  const conceptLandscapeModelIdOf = arch => `${arch.id}-concepts`;
+
+  const CONCEPT_WIDTH = 180;
+  const CONCEPT_CARD_CLASS = "concept-card";     // arch-landscape.css styles the cards by that class
+  const UNPLACED_NAME = "Not placed on any system";
+  /* what the `unplaced` group lists: the main concepts of the domain */
+  const UNPLACED_KINDS = new Set(["entity", "aggregate", "readonly-entity"]);
+  const NOTE_MAX = 90;                           // characters of a NOTE on a note card
+  /* the concept cards of a system have no edges between them: they sit on
+     the group's grid, about square, at most four wide */
+  const conceptGridLayout = n => ({ shelfColumns: Math.max(2, Math.min(4, Math.ceil(Math.sqrt(Math.max(n, 1))))), shelfGap: 14 });
+  const FLOW_STYLE = { stroke: "#8d7e63", strokeWidth: 1.2, strokeDasharray: "4 3" };
+  const CONCEPT_LANDSCAPE_LEGEND = LANDSCAPE_LEGEND.concat([
+    { key: "flow", label: "flow (concept → concept)",
+      description: "With flows on: the concept a flow carries, from the sender's card to the receiver's (its `as` name when the receiver translates it); the label is the flow number.",
+      style: Object.assign({}, FLOW_STYLE) },
+  ]);
+
+  function conceptLandscapeDiagram(arch, show, opts) {
+    show = Object.assign({}, CONCEPT_LANDSCAPE_DEFAULT_SHOW, show || {});
+    opts = opts || {};
+    const report = opts.report || {};
+    Object.assign(report, { unresolved: [], dropped: [], flowsDropped: [], multiMastered: [],
+      systems: 0, groups: 0, cards: 0, notes: 0, flows: 0, flowsAtSystem: 0, unplaced: 0, placed: 0 });
+
+    const modelId = conceptLandscapeModelIdOf(arch);
+    const { elements, relations, nodes, edges, add } = sheet(modelId);
+    const resolution = opts.resolution && typeof opts.resolution.of === "function" ? opts.resolution : null;
+    const resolvedOf = ref => (resolution && resolution.of(ref)) || { status: resolution ? "unresolved" : "plain" };
+    const isResolved = x => x.status === "resolved" && !!x.id;
+    /* one card per concept and system: a resolved reference by its domain
+       element, the others by their name */
+    const keyOf = (ref, x) => (isResolved(x) ? x.id : "name:" + norm(ref.name));
+    const holders = list(arch.systems).map(s => ({ holder: s, kind: "system" }))
+      .concat(list(arch.externalSystems).map(x => ({ holder: x, kind: "externalSystem" })));
+
+    /* who masters what — a concept with several systems of record says so on
+       each of its cards (a violation check-arch-landscape.mjs reports; the
+       diagram shows it) */
+    const mastersOf = new Map();
+    for (const { holder } of holders)
+      for (const ref of list(holder.masters)) {
+        const key = keyOf(ref, resolvedOf(ref));
+        if (!mastersOf.has(key)) mastersOf.set(key, []);
+        if (!mastersOf.get(key).includes(holder.name)) mastersOf.get(key).push(holder.name);
+      }
+    for (const [key, who] of mastersOf) if (who.length > 1) report.multiMastered.push({ key, systems: who.slice() });
+
+    /* the concepts of a holder: masters first, then (shown) handles, each once */
+    function conceptsOf(holder) {
+      const seen = new Set(), items = [];
+      for (const [site, refs] of [["masters", holder.masters], ["handles", show.handled ? holder.handles : []]]) {
+        for (const ref of list(refs)) {
+          const x = resolvedOf(ref);
+          const key = keyOf(ref, x);
+          if (seen.has(key)) continue;
+          seen.add(key);
+          items.push({ ref, site, x, key });
+        }
+      }
+      return items;
+    }
+
+    const ends = new Map();            // system / external system name → { elementId, nodeId, kind, visible }
+    const cardsBySystem = new Map();   // system name → Map(key → { elementId, nodeId })
+    const placed = new Set();          // domain element ids drawn under a system
+    const landed = (name, entry) => { if (name && !ends.has(name)) ends.set(name, entry); };
+    const titleCase = s => s.charAt(0).toUpperCase() + s.slice(1);
+
+    /* a concept card: the domain element (kind, context, link) when the
+       reference resolved, a note card named as written otherwise */
+    function conceptCard(holderName, item, parentId) {
+      const { ref, site, x } = item;
+      const resolved = isResolved(x);
+      const also = site === "masters" ? (mastersOf.get(item.key) || []).filter(n => n !== holderName) : [];
+      const attributes = [];
+      if (also.length) attributes.push(`also mastered by ${also.join(", ")}`);
+      if (!resolved) attributes.push(x.status === "acknowledged" ? cap(x.note ? `NOTE: ${x.note}` : "acknowledged by a // NOTE:", NOTE_MAX)
+        : x.status === "unresolved" ? "not in the domain model" : "no domain model loaded");
+      const display = {
+        name: resolved ? x.name : ref.name,
+        kind: resolved ? "concept" : "concept-note",
+        kindLabel: resolved ? titleCase(x.kindLabel) : "Concept",   // the site is the border: solid masters, dashed handles
+        align: "left",
+        subtitle: resolved ? x.context + (x.sourcedFrom ? ` · copy of ${x.sourcedFrom}` : "") : "",   // the attribute says why
+        attributes,
+      };
+      const raw = { system: holderName, site, ref: ref.raw, status: x.status, domainId: resolved ? x.id : null,
+        domainKind: resolved ? x.kind : null, context: resolved ? x.context : "", sourcedFrom: resolved && x.sourcedFrom ? x.sourcedFrom : "",
+        alsoMasteredBy: also, note: !resolved && x.note ? x.note : "" };
+      const classes = [CONCEPT_CARD_CLASS, `${CONCEPT_CARD_CLASS}--${site}`, `${CONCEPT_CARD_CLASS}--${resolved ? x.kind : "note"}`];
+      const link = resolved ? { domainRef: { id: x.id }, actions: [{ label: `Open ${x.name}`, href: "#" + encodeURI(x.id) }] } : null;
+      const r = add("concept", `${holderName}.${ref.name}`, display, raw,
+        { type: "er-concept", className: classes.join(" "), style: { width: CONCEPT_WIDTH }, parentId }, link);
+      if (resolved) { placed.add(x.id); report.cards++; } else report.notes++;
+      return r;
+    }
+
+    /* a system: a group holding its concept cards, or a plain card when it names none */
+    function systemNode(holder, kind, parentId) {
+      const items = conceptsOf(holder);
+      const legend = kind === "system" ? KIND_LEGEND.system : KIND_LEGEND.externalSystem;
+      const display = { name: holder.name, kind, kindLabel: legend.label, subtitle: holder.technology || "" };
+      const raw = { description: holder.description || "", technology: holder.technology || "", area: holder.area || "",
+        detail: holder.detail || "none", status: holder.status || "", contexts: list(holder.contexts),
+        masters: list(holder.masters).map(r => r.raw), handles: list(holder.handles).map(r => r.raw), concepts: items.length };
+      const inParent = parentId ? { parentId } : null;
+      let r;
+      if (!items.length) {
+        r = add(kind, holder.name, Object.assign(display, { align: "left", attributes: holder.description ? [cap(holder.description, 120)] : [] }), raw,
+          Object.assign({ type: "er-concept", className: LANDSCAPE_CARD_CLASS, style: { width: LANDSCAPE_WIDTH.card } }, inParent));
+        cardsBySystem.set(holder.name, new Map());
+      } else {
+        r = add(kind, holder.name,
+          Object.assign(display, { level: 3, foldedWidth: foldedWidthFor(holder.name, FOLDED_WIDTH.container, 7.4) }), raw,
+          Object.assign({ type: "er-group" }, inParent), { layout: conceptGridLayout(items.length) });
+        const cards = new Map();
+        for (const item of items) cards.set(item.key, conceptCard(holder.name, item, r.nodeId));
+        cardsBySystem.set(holder.name, cards);
+        report.groups++;
+      }
+      report.systems++;
+      landed(holder.name, Object.assign({ kind, visible: true }, r));
+    }
+
+    /* ---- areas (groups, open) with their systems; then the systems in no
+       declared area; then the external systems ---- */
+    const areas = landscapeAreas(arch);
+    const areaNames = new Set(areas.map(a => a.name));
+    const systems = list(arch.systems);
+    for (const a of areas) {
+      const members = systems.filter(s => s.area === a.name);
+      const display = { name: a.name, kind: "area", kindLabel: KIND_LEGEND.area.label, subtitle: a.description || "" };
+      const raw = { description: a.description || "", area: a.name, systems: members.map(s => s.name) };
+      if (!members.length) { add("area", a.name, display, raw, null); continue; }
+      const g = add("area", a.name,
+        Object.assign(display, { level: 3, foldedWidth: foldedWidthFor(a.name, FOLDED_WIDTH.container, 7.4) }),
+        raw, { type: "er-group" }, { layout: Object.assign({}, AREA_LAYOUT) });
+      for (const s of members) systemNode(s, "system", g.nodeId);
+    }
+    for (const s of systems) if (!s.area || !areaNames.has(s.area)) systemNode(s, "system", null);
+    for (const x of list(arch.externalSystems)) {
+      if (!show.externalSystems) { landed(x.name, { kind: "externalSystem", visible: false }); continue; }
+      systemNode(x, "externalSystem", null);
+    }
+
+    /* ---- the domain's main concepts no system names: one group, each card
+       subtitled with its bounded context ---- */
+    if (show.unplaced) {
+      const orphans = [];
+      for (const org of list(opts.domainOrgs))
+        for (const c of list(org.contexts))
+          for (const m of list(c.modules))
+            for (const el of list(m.elements))
+              if (el && UNPLACED_KINDS.has(el.kind) && !placed.has(el.id)) orphans.push({ el, ctx: c, org });
+      if (orphans.length) {
+        const g = add("unplaced", UNPLACED_NAME,
+          { name: UNPLACED_NAME, kind: "unplaced", kindLabel: "Domain model", subtitle: "entities and aggregates no system masters or handles",
+            level: 3, foldedWidth: foldedWidthFor(UNPLACED_NAME, FOLDED_WIDTH.container, 7.4) },
+          { description: "", concepts: orphans.length }, { type: "er-group" }, { layout: conceptGridLayout(orphans.length) });
+        for (const { el, ctx } of orphans) {
+          const k = kindsOf(el);
+          add("concept", `unplaced.${ctx.shortname || ctx.name}.${el.name}`,
+            { name: el.name, kind: "concept", kindLabel: titleCase(k), align: "left",
+              subtitle: ctx.name + (el.sourcedFrom ? ` · copy of ${el.sourcedFrom}` : ""), attributes: [] },
+            { system: "", site: "unplaced", ref: el.name, status: "resolved", domainId: el.id, domainKind: el.kind, context: ctx.name,
+              sourcedFrom: el.sourcedFrom || "", alsoMasteredBy: [], note: "" },
+            { type: "er-concept", className: `${CONCEPT_CARD_CLASS} ${CONCEPT_CARD_CLASS}--unplaced ${CONCEPT_CARD_CLASS}--${el.kind}`,
+              style: { width: CONCEPT_WIDTH }, parentId: g.nodeId },
+            { domainRef: { id: el.id }, actions: [{ label: `Open ${el.name}`, href: "#" + encodeURI(el.id) }] });
+          report.unplaced++;
+        }
+      }
+    }
+    report.placed = placed.size;
+
+    /* ---- dependencies between the system nodes (groups or cards) ---- */
+    addDependencies(arch, ends, show.edgeLabels, modelId, relations, edges, report);
+    const walked = walkMutualFirst(edges);
+
+    /* ---- flows, concept to concept: the sender's card of the concept
+       carried to the receiver's card of its `as` name (or of the same
+       concept). A side that lists no such card — the system handles the
+       concept without declaring it — is the system node itself. One edge
+       per (node, node), labelled with the flow numbers. ---- */
+    if (show.flows) {
+      const perPair = new Map();
+      const endOf = (system, key) => {
+        const card = (cardsBySystem.get(system) || new Map()).get(key);
+        if (card) return { end: card, atCard: true };
+        const sys = ends.get(system);
+        return sys && sys.visible ? { end: sys, atCard: false } : null;
+      };
+      for (const d of list(arch.dependencies)) {
+        for (const f of list(d.flows)) {
+          for (const c of list(f.carries)) {
+            const sKey = keyOf(c.concept, resolvedOf(c.concept));
+            const rKey = c.as ? keyOf(c.as, resolvedOf(c.as)) : sKey;
+            const s = endOf(f.sender, sKey), t = endOf(f.receiver, rKey);
+            if (!s || !t || s.end.nodeId === t.end.nodeId) {
+              report.flowsDropped.push({ flow: f.number, concept: c.concept.raw, as: c.as ? c.as.raw : null,
+                reason: !s ? `${f.sender} not drawn` : !t ? `${f.receiver} not drawn` : "same node" });
+              continue;
+            }
+            if (!s.atCard || !t.atCard) report.flowsAtSystem++;
+            const rid = `flow-${f.number}-${relations.length}`;
+            relations.push({ id: rid, type: "flow", sourceElementId: s.end.elementId, targetElementId: t.end.elementId,
+              data: { number: f.number, label: f.label || "", sender: f.sender, receiver: f.receiver, dependency: d.id,
+                concept: c.concept.raw, as: c.as ? c.as.raw : null, senderCard: s.atCard, receiverCard: t.atCard } });
+            const sNode = s.end.nodeId, tNode = t.end.nodeId;
+            const pair = sNode + "\u0000" + tNode;
+            if (!perPair.has(pair)) perPair.set(pair, { source: sNode, target: tNode, rids: [], numbers: [], lines: [] });
+            const p = perPair.get(pair);
+            p.rids.push(rid); p.numbers.push(f.number); p.lines.push(flowLine(f));
+            report.flows++;
+          }
+        }
+      }
+      for (const p of perPair.values()) {
+        const data = { modelRef: { modelId, relationId: p.rids[0] }, relationIds: p.rids.slice(), flow: true,
+          description: [...new Set(p.lines)].join("\n"), points: [] };
+        if (show.edgeLabels) data.label = numberRanges(p.numbers);
+        walked.push({ id: "edge-" + p.rids[0], source: p.source, target: p.target, type: "er-edge",
+          markerEnd: LANDSCAPE_ARROW, style: Object.assign({}, FLOW_STYLE), data });
+      }
+    }
+
+    const name = `${arch.name} — domain concepts by system`;
+    return {
+      version: 1,
+      model: { id: modelId, name, metamodel: "software-architecture", elements, relations },
+      diagram: { id: modelId + "#concepts", name, layout: Object.assign({}, LANDSCAPE_LAYOUT), nodes, edges: walked },
+    };
+  }
+  /* the kind label of a domain element, as arch-concepts.js spells it */
+  const kindsOf = el => (typeof SpecyArchConcepts !== "undefined" && SpecyArchConcepts && typeof SpecyArchConcepts.kindLabel === "function"
+    ? SpecyArchConcepts.kindLabel(el) : el.kind);
+
   return { architectureDiagram, modelIdOf, countVisible, DEFAULT_SHOW, KIND_LEGEND,
     landscapeDiagram, landscapeModelIdOf, landscapeCountVisible, LANDSCAPE_DEFAULT_SHOW, LANDSCAPE_LEGEND,
     LANDSCAPE_KIND_LEGEND,
-    LANDSCAPE_LIMITS: { concepts: CONCEPT_MAX, hotspots: HOTSPOT_MAX, actions: ACTION_MAX, label: LANDSCAPE_LABEL_MAX } };
+    LANDSCAPE_LIMITS: { concepts: CONCEPT_MAX, hotspots: HOTSPOT_MAX, actions: ACTION_MAX, label: LANDSCAPE_LABEL_MAX },
+    conceptLandscapeDiagram, conceptLandscapeModelIdOf, CONCEPT_LANDSCAPE_DEFAULT_SHOW, CONCEPT_LANDSCAPE_LEGEND,
+    CONCEPT_LANDSCAPE_LIMITS: { width: CONCEPT_WIDTH, note: NOTE_MAX, unplaced: UNPLACED_NAME } };
 })();
 
 /* Node (scripts/check-arch-export.mjs loads this file through vm; the

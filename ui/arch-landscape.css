@@ -19,6 +19,17 @@
    beat one of its single-class rules (`.group-node`, `.er-node`) names two
    classes; the hover / selection accent the bundle then loses is restated. */
 
+/* ---- eyebrows: a level-0 diagram says the kind of a card or a group by its
+   colour, once, in the legend strip above the canvas (app.js), not on every
+   card ("SYSTEM", "ENTITY · MASTERS"…). The `kindLabel` stays in the
+   DiagramFile; only a detailed system shows its eyebrow ("Detailed") ---- */
+.landscape-card:not(.landscape-card--detailed) .er-node__kind,
+.react-flow:has(.landscape-card) .er-node--kind-person .er-node__kind,
+.group-node--kind-area .group-node__kind,
+.react-flow:has(.concept-card) .group-node--kind-system .group-node__kind,
+.react-flow:has(.concept-card) .group-node--kind-externalSystem .group-node__kind,
+.concept-card .er-node__kind { display: none; }
+
 /* ---- area: a department's systems. Warm and solid, where the system
    boundary of the C4 view is blue and dashed ---- */
 .group-node.group-node--kind-area {
@@ -55,9 +66,12 @@
 .landscape-card .er-node__attributes { font-style: normal; color: var(--ds-red-500, #a13e3e); }
 /* the rows. `masters` — what the system is the source of truth for — comes
    first and reads heavier than `handles` and `used by` under it; the
-   converter flags the cards that have that row (`landscape-card--masters`) */
+   converter flags the cards that have that row (`landscape-card--masters`).
+   Its key is not printed: the weight says it, and the legend strip says so
+   once (app.js `renderLandscapeView`) */
 .landscape-card .er-node__body--kv { margin-top: 6px; gap: 3px; }
-.landscape-card--masters .er-node__body--kv-row:first-child dt,
+.landscape-card--masters .er-node__body--kv-row:first-child { grid-template-columns: 1fr; }
+.landscape-card--masters .er-node__body--kv-row:first-child dt { display: none; }
 .landscape-card--masters .er-node__body--kv-row:first-child dd { color: var(--ds-blue-700, #172741); font-weight: 600; }
 
 /* ---- two opposite dependencies stay two edges ----
@@ -126,6 +140,105 @@
    supported the engine's head stays as it is. */
 svg:has(+ .diagram-wrapper .landscape-card) #er-arrow { overflow: visible; }
 svg:has(+ .diagram-wrapper .landscape-card) #er-arrow path {
+  fill: context-stroke;
+  transform: scale(1.7);
+  transform-origin: 10px 5px;
+}
+
+/* ======================================================================
+   Concept landscape (arch-to-diagram.js `conceptLandscapeDiagram`): the
+   domain concepts by system. A system is a group (the engine's
+   `.group-node--kind-system`, the C4 boundary); inside it, one card per
+   concept, `.concept-card`, qualified by what the system does with it
+   (`--masters` set solid: the system is the source of truth; `--handles`
+   dashed: it works on someone else's concept, like a ghost card of the
+   class diagram) and by the domain kind (`--entity`, `--aggregate`,
+   `--readonly-entity`, `--value`, `--enum`, `--event`), whose colour the
+   left bar takes — the colours of KINDS in app.js. A `--note` card stands
+   for a name the domain model does not hold (`// NOTE:`); an `--unplaced`
+   card for a domain concept no system names (toggle). The flow edges
+   (toggle) are dashed beige, under the dependency edges.
+   ====================================================================== */
+.node-shell.er-node--kind-concept,
+.node-shell.er-node--kind-concept-note {
+  background: #ffffff;
+  --node-border-color: var(--ds-blue-400, #5b7bb5);
+  --concept-accent: var(--ds-blue-700, #172741);
+  box-shadow: inset 4px 0 0 var(--concept-accent);
+  border-radius: 6px;
+}
+.node-shell.er-node--kind-concept:hover,
+.node-shell.er-node--kind-concept-note:hover,
+.react-flow__node.selected .node-shell.er-node--kind-concept,
+.react-flow__node.selected .node-shell.er-node--kind-concept-note,
+.react-flow__node.is-highlighted .node-shell.er-node--kind-concept { --node-border-color: var(--node-accent); }
+.concept-card .er-node__name { font-size: 10.5pt; }
+.concept-card .er-node__subtitle { font-size: 8pt; color: var(--fg-muted, #4b5d6c); }
+.concept-card .er-node__attributes { font-size: 7.5pt; font-style: normal; color: var(--ds-red-500, #a13e3e); }
+/* the domain kind, on the left bar */
+.concept-card--entity .node-shell          { --concept-accent: #F65E5E; }
+.concept-card--aggregate .node-shell       { --concept-accent: #172741; }
+.concept-card--readonly-entity .node-shell { --concept-accent: #b7a480; }
+.concept-card--value .node-shell           { --concept-accent: #8d7e63; }
+.concept-card--enum .node-shell            { --concept-accent: #b7a480; }
+.concept-card--event .node-shell           { --concept-accent: #8d7e63; }
+/* `handles`: a copy of a concept owned elsewhere — dashed, like a ghost */
+.concept-card--handles .node-shell.er-node--kind-concept {
+  border-style: dashed;
+  background: #fbfbfb;
+}
+.concept-card--handles .er-node__name { font-weight: 500; }
+/* a name with no domain element: dashed, grey, no accent bar */
+.concept-card--note .node-shell.er-node--kind-concept-note {
+  border-style: dashed;
+  background: #f4f4f4;
+  --node-border-color: #9a9a9a;
+  --concept-accent: #c9c9c9;
+}
+.concept-card--note .er-node__attributes { color: var(--fg-muted, #4b5d6c); }
+/* the domain concepts no system names: a dashed group, muted */
+.group-node.group-node--kind-unplaced {
+  border: 1.5px dashed #9a9a9a;
+  border-radius: 12px;
+  background: #f7f7f7;
+}
+.group-node--kind-unplaced .group-node__header { background: #efefef; border-bottom-color: #dcdcdc; border-radius: 10px 10px 0 0; }
+.group-node--kind-unplaced .group-node__kind,
+.group-node--kind-unplaced .group-node__subtitle { color: var(--fg-muted, #4b5d6c); }
+.group-node.group-node--kind-unplaced.group-node--l1 { background: #efefef; }
+/* an external system holding concepts: grey, as its card (KIND_LEGEND.externalSystem) —
+   the legend strip names it, the group carries no eyebrow */
+.group-node.group-node--kind-externalSystem {
+  border: 1.5px solid #9a9a9a;
+  border-radius: 12px;
+  background: #ececec;
+}
+.group-node.group-node--kind-externalSystem:hover,
+.react-flow__node.selected .group-node.group-node--kind-externalSystem,
+.react-flow__node.is-highlighted .group-node.group-node--kind-externalSystem { border-color: var(--node-accent); }
+.group-node--kind-externalSystem .group-node__header { background: #e2e2e2; border-bottom-color: #cfcfcf; border-radius: 10px 10px 0 0; }
+.group-node.group-node--kind-externalSystem.group-node--l1 { background: #e2e2e2; }
+.group-node--kind-externalSystem.group-node--l1 .group-node__header { background: transparent; border-radius: 10px; }
+/* a system group of the concept landscape: its cards' handles are not
+   offset (the dependency edges leave the group, not the cards), but the
+   group itself takes the landscape's offsets so a mutual pair stays apart */
+.group-node--kind-system.group-node--l1 { --dep-side: 9px; --dep-end: 44px; --dep-in: 0px; }
+.react-flow:has(.concept-card) .group-node--kind-system > .react-flow__handle[data-handleid="source-right"],
+.react-flow:has(.concept-card) .group-node--kind-system > .react-flow__handle[data-handleid="target-left"] { top: calc(50% + var(--dep-side, 9px)); }
+.react-flow:has(.concept-card) .group-node--kind-system > .react-flow__handle[data-handleid="source-left"],
+.react-flow:has(.concept-card) .group-node--kind-system > .react-flow__handle[data-handleid="target-right"] { top: calc(50% - var(--dep-side, 9px)); }
+.react-flow:has(.concept-card) .group-node--kind-system > .react-flow__handle[data-handleid="source-top"],
+.react-flow:has(.concept-card) .group-node--kind-system > .react-flow__handle[data-handleid="target-bottom"] { left: calc(50% + var(--dep-end, 44px)); }
+.react-flow:has(.concept-card) .group-node--kind-system > .react-flow__handle[data-handleid="source-bottom"],
+.react-flow:has(.concept-card) .group-node--kind-system > .react-flow__handle[data-handleid="target-top"] { left: calc(50% - var(--dep-end, 44px)); }
+/* edge labels and arrowheads: as on the landscape canvas */
+.react-flow:has(.concept-card) .react-flow__edgelabel-renderer > div {
+  z-index: 2500;
+  color: var(--ds-blue-700, #172741) !important;
+  font-style: normal !important;
+}
+svg:has(+ .diagram-wrapper .concept-card) #er-arrow { overflow: visible; }
+svg:has(+ .diagram-wrapper .concept-card) #er-arrow path {
   fill: context-stroke;
   transform: scale(1.7);
   transform-origin: 10px 5px;

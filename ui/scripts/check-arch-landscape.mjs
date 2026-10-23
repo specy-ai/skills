@@ -28,8 +28,19 @@
         `masters` names an entity or aggregate of a context the system
         realizes, or a read-only entity sourced from it. A name matched only
         after normalisation is a warning
-     5. prints counts; exits non-zero on a violation
-   It writes nothing.
+     5. converts the organization into the Navigator's concept landscape —
+        the domain concepts by system (ui/arch-to-diagram.js
+        `conceptLandscapeDiagram`) — with every toggle combination and
+        checks the DiagramFiles against the group contract of
+        diagram-engine/docs/DERIVED-DIAGRAMS.md §7: parents before members,
+        `er-group` iff members, every modelRef resolving, every system drawn
+        once, every resolved `masters` / `handles` reference one card inside
+        its system, every dependency between drawn systems one edge between
+        the system nodes, flows and the unplaced group only when toggled on
+     6. prints counts; exits non-zero on a violation
+   For the default example it writes the default conversion to
+   ../diagram-engine/examples/diagrams/navigator-concept-landscape.json as an
+   engine fixture; a file passed on the command line is checked only.
    Usage: node ui/scripts/check-arch-landscape.mjs [--no-domain] [path/to/file.arch]
           (default: examples/retail-media/retail-media.arch) */
 
@@ -56,11 +67,13 @@ const ARCH = files[0]
 
 /* ---- load the parsers + the resolver in a bare context (no window/document) ---- */
 const ctx = vm.createContext({ console, module: { exports: {} } });
-for (const f of ["domain-parser.js", "arch-parser.js", "arch-concepts.js"])
+for (const f of ["domain-parser.js", "arch-parser.js", "arch-concepts.js", "arch-to-diagram.js"])
   vm.runInContext(read(path.join(UI, f)), ctx, { filename: f });
 /* top-level declarations of a classic script land in the context's global
    lexical scope — read them back through an expression */
-const { parseDomain, parseArch, SpecyArchConcepts: C } = vm.runInContext("({ parseDomain, parseArch, SpecyArchConcepts })", ctx);
+const { parseDomain, parseArch, SpecyArchConcepts: C, SpecyArchDiagrams: A } =
+  vm.runInContext("({ parseDomain, parseArch, SpecyArchConcepts, SpecyArchDiagrams })", ctx);
+const ENGINE_EXAMPLES = path.resolve(SKILL, "..", "diagram-engine", "examples", "diagrams");
 
 /* ---- parse ---- */
 if (!fs.existsSync(ARCH)) fail("no such file " + ARCH);
@@ -248,6 +261,156 @@ for (const rs of masters.values()) {
   else err(rs[1].ref.line, `${label} is mastered by ${who.join(" and ")}: a concept has at most one system of record`);
 }
 
+/* ---- the concept landscape: the same organization at concept granularity
+   (the Navigator's "domain concepts by system"), converted with every
+   toggle combination and checked against the group contract ---- */
+const conceptLines = [];
+let conceptDefault = null;
+if (typeof A.conceptLandscapeDiagram === "function") {
+  const SHOW = A.CONCEPT_LANDSCAPE_DEFAULT_SHOW;
+  const variants = [["default", {}]];
+  for (const k of Object.keys(SHOW)) variants.push([`${k} ${SHOW[k] ? "off" : "on"}`, { [k]: !SHOW[k] }]);
+  variants.push(["all on", Object.fromEntries(Object.keys(SHOW).map(k => [k, true]))]);
+  variants.push(["all off", Object.fromEntries(Object.keys(SHOW).map(k => [k, false]))]);
+  for (const [label, show] of variants) {
+    const report = {};
+    let F;
+    try {
+      F = A.conceptLandscapeDiagram(arch, show, { resolution: resolving ? summary : null, domainOrgs: resolving ? domainOrgs : [], report });
+    } catch (e) { err(0, `concept landscape [${label}] threw: ${e.message}`); continue; }
+    const full = Object.assign({}, SHOW, show);
+    checkConceptLandscape(F, label, full, report);
+    if (label === "default") conceptDefault = F;
+    conceptLines.push(`  [${label.padEnd(19)}] ${String(F.diagram.nodes.length).padStart(3)} nodes (${report.groups} system groups, ${report.cards} cards, ${report.notes} notes${full.unplaced ? `, ${report.unplaced} unplaced` : ""})  ${String(F.diagram.edges.length).padStart(3)} edges${full.flows ? ` (${report.flows} flows, ${report.flowsAtSystem} at a system node)` : ""}${report.dropped.length ? `  dropped ${report.dropped.map(d => d.id).join(", ")}` : ""}`);
+  }
+} else {
+  err(0, "ui/arch-to-diagram.js has no conceptLandscapeDiagram: the concept landscape cannot be checked");
+}
+
+function checkConceptLandscape(F, label, show, report) {
+  const E = msg => err(0, `concept landscape [${label}]: ${msg}`);
+  if (!F || !F.model || !F.diagram) { E("no DiagramFile"); return; }
+  if (F.version !== 1) E("version must be 1");
+  if (F.model.metamodel !== "software-architecture") E("metamodel " + F.model.metamodel);
+  if (F.model.id !== A.conceptLandscapeModelIdOf(arch)) E(`model id ${F.model.id}`);
+  if (F.diagram.id !== F.model.id + "#concepts") E(`diagram id ${F.diagram.id}`);
+  const L = F.diagram.layout || {};
+  if (L.engine !== "dagre" || L.handles !== "auto") E("layout must be dagre with handles auto");
+
+  const elById = new Map(), relById = new Map();
+  for (const e of F.model.elements) {
+    if (!e.id || !e.type || !e.data) E("element without id/type/data");
+    if (elById.has(e.id)) E("duplicate element id " + e.id);
+    elById.set(e.id, e);
+  }
+  for (const r of F.model.relations) {
+    if (relById.has(r.id)) E("duplicate relation id " + r.id);
+    relById.set(r.id, r);
+    for (const side of ["sourceElementId", "targetElementId"]) if (!elById.has(r[side])) E(`relation ${r.id} ${side} unknown`);
+    if (!["dependency", "flow"].includes(r.type)) E(`relation ${r.id} type ${r.type}`);
+  }
+
+  const nodeById = new Map(), members = new Map(), nodeOfElement = new Map();
+  for (const n of F.diagram.nodes) {
+    if (!n.id || !n.type || !n.data) { E("node without id/type/data"); continue; }
+    if (nodeById.has(n.id)) E("duplicate node id " + n.id);
+    if ("position" in n) E(`node ${n.id} carries a position`);
+    if (!["er-group", "er-concept"].includes(n.type)) E(`node ${n.id} type ${n.type}`);
+    if (n.parentId != null) {
+      const p = nodeById.get(n.parentId);
+      if (!p) E(`node ${n.id}: parent ${n.parentId} is not an earlier node`);
+      else if (p.type !== "er-group") E(`node ${n.id}: parent ${n.parentId} is not an er-group`);
+      if (n.extent !== "parent") E(`member ${n.id} without extent "parent"`);
+      members.set(n.parentId, (members.get(n.parentId) || 0) + 1);
+    }
+    nodeById.set(n.id, n);
+    const d = n.data;
+    if (!d.modelRef || d.modelRef.modelId !== F.model.id || !elById.has(d.modelRef.elementId)) E(`node ${n.id}: modelRef does not resolve`);
+    else {
+      if (nodeOfElement.has(d.modelRef.elementId)) E(`element ${d.modelRef.elementId} drawn twice`);
+      nodeOfElement.set(d.modelRef.elementId, n.id);
+    }
+    if (!d.name || !d.kind || !d.kindLabel) E(`node ${n.id} lacks name/kind/kindLabel`);
+    if (n.type === "er-group" && (d.level == null || !d.foldedWidth)) E(`group ${n.id} without level/foldedWidth`);
+    if (d.kind === "concept" || d.kind === "concept-note") {
+      if (!n.parentId) E(`concept card ${n.id} outside any group`);
+      if (!n.style || n.style.width !== A.CONCEPT_LANDSCAPE_LIMITS.width) E(`concept card ${n.id} width`);
+      if (!/concept-card--(masters|handles|unplaced)/.test(n.className || "")) E(`concept card ${n.id} without its site class`);
+      if (d.kind === "concept" && !(d.domainRef && d.domainRef.id)) E(`concept card ${n.id} without domainRef`);
+      if (d.kind === "concept-note" && d.domainRef) E(`note card ${n.id} carries a domainRef`);
+      for (const a of d.actions || []) if (!a.label || !a.href) E(`node ${n.id} malformed action`);
+    }
+  }
+  for (const n of F.diagram.nodes) {
+    const isGroup = (members.get(n.id) || 0) > 0;
+    if (isGroup !== (n.type === "er-group")) E(`node ${n.id}: er-group iff it has members`);
+    if (n.data.kind === "system" && n.parentId && nodeById.get(n.parentId).data.kind !== "area") E(`system ${n.id} nested in a non-area`);
+    if (n.data.kind === "externalSystem" && n.parentId) E(`external system ${n.id} is nested`);
+  }
+  if (!show.externalSystems && F.diagram.nodes.some(n => n.data.kind === "externalSystem")) E("external systems hidden but drawn");
+  if (F.diagram.nodes.some(n => n.data.kind === "person")) E("persons drawn");
+  if (!show.unplaced && F.diagram.nodes.some(n => n.data.kind === "unplaced")) E("unplaced group drawn while off");
+
+  /* every system drawn once; every (shown) masters / handles reference of a
+     system one card inside its node */
+  const systemNodes = F.diagram.nodes.filter(n => n.data.kind === "system");
+  if (systemNodes.length !== arch.systems.length) E(`${systemNodes.length} system nodes for ${arch.systems.length} systems`);
+  const holders = arch.systems.map(s => [s, "system"]).concat(show.externalSystems ? arch.externalSystems.map(x => [x, "externalSystem"]) : []);
+  for (const [s, type] of holders) {
+    const holderEl = F.model.elements.find(e => e.type === type && e.data.name === s.name);
+    if (!holderEl) { E(`${s.name} not in the model`); continue; }
+    const cards = F.model.elements.filter(e => e.type === "concept" && e.data.system === s.name);
+    const wanted = new Set();
+    for (const site of ["masters"].concat(show.handled ? ["handles"] : []))
+      for (const ref of s[site] || []) {
+        const x = resolving ? summary.of(ref) : null;
+        wanted.add(x && x.status === "resolved" ? x.id : "name:" + C.norm(ref.name));
+      }
+    const drawn = new Set(cards.map(e => e.data.domainId || "name:" + C.norm(e.data.ref)));
+    for (const w of wanted) if (!drawn.has(w)) E(`${s.name}: concept ${w} not drawn`);
+    if (cards.length !== wanted.size) E(`${s.name}: ${cards.length} cards for ${wanted.size} distinct concepts`);
+    if (!show.handled && cards.some(e => e.data.site === "handles")) E(`${s.name}: handled concept drawn while handled is off`);
+    const holderNode = nodeOfElement.get(holderEl.id);
+    for (const e of cards) {
+      const n = nodeById.get(nodeOfElement.get(e.id));
+      if (!n || n.parentId !== holderNode) E(`${s.name}: card ${e.id} is not inside its system`);
+    }
+  }
+
+  /* edges: every relation drawn once, between the nodes of its ends; every
+     dependency between two drawn systems present, none to a hidden one */
+  const drawnRel = new Set();
+  for (const e of F.diagram.edges) {
+    if (e.type !== "er-edge" || e.markerEnd !== "er-arrow") E(`edge ${e.id} type / marker`);
+    if (e.sourceHandle != null || e.targetHandle != null) E(`edge ${e.id} carries handles`);
+    if (!nodeById.has(e.source) || !nodeById.has(e.target)) E(`edge ${e.id} endpoint not a node`);
+    const d = e.data || {};
+    if (!d.modelRef || !relById.has(d.modelRef.relationId)) { E(`edge ${e.id} modelRef does not resolve`); continue; }
+    if (!Array.isArray(d.points) || typeof d.description !== "string") E(`edge ${e.id} without points / description`);
+    if (!show.edgeLabels && d.label != null) E(`edge ${e.id} labelled while labels are off`);
+    for (const rid of d.relationIds || [d.modelRef.relationId]) {
+      const r = relById.get(rid);
+      if (!r) { E(`edge ${e.id} relation ${rid} unknown`); continue; }
+      if (drawnRel.has(rid)) E(`relation ${rid} drawn twice`);
+      drawnRel.add(rid);
+      if (nodeOfElement.get(r.sourceElementId) !== e.source || nodeOfElement.get(r.targetElementId) !== e.target) E(`edge ${e.id} endpoints disagree with ${rid}`);
+      if (r.type === "flow" && !show.flows) E(`flow ${rid} drawn while flows are off`);
+      if (r.type === "flow" && !d.flow) E(`edge ${e.id} of a flow not flagged data.flow`);
+    }
+  }
+  for (const r of F.model.relations) if (!drawnRel.has(r.id)) E(`relation ${r.id} is not drawn`);
+  const visible = new Set(F.model.elements.filter(e => e.type === "system" || e.type === "externalSystem").map(e => e.data.name));
+  for (const d of arch.dependencies) {
+    const expected = visible.has(d.from) && visible.has(d.to) && d.from !== d.to;
+    if (expected !== relById.has(d.id)) E(`dependency ${d.id} ${expected ? "missing" : "drawn though an end is hidden"}`);
+    if (relById.has(d.id)) {
+      const r = relById.get(d.id);
+      if (elById.get(r.sourceElementId).data.name !== d.from || elById.get(r.targetElementId).data.name !== d.to) E(`dependency ${d.id} joins the wrong ends`);
+    }
+  }
+  for (const u of report.unresolved || []) E(`unresolved end ${u.side} "${u.name}" of ${u.id}`);
+}
+
 /* ---- report ---- */
 const tally = (items, key) => {
   const t = new Map();
@@ -290,6 +453,10 @@ if (resolving) {
   for (const n of summary.staleNotes) console.log(`  info: line ${n.line} carries a // NOTE: and the names on this line all resolve (${n.names.join(", ")})`);
 }
 for (const w of warnings) console.log(`  warning: ${w}`);
+if (conceptLines.length) {
+  console.log(`concept landscape (the domain concepts by system), per toggle combination:`);
+  for (const l of conceptLines) console.log(l);
+}
 
 if (errors.length) {
   errors.sort((a, b) => a.line - b.line);   // stable: file order, the rules of one line together
@@ -301,3 +468,15 @@ if (errors.length) {
 console.log(`\nOK — the organization satisfies the level-0 structural rules${resolving ? " and every concept reference resolves or is acknowledged"
   : NO_DOMAIN && sources.length ? "; its concept references were NOT checked against the domain (--no-domain)"
   : " (no domain-source: its concept references are plain names)"}`);
+
+/* ---- engine fixture: the default (public) example only — a client model
+   passed on the command line is checked but never written into the
+   engine's examples ---- */
+if (conceptDefault && files[0]) {
+  console.log("custom model: concept landscape fixture not written (engine examples stay on retail-media)");
+} else if (conceptDefault && fs.existsSync(path.dirname(ENGINE_EXAMPLES))) {
+  fs.mkdirSync(ENGINE_EXAMPLES, { recursive: true });
+  const out = path.join(ENGINE_EXAMPLES, "navigator-concept-landscape.json");
+  fs.writeFileSync(out, JSON.stringify(conceptDefault, null, 2) + "\n");
+  console.log(`wrote ${out}  (${conceptDefault.model.id})`);
+}

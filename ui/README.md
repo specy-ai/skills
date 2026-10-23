@@ -12,8 +12,8 @@ its **Satisfied by** table by scanning the `satisfies` lists of every loaded
 domain model — with the satisfaction role derived from the element's kind
 (entity → structured-by, invariant → enforced-by, error event → detected-by, …).
 The set overview reports coverage (satisfied / unsatisfied) and lists the
-unsatisfied requirements. `.sysreq` files are registered in `SYSREQ_FILES`
-(top of `app.js`) and parsed by `sysreq-parser.js`.
+unsatisfied requirements. `.sysreq` files come from the model manifest (see
+"Loading real `.domain` files") and are parsed by `sysreq-parser.js`.
 
 A static prototype for navigating a Specy domain model, structured by
 `src/metamodels/DOMAIN-METAMODEL.md`:
@@ -60,14 +60,20 @@ modules or machines).
 - `SpecyDomainDiagrams.moduleClassDiagram(mod, context, show, orgId?)` —
   metamodel `domain-class`; `show` is the category toggle map
   (`{ interfaces, entities, values, services }`, default `DEFAULT_SHOW`).
+- `SpecyDomainDiagrams.contextClassDiagram(context, show, orgId?)` — the
+  same metamodel for a whole bounded context at once: every module's
+  elements on one canvas, no ghosts (default `CONCEPTS_SHOW`: entities and
+  aggregates only — the context's main concepts).
 - `SpecyDomainDiagrams.stateMachineDiagram(el, sm, hit?)` — metamodel
   `state-machine`, one file per `machine` of an entity / aggregate.
-- Also exported: `MAIN_KINDS`, `CATEGORY_OF`, `DEFAULT_SHOW`, `countVisible`,
-  `moduleModelId`, `machineModelId`, `compartmentsFor`, `KINDS_FALLBACK`.
+- Also exported: `MAIN_KINDS`, `CATEGORY_OF`, `DEFAULT_SHOW`, `CONCEPTS_SHOW`,
+  `countVisible`, `countVisibleIn`, `moduleModelId`, `contextModelId`,
+  `machineModelId`, `compartmentsFor`, `KINDS_FALLBACK`.
 
 Model ids are stable across re-parses: `<org>.<ctx>.<module>` for a class
-diagram (derived from the parser's ids, e.g. `business-loan.BL.LoanServicing`)
-and `<element id>.<machine>` for a statechart. Node ids equal the parser's
+diagram (derived from the parser's ids, e.g. `business-loan.BL.LoanServicing`),
+`<org>.<ctx>` for a context's concept diagram (diagram id `…#concepts`) and
+`<element id>.<machine>` for a statechart. Node ids equal the parser's
 element ids; cross-module ghosts are `ghost:<id>`.
 
 `app.js` mounts the engine (`mountDiagram`), keeps every mount handle in
@@ -109,8 +115,60 @@ entities / aggregates, values, services — the converter decides visibility,
 so a hidden endpoint simply drops its edges. Cross-module endpoints appear as
 dashed ghost cards naming their home module (their `modelRef` points at the
 home module's model). Double-click any element to open it in the Domain
-Navigator (`onNavigate`). Still no build step on this side: only the vendored
+Navigator (`onNavigate`). The last header checkbox, **legend**
+(`legendToggleHtml`), hides the legend: the engine's panel under the class
+diagrams and the strip above the organization diagrams (the landscape, the
+domain concepts by system). It applies to every diagram at once, redraws
+nothing, and is kept per browser (`localStorage`
+`specy-navigator:legend-hidden`). Still no build step on this side: only the vendored
 engine bundle is a build product.
+
+The left panel offers two wider scopes above the module rows
+(`state.diagramScope`: `module` | `context` | `org`):
+
+- **All concepts of a context** — the first row of the tree, above
+  `Modules`: every entity and aggregate of the bounded context on one class
+  diagram, whatever its module (`contextClassDiagram`). The same cards and
+  labeled relations as the module diagram, now crossing modules, so there are
+  no ghosts; the four category toggles (`data-conceptopt`) open on entities /
+  aggregates alone and let values, services and interfaces in. `open context
+  map ↗` goes to the context in the Domain Navigator.
+- **Domain concepts by system** — the entry **above the "Bounded context"
+  dropdown** (`#tree-top`, shown in this tab only): the whole organization,
+  every concept grouped under the system that manipulates it, drawn by
+  `SpecyArchDiagrams.conceptLandscapeDiagram` from the **level-0 `.arch`**
+  (an `organization` file, see "Organization files" below) whose
+  `domain-source` is this organization — `conceptArchFor(org)`, the first
+  such file loaded (name order). Without one the entry is disabled and says so.
+  Areas are groups as in the landscape; inside them **each system is a
+  foldable group holding one card per concept it `masters`** (solid: its
+  source of truth) **or `handles`** (dashed: owned by another system), the
+  name resolved through `arch-concepts.js` as the Architecture diagram
+  resolves it — the bounded context on the card, the kind as the colour of
+  its left bar, `also mastered by …` when several systems claim it, a grey
+  note card for a name a `// NOTE:` acknowledges. No card or group repeats
+  its kind ("System", "Entity · masters"): the legend strip names each kind
+  once, by its colour (`kindLegendHtml`), and the diagram bar carries the
+  title alone. The **dependency edges are
+  the landscape's**, between the system nodes: fold the systems (*Groups 1*
+  or *2*) and the picture is the level-0 landscape again (the engine
+  aggregates the edges). Toggles (`data-conceptlandopt`): external systems,
+  handled concepts, edge labels, **flows** (off by default: one dashed edge
+  per concept a flow carries, from the sender's card to the receiver's card
+  of its `as` name — or to the system node when it lists no such card —
+  labelled with the flow number) and **unplaced concepts** (off: a dashed
+  group of the domain's entities and aggregates no system names, the audit
+  view). Double-click a card, or use its `⋯` menu, to open the domain
+  element; the Domain Navigator then shows a `← … — concepts by system` link
+  and the browser's Back button returns to the diagram. `open landscape ↗`
+  switches to the Architecture diagram. Model id `<file stem>-concepts`
+  (also the storage prefix), diagram id `…#concepts`; the cards' styles are
+  in `arch-landscape.css` (`.concept-card`).
+
+Deep links: `#concepts:<org id>` (by system), `#concepts:ctx:<context id>`
+(a context's concepts) and `#concepts:mod:<module id>` (a module); the hash
+follows the selection. Changing the context in the dropdown while the
+organization diagram is shown opens that context's concepts.
 
 ## Architecture diagram tab
 
@@ -127,9 +185,10 @@ own `1 | 2 | 3` control and a header double-click cycle. Folded groups carry
 aggregated edges (one line per direction; hovering it lists the connectors it stands for).
 
 - **Picker** — the left-panel dropdown lists the loaded architectures
-  (`ARCH_FILES` at the top of `app.js`: `ffm.arch`, the FFM landscape, the
-  public `url-shortener.arch`, and the public `retail-media.arch`, an
-  `organization` file — see "Organization files" below); the
+  (every `.arch` the model manifest names, in name order — locally the
+  `.arch` files of `ui/`, such as the public `url-shortener.arch` and
+  `retail-media.arch`, an `organization` file — see "Organization files"
+  below); the
   tree shows the system, element counts keyed by the canvas colours, the fold
   hint and the containers (info rows; the filter box is hidden in this view).
 - **Landscapes** — a file may hold several `system` blocks (a C4 system
@@ -173,8 +232,8 @@ aggregated edges (one line per direction; hovering it lists the connectors it st
   in the model but is not drawn. Edge sides are derived by the engine
   (`layout.handles: "auto"`).
 - **Navigation** — a card whose `realizes module "…"` / `realizes context X`
-  resolves in the `.domain` named by the file's `domain-source` (it must be
-  loaded through `DOMAIN_FILES`) carries `data.domainRef` and an
+  resolves in the `.domain` named by the file's `domain-source` (that
+  `.domain` must be loaded too) carries `data.domainRef` and an
   `Open module "…"` action; double-click or the action opens it in the
   Domain Navigator. Deep link: `#arch:<file stem>` (e.g. `#arch:url-shortener`),
   followed by the selection when there is one: `#arch:url-shortener/container:EdgeApi`.
@@ -193,24 +252,29 @@ its **landscape**, and keeps the C4 diagram one click away; a file rooted at
 `architecture` only has the C4 view described above.
 
 - **Landscape** — the systems grouped by area, each card showing its role
-  name, its product, its hotspots and its main concepts (`masters` first: what
-  it is the source of truth for; then `handles`), and one edge per dependency,
+  name, its product, its hotspots and its main concepts (first, in bold and
+  with no key, the ones it `masters`: what it is the source of truth for;
+  then `handles`), and one edge per dependency,
   labelled with its flow numbers. **An arrow means "depends on"**, not "sends
   data to": `A → B` reads "A depends on B", the arrowhead is on the system
   depended upon, and two systems that depend on each other show two edges. A
   strip under the diagram bar says so and prints the converter's
-  `LANDSCAPE_LEGEND` (how a critical dependency and a Partnership are drawn).
-  Toggles: external systems, persons (off by default: the person cards, and a
+  `LANDSCAPE_LEGEND` (how a critical dependency and a Partnership are drawn),
+  after one swatch per kind drawn (area, system, external system, person)
+  and what the bold names mean:
+  the cards carry no "System" / "Area" eyebrow, only a system detailed in
+  containers says "Detailed". The diagram bar holds the title, not the file
+  name (the picker's) nor the counts (the tree's). Toggles: external systems, persons (off by default: the person cards, and a
   `used by` row on the system cards), edge labels, concepts.
 - **Landscape | C4 switch** — in the diagram bar. The C4 view draws the
   systems detailed inline with their containers and components and the others
   as black-box cards; its tree and details are the C4 ones. A system detailed
   inline has an `Open C4 view` button on its sheet, which arrives on its
   containers; in the C4 view a system's details carry `Open system sheet`.
-- **Tree** — the organization (counts, how its concept names resolved:
-  "91 concepts linked · 9 not in the domain model"), a **Problems** block when
-  the reader left `issues` or a name is ambiguous or unresolved, the areas
-  with their systems, the external systems, the persons, the dependencies
+- **Tree** — the organization (its description, and a line only when its
+  concept names cannot be linked: no `domain-source`, or one not loaded), a
+  **Problems** block when the reader left `issues` or a name is ambiguous or
+  unresolved, the areas with their systems, the external systems, the persons, the dependencies
   (`ERP → CRM`, `⇄` on a mutual pair, the flow numbers) and the phases in
   order. Rows select as in the C4 view. The selected system unfolds its main
   concepts (● mastered, ○ handled), the selected dependency its flows.
@@ -243,7 +307,7 @@ its **landscape**, and keeps the C4 diagram one click away; a file rooted at
 - **Concept links** — every concept name (`masters`, `handles`, a hotspot's
   `concerns`, both sides of `carries X as Y`) is resolved by
   `arch-concepts.js` against the `.domain` files named by the organization's
-  `domain-source`s (they must be loaded through `DOMAIN_FILES`): a qualified
+  `domain-source`s (they must be loaded too): a qualified
   name (`Sales.Account`) in that context; a bare name first in the contexts
   the system realizes, then in the whole model, where a read-only copy never
   competes with the definition it copies. A resolved name is a link into the
@@ -279,8 +343,12 @@ also returns the level-0 shape (areas, phases, dependencies, flows,
 acknowledged names, `issues` — documented at the top of the file), and the
 converter adds `landscapeDiagram(arch, show, { resolution })`,
 `LANDSCAPE_DEFAULT_SHOW`, `landscapeModelIdOf`, `landscapeCountVisible` and
-`LANDSCAPE_LEGEND`; the node kinds it introduces are styled by
-`arch-landscape.css`. `arch-concepts.js` (global `SpecyArchConcepts`, pure
+`LANDSCAPE_LEGEND`, plus the Domain Diagram tab's
+`conceptLandscapeDiagram(arch, show, { resolution, domainOrgs, report })`,
+`CONCEPT_LANDSCAPE_DEFAULT_SHOW`, `conceptLandscapeModelIdOf` and
+`CONCEPT_LANDSCAPE_LEGEND` (the `report` collects counts: systems, groups,
+cards, notes, flows, unplaced, the flows dropped); the node kinds they
+introduce are styled by `arch-landscape.css`. `arch-concepts.js` (global `SpecyArchConcepts`, pure
 and DOM-free like the converters) resolves the concept references:
 `domainOrgsFor(arch, organizations)` picks the loaded domain models,
 `resolveAll(arch, orgs)` returns the counts, the problems and `of(ref)` — the
@@ -288,7 +356,7 @@ resolution of one reference: `resolved` (with the element id `goto()` takes),
 `ambiguous` (candidates), `acknowledged` (the NOTE), `unresolved` or `plain`.
 
 Every `.arch` and `.domain` file in `ui/` is git-ignored (client models stay
-local; a file listed in `ARCH_FILES` / `DOMAIN_FILES` but missing is skipped).
+local; the manifest lists whatever model files are in `ui/`).
 For the public samples, link them from `examples/` once after cloning (the
 server started by `./serve.sh` follows symlinks). Sniplink is a single-system
 `architecture` file — double-click navigation then lands in the Sniplink
@@ -302,7 +370,11 @@ ln -s ../examples/retail-media/retail-media.arch     ui/retail-media.arch
 ln -s ../examples/retail-media/retail-media.domain   ui/retail-media.domain
 ```
 
-Then open `http://localhost:8347/#arch:retail-media`.
+Then open `http://localhost:8347/#arch:retail-media`, or
+`#concepts:retail-media` for its concepts by system. The FFM files are
+symlinks too, to the mission's `specy/` folder (`ffm.domain`, `ffm.arch`,
+`ffm-paysage.arch` — the level-0 file behind `#concepts:ffm`), so the
+Navigator always shows the regenerated models.
 
 ## Checking the converters
 
@@ -317,15 +389,17 @@ node scripts/check-arch-landscape.mjs path/to/x.arch
 
 The script needs only Node (no dependencies): it loads `domain-parser.js` and
 `domain-to-diagram.js` in a bare `vm` context, converts every module (with
-every category toggle) and every state machine of the model, validates the
+every category toggle), every context's concept diagram (every toggle on and
+off: no ghost, every card naming its home module, a model id no module
+shares) and every state machine of the model, validates the
 DiagramFiles against the contract (required fields, edge endpoints among the
 nodes, every `modelRef` resolving, no node positions, ghosts prefixed
 `ghost:`, one relation per edge), checks that `KINDS_FALLBACK` has not drifted
-from `KINDS` in `app.js`, prints counts, and writes the richest module and
-machine to `../diagram-engine/examples/diagrams/navigator-domain-class.json`
-and `navigator-statechart.json` as engine fixtures. Examples that elide the
-`organization` / `context` containers (business-loan) are wrapped in a
-synthetic one before parsing.
+from `KINDS` in `app.js`, prints counts, and writes the richest module,
+machine and context to `../diagram-engine/examples/diagrams/navigator-domain-class.json`,
+`navigator-statechart.json` and `navigator-context-concepts.json` as engine
+fixtures. Examples that elide the `organization` / `context` containers
+(business-loan) are wrapped in a synthetic one before parsing.
 
 `check-arch-export.mjs` does the same for the architecture converter: it
 parses the `.arch` (and its `domain-source`, for the `domainRef` links),
@@ -342,7 +416,7 @@ passed on the command line is validated only, never written — client
 models stay out of the engine repository.
 
 `check-arch-landscape.mjs` checks an `organization` file as the Navigator
-reads it, and writes nothing: it parses the `.arch` and its `domain-source`s
+reads it: it parses the `.arch` and its `domain-source`s
 (looked up next to it), applies the level-0 rules that need no judgment (flow
 numbers unique, `to` naming an end of its dependency, declared areas, phases
 and persons, one dependency per ordered pair, known patterns and criticality,
@@ -350,8 +424,15 @@ and persons, one dependency per ordered pair, known patterns and criticality,
 by a Conformist downstream, a hotspot concerning flows of its own system, a
 concept mastered by one system at most…), resolves every concept reference
 with `arch-concepts.js` — each one resolves to exactly one domain element or
-is acknowledged by a `// NOTE:` — prints the counts and exits non-zero on a
-violation.
+is acknowledged by a `// NOTE:` — then converts the organization into the
+concept landscape with every toggle combination and checks the group
+contract (parents before members, `er-group` iff members, every system drawn
+once, every resolved `masters` / `handles` reference one card inside its
+system, every dependency between drawn systems one edge between the system
+nodes, flows and the unplaced group only when toggled on), prints the counts
+and exits non-zero on a violation. For the default example it writes the
+default conversion to `../diagram-engine/examples/diagrams/navigator-concept-landscape.json`;
+a file passed on the command line is checked only.
 
 ## Run
 
@@ -365,14 +446,22 @@ Deep links work: `http://localhost:8347/#rh.rides.RideRequest`,
 
 ## Loading real `.domain` files
 
-At boot the app fetches the files listed in `DOMAIN_FILES` (top of `app.js`),
-parses them with `domain-parser.js` (a tolerant structural reader for the v3
-DSL — comments stripped, brace-scoped block tree, headers matched by pattern),
-and adds each as an organization in the header picker. Registered by default are
-the `fipro.*` client models, which are **not** in this repo (they are gitignored)
-— a missing file is skipped with a console warning, so the app boots on the
-`data.js` samples alone. For a tracked model to browse, copy one out of
-`examples/` (e.g. `business-loan.domain` + `business-loan.sysreq`) into `ui/`.
+At boot the app asks the server for the model manifest (`GET api/models` →
+`{ tenant, files: [{ org, name, kind }] }`) and fetches each file at
+`api/models/<org>/<name>`. `serve.sh` builds the manifest from the `.domain`,
+`.sysreq` and `.arch` files in `ui/` (one organization, `local`; cloud-sync
+`*_Conflict.*` copies are skipped); the hosted Worker (`hosting/`) builds it
+from the files published for the signed-in tenant, restricted to the
+organizations that user may see. Files are loaded by kind — `.domain`, then
+`.sysreq`, then `.arch` — in name order; each `.domain` is parsed by
+`domain-parser.js` (a tolerant structural reader for the v3 DSL — comments
+stripped, brace-scoped block tree, headers matched by pattern) and added as an
+organization in the header picker, after the `data.js` samples. With nothing
+listed at all the app shows an empty state; with `.arch` or `.sysreq` files but
+no `.domain`, the two domain tabs are disabled. Client models are **not** in
+this repo (they are gitignored); for a tracked model to browse, copy or link
+one out of `examples/` (e.g. `business-loan.domain` + `business-loan.sysreq`)
+into `ui/`.
 
 The reader follows the grammar's elisions: a definition written on one line is
 read like its multi-line form; definitions written directly under a `context`
@@ -385,9 +474,9 @@ share an id; the first one is the one the app opens. Still not read: one-line
 sub-blocks (`fields { … }`, `entities { … }`) inside a definition laid out
 over several lines, so such an aggregate shows no contained entities.
 
-To add another model, drop the file in `ui/` and append its name to
-`DOMAIN_FILES` (`.arch` files: `ARCH_FILES`; a missing file is skipped with a
-console warning). Cross-references are resolved by name within the bounded
+To add another model, drop the file in `ui/` and reload: the manifest lists
+it (a file that fails to load is skipped with a console warning).
+Cross-references are resolved by name within the bounded
 context; command→operation→event chains are back-linked automatically
 (`"Label" on Command` gives the command its `targets`/`triggers`/`produces`,
 and `emits` gives each event its `raised by`).
@@ -422,6 +511,10 @@ and `emits` gives each event its `raised by`).
   `retail-media.domain` — local symlinks to the public `examples/` samples
   (git-ignored, see above)
 - `app.js` — vanilla JS rendering, no build step; mounts the engine islands
+- `serve.sh` — local server: the static files plus the model manifest (`api/models`)
+- `hosting/` — the Cloudflare Worker that serves this app to a client's
+  readers behind Cloudflare Access (its own README; design in
+  `proposals/navigator-hosting.md`)
 - `vendor/specy-diagram-engine.js` — the Specy Diagram Engine bundle
   (built in `../diagram-engine` with `npm run build`, copied here)
 - `scripts/check-diagram-export.mjs` — converter contract check + engine fixtures

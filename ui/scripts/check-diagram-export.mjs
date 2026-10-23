@@ -61,12 +61,28 @@ function wrapIfElided(text, fileStem) {
 const errors = [];
 const err = (file, msg) => errors.push(`${file.model.id}: ${msg}`);
 
-const classFiles = [], smFiles = [];
+const classFiles = [], smFiles = [], contextFiles = [];
 const moduleIds = new Set();
 for (const c of org.contexts)
   for (const m of c.modules) moduleIds.add(D.moduleModelId(m, c, org.id));
 
 for (const c of org.contexts) {
+  /* the context's concept diagram: every module at once, so no ghost — a
+     cross-module endpoint is a card of its own; checked with the default
+     (entities only) and with every category toggle on and off */
+  const ctxElementIds = new Set(c.modules.flatMap(x => x.elements.map(e => e.id)));
+  const ctxFile = D.contextClassDiagram(c, D.CONCEPTS_SHOW, org.id);
+  contextFiles.push({ file: ctxFile, ctx: c });
+  validate(ctxFile, "domain-class", { moduleIds, contextElementIds: ctxElementIds, context: c });
+  if (ctxFile.model.id !== D.contextModelId(c, org.id)) err(ctxFile, "model id ≠ contextModelId");
+  if (moduleIds.has(ctxFile.model.id)) err(ctxFile, "context model id collides with a module model id");
+  for (const cat of Object.keys(D.DEFAULT_SHOW)) {
+    for (const on of [true, false]) {
+      const show = Object.assign({}, D.CONCEPTS_SHOW, { [cat]: on });
+      validate(D.contextClassDiagram(c, show, org.id), "domain-class", { moduleIds, contextElementIds: ctxElementIds, context: c, silentCounts: true });
+    }
+  }
+  validate(D.contextClassDiagram(c, D.DEFAULT_SHOW, org.id), "domain-class", { moduleIds, contextElementIds: ctxElementIds, context: c, silentCounts: true });
   for (const m of c.modules) {
     const file = D.moduleClassDiagram(m, c, D.DEFAULT_SHOW, org.id);
     classFiles.push({ file, mod: m, ctx: c });
@@ -98,6 +114,13 @@ function validate(file, metamodel, opts) {
     if (F.diagram[k] == null) err(F, "diagram." + k + " missing");
   if (!F.diagram.layout || F.diagram.layout.engine !== "dagre") err(F, "diagram.layout hint missing");
   if (!F.diagram.id.startsWith(F.model.id + "#")) err(F, "diagram.id must be <model id>#…");
+  /* a context diagram holds the whole context: no ghost, every visible
+     element of every module drawn once, with its home module named */
+  if (opts.context) {
+    if (!F.diagram.id.endsWith("#concepts")) err(F, "context diagram id must end with #concepts");
+    if (F.diagram.nodes.some(n => n.type === "ghost-card")) err(F, "context diagram draws a ghost");
+    for (const n of F.diagram.nodes) if (n.type === "class-card" && !n.data.module) err(F, `node ${n.id} without its home module`);
+  }
 
   const elIds = new Set(), relIds = new Set(), nodeIds = new Set();
   for (const e of F.model.elements) {
@@ -186,6 +209,9 @@ console.log(`class diagrams: ${totalNodes} nodes (${totalGhosts} ghosts), ${tota
 console.log(`  relations by type: ${Object.entries(relTypes).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}=${v}`).join("  ")}`);
 for (const { file } of classFiles)
   console.log(`  ${file.model.id.padEnd(44)} ${String(file.diagram.nodes.length).padStart(3)} nodes ${String(file.diagram.edges.length).padStart(3)} edges`);
+console.log(`context concept diagrams (entities / aggregates, every module at once):`);
+for (const { file, ctx } of contextFiles)
+  console.log(`  ${file.model.id.padEnd(44)} ${String(file.diagram.nodes.length).padStart(3)} nodes ${String(file.diagram.edges.length).padStart(3)} edges  (${ctx.modules.length} module${ctx.modules.length > 1 ? "s" : ""})`);
 console.log(`statecharts:`);
 for (const { file } of smFiles)
   console.log(`  ${file.model.id.padEnd(60)} ${String(file.model.elements.length).padStart(3)} states ${String(file.diagram.edges.length).padStart(3)} transitions`);
@@ -207,13 +233,17 @@ if (process.argv[2]) {
 }
 const bestClass = classFiles.slice().sort((a, b) => b.file.diagram.edges.length - a.file.diagram.edges.length)[0];
 const bestSm = smFiles.slice().sort((a, b) => b.file.diagram.edges.length - a.file.diagram.edges.length)[0];
+const bestCtx = contextFiles.slice().sort((a, b) => b.file.diagram.edges.length - a.file.diagram.edges.length)[0];
 fs.mkdirSync(ENGINE_EXAMPLES, { recursive: true });
 const outClass = path.join(ENGINE_EXAMPLES, "navigator-domain-class.json");
 const outSm = path.join(ENGINE_EXAMPLES, "navigator-statechart.json");
+const outCtx = path.join(ENGINE_EXAMPLES, "navigator-context-concepts.json");
 fs.writeFileSync(outClass, JSON.stringify(bestClass.file, null, 2) + "\n");
 if (bestSm) fs.writeFileSync(outSm, JSON.stringify(bestSm.file, null, 2) + "\n");
+if (bestCtx) fs.writeFileSync(outCtx, JSON.stringify(bestCtx.file, null, 2) + "\n");
 console.log(`wrote ${outClass}  (${bestClass.file.model.id})`);
 if (bestSm) console.log(`wrote ${outSm}  (${bestSm.file.model.id})`);
 else console.log("no state machine found — navigator-statechart.json not written");
+if (bestCtx) console.log(`wrote ${outCtx}  (${bestCtx.file.model.id})`);
 
 function fail(msg) { console.error("FAIL: " + msg); process.exit(1); }

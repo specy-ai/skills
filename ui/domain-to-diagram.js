@@ -4,6 +4,10 @@
    bundle (vendor/specy-diagram-engine.js), per the normative contract
    diagram-engine/docs/DERIVED-DIAGRAMS.md:
      - moduleClassDiagram(mod, context, show, orgId?)  → metamodel "domain-class"
+     - contextClassDiagram(context, show, orgId?)      → metamodel "domain-class":
+       the main concepts of a whole bounded context on one canvas, every
+       module at once (default toggles CONCEPTS_SHOW: entities / aggregates
+       only), the same cards and relations as the module diagram
      - stateMachineDiagram(el, sm, hit?)               → metamodel "state-machine"
    The view half (layout, node components, edge routing) lives in the engine;
    this file is the model half of the former diagram.js.
@@ -64,12 +68,15 @@ const SpecyDomainDiagrams = (() => {
     "interface": "interfaces",
   };
   const DEFAULT_SHOW = { interfaces: true, entities: true, values: true, services: true };
+  /* the context diagram opens on the main concepts alone */
+  const CONCEPTS_SHOW = { interfaces: false, entities: true, values: false, services: false };
 
   const isVisible = (el, show) => {
     const cat = CATEGORY_OF[el.kind];
     return !!(cat && show[cat]);
   };
   const countVisible = (mod, show) => mod.elements.filter(el => isVisible(el, show || DEFAULT_SHOW)).length;
+  const countVisibleIn = (modules, show) => (modules || []).reduce((n, m) => n + countVisible(m, show), 0);
 
   const MAX_FIELDS = 12, MAX_OPS = 10, MAX_ENUM = 8;
 
@@ -85,14 +92,16 @@ const SpecyDomainDiagrams = (() => {
   const dotted = s => String(s == null ? "" : s).trim().replace(/[:/]+/g, ".");
   const slug = s => dotted(s).replace(/\s+/g, "-").replace(/[^\w.\-\[\]*]+/g, "-");
 
-  function moduleModelId(mod, context, orgId) {
+  function contextModelId(context, orgId) {
     const ctxId = String(context.id);
     const parts = [];
     if (orgId && ctxId !== orgId && !ctxId.startsWith(orgId + ":") && !ctxId.startsWith(orgId + "."))
       parts.push(orgId);
-    parts.push(ctxId, mod.name);
+    parts.push(ctxId);
     return parts.map(dotted).join(".");
   }
+  /* a module always adds a segment, so a context id never collides with a module id */
+  const moduleModelId = (mod, context, orgId) => contextModelId(context, orgId) + "." + dotted(mod.name);
 
   /* State machine: <element id>.<machine name> — element ids are unique
      context-wide, which keeps the storage prefix unique per machine. */
@@ -171,37 +180,41 @@ const SpecyDomainDiagrams = (() => {
       kindShort: KIND_SHORT[el.kind] || k.title, color: k.color };
   };
 
-  /* ============ Module class diagram ============ */
+  /* ============ Class diagrams: one module, or a whole context ============ */
 
-  function moduleClassDiagram(mod, context, show, orgId) {
-    show = show || DEFAULT_SHOW;
-    const modelId = moduleModelId(mod, context, orgId);
+  /* The class diagram of a scope — the modules whose elements are drawn.
+     One module: the module diagram, cross-module endpoints as ghosts. Every
+     module of the context: the context's concept diagram, no ghosts. */
+  function classDiagram(scope, context, show, orgId, ids) {
+    const { modelId, diagramId, name } = ids;
+    const inScope = new Set(scope.map(m => m.id));
 
     const byId = {};            // id → {el, mod} across the whole context
     const nameToId = {};        // element name → id (context-wide, mirrors the parser's byName)
     for (const m of context.modules)
       for (const e of m.elements) { byId[e.id] = { el: e, mod: m }; nameToId[e.name] = e.id; }
 
-    const els = mod.elements.filter(el => isVisible(el, show));
+    const els = scope.flatMap(m => m.elements.filter(el => isVisible(el, show)));
     const present = new Set(els.map(e => e.id));
 
     const invariantsByScope = {};
-    for (const inv of mod.elements.filter(e => e.kind === "invariant")) {
-      const scope = inv.scopedTo && inv.scopedTo.ref;
-      if (scope) (invariantsByScope[scope] = invariantsByScope[scope] || []).push(inv.name);
+    for (const inv of scope.flatMap(m => m.elements.filter(e => e.kind === "invariant"))) {
+      const scopeRef = inv.scopedTo && inv.scopedTo.ref;
+      if (scopeRef) (invariantsByScope[scopeRef] = invariantsByScope[scopeRef] || []).push(inv.name);
     }
 
     const relations = [], edges = [];
     const seen = new Set();
     const ghosts = new Map();   // element id → ghost node id
 
-    /* endpoint: visible in this module → itself; cross-module element of a
-       shown category → ghost card; hidden or unknown → edge dropped */
+    /* endpoint: visible in the scope → itself; element of a module outside
+       the scope, of a shown category → ghost card; hidden or unknown → edge
+       dropped */
     function endpoint(id) {
       if (!id || !byId[id]) return null;
       if (present.has(id)) return id;
       const hit = byId[id];
-      if (hit.mod.id === mod.id || !isVisible(hit.el, show)) return null;
+      if (inScope.has(hit.mod.id) || !isVisible(hit.el, show)) return null;
       if (!ghosts.has(id)) ghosts.set(id, "ghost:" + id);
       return ghosts.get(id);
     }
@@ -259,11 +272,12 @@ const SpecyDomainDiagrams = (() => {
     }
 
     /* ---- model elements + class-card nodes (no positions: the engine lays out) ---- */
-    const elements = els.map(el => ({ id: el.id, type: el.kind, data: elementData(el, mod, invariantsByScope) }));
+    const elements = els.map(el => ({ id: el.id, type: el.kind, data: elementData(el, byId[el.id].mod, invariantsByScope) }));
     const nodes = els.map(el => ({
       id: el.id, type: "class-card",
       data: Object.assign({ modelRef: { modelId, elementId: el.id } }, nodeKindData(el), {
         description: el.description || "",
+        module: byId[el.id].mod.name,
         compartments: compartmentsFor(el, byId, invariantsByScope),
       }),
     }));
@@ -278,9 +292,23 @@ const SpecyDomainDiagrams = (() => {
 
     return {
       version: 1,
-      model: { id: modelId, name: mod.name, metamodel: "domain-class", elements, relations },
-      diagram: { id: modelId + "#class", name: mod.name, layout: Object.assign({}, CLASS_LAYOUT), nodes, edges },
+      model: { id: modelId, name, metamodel: "domain-class", elements, relations },
+      diagram: { id: diagramId, name, layout: Object.assign({}, CLASS_LAYOUT), nodes, edges },
     };
+  }
+
+  /* one module: cross-module endpoints are ghosts */
+  function moduleClassDiagram(mod, context, show, orgId) {
+    const modelId = moduleModelId(mod, context, orgId);
+    return classDiagram([mod], context, show || DEFAULT_SHOW, orgId,
+      { modelId, diagramId: modelId + "#class", name: mod.name });
+  }
+
+  /* the whole context at once — its main concepts by default (CONCEPTS_SHOW) */
+  function contextClassDiagram(context, show, orgId) {
+    const modelId = contextModelId(context, orgId);
+    return classDiagram(context.modules.slice(), context, show || CONCEPTS_SHOW, orgId,
+      { modelId, diagramId: modelId + "#concepts", name: `${context.name} — concepts` });
   }
 
   /* ============ UML statechart per entity / aggregate machine ============ */
@@ -332,10 +360,10 @@ const SpecyDomainDiagrams = (() => {
   }
 
   return {
-    moduleClassDiagram, stateMachineDiagram,
-    moduleModelId, machineModelId, compartmentsFor,
-    MAIN_KINDS, CATEGORY_OF, DEFAULT_SHOW, KIND_SHORT, KINDS_FALLBACK,
-    isVisible, countVisible,
+    moduleClassDiagram, contextClassDiagram, stateMachineDiagram,
+    moduleModelId, contextModelId, machineModelId, compartmentsFor,
+    MAIN_KINDS, CATEGORY_OF, DEFAULT_SHOW, CONCEPTS_SHOW, KIND_SHORT, KINDS_FALLBACK,
+    isVisible, countVisible, countVisibleIn,
   };
 })();
 

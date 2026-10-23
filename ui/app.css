@@ -91,6 +91,24 @@ html, body {
 .org-picker select:focus-visible { outline: 2px solid var(--fg-accent); outline-offset: 1px; border-radius: var(--r-1); }
 .org-picker select option { color: var(--fg-default); background: var(--bg-default); }
 
+/* who is signed in (app.js loadMe); hidden until the server answers */
+.user-menu {
+  display: flex; align-items: center; gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  padding-left: var(--sp-3);
+  border-left: 1px solid var(--border-on-dark);
+}
+.user-menu[hidden] { display: none; }
+.user-menu .user-name { color: var(--fg-on-dark); font-weight: var(--weight-semi); }
+.user-menu .user-tenant { color: var(--fg-on-dark-muted); font-size: 11px; }
+.user-menu .user-signout {
+  color: var(--fg-on-dark-muted); text-decoration: none;
+  font-size: 10px; font-weight: var(--weight-semi);
+  letter-spacing: var(--tracking-wider); text-transform: uppercase;
+  margin-left: var(--sp-2);
+}
+.user-menu .user-signout:hover { color: var(--fg-on-dark); text-decoration: underline; }
+
 /* ============ Tree panel ============ */
 .tree-panel {
   grid-area: tree;
@@ -172,6 +190,21 @@ html, body {
 }
 .badge.lg { width: 26px; height: 26px; font-size: var(--fs-xs); }
 
+/* ---- Diagram view: the scope rows — the organization entry above the
+   context dropdown (#tree-top, Domain Diagram tab only) and the context
+   entry above the module rows. Tree rows, bled to the panel edges so the
+   selection accent sits where the tree's does. ---- */
+.tree-top:empty { display: none; }
+.tree-top .scope-row { margin: 0 calc(-1 * var(--sp-3)); width: auto; }
+.scope-row .row-hint { font-size: 10px; margin-left: 2px; }
+.scope-row[disabled] { cursor: default; color: var(--fg-subtle); }
+.scope-row[disabled]:hover { background: transparent; }
+.scope-row[disabled] .badge { opacity: .45; }
+.org-row { flex-wrap: wrap; row-gap: 0; }
+.org-row .row-name { flex: 1 1 auto; }
+.org-row .row-hint { flex: 0 0 100%; margin-left: 37px; }   /* under the name: past the caret and the badge */
+a.diagram-open { text-decoration: none; display: inline-flex; align-items: center; }
+
 .tree-group-label {
   padding: var(--sp-2) var(--sp-3) 2px calc(var(--sp-2) + var(--indent, 0px));
   font-size: 9.5px; font-weight: var(--weight-bold);
@@ -207,6 +240,9 @@ html, body {
 }
 .arch-swatch.dashed { border-style: dashed; border-width: 1.5px; }
 .arch-swatch.none { visibility: hidden; }
+/* a concept card of the concept landscape: white, its domain kind on the left bar */
+.arch-swatch.concept-swatch { background: #fff; border-color: #5b7bb5; box-shadow: inset 3px 0 0 var(--bar); }
+.arch-swatch.concept-swatch.note { background: #f4f4f4; border: 1.5px dashed #9a9a9a; box-shadow: none; }
 .tree-hint {
   padding: 2px var(--sp-3) 4px calc(var(--sp-2) + 16px);
   font-size: 11px; color: var(--fg-muted);
@@ -228,6 +264,11 @@ html, body {
   margin: 0;
   padding: var(--sp-4) var(--sp-5) var(--sp-8);
 }
+/* nothing listed by the server (app.js renderEmpty) */
+.empty-state { padding-top: var(--sp-8); color: var(--fg-muted); max-width: 520px; }
+.empty-state h2 { font-family: var(--font-serif); font-weight: 500; color: var(--fg); margin: 0 0 var(--sp-2); }
+.empty-state p { margin: 0; line-height: 1.5; }
+.tab:disabled { opacity: 0.4; cursor: default; }
 
 .breadcrumb {
   font-family: var(--font-mono); font-size: 11px;
@@ -513,6 +554,10 @@ code.inline {
   cursor: pointer;
 }
 .diag-opt input:focus-visible { outline: 2px solid var(--fg-accent); outline-offset: 1px; }
+/* the legend toggle (app.js `legendToggleHtml`): about the view, not what is drawn */
+.diag-opt-legend { padding-left: var(--sp-3); border-left: 1px solid var(--border-default); }
+.legend-hidden .diagram-wrap .land-legend,
+.legend-hidden .diagram-wrap .specy-legend { display: none; }
 
 /* Detail switch — no animation: a tool snaps */
 @media (prefers-reduced-motion: reduce) {

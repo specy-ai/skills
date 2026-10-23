@@ -43,16 +43,18 @@ const GROUPS = [
 ];
 
 /* ---- .domain / .sysreq / .arch files loaded at boot ----
+   The server lists them at `api/models` — `{ tenant, files: [{ org, name,
+   kind }] }` — and serves each one at `api/models/<org>/<name>`. Locally
+   `serve.sh` lists the model files of ui/ under the one organization "local";
+   hosted, the Worker (ui/hosting/) lists the files published for the
+   signed-in tenant, restricted to the organizations that user may see. Files
+   are loaded by kind (.domain, then .sysreq, then .arch) in name order.
    Always revalidated with the server (304 when unchanged): an edited model
-   must never be read from a stale HTTP cache next to newer code. */
-const NO_CACHE = { cache: "no-cache" };
-const DOMAIN_FILES = ["fipro.domain", "fipro.refactored.domain", "ffm.domain", "url-shortener.domain", "retail-media.domain"];
-const SYSREQ_FILES = ["fipro.sysreq"];
-const ARCH_FILES = [
-  "ffm.arch",            // FFM landscape: 11 systems merged by scripts/merge-arch.mjs from ffm.arch-sources/
-  "url-shortener.arch",  // public sample (symlink to examples/)
-  "retail-media.arch",   // public sample, an `organization` file — level 0 (symlink to examples/)
-];
+   must never be read from a stale HTTP cache next to newer code. The
+   X-Requested-With header makes an expired hosted session answer 401 instead
+   of redirecting a fetch to a login page. */
+const MODELS_API = "api/models";
+const NO_CACHE = { cache: "no-cache", headers: { "X-Requested-With": "XMLHttpRequest" } };
 
 const ARCHS = [];            // parsed .arch architectures (arch-parser.js)
 
@@ -129,13 +131,17 @@ buildIndex();
 /* ---- State ---- */
 const state = {
   view: "domain",            // "domain" | "diagram" | "arch" | "req"
-  orgId: MODEL.organizations[0].id,
-  ctxId: MODEL.organizations[0].contexts[0].id,
-  selected: "ctx:" + MODEL.organizations[0].contexts[0].id,
+  /* null until boot when data.js ships no sample (the hosted build) */
+  orgId: MODEL.organizations[0]?.id ?? null,
+  ctxId: MODEL.organizations[0]?.contexts[0]?.id ?? null,
+  selected: MODEL.organizations[0] ? "ctx:" + MODEL.organizations[0].contexts[0].id : null,
   reqSetId: null,
   reqSelected: null,
   diagramModId: null,        // module rendered in the diagram view
   diagramShow: { interfaces: true, entities: true, values: true, services: true },
+  diagramScope: "module",    // diagram view: "module" (one module) | "context" (every concept of the context) | "org" (the concepts by system)
+  conceptShow: null,         // category toggles of the context diagram (seeded from SpecyDomainDiagrams.CONCEPTS_SHOW)
+  conceptLandShow: {},       // toggles of the organization diagram the user changed (defaults: CONCEPT_LANDSCAPE_DEFAULT_SHOW)
   archId: null,              // architecture rendered in the arch view
   archShow: { persons: true, externalSystems: true, channels: true, edgeLabels: true },
   archSel: null,             // "kind:name" of the element selected in the arch view (tree or canvas)
@@ -152,6 +158,14 @@ const curArch = () => ARCHS.find(a => a.id === state.archId) || ARCHS[0];
 
 const org = () => MODEL.organizations.find(o => o.id === state.orgId);
 const ctx = () => org().contexts.find(c => c.id === state.ctxId) || org().contexts[0];
+/* Enters an organization: its first context selected, nothing unfolded. */
+function enterOrg(o) {
+  state.orgId = o.id;
+  state.ctxId = o.contexts[0].id;
+  state.selected = "ctx:" + state.ctxId;
+  state.diagramModId = null;
+  state.expanded.clear();
+}
 
 function kindOf(el) {
   if (el.kind === "event" && el.eventType) {
@@ -238,21 +252,30 @@ function treeRowSel({ id, name, k, depth, hint }) {
   </button>`;
 }
 
-/* Diagram view tree: one row per module of the current context */
+/* Diagram view tree: the context's concept diagram — every entity and
+   aggregate of the context at once — then one row per module */
+const CTX_BADGE = { label: "BC", title: "Bounded context — all its concepts", color: "#172741" };
 function renderDiagramTree() {
   const c = ctx();
   if (!c.modules.some(m => m.id === state.diagramModId))
     state.diagramModId = c.modules.length ? c.modules[0].id : null;
   const f = state.filter.trim().toLowerCase();
   const mods = c.modules.filter(m => !f || m.name.toLowerCase().includes(f));
+  const D = SpecyDomainDiagrams;
+  const concepts = c.modules.reduce((n, m) => n + m.elements.filter(e => D.CATEGORY_OF[e.kind] === "entities").length, 0);
+  const ctxSel = state.diagramScope === "context" ? " selected" : "";
+  let html = `<ul><li><button class="tree-row scope-row${ctxSel}" data-select="diagctx" style="--indent:0px" title="Every entity and aggregate of the context on one canvas, whatever its module">
+      <span class="caret leaf">▶</span>${badge(CTX_BADGE)}<span class="row-name">All concepts of ${esc(c.shortname || c.name)}</span>
+      <span class="row-count">${concepts}</span>
+    </button></li>`;
   if (!mods.length) {
-    document.getElementById("tree").innerHTML = `<div class="tree-empty">No module matches “${esc(state.filter)}”.</div>`;
+    document.getElementById("tree").innerHTML = html + `<li><div class="tree-empty">No module matches “${esc(state.filter)}”.</div></li></ul>`;
     return;
   }
-  let html = `<ul><li><div class="tree-group-label" style="--indent:0px">Modules</div></li>`;
+  html += `<li><div class="tree-group-label" style="--indent:0px">Modules</div></li>`;
   for (const mod of mods) {
-    const mains = mod.elements.filter(e => SpecyDomainDiagrams.MAIN_KINDS.has(e.kind)).length;
-    const sel = state.diagramModId === mod.id ? " selected" : "";
+    const mains = mod.elements.filter(e => D.MAIN_KINDS.has(e.kind)).length;
+    const sel = state.diagramScope === "module" && state.diagramModId === mod.id ? " selected" : "";
     html += `<li><button class="tree-row${sel}" data-select="diagmod:${esc(mod.id)}" style="--indent:0px" title="${esc(mod.description || mod.name)}">
       <span class="caret leaf">▶</span>${badge(KINDS.module)}<span class="row-name">${esc(mod.name)}</span>
       <span class="row-count">${mains}/${mod.elements.length}</span>
@@ -481,8 +504,7 @@ function renderArchTree() {
    system unfolds its main concepts (links into the Domain Navigator), the
    selected dependency its flows (a row jumps to the flow in the sheet). */
 function renderOrgTree(tree, a) {
-  const n = a.counts, res = archResolution(a), sum = res.summary;
-  const plural = (k, one, many) => `${k} ${k === 1 ? one : many || one + "s"}`;
+  const res = archResolution(a), sum = res.summary;
   const group = label => `<li><div class="tree-group-label" style="--indent:0px">${label}</div></li>`;
   const pick = (kind, id, label, count, title, depth) => {
     const key = `${kind}:${id}`;
@@ -499,24 +521,15 @@ function renderOrgTree(tree, a) {
       + (state.archSel === "system:" + s.name ? conceptRows(s, depth + 1) : "");
   };
 
-  /* how the concept names resolved */
-  let resolution;
-  if (!res.sources.length) resolution = `no <code class="inline">domain-source</code> — concept names are plain text`;
-  else if (!res.orgs.length) resolution = `domain-source ${res.sources.map(s => `<code class="inline">${esc(s)}</code>`).join(", ")} not loaded — concept names are plain text`;
-  else {
-    const c = sum ? sum.counts : { resolved: 0, ambiguous: 0, acknowledged: 0, unresolved: 0 };
-    const out = c.acknowledged + (res.missing.length ? 0 : c.unresolved);
-    const tip = sum ? `${sum.total} concept references: ${c.resolved} resolve to ${sum.distinct.resolved} domain elements`
-      + (sum.acknowledged.length ? `; acknowledged by a // NOTE: ${sum.acknowledged.map(k => `${k.name} ×${k.uses}`).join(", ")}` : "")
-      + (c.unresolved && !res.missing.length ? `; ${c.unresolved} unresolved` : "") : "";
-    resolution = `<span title="${esc(tip)}"><b>${c.resolved}</b> concepts linked · <b>${out}</b> not in the domain model${c.ambiguous ? ` · <b>${c.ambiguous}</b> ambiguous` : ""}</span>`
-      + (res.missing.length ? `<br>not loaded: ${res.missing.map(s => `<code class="inline">${esc(s)}</code>`).join(", ")}` : "");
-  }
+  /* why concept names are not linked, when they are not: the counts are the
+     tree's own (groups below, Problems), the file name is the picker's */
+  const resolution = !res.sources.length ? `no <code class="inline">domain-source</code> — concept names are plain text`
+    : !res.orgs.length ? `domain-source ${res.sources.map(s => `<code class="inline">${esc(s)}</code>`).join(", ")} not loaded — concept names are plain text`
+    : res.missing.length ? `not loaded: ${res.missing.map(s => `<code class="inline">${esc(s)}</code>`).join(", ")}` : "";
   let html = `<div class="arch-head">
       <div class="arch-name">${badge(ORG_BADGE)}<span>${esc(a.name)}</span></div>
       ${a.description ? `<p class="arch-desc">${esc(a.description)}</p>` : ""}
-      <p class="arch-source">organization · ${plural(n.systems, "system")} · ${plural(n.dependencies || 0, "dependency", "dependencies")} · ${plural(n.flows || 0, "flow")}${n.hotspots ? ` · ${plural(n.hotspots, "hotspot")}` : ""}</p>
-      <p class="arch-source arch-resolution">${resolution}</p>
+      ${resolution ? `<p class="arch-source arch-resolution">${resolution}</p>` : ""}
     </div>
     <ul class="arch-legend">`;
 
@@ -1058,8 +1071,22 @@ function mountDiagram(host, file, opts) {
   }
 }
 
-/* Diagram view fills the main panel with an engine-rendered module class diagram */
+/* ---- Legend: the strip above the organization diagrams, the engine's panel
+   under the class diagrams. The diagram bar's "legend" toggle hides it, in
+   every diagram at once; the choice is kept per browser ---- */
+const LEGEND_KEY = "specy-navigator:legend-hidden";
+let legendHidden = (() => { try { return localStorage.getItem(LEGEND_KEY) === "1"; } catch (e) { return false; } })();
+document.body.classList.toggle("legend-hidden", legendHidden);
+function legendToggleHtml() {
+  return `<label class="diag-opt diag-opt-legend" title="Show or hide the legend"><input type="checkbox" data-legendopt="1"${legendHidden ? "" : " checked"}/>legend</label>`;
+}
+
+/* Diagram view fills the main panel with an engine-rendered class diagram:
+   one module, every concept of the context, or the organization's concepts
+   grouped by system (state.diagramScope) */
 function renderDiagramView(target) {
+  if (state.diagramScope === "org") { renderOrgConceptsView(target); return; }
+  if (state.diagramScope === "context") { renderContextConceptsView(target); return; }
   const c = ctx();
   const mod = c.modules.find(m => m.id === state.diagramModId) || c.modules[0];
   if (!mod) {
@@ -1068,15 +1095,14 @@ function renderDiagramView(target) {
   }
   state.diagramModId = mod.id;
   const show = state.diagramShow;
-  const shown = SpecyDomainDiagrams.countVisible(mod, show);
   const opts = [["interfaces", "interfaces"], ["entities", "entities / aggregates"], ["values", "values"], ["services", "services"]];
   target.innerHTML = `<div class="diagram-wrap">
     <div class="diagram-bar">
       ${badge(KINDS.module)}<span class="diagram-title">${esc(mod.name)}</span>
-      <span class="diagram-sub">${esc(c.shortname || c.name)} · ${shown} of ${mod.elements.length} elements</span>
       <span class="spacer"></span>
       <div class="diagram-opts">${opts.map(([key, label]) =>
         `<label class="diag-opt"><input type="checkbox" data-diagopt="${key}"${show[key] ? " checked" : ""}/>${esc(label)}</label>`).join("")}
+        ${legendToggleHtml()}
       </div>
       <button class="diagram-open" data-goto="mod:${esc(mod.id)}">open module detail ↗</button>
     </div>
@@ -1090,6 +1116,100 @@ function renderDiagramView(target) {
     fitView: true,
     logo: false,
     onNavigate: ref => { if (ref && ref.elementId) goto(ref.elementId); },
+  });
+}
+
+/* The context at once: every module's entities and aggregates (the other
+   categories by toggle) on one class diagram — SpecyDomainDiagrams.contextClassDiagram */
+function renderContextConceptsView(target) {
+  const c = ctx();
+  const D = SpecyDomainDiagrams;
+  if (!state.conceptShow) state.conceptShow = Object.assign({}, D.CONCEPTS_SHOW);
+  const show = state.conceptShow;
+  const shown = D.countVisibleIn(c.modules, show);
+  const opts = [["interfaces", "interfaces"], ["entities", "entities / aggregates"], ["values", "values"], ["services", "services"]];
+  target.innerHTML = `<div class="diagram-wrap">
+    <div class="diagram-bar">
+      ${badge(CTX_BADGE)}<span class="diagram-title">${esc(c.name)} — concepts</span>
+      <span class="spacer"></span>
+      <div class="diagram-opts">${opts.map(([key, label]) =>
+        `<label class="diag-opt"><input type="checkbox" data-conceptopt="${key}"${show[key] ? " checked" : ""}/>${esc(label)}</label>`).join("")}
+        ${legendToggleHtml()}
+      </div>
+      <button class="diagram-open" data-goto="ctx:${esc(c.id)}">open context map ↗</button>
+    </div>
+    <div id="flow" class="flow-host"></div>
+  </div>`;
+  if (!shown) {
+    document.getElementById("flow").innerHTML = `<div class="empty-state"><span class="brackets">[ ]</span>Nothing to draw with these toggles — this context has no element of the categories checked.</div>`;
+    return;
+  }
+  const file = D.contextClassDiagram(c, show, org().id);
+  mountDiagram(document.getElementById("flow"), file, {
+    storagePrefix: file.model.id,
+    interactive: true,
+    wheel: "pan",
+    fitView: true,
+    logo: false,
+    onNavigate: ref => { if (ref && ref.elementId) goto(ref.elementId); },
+  });
+}
+
+/* The organization: every concept a system masters or handles, as cards
+   inside the system's group, the systems grouped by area, the level-0
+   dependencies between them — SpecyArchDiagrams.conceptLandscapeDiagram on
+   the organization .arch whose domain-source is this model (conceptArchFor),
+   the concept names resolved as the Architecture diagram resolves them
+   (archResolution). Double-click a card (or its ⋯ menu) to open the domain
+   element; the browser's Back button returns here. */
+function renderOrgConceptsView(target) {
+  const o = org();
+  const a = conceptArchFor(o);
+  const D = SpecyArchDiagrams;
+  if (!a || typeof D.conceptLandscapeDiagram !== "function") {
+    target.innerHTML = `<div class="empty-state"><span class="brackets">[ ]</span>No level-0 architecture is loaded for this organization — an <code class="inline">organization</code> <code class="inline">.arch</code> whose <code class="inline">domain-source</code> is <code class="inline">${esc(o.id)}.domain</code>, listed in <code class="inline">ARCH_FILES</code> (top of app.js) — so its concepts cannot be grouped by system.</div>`;
+    return;
+  }
+  const res = archResolution(a);
+  const show = Object.assign({}, D.CONCEPT_LANDSCAPE_DEFAULT_SHOW, state.conceptLandShow);
+  const report = {};
+  let file = null;
+  try {
+    file = D.conceptLandscapeDiagram(a, show, { resolution: res.summary, domainOrgs: res.orgs, report });
+    if (!file || !file.model || !file.diagram) throw new Error("no DiagramFile returned");
+  } catch (e) {
+    console.error("concept landscape conversion failed for " + a.id + ".arch:", e);
+    target.innerHTML = `<div class="diagram-missing">Could not build the concept diagram of <code class="inline">${esc(a.id)}.arch</code>: ${esc(e && e.message ? e.message : e)}</div>`;
+    return;
+  }
+  const opts = [["externalSystems", "external systems"], ["handled", "handled concepts"], ["edgeLabels", "edge labels"], ["flows", "flows"], ["unplaced", "unplaced concepts"]];
+  const legend = kindLegendHtml(file, D.KIND_LEGEND) + landscapeLegendHtml(D.CONCEPT_LANDSCAPE_LEGEND);
+  target.innerHTML = `<div class="diagram-wrap">
+    <div class="diagram-bar arch-bar">
+      ${badge(ORG_BADGE)}<span class="diagram-title">Domain concepts by system</span>
+      <span class="spacer"></span>
+      <div class="diagram-opts">${opts.map(([key, label]) =>
+        `<label class="diag-opt"><input type="checkbox" data-conceptlandopt="${key}"${show[key] ? " checked" : ""}/>${esc(label)}</label>`).join("")}
+        ${legendToggleHtml()}
+      </div>
+      <a class="diagram-open" href="#arch:${esc(a.id)}" title="The same organization as a system landscape, in the Architecture diagram">open landscape ↗</a>
+    </div>
+    <div class="land-legend">
+      <span class="land-legend-text"><b>A system holds the concepts it masters</b> (solid cards: its source of truth) <b>and handles</b> (dashed: owned by another system). <b>An arrow means “depends on”</b>: A <span class="sm-arrow">→</span> B reads “A depends on B”. Fold the systems (Groups 1) to get the landscape back.</span>
+      ${legend ? `<span class="land-legend-items">${legend}</span>` : ""}
+    </div>
+    <div id="flow" class="flow-host"></div>
+  </div>`;
+  mountDiagram(document.getElementById("flow"), file, {
+    storagePrefix: D.conceptLandscapeModelIdOf(a),
+    interactive: true,
+    wheel: "pan",
+    fitView: true,
+    logo: false,
+    onNavigate: (ref, node) => {
+      const d = node && node.data && node.data.domainRef;
+      if (d && INDEX[d.id]) goto(d.id);
+    },
   });
 }
 
@@ -1107,12 +1227,10 @@ function renderArchView(target) {
   state.archId = a.id;
   if (archModeOf(a) === "landscape" && renderLandscapeView(target, a)) return;
   const show = state.archShow;
-  const n = a.counts;
   const opts = [["persons", "persons"], ["externalSystems", "external systems"], ["channels", "channels"], ["edgeLabels", "edge labels"]];
   target.innerHTML = `<div class="diagram-wrap">
     <div class="diagram-bar arch-bar">
       ${badge(ARCH_BADGE)}<span class="diagram-title">${esc(archTitle(a))}</span>
-      <span class="diagram-sub">${esc(a.id)}.arch · ${a.systems.length > 1 ? `${n.systems} systems · ` : ""}${n.containers} containers · ${n.components} components · ${n.connectors} connectors</span>
       <span class="spacer"></span>
       ${archModeSwitch(a, "c4")}
       <div class="diagram-opts">${opts.map(([key, label]) =>
@@ -1192,8 +1310,8 @@ function archModeSwitch(a, mode) {
    printed as line samples. The converter owns the encoding; this reads a
    list or a keyed map of { label, stroke | color, strokeDasharray | dash,
    strokeWidth | width, description } tolerantly. */
-function landscapeLegendHtml() {
-  const legend = SpecyArchDiagrams.LANDSCAPE_LEGEND;
+function landscapeLegendHtml(legend) {
+  legend = legend || SpecyArchDiagrams.LANDSCAPE_LEGEND;
   if (!legend || typeof legend !== "object") return "";
   const items = Array.isArray(legend) ? legend
     : Object.entries(legend).map(([key, v]) => (v && typeof v === "object" ? Object.assign({ key }, v) : { key, label: String(v) }));
@@ -1206,6 +1324,31 @@ function landscapeLegendHtml() {
     const tip = it.description || it.meaning || "";
     return `<span class="land-legend-item"${tip ? ` title="${esc(tip)}"` : ""}><svg width="28" height="8" viewBox="0 0 28 8" aria-hidden="true"><line x1="1" y1="4" x2="27" y2="4" stroke="${esc(stroke)}" stroke-width="${width}"${dash ? ` stroke-dasharray="${esc(dash)}"` : ""}/></svg>${esc(label)}</span>`;
   }).join("");
+}
+
+/* The kinds of card and group a level-0 diagram draws, said once in the
+   legend strip, as arch-landscape.css shows no eyebrow on them. `legend`
+   maps a node kind to { label, color, border, dashed }; a concept card is
+   said by its domain kind, the colour of its left bar (KINDS), in the order
+   of the tree's GROUPS, the kinds of one colour in one item; a name with no
+   domain element by its grey card. */
+function kindLegendHtml(file, legend) {
+  const data = new Map(file.model.elements.map(e => [e.id, e.data || {}]));
+  const kinds = [], domainKinds = new Set();   // node kinds in drawing order; domain kinds of the concept cards
+  let notes = false;
+  for (const node of file.diagram.nodes) {
+    const d = node.data || {}, el = data.get(d.modelRef && d.modelRef.elementId) || {};
+    if (d.kind === "concept" && KINDS[el.domainKind]) domainKinds.add(el.domainKind);
+    else if (d.kind === "concept-note") notes = true;
+    else if (legend[d.kind] && !kinds.includes(d.kind)) kinds.push(d.kind);
+  }
+  const bars = new Map();   // bar colour → domain kind titles
+  for (const k of GROUPS.flatMap(([, ks]) => ks).filter(k => domainKinds.has(k)))
+    bars.set(KINDS[k].color, (bars.get(KINDS[k].color) || []).concat(KINDS[k].title));
+  const item = (swatch, label) => `<span class="land-legend-item">${swatch}${esc(label)}</span>`;
+  return kinds.map(k => item(`<span class="arch-swatch${legend[k].dashed ? " dashed" : ""}" style="background:${esc(legend[k].color)};border-color:${esc(legend[k].border)}"></span>`, legend[k].label.toLowerCase())).join("")
+    + [...bars].map(([color, titles]) => item(`<span class="arch-swatch concept-swatch" style="--bar:${esc(color)}"></span>`, titles.join(" / ").toLowerCase())).join("")
+    + (notes ? item(`<span class="arch-swatch concept-swatch note"></span>`, "not in the domain model") : "");
 }
 
 /* Organization view (level 0): the landscape — systems grouped by area with
@@ -1228,18 +1371,19 @@ function renderLandscapeView(target, a) {
     renderTree();
     return false;
   }
-  const n = a.counts;
-  const drawn = typeof D.landscapeCountVisible === "function" ? D.landscapeCountVisible(a, show) : null;
   const opts = [["externalSystems", "external systems"], ["persons", "persons"], ["edgeLabels", "edge labels"], ["concepts", "concepts"]];
-  const legend = landscapeLegendHtml();
+  /* the concepts a system masters are its card's first row, set bold, with no key */
+  const mastered = show.concepts && a.systems.concat(show.externalSystems ? a.externalSystems : []).some(s => s.masters.length)
+    ? `<span class="land-legend-item"><b>Bold</b>&nbsp;concepts: the system is their source of truth (masters)</span>` : "";
+  const legend = kindLegendHtml(file, D.LANDSCAPE_KIND_LEGEND) + mastered + landscapeLegendHtml();
   target.innerHTML = `<div class="diagram-wrap">
     <div class="diagram-bar arch-bar">
       ${badge(ORG_BADGE)}<span class="diagram-title">${esc(a.name)}</span>
-      <span class="diagram-sub">${esc(a.id)}.arch · ${n.systems} systems${a.areas.length ? ` in ${a.areas.length} areas` : ""} · ${n.dependencies} dependencies · ${n.flows} flows${drawn != null ? ` · ${drawn} cards` : ""}</span>
       <span class="spacer"></span>
       ${archModeSwitch(a, "landscape")}
       <div class="diagram-opts">${opts.map(([key, label]) =>
         `<label class="diag-opt"><input type="checkbox" data-landopt="${key}"${show[key] ? " checked" : ""}/>${esc(label)}</label>`).join("")}
+        ${legendToggleHtml()}
       </div>
     </div>
     <div class="land-legend">
@@ -1871,6 +2015,48 @@ function renderContextSelect() {
     sel.innerHTML = org().contexts.map(c =>
       `<option value="${esc(c.id)}"${c.id === state.ctxId ? " selected" : ""}>${esc(c.name)} (${esc(c.shortname)})</option>`).join("");
   }
+  renderTreeTop();
+}
+
+/* ---- Diagram view: the organization-wide entry above the context dropdown ----
+   The domain concepts grouped by system come from the level-0 `.arch` (an
+   `organization` file) whose `domain-source` is this organization — the
+   first one loaded through ARCH_FILES. */
+function conceptArchFor(o) {
+  if (typeof SpecyArchConcepts === "undefined" || !o) return null;
+  return ARCHS.find(a => isOrgArch(a) && SpecyArchConcepts.domainSources(a).some(s => SpecyArchConcepts.domainStem(s) === o.id)) || null;
+}
+function renderTreeTop() {
+  const top = document.getElementById("tree-top");
+  if (state.view !== "diagram") { top.innerHTML = ""; return; }
+  const o = org();
+  const a = conceptArchFor(o);
+  const sel = state.diagramScope === "org" ? " selected" : "";
+  const hint = a ? `${a.id}.arch` : `no level-0 .arch names ${o.id}.domain — list one in ARCH_FILES`;
+  const tip = a ? "Every concept a system masters or handles, grouped by system, with the dependencies between the systems (level 0)"
+    : "Load an organization .arch (level 0) whose domain-source is this model to group its concepts by system";
+  top.innerHTML = `<button class="tree-row scope-row org-row${sel}" data-select="diagorg"${a ? "" : " disabled"} title="${esc(tip)}">
+    <span class="caret leaf">▶</span>${badge(ORG_BADGE)}<span class="row-name">Domain concepts by system</span>
+    <span class="row-hint">${esc(hint)}</span>
+  </button>`;
+}
+/* deep link of what the diagram view shows */
+function diagramHash() {
+  if (state.diagramScope === "org") return "#concepts:" + org().id;
+  if (state.diagramScope === "context" || !state.diagramModId) return "#concepts:ctx:" + ctx().id;
+  return "#concepts:mod:" + state.diagramModId;
+}
+function syncDiagramHash() {
+  if (state.view === "diagram") history.replaceState(null, "", diagramHash());
+}
+/* what the "back to …" link of the Domain Navigator names */
+function diagramReturn() {
+  const o = org();
+  if (!o) return null;
+  const label = state.diagramScope === "org" ? `${o.name} — concepts by system`
+    : state.diagramScope === "context" ? `${ctx().name} — concepts`
+    : `${(INDEX["mod:" + state.diagramModId] || { mod: { name: "module" } }).mod.name} — class diagram`;
+  return { hash: diagramHash(), label };
 }
 
 function renderAll() {
@@ -1889,7 +2075,7 @@ function goto(id) {
      holds the current `#arch:…` deep link, so Back returns there — and
      remembers the place for the "back to …" link; elsewhere the entry is
      replaced, as before */
-  const back = state.view === "arch" ? archReturn() : null;
+  const back = state.view === "arch" ? archReturn() : state.view === "diagram" ? diagramReturn() : null;
   if (back) state.returnTo = back;
   selectById(id, hit);
   if (back) history.pushState(null, "", "#" + id);
@@ -1931,6 +2117,28 @@ function applyHash(hash) {
     state.archSel = tail || null;
     return true;
   }
+  /* `#concepts:<org id>` — the organization's concepts by system;
+     `#concepts:ctx:<context id>` — every concept of a context;
+     `#concepts:mod:<module id>` — one module's class diagram */
+  if (hash.startsWith("concepts:")) {
+    const rest = hash.slice("concepts:".length);
+    const m = rest.match(/^(ctx|mod):(.+)$/);
+    if (m) {
+      const key = m[1] + ":" + m[2], hit = INDEX[key];
+      if (!hit || !hit.ctx) return false;
+      selectById(key, hit);
+      state.view = "diagram";
+      state.diagramScope = m[1] === "mod" ? "module" : "context";
+      if (m[1] === "mod") state.diagramModId = m[2];
+      return true;
+    }
+    const o = MODEL.organizations.find(x => x.id === rest);
+    if (!o) return false;
+    if (o.id !== state.orgId) enterOrg(o);
+    state.view = "diagram";
+    state.diagramScope = "org";
+    return true;
+  }
   const hit = hash && INDEX[hash];
   if (!hit) return false;
   selectById(hash, hit);
@@ -1939,9 +2147,9 @@ function applyHash(hash) {
 /* Back / Forward, a hash typed in the address bar, and the plain `#…` links
    of a diagram card's "⋯" menu (the app's own links go through goto) */
 window.addEventListener("hashchange", () => {
-  const back = state.view === "arch" ? archReturn() : null;
+  const back = state.view === "arch" ? archReturn() : state.view === "diagram" ? diagramReturn() : null;
   if (!applyHash(currentHash())) return;
-  if (state.view === "arch") state.returnTo = null;
+  if (state.view === "arch" || state.view === "diagram") state.returnTo = null;
   else if (back) state.returnTo = back;
   renderAll();
 });
@@ -1950,13 +2158,16 @@ window.addEventListener("hashchange", () => {
 document.addEventListener("click", e => {
   const tab = e.target.closest("[data-view]");
   if (tab) {
+    /* no .domain loaded (see boot): the two domain tabs have nothing to show */
+    if (!MODEL.organizations.length && tab.dataset.view !== "arch" && tab.dataset.view !== "req") return;
     state.view = tab.dataset.view;
     if (state.view === "req" && !state.reqSelected && REQSETS.length) {
       state.reqSetId = REQSETS[0].id;
       state.reqSelected = "reqset:" + REQSETS[0].id;
     }
-    if (state.view === "diagram" && !ctx().modules.some(m => m.id === state.diagramModId)) {
-      state.diagramModId = ctx().modules.length ? ctx().modules[0].id : null;
+    if (state.view === "diagram") {
+      if (!ctx().modules.some(m => m.id === state.diagramModId)) state.diagramModId = ctx().modules.length ? ctx().modules[0].id : null;
+      syncDiagramHash();
     }
     if (state.view === "arch") {
       if (!ARCHS.some(a => a.id === state.archId)) state.archId = ARCHS.length ? ARCHS[0].id : null;
@@ -2001,8 +2212,11 @@ document.addEventListener("click", e => {
   const row = e.target.closest("[data-select]");
   if (row) {
     const id = row.dataset.select;
-    if (id.startsWith("diagmod:")) {
-      state.diagramModId = id.slice("diagmod:".length);
+    if (id === "diagorg" || id === "diagctx" || id.startsWith("diagmod:")) {
+      state.diagramScope = id === "diagorg" ? "org" : id === "diagctx" ? "context" : "module";
+      if (id.startsWith("diagmod:")) state.diagramModId = id.slice("diagmod:".length);
+      syncDiagramHash();
+      renderTreeTop();
       renderTree();
       renderDetail();
       return;
@@ -2025,13 +2239,10 @@ document.addEventListener("click", e => {
 });
 
 document.getElementById("org-select").addEventListener("change", e => {
-  state.orgId = e.target.value;
-  state.ctxId = org().contexts[0].id;
-  state.selected = "ctx:" + state.ctxId;
-  state.diagramModId = null;
-  state.expanded.clear();
+  enterOrg(MODEL.organizations.find(o => o.id === e.target.value) || MODEL.organizations[0]);
   state.filter = "";
   document.getElementById("tree-filter").value = "";
+  syncDiagramHash();
   renderAll();
 });
 
@@ -2048,6 +2259,9 @@ document.getElementById("context-select").addEventListener("change", e => {
     state.selected = "ctx:" + state.ctxId;
     state.diagramModId = null;
     state.expanded.clear();
+    /* the dropdown picks a context: from the organization diagram it opens that context's concepts */
+    if (state.view === "diagram" && state.diagramScope === "org") state.diagramScope = "context";
+    syncDiagramHash();
   }
   renderAll();
 });
@@ -2058,11 +2272,23 @@ document.getElementById("tree-filter").addEventListener("input", e => {
 });
 
 /* Diagram header toggles: domain categories (data-diagopt), architecture
-   kinds / edge labels (data-archopt) and the landscape's (data-landopt) */
+   kinds / edge labels (data-archopt) and the landscape's (data-landopt); the
+   legend (data-legendopt) only shows or hides, nothing is redrawn */
 document.addEventListener("change", e => {
   const ds = e.target && e.target.dataset;
   if (!ds) return;
+  if (ds.legendopt) {
+    legendHidden = !e.target.checked;
+    document.body.classList.toggle("legend-hidden", legendHidden);
+    try { localStorage.setItem(LEGEND_KEY, legendHidden ? "1" : "0"); } catch (err) { /* private mode: the choice lasts the session */ }
+    return;
+  }
   if (ds.diagopt) state.diagramShow[ds.diagopt] = e.target.checked;
+  else if (ds.conceptopt) {
+    if (!state.conceptShow) state.conceptShow = Object.assign({}, SpecyDomainDiagrams.CONCEPTS_SHOW);
+    state.conceptShow[ds.conceptopt] = e.target.checked;
+  }
+  else if (ds.conceptlandopt) state.conceptLandShow[ds.conceptlandopt] = e.target.checked;
   else if (ds.archopt) state.archShow[ds.archopt] = e.target.checked;
   else if (ds.landopt) state.landShow[ds.landopt] = e.target.checked;
   else return;
@@ -2107,39 +2333,103 @@ document.addEventListener("keydown", e => {
   setArchPanelWidth(aside, Math.min(Math.max(aside.getBoundingClientRect().width + (e.key === "ArrowLeft" ? 32 : -32), 300), max));
 });
 
-/* ---- Boot: load .domain, .sysreq and .arch files, then honor a deep link ---- */
+/* ---- Boot: list the models, load them by kind, then honor a deep link ---- */
+async function listModels() {
+  try {
+    const res = await fetch(MODELS_API, NO_CACHE);
+    if (res.status === 401) { reloadForLogin(); return []; }
+    if (!res.ok) { console.warn(`could not list the models: HTTP ${res.status}`); return []; }
+    return ((await res.json()).files || []).filter(f => f && f.org && f.name);
+  } catch (e) {
+    console.warn("could not list the models:", e);
+    return [];
+  }
+}
+async function fetchModel(f) {
+  const res = await fetch(`${MODELS_API}/${encodeURIComponent(f.org)}/${encodeURIComponent(f.name)}`, NO_CACHE);
+  if (res.status === 401) reloadForLogin();
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  return res.text();
+}
+const kindOfFile = f => f.kind || (f.name.match(/\.(domain|sysreq|arch)$/) || [])[1];
+
+/* An expired hosted session: the fetches get 401 (X-Requested-With), a page
+   load gets the login page. At most one reload per minute, so a server that
+   kept answering 401 could not loop the browser. */
+function reloadForLogin() {
+  const key = "specy-nav:reload-at";
+  let last = 0;
+  try { last = Number(sessionStorage.getItem(key) || 0); } catch (e) { /* storage blocked: reload anyway */ }
+  if (Date.now() - last < 60000) return;
+  try { sessionStorage.setItem(key, String(Date.now())); } catch (e) { /* as above */ }
+  location.reload();
+}
+
+/* Header: who is signed in (api/me) and where "Sign out" goes; the menu stays
+   hidden when the server has no identity to show (a plain file server). */
+async function loadMe() {
+  const el = document.getElementById("user-menu");
+  if (!el) return;
+  try {
+    const res = await fetch("api/me", NO_CACHE);
+    if (res.status === 401) return reloadForLogin();
+    if (!res.ok) return;
+    const me = await res.json();
+    const name = me.user && (me.user.name || me.user.email);
+    if (!name) return;
+    el.innerHTML =
+      `<span class="user-name" title="${esc(me.user.email || "")}">${esc(name)}</span>` +
+      (me.tenant && me.tenant.name ? `<span class="user-tenant">${esc(me.tenant.name)}</span>` : "") +
+      (me.logoutUrl ? `<a class="user-signout" href="${esc(me.logoutUrl)}">Sign out</a>` : "");
+    el.hidden = false;
+  } catch (e) { /* no api/me here: no menu */ }
+}
+
+/* Nothing listed by the server (a hosted space with no published model yet):
+   an empty state instead of a navigator with nothing to navigate. */
+function renderEmpty() {
+  document.querySelector(".org-picker").style.visibility = "hidden";
+  document.querySelectorAll(".tab").forEach(t => { t.disabled = true; });
+  document.querySelector(".tree-head").style.display = "none";
+  document.getElementById("main").innerHTML =
+    `<div class="main-inner empty-state"><h2>No model published yet</h2>` +
+    `<p>Nothing is listed for this space. Once a model is published, reload this page.</p></div>`;
+}
+
 (async function boot() {
-  for (const file of DOMAIN_FILES) {
-    try {
-      const res = await fetch(file, NO_CACHE);
-      if (!res.ok) continue;
-      const org = parseDomain(await res.text(), file.replace(/\.domain$/, ""));
-      MODEL.organizations.push(org);
-    } catch (e) {
-      console.warn("could not load " + file + ":", e);
-    }
+  loadMe();
+  const files = await listModels();
+  const loaded = await Promise.all(files.map(f => fetchModel(f).then(text => ({ f, text }), error => ({ f, error }))));
+  const byKind = kind => loaded.filter(x => kindOfFile(x.f) === kind).sort((a, b) => a.f.name.localeCompare(b.f.name));
+  const stem = (f, ext) => f.name.slice(0, -ext.length);
+  for (const { f, text, error } of byKind("domain")) {
+    try { if (error) throw error; MODEL.organizations.push(parseDomain(text, stem(f, ".domain"))); }
+    catch (e) { console.warn("could not load " + f.name + ":", e); }
   }
-  for (const file of SYSREQ_FILES) {
-    try {
-      const res = await fetch(file, NO_CACHE);
-      if (!res.ok) continue;
-      REQSETS.push(...parseSysreq(await res.text(), file.replace(/\.sysreq$/, "")));
-    } catch (e) {
-      console.warn("could not load " + file + ":", e);
-    }
+  for (const { f, text, error } of byKind("sysreq")) {
+    try { if (error) throw error; REQSETS.push(...parseSysreq(text, stem(f, ".sysreq"))); }
+    catch (e) { console.warn("could not load " + f.name + ":", e); }
   }
-  for (const file of ARCH_FILES) {
-    try {
-      const res = await fetch(file, NO_CACHE);
-      if (!res.ok) { console.warn(`could not load ${file}: HTTP ${res.status}`); continue; }
-      ARCHS.push(parseArch(await res.text(), file.replace(/\.arch$/, "")));
-    } catch (e) {
-      console.warn("could not load " + file + ":", e);
-    }
+  for (const { f, text, error } of byKind("arch")) {
+    try { if (error) throw error; ARCHS.push(parseArch(text, stem(f, ".arch"))); }
+    catch (e) { console.warn("could not load " + f.name + ":", e); }
   }
   buildIndex();
-  /* nothing to open, or the Architecture diagram: the Domain Navigator keeps
-     its first module unfolded */
-  if (!applyHash(currentHash()) || state.view === "arch") state.expanded.add("mod:" + ctx().modules[0].id);
+  if (!MODEL.organizations.length && !ARCHS.length && !REQSETS.length) { renderEmpty(); return; }
+  if (!org() && MODEL.organizations.length) enterOrg(MODEL.organizations[0]);   // data.js shipped no sample
+  const known = applyHash(currentHash());
+  if (!MODEL.organizations.length) {
+    /* architectures or requirements only (a landscape published without its
+       .domain): the two domain tabs have nothing to show */
+    document.querySelectorAll(".tab[data-view=domain], .tab[data-view=diagram]").forEach(t => { t.disabled = true; t.title = "No domain model loaded"; });
+    if (state.view === "domain" || state.view === "diagram") {
+      if (ARCHS.length) { state.view = "arch"; state.archId = ARCHS[0].id; }
+      else { state.view = "req"; state.reqSetId = REQSETS[0].id; state.reqSelected = "reqset:" + REQSETS[0].id; }
+    }
+  } else if (!known || state.view === "arch") {
+    /* nothing to open, or the Architecture diagram: the Domain Navigator keeps
+       its first module unfolded */
+    state.expanded.add("mod:" + ctx().modules[0].id);
+  }
   renderAll();
 })();
