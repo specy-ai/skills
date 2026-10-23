@@ -26,3 +26,8 @@ ui/ffm.*
 # landscapes, symlinks to examples/) — the navigator skips a missing file.
 ui/**/*.arch
 ui/**/*.domain
+# Hosted Navigator (ui/hosting): generated assets, dependencies, local state, dev identity
+ui/hosting/dist/
+ui/hosting/node_modules/
+ui/hosting/.wrangler/
+ui/hosting/.dev.vars

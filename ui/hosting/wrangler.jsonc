@@ -1,0 +1,33 @@
+// Hosted Specy Navigator — the Cloudflare Worker (proposals/navigator-hosting.md, §12 variante Access).
+// The static assets behind a gate, Access identity, KV user records, R2 models.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "specy-app",
+  "account_id": "ee001e0ec626cafbf890396d7ce6fbf4", // Defsquare, the account of the specy.ai zone and site Worker
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-22",
+  "assets": {
+    "directory": "./dist/public",
+    "binding": "ASSETS",
+    // every request runs the Worker first: nothing is served without its say
+    "run_worker_first": true,
+    "not_found_handling": "none"
+  },
+  "vars": {
+    "APP_ORIGIN": "https://app.specy.ai",
+    // Cloudflare Access (step 2): the team domain and the application's AUD tag
+    // (Zero Trust › Access › Applications › the Navigator application › Overview).
+    // Empty until configured — then nobody can sign in.
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": ""
+  },
+  // user records (§3.11): once, `npx wrangler kv namespace create APP_AUTH`, paste the id here
+  "kv_namespaces": [{ "binding": "APP_AUTH", "id": "REPLACE_WITH_NAMESPACE_ID" }],
+  // the published models (§3.2): once, `npx wrangler r2 bucket create specy-models`; keys tenants/<tid>/models/<org>/<name>
+  "r2_buckets": [{ "binding": "MODELS", "bucket_name": "specy-models" }],
+  "routes": [{ "pattern": "app.specy.ai", "custom_domain": true }],
+  // reachable on the custom domain only: no workers.dev, no version URLs
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": true }
+}

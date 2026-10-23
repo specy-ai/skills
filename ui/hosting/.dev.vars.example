@@ -1,0 +1,4 @@
+# Copy to .dev.vars (git-ignored). `wrangler dev` then signs every request as
+# this user: tenant "local", role admin, every organization (src/access.js).
+# A deployment never carries it: scripts/check-deploy.sh refuses it.
+DEV_IDENTITY_EMAIL=dev@example.com

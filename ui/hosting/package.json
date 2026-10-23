@@ -1,0 +1,20 @@
+{
+  "name": "specy-app-hosting",
+  "private": true,
+  "type": "module",
+  "description": "Hosted Specy Navigator: the Cloudflare Worker that serves ui/ to a client's readers (proposals/navigator-hosting.md)",
+  "scripts": {
+    "build": "./build.sh",
+    "dev": "./build.sh && wrangler dev",
+    "test": "./build.sh && vitest run",
+    "deploy": "./build.sh && ./scripts/check-deploy.sh && wrangler deploy"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.4.7",
+    "vitest": "^4.1.0",
+    "wrangler": "^4.152.0"
+  },
+  "dependencies": {
+    "jose": "^6.2.13"
+  }
+}

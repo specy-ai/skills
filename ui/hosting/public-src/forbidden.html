@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Specy Navigator — no access</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Served by the Worker with status 403 (src/handlers/forbidden.js), which
+       fills the detail placeholder in. Self-contained on purpose: the application's own
+       stylesheets are not served to a reader who has no access. Colours are
+       the specy.ai tokens (ui/ds-tokens.css). -->
+  <style>
+    html { background: #172741; color: #eeeeee; }
+    body {
+      margin: 0; min-height: 100vh; display: flex; flex-direction: column;
+      font-family: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 15px; line-height: 1.55;
+    }
+    header {
+      padding: 14px 24px; border-bottom: 1px solid #070f19;
+      font-family: "Orbitron", "IBM Plex Sans", sans-serif; font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase;
+      color: #9fb1d6;
+    }
+    header b { color: #eeeeee; }
+    main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 32px 24px; }
+    .card {
+      max-width: 520px; background: #ffffff; color: #172741;
+      border-top: 4px solid #f65e5e; border-radius: 6px; padding: 28px 32px 30px;
+      box-shadow: 0 12px 40px rgba(7, 15, 25, 0.35);
+    }
+    h1 { font-family: "EB Garamond", "Iowan Old Style", "Palatino Linotype", serif; font-weight: 500; font-size: 28px; margin: 0 0 12px; }
+    p { margin: 0 0 12px; }
+    p:last-child { margin-bottom: 0; color: #4b5d6c; }
+    strong { word-break: break-all; }
+    a { color: #172741; text-decoration: underline; text-underline-offset: 2px; }
+    a:hover { color: #f65e5e; }
+  </style>
+</head>
+<body>
+  <header><b>specy</b>.ai &nbsp;·&nbsp; Navigator</header>
+  <main>
+    <div class="card">
+      <h1>No access to this space</h1>
+      <p>{{detail}}</p>
+      <p>Ask the person who runs this space to register your address, then reload this page.
+         You can also <a href="/cdn-cgi/access/logout">sign out</a> and continue with another account.</p>
+    </div>
+  </main>
+</body>
+</html>
