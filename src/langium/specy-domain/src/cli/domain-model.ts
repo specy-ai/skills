@@ -1,4 +1,5 @@
 import type { AstNode, Reference } from 'langium';
+import { PARSER_VERSION } from './version.js';
 import * as ast from '../generated/ast.js';
 
 /**
@@ -107,6 +108,8 @@ export interface OrganizationModel {
 }
 
 export interface DomainModel {
+    /** Which parser wrote this JSON, so consumers can pin the minimum shape they understand. */
+    parser?: { name: string; version: string };
     organizations?: OrganizationModel[];
     contexts?: ContextModel[];
     modules?: ModuleModel[];
@@ -163,9 +166,47 @@ function literalScalar(lit: ast.LiteralValue): string | number | boolean {
     return lit.value;
 }
 
+/**
+ * Discriminators for nodes whose cleaned shape would otherwise be ambiguous.
+ * `x is defined`, `x is not defined` and a bare `x` all reduce to `{ path }`;
+ * `in` / `not in` share `{ path, values }`; `sets` / `creates` share
+ * `{ type, assignments }`. Consumers that evaluate or invert expressions (the
+ * synthetic-data generator, for one) must tell them apart, so the node kind is
+ * kept as `kind` — the property QuantifierExpr already uses for exists/forall.
+ * Nodes not listed here are unambiguous from their own properties.
+ */
+const NODE_KIND: Record<string, string> = {
+    IsDefinedExpr: 'isDefined',
+    IsNotDefinedExpr: 'isNotDefined',
+    IsNullExpr: 'isNull',
+    IsNotNullExpr: 'isNotNull',
+    InExpr: 'in',
+    NotInExpr: 'notIn',
+    EveryExpr: 'every',
+    IfExpr: 'if',
+    ConditionalExpr: 'conditional',
+    MatchesExpr: 'matches',
+    ContainsExpr: 'contains',
+    DurationLiteral: 'duration',
+    CallExpr: 'call',
+    UnaryExpr: 'not',
+    ParenExpr: 'paren',
+    SetsClause: 'sets',
+    CreatesClause: 'creates',
+    ResolvesClause: 'resolves',
+    PreconditionClause: 'precondition',
+    PostconditionClause: 'postcondition',
+    EmitsClause: 'emits',
+    ForeachClause: 'foreach',
+    ServiceCallClause: 'serviceCall',
+    ReturnsClause: 'returns',
+};
+
 /** Clean a node to a plain object, dropping every `$`-prefixed property. */
 function cleanNode(node: AstNode): Record<string, unknown> {
     const result: Record<string, unknown> = {};
+    const kind = NODE_KIND[node.$type];
+    if (kind) result.kind = kind;
     for (const [key, value] of Object.entries(node)) {
         if (key.startsWith('$')) continue;
         const cleaned = cleanValue(value);
@@ -751,6 +792,7 @@ export function normalizeDomain(file: ast.DomainFile): DomainModel {
     }
 
     return compact({
+        parser: { name: 'specy-domain', version: PARSER_VERSION },
         organizations: nonEmpty(organizations),
         contexts: nonEmpty(contexts),
         modules: nonEmpty(modules),

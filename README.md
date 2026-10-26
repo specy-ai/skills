@@ -690,7 +690,7 @@ In your target project, Specy files live under `specy/` at the project root.
 Specy ships a [Langium](https://langium.org/)-based Language Server and parser CLI for `.domain` files, located in `src/langium/specy-domain/`. It provides:
 
 - **Editor integration** — diagnostics, syntax validation, and AST navigation via LSP (VS Code extension entrypoint in `src/extension/main.ts`).
-- **Parser CLI** (`specy-domain`) — parses a `.domain` file into **JSON, YAML, or Markdown**, or validates it from the command line.
+- **Parser CLI** (`specy-domain`) — parses a `.domain` file into **JSON, YAML, or Markdown**, or validates it from the command line. Since 1.1.0 the JSON output opens with a `parser: { name, version }` header, so consumers such as synthy can pin the shape they understand.
 
 ### Build
 

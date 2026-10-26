@@ -6,6 +6,7 @@ import { createSpecyDomainServices } from '../language/specy-domain-module.js';
 import { astToJson } from './json-serializer.js';
 import { normalizeDomain } from './domain-model.js';
 import { modelToMarkdown } from './markdown-serializer.js';
+import { PARSER_VERSION } from './version.js';
 import { URI } from 'langium';
 import { stringify as yamlStringify } from 'yaml';
 import * as fs from 'node:fs';
@@ -17,7 +18,7 @@ const program = new Command();
 program
     .name('specy-domain')
     .description('Specy Domain DSL parser and validator')
-    .version('1.0.0');
+    .version(PARSER_VERSION);
 
 program
     .command('parse')
