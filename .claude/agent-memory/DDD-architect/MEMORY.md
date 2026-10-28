@@ -1,0 +1,1 @@
+- [Client confidentiality in examples](project_client_confidentiality.md) — user-shared reference pictures may hold client/person names; repo examples must be fictional
