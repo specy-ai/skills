@@ -1,0 +1,43 @@
+title,description,price_eur,stock,rating,in_stock,tags
+Stoneware Teapot 1.2 L,"Hand-glazed stoneware teapot with a stainless steel infuser, dishwasher safe.",34.90,120,5,true,kitchen|tea
+Cast Iron Casserole 24 cm,"Enamelled cast iron casserole, 4.2 L, suitable for every hob including induction.",129.00,35,5,true,kitchen|cookware
+Linen Tea Towels (set of 3),"Stonewashed European linen, 50 x 70 cm, natural and charcoal.",24.50,260,4,true,kitchen|linen
+Oak Chopping Board,"End-grain oak board, 40 x 30 cm, finished with food-safe oil.",49.00,80,5,true,kitchen|wood
+Chef's Knife 20 cm,"Forged high-carbon stainless steel, full tang, beech handle.",79.90,60,5,true,kitchen|knives
+Glass Storage Jars (set of 4),"Borosilicate jars with bamboo lids, 0.5 to 1.5 L.",29.90,190,4,true,kitchen|storage
+French Press 1 L,"Double-walled stainless steel cafetière, keeps coffee hot for an hour.",39.00,140,4,true,kitchen|coffee
+Hand Coffee Grinder,"Ceramic conical burrs, 18 grind settings, aluminium body.",54.00,70,4,true,kitchen|coffee
+Espresso Cups (set of 2),"Porcelain cups with saucers, 80 ml.",18.00,210,4,true,kitchen|coffee
+Ceramic Mixing Bowls (set of 3),"Nesting bowls in speckled cream glaze, 1, 2 and 3.5 L.",44.00,95,5,true,kitchen|baking
+Silicone Baking Mat,"Non-stick mat for half-sheet trays, oven safe to 250 °C.",12.90,320,4,true,kitchen|baking
+Rolling Pin,"Solid beech French rolling pin, 50 cm.",16.50,150,5,true,kitchen|baking|wood
+Wool Throw,"Merino wool throw, 130 x 180 cm, herringbone weave.",89.00,45,5,true,living|textile
+Velvet Cushion Cover,"Cotton velvet, 45 x 45 cm, hidden zip, six colours.",22.00,300,4,true,living|textile
+Floor Lamp,"Brass floor lamp with linen shade, E27 bulb not included.",159.00,25,4,true,living|lighting
+Bedside Lamp,"Opal glass globe on a walnut base, dimmable.",69.00,55,4,true,bedroom|lighting
+Scented Candle,"Soy wax candle, fig and cedar, 45 hours of burning.",24.00,400,4,true,living|home fragrance
+Reed Diffuser,"Vetiver and bergamot, 200 ml with rattan reeds.",28.00,180,3,true,living|home fragrance
+Ceramic Vase,"Wheel-thrown vase in matte sage glaze, 28 cm.",42.00,65,5,true,living|decor
+Wall Clock,"Silent sweep movement, ash frame, 30 cm.",55.00,40,4,true,living|decor
+Picture Frame A4,"Solid oak frame with glass front and passe-partout.",19.90,230,4,true,living|decor
+Wool Rug 160 x 230,"Hand-tufted wool rug, low pile, ivory and rust.",249.00,12,4,true,living|textile
+Percale Duvet Cover,"200 thread count organic cotton percale, 240 x 220 cm.",79.00,110,5,true,bedroom|bedding
+Linen Pillowcases (pair),"Washed linen, 50 x 75 cm, envelope closure.",39.00,175,5,true,bedroom|bedding
+Down Pillow,"Responsibly sourced duck down, medium firmness.",59.00,90,4,true,bedroom|bedding
+Waffle Bath Towel,"Turkish cotton waffle weave, 70 x 140 cm.",29.00,240,4,true,bathroom|textile
+Bath Mat,"Cotton bath mat with non-slip backing, 50 x 80 cm.",25.00,160,3,true,bathroom|textile
+Soap Dispenser,"Stoneware pump dispenser, 350 ml.",17.50,140,4,true,bathroom
+Bamboo Laundry Basket,"Foldable bamboo frame with a removable cotton bag, 60 L.",45.00,50,4,true,bathroom|storage
+Plant Pot with Saucer,"Terracotta pot, 20 cm, frost resistant.",21.00,130,5,true,garden|plants
+Watering Can,"Galvanised steel, 5 L, long spout.",34.00,75,5,true,garden
+Garden Gloves,"Goatskin leather gloves, sizes S to XL.",19.00,200,4,true,garden
+Pruning Shears,"Bypass pruner with carbon steel blades.",32.00,85,5,true,garden|tools
+Outdoor String Lights,"Solar-powered, 10 m, warm white.",36.00,0,3,false,garden|lighting
+Picnic Blanket,"Water-resistant backing, 150 x 200 cm, folds into a bag.",39.90,95,4,true,outdoor|textile
+Insulated Bottle 750 ml,"Keeps drinks cold for 24 hours or hot for 12.",27.00,350,5,true,outdoor
+Enamel Camping Mugs (set of 4),"Speckled enamel on steel, 350 ml.",26.00,0,4,false,outdoor|kitchen
+Desk Organiser,"Walnut tray with three compartments.",38.00,60,4,true,office|wood
+Notebook A5,"Dotted pages, lay-flat binding, 192 pages.",14.50,500,5,true,office|stationery
+Fountain Pen,"Steel nib, medium, comes with a converter.",42.00,70,4,true,office|stationery
+Desk Lamp,"Adjustable arm, LED, three colour temperatures.",64.00,48,4,true,office|lighting
+Gift Card 50 EUR,"A digital gift card, valid for two years.",50.00,999,,true,gift

@@ -1,0 +1,52 @@
+// A real product catalogue flowing through unchanged.
+//
+// catalogue.csv is the shop's export, with its own column names. The Product table
+// holds its 42 rows, row for row; synthy generates only what the file leaves out
+// (the ids, the currency) and the business around them: customers, orders, lines,
+// payments. The certificate asks that every supplied value arrived unchanged.
+//
+// The locale pack only changes text: swap `locale fr` for `locale de` and every
+// number, date, enum and id stays byte-identical.
+scenario CatalogueQ3_2026 :: "Q3 2026 of a home-goods shop selling its real catalogue: a summer dip, a September peak, best sellers and regulars, French customers" {
+    domain-source "orders.domain"
+    seed 7
+    horizon 2026-07-01 .. 2026-10-01
+
+    populations {
+        Customer  count 300
+        Order     count 600
+        OrderLine per Order 1..4
+        Payment   per Order exactly 1
+    }
+
+    outcomes {
+        // in EUR, the unit of the amount
+        curve revenue Order.totalAmount.amount by Order.placedAt per month :: "A summer dip, then the back-to-school peak" {
+            2026-07: 52000
+            2026-08: 47000
+            2026-09: 61000
+        }
+        rollup Order.totalAmount.amount from OrderLine.total.amount
+        share Payment.method { creditCard: 60%  paypal: 30%  bankTransfer: 10% }
+    }
+
+    givens {
+        // the back office's export: description, rating and tags match fields by name
+        Product csv "catalogue.csv" :: "42 products, prices in EUR" {
+            name          from "title"
+            price.amount  from "price_eur"
+            stockQuantity from "stock"
+            available     from "in_stock"
+        }
+    }
+
+    vocabulary {
+        locale fr
+    }
+
+    distributions {
+        OrderLine.productId    zipf 1.1             :: "Best sellers: the top product carries a quarter of the lines"
+        Order.customer         zipf 0.8             :: "Regulars, the oldest customers, order far more often"
+        OrderLine.total.amount lognormal sigma 0.9  :: "Each order's total splits into a few large lines and small ones"
+    }
+}

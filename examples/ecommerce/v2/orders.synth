@@ -1,0 +1,58 @@
+// Six months of e-commerce orders: the figures the generated data must add up to.
+// Every name below is resolved against orders.domain; synthy writes a row set
+// that satisfies both files and a certificate that re-verifies each outcome.
+scenario OrdersH1_2025 :: "Six months of e-commerce orders with a declared monthly revenue curve, lifecycle mix and payment-method split." {
+    domain-source "orders.domain"
+    seed 42
+    horizon 2025-01-01 .. 2025-07-01
+    as-of 2025-07-01T00:00:00Z
+
+    populations {
+        Customer  count 200
+        Product   count 60
+        Order     count 1200
+        OrderLine per Order 1..5
+        Payment   per Order exactly 1
+    }
+
+    outcomes {
+        // SUM(totalAmount.amount) per month of placedAt, exactly, in EUR (the amount's own unit).
+        curve monthlyRevenue Order.totalAmount.amount by Order.placedAt per month {
+            2025-01: 180000
+            2025-02: 195000
+            2025-03: 210000
+            2025-04: 205000
+            2025-05: 230000
+            2025-06: 260000
+        }
+
+        // Where each order's lifecycle walk ends, as of the observation instant.
+        mix Order.OrderLifecycle {
+            delivered: 72%
+            shipped:    6%
+            confirmed:  8%
+            draft:      4%
+            cancelled: 10%
+        }
+
+        share Payment.method {
+            creditCard:   60%
+            paypal:       30%
+            bankTransfer: 10%
+        }
+
+        rollup Order.totalAmount.amount from OrderLine.total.amount
+
+        rate Product.available = true : 90%
+    }
+
+    options {
+        dwell {
+            draft     --> confirmed : 4h
+            confirmed --> shipped   : 2d
+            shipped   --> delivered : 3d
+            draft     --> cancelled : 1d
+            confirmed --> cancelled : 1d
+        }
+    }
+}

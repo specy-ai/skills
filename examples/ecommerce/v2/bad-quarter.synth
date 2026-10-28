@@ -1,0 +1,69 @@
+// "Give me a bad quarter for this domain."
+// Q3 2026 (the last complete quarter) going wrong: orders and revenue slide month after month,
+// cancellations double, payments fail and get refunded far more often, and more customers
+// are suspended or closed.
+//
+// Baseline (a normal month, taken from the H1 2025 orders scenario of the same model):
+// about 220 orders and 230 000 EUR placed per month, 10% of orders cancelled,
+// 60/30/10 card/PayPal/bank transfer. Every figure below is a deviation from it.
+scenario BadQuarterQ3_2026 :: "A bad quarter, as requested: Q3 2026 with revenue down 15% then 30% then 39% against a 230 000 EUR month, 22% of orders cancelled (baseline 10%), 9% of payments failed and 8% refunded, 15% of customers suspended or closed" {
+    domain-source "orders.domain"
+    seed 2026
+    horizon 2026-07-01 .. 2026-10-01
+
+    populations {
+        Customer  count 250
+        Product   count 60
+        // 500 orders in the quarter, against about 660 in a normal one
+        Order     count 500
+        OrderLine per Order 1..5
+        Payment   per Order exactly 1
+    }
+
+    outcomes {
+        // The slide: exact SUM(Order.totalAmount.amount) per month of placedAt, in EUR.
+        // Counts orders placed in the month, whatever their state now (gross bookings).
+        // Baseline 230 000 over ~220 orders a month.
+        curve badQuarterRevenue Order.totalAmount.amount by Order.placedAt per month :: "Revenue falls 15%, 30%, then 39% below a normal month" {
+            2026-07: 195000 over 190 rows   // -15% revenue, -14% orders
+            2026-08: 160000 over 165 rows   // -30% revenue, -25% orders
+            2026-09: 140000 over 145 rows   // -39% revenue, -34% orders
+        }
+        rollup Order.totalAmount.amount from OrderLine.total.amount
+
+        // Where orders stand on 2026-10-01: cancellations up from 10% to 22%.
+        mix cancellationSpike Order.OrderLifecycle :: "Cancellations more than double" {
+            delivered: 62%   // baseline 72%
+            shipped:    6%
+            confirmed:  6%   // baseline 8%
+            draft:      4%
+            cancelled: 22%   // baseline 10%
+        }
+
+        // Payment trouble: failures (which cancel the order) and refunds (only on cancelled
+        // orders) must both fit inside the 22% of cancelled orders: 9% + 8% = 17%.
+        mix paymentTrouble Payment.PaymentLifecycle :: "Payment failures and refunds climb" {
+            captured: 78%
+            pending:   5%
+            failed:    9%    // assumed baseline about 3%
+            refunded:  8%    // assumed baseline about 2%
+        }
+
+        // Unchanged from the baseline.
+        share Payment.method { creditCard: 60%  paypal: 30%  bankTransfer: 10% }
+
+        // Churn: 15% of customers suspended or closed (assumed baseline 8%).
+        share customerChurn Customer.status { active: 85%  suspended: 9%  closed: 6% }
+    }
+
+    options {
+        dwell {
+            draft     --> confirmed : 4h
+            // the warehouse is slow this quarter: 4 days to ship (baseline 2d), 4 to deliver (3d)
+            confirmed --> shipped   : 4d
+            shipped   --> delivered : 4d
+            draft     --> cancelled : 1d
+            confirmed --> cancelled : 1d
+        }
+    }
+}
