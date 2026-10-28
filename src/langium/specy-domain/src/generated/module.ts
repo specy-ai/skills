@@ -5,11 +5,18 @@
 
 import type { LangiumSharedCoreServices, LangiumCoreServices, LangiumGeneratedCoreServices, LangiumGeneratedSharedCoreServices, LanguageMetaData, Module } from 'langium';
 import { SpecyDomainAstReflection } from './ast.js';
-import { SpecyDomainGrammar } from './grammar.js';
+import { SpecyDomainGrammar, SpecySynthGrammar } from './grammar.js';
 
 export const SpecyDomainLanguageMetaData = {
     languageId: 'specy-domain',
     fileExtensions: ['.domain'],
+    caseInsensitive: false,
+    mode: 'production'
+} as const satisfies LanguageMetaData;
+
+export const SpecySynthLanguageMetaData = {
+    languageId: 'specy-synth',
+    fileExtensions: ['.synth'],
     caseInsensitive: false,
     mode: 'production'
 } as const satisfies LanguageMetaData;
@@ -21,5 +28,11 @@ export const SpecyDomainGeneratedSharedModule: Module<LangiumSharedCoreServices,
 export const SpecyDomainGeneratedModule: Module<LangiumCoreServices, LangiumGeneratedCoreServices> = {
     Grammar: () => SpecyDomainGrammar(),
     LanguageMetaData: () => SpecyDomainLanguageMetaData,
+    parser: {}
+};
+
+export const SpecySynthGeneratedModule: Module<LangiumCoreServices, LangiumGeneratedCoreServices> = {
+    Grammar: () => SpecySynthGrammar(),
+    LanguageMetaData: () => SpecySynthLanguageMetaData,
     parser: {}
 };

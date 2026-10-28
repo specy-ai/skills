@@ -1,5 +1,5 @@
 /**
- * Language server entry point for the Specy Domain DSL.
+ * Language server entry point for the Specy languages: .domain and .synth.
  *
  * Speaks LSP over stdio (or IPC, when a client asks for it), so any editor can
  * drive it: neovim via `vim.lsp.config`, and the VS Code client in
@@ -11,12 +11,14 @@
 import { startLanguageServer } from 'langium/lsp';
 import { NodeFileSystem } from 'langium/node';
 import { ProposedFeatures, createConnection } from 'vscode-languageserver/node.js';
-import { createSpecyDomainLspServices } from './specy-domain-module.js';
+import { createSpecyLspServices } from './specy-synth-module.js';
 
 // The transport is chosen from argv by vscode-languageserver: --stdio, --node-ipc,
 // or --socket. Nothing here needs to care which one the editor picked.
 const connection = createConnection(ProposedFeatures.all);
 
-const { shared } = createSpecyDomainLspServices({ connection, ...NodeFileSystem });
+// Both languages on one shared service set: a .synth file resolves its references
+// into the .domain it declares, so the two must share documents and builder.
+const { shared } = createSpecyLspServices({ connection, ...NodeFileSystem });
 
 startLanguageServer(shared);

@@ -3,7 +3,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-echo "=== Specy Domain Langium Build ==="
+echo "=== Specy Langium Build (.domain + .synth) ==="
 
 echo "1. Installing dependencies..."
 npm install --silent
@@ -52,6 +52,19 @@ echo ""
 echo "Results: $PASS passed, $FAIL failed"
 
 echo ""
+echo "4b. Validating the .synth scenario against its domain-source..."
+SYNTH_FILE="$EXAMPLES_DIR/ecommerce/v2/orders.synth"
+output=$(timeout 90 node out/cli/synth.js validate "$SYNTH_FILE" 2>&1) || rc=$?
+if [ "${rc:-0}" = "0" ]; then
+    echo "  PASS: $(basename "$SYNTH_FILE")"
+else
+    echo "  FAIL: $(basename "$SYNTH_FILE")"
+    printf '%s\n' "$output" | head -5 | sed 's/^/      /'
+    FAIL=$((FAIL + 1))
+fi
+unset rc
+
+echo ""
 echo "5. Testing parse output formats..."
 PARSE_FILE="$EXAMPLES_DIR/ecommerce/v2/orders.domain"
 for fmt in json yaml markdown; do
@@ -65,6 +78,25 @@ for fmt in json yaml markdown; do
         FAIL=$((FAIL + 1))
     fi
 done
+
+for fmt in json yaml; do
+    out=$(timeout 60 node out/cli/synth.js parse "$SYNTH_FILE" --strict -f "$fmt" 2>/dev/null || true)
+    if [ -n "$out" ]; then
+        echo "  PASS: specy-synth parse -f $fmt ($(printf '%s' "$out" | wc -c) bytes)"
+    else
+        echo "  FAIL: specy-synth parse -f $fmt (empty output)"
+        FAIL=$((FAIL + 1))
+    fi
+done
+
+echo ""
+echo "6. Running the test suite..."
+if npx vitest run --reporter=dot 2>&1 | tail -3; then
+    echo "  PASS: vitest"
+else
+    echo "  FAIL: vitest"
+    FAIL=$((FAIL + 1))
+fi
 
 echo ""
 if [ "$FAIL" -gt 0 ]; then

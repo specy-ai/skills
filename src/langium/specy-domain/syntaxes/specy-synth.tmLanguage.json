@@ -1,0 +1,56 @@
+{
+  "name": "specy-synth",
+  "scopeName": "source.specy-synth",
+  "fileTypes": [
+    ".synth"
+  ],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "name": "keyword.control.specy-synth",
+      "match": "\\b(alpha|and|as-of|by|clock|count|csv|curve|day|decimals|default-dwell|distributions|domain-source|dwell|exactly|false|from|given|givens|horizon|json|locale|lognormal|median|mix|month|not|null|null-rate|options|or|outcomes|over|pack|per|populations|quarter|rate|reaction-latency|rejections|requirements-source|rollup|rows|satisfies|scenario|seed|share|sigma|since|total|true|uniform|vocabulary|week|words|year|zipf)\\b"
+    },
+    {
+      "name": "string.quoted.double.specy-synth",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "include": "#string-character-escape"
+        }
+      ]
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "begin": "//",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.whitespace.comment.leading.specy-synth"
+            }
+          },
+          "end": "(?=$)",
+          "name": "comment.line.specy-synth"
+        },
+        {
+          "begin": "#",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.whitespace.comment.leading.specy-synth"
+            }
+          },
+          "end": "(?=$)",
+          "name": "comment.line.specy-synth"
+        }
+      ]
+    },
+    "string-character-escape": {
+      "name": "constant.character.escape.specy-synth",
+      "match": "\\\\(x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|u\\{[0-9A-Fa-f]+\\}|[0-2][0-7]{0,2}|3[0-6][0-7]?|37[0-7]?|[4-7][0-7]?|.|$)"
+    }
+  }
+}

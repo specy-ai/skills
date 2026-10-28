@@ -24,12 +24,15 @@ function startLanguageClient(context: vscode.ExtensionContext): LanguageClient {
     };
 
     const clientOptions: LanguageClientOptions = {
-        documentSelector: [{ scheme: 'file', language: 'specy-domain' }],
+        documentSelector: [
+            { scheme: 'file', language: 'specy-domain' },
+            { scheme: 'file', language: 'specy-synth' },
+        ],
     };
 
     const client = new LanguageClient(
-        'specy-domain',
-        'Specy Domain',
+        'specy',
+        'Specy',
         serverOptions,
         clientOptions,
     );

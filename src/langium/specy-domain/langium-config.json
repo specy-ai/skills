@@ -8,6 +8,14 @@
       "textMate": {
         "out": "syntaxes/specy-domain.tmLanguage.json"
       }
+    },
+    {
+      "id": "specy-synth",
+      "grammar": "src/language/specy-synth.langium",
+      "fileExtensions": [".synth"],
+      "textMate": {
+        "out": "syntaxes/specy-synth.tmLanguage.json"
+      }
     }
   ],
   "out": "src/generated",
