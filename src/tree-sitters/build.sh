@@ -13,6 +13,7 @@ GRAMMARS=(
   "tree-sitter-specy-sysreq"
   "tree-sitter-specy-domain"
   "tree-sitter-specy-architecture"
+  "tree-sitter-specy-synth"
 )
 
 # Every .domain file in examples/ is smoke-tested. A file left out of this list is
@@ -43,6 +44,9 @@ EXAMPLES=(
   "examples/retail-media/retail-media.domain"
   "examples/url-shortener/url-shortener.arch"
   "examples/retail-media/retail-media.arch"
+  "examples/ecommerce/v2/orders.synth"
+  "examples/ecommerce/v2/bad-quarter.synth"
+  "examples/ecommerce/v2/catalogue.synth"
 )
 
 RED='\033[0;31m'

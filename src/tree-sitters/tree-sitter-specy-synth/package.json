@@ -1,0 +1,26 @@
+{
+  "name": "tree-sitter-specy-synth",
+  "version": "1.0.0",
+  "description": "Tree-sitter grammar for Specy synthetic-data scenarios (.synth)",
+  "main": "bindings/node",
+  "keywords": [
+    "tree-sitter",
+    "parser",
+    "specy",
+    "synthetic-data",
+    "scenario"
+  ],
+  "tree-sitter": [
+    {
+      "scope": "source.specy_synth",
+      "file-types": [
+        "synth"
+      ],
+      "highlights": "queries/highlights.scm"
+    }
+  ],
+  "dependencies": {},
+  "devDependencies": {
+    "tree-sitter-cli": ">=0.20.0"
+  }
+}

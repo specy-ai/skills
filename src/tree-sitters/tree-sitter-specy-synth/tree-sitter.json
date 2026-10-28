@@ -1,0 +1,18 @@
+{
+  "grammars": [
+    {
+      "name": "specy_synth",
+      "camelCase": "specySynth",
+      "scope": "source.specy_synth",
+      "path": ".",
+      "file-types": [
+        "synth"
+      ],
+      "highlights": "queries/highlights.scm"
+    }
+  ],
+  "metadata": {
+    "version": "1.0.0",
+    "links": {}
+  }
+}

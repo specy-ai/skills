@@ -1,6 +1,6 @@
 # Specy Tree-sitter Parsers
 
-Four tree-sitter parsers provide syntax highlighting (and future LSP support) for the Specy DSL files.
+Five tree-sitter parsers provide syntax highlighting for the Specy DSL files. (Editor diagnostics and cross-file resolution come from the Langium language server in `src/langium/specy-domain`, not from these parsers.)
 
 | Parser | Language name | File type | Location |
 |--------|---------------|-----------|----------|
@@ -8,10 +8,13 @@ Four tree-sitter parsers provide syntax highlighting (and future LSP support) fo
 | `specy_sysreq` | `specy_sysreq` | `.sysreq` | `src/tree-sitters/tree-sitter-specy-sysreq/` |
 | `specy_domain` | `specy_domain` | `.domain` | `src/tree-sitters/tree-sitter-specy-domain/` |
 | `specy_architecture` | `specy_architecture` | `.arch` | `src/tree-sitters/tree-sitter-specy-architecture/` |
+| `specy_synth` | `specy_synth` | `.synth` | `src/tree-sitters/tree-sitter-specy-synth/` |
 
 `specy_domain` handles both module-level (v2, e.g. `business-loan.domain`) and full-hierarchy formats with organizations, bounded contexts, nested modules, state machines, reactions, agreements, and reconciliation (e.g. `url-shortener.domain`).
 
 `specy_architecture` handles both roots of a `.arch` file: `architecture` (C4 levels 1–3, e.g. `url-shortener.arch`) and `organization` (level 0, the system landscape, e.g. `retail-media.arch`).
+
+`specy_synth` highlights synthetic-data scenarios (`orders.synth`): populations, the six outcome kinds, givens, options and the dot-paths into the `.domain`. Whether a dot-path resolves is the language server's call.
 
 
 ## Prerequisites
@@ -125,9 +128,9 @@ specy-skill/
   build.sh                                     <-- builds every component, the parsers included
   TREE-SITTER.md                               <-- this file
   src/
-    grammars/                                  <-- canonical EBNF grammars (prd, sysreq, domain, architecture)
+    grammars/                                  <-- canonical EBNF grammars (prd, sysreq, domain, architecture, synth)
     tree-sitters/
-      build.sh                                 <-- builds the four parsers, runs the smoke tests
+      build.sh                                 <-- builds the five parsers, runs the smoke tests
       sync-nvim.sh                             <-- registers them in Neovim
       tree-sitter-specy-prd/
         grammar.js
@@ -136,4 +139,5 @@ specy-skill/
       tree-sitter-specy-sysreq/
       tree-sitter-specy-domain/
       tree-sitter-specy-architecture/
+      tree-sitter-specy-synth/
 ```
