@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-Specy is a DDD toolkit that captures business knowledge in structured DSL files (`.prd`, `.sysreq`, `.domain`, `.arch`). This repo contains the AI skill definitions, packaged as a single Claude Code **plugin** named `specy`. The 11 skills (invoked as `specy:<name>`) are: 7 core — `prd-design`, `sysreq-design`, `sysreq-extract-from-code`, `domain-design`, `domain-build-code`, `domain-extract-from-code`, `domain-refactor` — 3 architecture — `architecture-design`, `architecture-extract-from-code`, `architecture-build-code` — plus 1 auxiliary — `domain-dialogue`. Skills are assembled from modular templates into self-contained `dist/skills/<name>/SKILL.md` files.
+Specy is a DDD toolkit that captures business knowledge in structured DSL files (`.prd`, `.sysreq`, `.domain`, `.arch`). This repo contains the AI skill definitions, packaged as a single Claude Code **plugin** named `specy`. The 13 skills (invoked as `specy:<name>`) are: 7 core — `prd-design`, `sysreq-design`, `sysreq-extract-from-code`, `domain-design`, `domain-build-code`, `domain-extract-from-code`, `domain-refactor` — 3 architecture — `architecture-design`, `architecture-extract-from-code`, `architecture-build-code` — 2 synthetic data — `synth-design`, `domain-build-fixtures` — plus 1 auxiliary — `domain-dialogue`. Skills are assembled from modular templates into self-contained `dist/skills/<name>/SKILL.md` files.
 
 ## Build Commands
 
@@ -48,9 +48,11 @@ SKILL.md (a plugin can't reference files outside its own directory).
 
 ### Source of Truth
 
-- **Grammars**: `src/grammars/*.ebnf` are the canonical grammars (`domain.ebnf`, `architecture.ebnf`, `prd.ebnf`, `sysreq.ebnf`, `data-operation.ebnf`). The build script copies each into the skills that need it (e.g. `dist/skills/domain-extract-from-code/grammars/`). The tree-sitter grammars under `src/tree-sitters/` are faithful translations of the EBNF files and must be updated with them.
-- **Metamodels**: `src/metamodels/*.md` document each layer's concepts and constraints (`DOMAIN-METAMODEL.md` for the v3 domain model, `SOFTWARE-ARCHITECTURE-METAMODEL.md` for `.arch`, incl. its level 0). They are published verbatim on specy.ai, so their heading texts are stable anchors: add headings, do not rename them.
+- **Grammars**: `src/grammars/*.ebnf` are the canonical grammars (`domain.ebnf`, `architecture.ebnf`, `prd.ebnf`, `sysreq.ebnf`, `data-operation.ebnf`, `synth.ebnf`). The build script copies each into the skills that need it (e.g. `dist/skills/domain-extract-from-code/grammars/`). The tree-sitter grammars under `src/tree-sitters/` are faithful translations of the EBNF files and must be updated with them.
+- **Metamodels**: `src/metamodels/*.md` document each layer's concepts and constraints (`DOMAIN-METAMODEL.md` for the v3 domain model, `SOFTWARE-ARCHITECTURE-METAMODEL.md` for `.arch`, incl. its level 0, `SYNTH-METAMODEL.md` for `.synth` synthetic-data scenarios written against a `.domain`). They are published verbatim on specy.ai, so their heading texts are stable anchors: add headings, do not rename them.
+- **Schemas**: `src/schemas/*.schema.json` are the JSON Schemas of documents stored as JSON or YAML; `synth-scenario.schema.json` describes a `.synth` scenario as a document (`specy-synth parse -f json|yaml`; the metamodel's Storage formats section). Its `$id` (`https://specy.ai/schemas/synth-scenario/1.json`) carries the format's major version; synthy vendors a copy (`npm run sync:fixtures`) and its `test/schema.test.ts` pins the loader and the schema together, so change the schema, the normalizer (`src/langium/specy-domain/src/cli/synth-model.ts`) and synthy's loader together. A rate's predicate is written in one spelling by both tools (`ratePredicate` in synth-model.ts, `renderPredicate` in synthy's `src/scenario/predicate.ts`): keep them equal.
 - **Skill templates**: `src/skills/{skill}/main.md` — always edit here, never in `dist/`.
+- **Synthetic-data skills**: `synth-design` and `domain-build-fixtures` drive synthy (`../specy-synthy`, npm `specy-synthy`) through its CLI or its MCP server (`synthy mcp`) and never write rows themselves. The certificate harnesses in `src/skills/domain-build-fixtures/heuristics/` (JUnit, vitest, clojure.test; dbt needs none) were run against synthy's exports: keep them in step with synthy's `load.sql` and `questions.json` formats. The worked example and the phrasebook of `synth-design` are checked against `examples/ecommerce/v2/orders.domain`; re-check them when the language changes.
 
 ### Key Distinction: src/ vs dist/
 
@@ -103,7 +105,7 @@ Setup hooks after clone: `git config core.hooksPath hooks/`
 
 ## Tree-Sitter Parsers
 
-Four parsers in `src/tree-sitters/`: specy-domain, specy-prd, specy-sysreq, specy-architecture. `src/tree-sitters/build.sh` generates, builds, and smoke-tests them against files in `examples/`. `src/tree-sitters/sync-nvim.sh` registers them in Neovim (see `TREE-SITTER.md`); re-run it when a parser is added.
+Five parsers in `src/tree-sitters/`: specy-domain, specy-prd, specy-sysreq, specy-architecture, specy-synth. `src/tree-sitters/build.sh` generates, builds, and smoke-tests them against files in `examples/`. `src/tree-sitters/sync-nvim.sh` registers them in Neovim (see `TREE-SITTER.md`); re-run it when a parser is added.
 
 ## Examples
 

@@ -1,0 +1,341 @@
+// =============================================================================
+// Specy — Synthetic-Data Scenario Grammar (.synth)
+//
+// Normative concrete syntax for the synthetic-data scenario metamodel.
+// Every production here has a counterpart in src/metamodels/SYNTH-METAMODEL.md;
+// section references are given as (metamodel: <Section>).
+//
+// A scenario is written AGAINST a .domain model and never restates it: every
+// entity, field, state machine, state and enum member it names is a reference
+// into the model named by `domain-source`. The grammar below is context-free;
+// the resolution of those references and the arithmetic rules are the semantic
+// rules at the foot of this file, enforced by the Langium parser
+// (src/langium/specy-domain, language specy-synth) and by synthy's planner.
+//
+// EBNF (ISO 14977 style)
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// Top-level  (metamodel: Scenario)
+//
+// One scenario per file. Header clauses come in a fixed order, like the slots
+// of a domain definition: satisfies first (the convention of every Specy body),
+// then provenance, then the three knobs of the whole run.
+// -----------------------------------------------------------------------------
+
+synthFile        = { comment } , scenarioDef , { comment } ;
+
+scenarioDef      = "scenario" , scenarioName , [ description ] , "{"
+                 , [ satisfiesDecl ]
+                 , domainSourceDecl
+                 , [ requirementsSourceDecl ]
+                 , [ seedDecl ]
+                 , [ horizonDecl ]
+                 , [ asOfDecl ]
+                 , populationsBlock
+                 , [ outcomesBlock ]
+                 , [ givensBlock ]
+                 , [ vocabularyBlock ]
+                 , [ distributionsBlock ]
+                 , [ optionsBlock ]
+                 , "}" ;
+
+scenarioName     = identifier | typeName ;
+
+// The .domain this scenario is written against, relative to the .synth file.
+domainSourceDecl = "domain-source" , stringLiteral ;
+
+// Provenance of the requirement identifiers used in `satisfies` lists.
+requirementsSourceDecl = "requirements-source" , stringLiteral ;
+
+// Same seed, same files: same bytes.
+seedDecl         = "seed" , ( number | stringLiteral ) ;
+
+// Clocks fall in [from, to). Dates are written bare (2025-01-01) or quoted.
+horizonDecl      = "horizon" , dateLiteral , ".." , dateLiteral ;
+
+// The instant the snapshot tables are observed at. Defaults to the horizon's end.
+asOfDecl         = "as-of" , instantLiteral ;
+
+dateLiteral      = date | stringLiteral ;
+instantLiteral   = dateTime | date | stringLiteral ;
+
+// -----------------------------------------------------------------------------
+// Populations  (metamodel: Population)
+//
+//   Customer   count 200              a fixed number of rows
+//   OrderLine  per Order 1..5         k rows per parent row, k drawn in [1, 5]
+//   Payment    per Order exactly 1
+// -----------------------------------------------------------------------------
+
+populationsBlock = "populations" , "{" , { comment | populationDecl } , "}" ;
+
+populationDecl   = entityRef
+                 , ( "count" , number , [ "since" , dateLiteral ]   // clocks from that date: rows that predate the horizon
+                   | "per" , entityRef , ( "exactly" , number | cardinality ) )
+                 , [ "clock" , memberRef ]
+                 , [ description ] ;
+
+// -----------------------------------------------------------------------------
+// Outcomes  (metamodel: Outcome)
+//
+// What the data must add up to. Six kinds, each a hard fact the certificate
+// verifies. An outcome may carry a camelCase name and `satisfies` ids.
+// -----------------------------------------------------------------------------
+
+outcomesBlock    = "outcomes" , "{" , { comment | outcomeDecl } , "}" ;
+
+outcomeDecl      = curveOutcome | totalOutcome | shareOutcome
+                 | mixOutcome | rateOutcome | rollupOutcome ;
+
+outcomeName      = identifier ;
+
+// (metamodel: Curve) — SUM(measure) per period of `by`, exactly.
+curveOutcome     = "curve" , [ outcomeName ] , path , "by" , path , "per" , period
+                 , [ "alpha" , number ]
+                 , [ description ]
+                 , "{" , [ satisfiesDecl ] , { comment | curvePoint } , "}" ;
+
+curvePoint       = periodKey , ":" , number , [ "over" , number , "rows" ] , [ "," ] ;
+
+// (metamodel: Total) — SUM(measure) over the population.
+totalOutcome     = "total" , [ outcomeName ] , path , "=" , number
+                 , [ "alpha" , number ]
+                 , [ description ]
+                 , [ satisfiesDecl ] ;
+
+// (metamodel: Share) — fraction of rows per enum member or truth value; with
+// `given`, one split per value of another column of the same rows.
+shareOutcome     = "share" , [ outcomeName ] , path , [ "given" , path ]
+                 , [ description ]
+                 , "{" , [ satisfiesDecl ] , { comment | shareEntry | shareGroup } , "}" ;
+
+shareEntry       = ( memberRef | booleanLiteral ) , ":" , fraction , [ "," ] ;
+shareGroup       = ( memberRef | booleanLiteral ) , ":" , "{" , { comment | shareEntry } , "}" , [ "," ] ;
+
+// (metamodel: Mix) — fraction of rows whose walk ends in each state.
+mixOutcome       = "mix" , [ outcomeName ] , path
+                 , [ description ]
+                 , "{" , [ satisfiesDecl ] , { comment | mixEntry } , "}" ;
+
+mixEntry         = stateRef , ":" , fraction , [ "," ] ;
+
+// (metamodel: Rate) — fraction of rows satisfying a predicate, overall or per period.
+rateOutcome      = "rate" , [ outcomeName ] , rateExpr
+                 , ( ":" , fraction , [ description ] , [ satisfiesDecl ]
+                   | "by" , path , "per" , period , [ description ]
+                     , "{" , [ satisfiesDecl ] , { comment | ratePoint } , "}" ) ;
+
+// `or` binds loosest, then `and`, then `not`; parentheses group.
+rateExpr         = rateAnd , { "or" , rateAnd } ;
+rateAnd          = rateUnary , { "and" , rateUnary } ;
+rateUnary        = "not" , rateUnary | "(" , rateExpr , ")" | ratePredicate ;
+ratePredicate    = path , [ ( "=" | "!=" ) , ( memberRef | booleanLiteral ) ] ;
+
+ratePoint        = periodKey , ":" , fraction , [ "," ] ;
+
+// (metamodel: Rollup) — a parent measure equals the sum of a child measure.
+rollupOutcome    = "rollup" , [ outcomeName ] , path , "from" , path
+                 , [ description ]
+                 , [ satisfiesDecl ] ;
+
+// -----------------------------------------------------------------------------
+// Givens  (metamodel: Given)
+// -----------------------------------------------------------------------------
+
+givensBlock      = "givens" , "{" , { comment | givenDecl } , "}" ;
+
+// entityRef: a row source, or an enum of a value type (its instances).
+givenDecl        = entityRef
+                 , ( "csv" , stringLiteral
+                   | "json" , stringLiteral
+                   | "rows" , "[" , [ rowLiteral , { [ "," ] , rowLiteral } ] , "]" )
+                 , [ description ]
+                 , [ "{" , { comment | givenColumn } , "}" ] ;
+
+// A path within the given's row source (the enum's value type) and the file column it reads.
+givenColumn      = memberRef , { "." , memberRef } , "from" , stringLiteral , [ "," ] ;
+
+rowLiteral       = "{" , [ rowEntry , { [ "," ] , rowEntry } ] , "}" ;
+rowEntry         = ( memberName | stringLiteral ) , ":" , rowValue ;
+rowValue         = stringLiteral | number | booleanLiteral | "null" | rowLiteral | rowArray ;
+rowArray         = "[" , [ rowValue , { [ "," ] , rowValue } ] , "]" ;
+
+// -----------------------------------------------------------------------------
+// Vocabulary  (metamodel: Vocabulary)
+// -----------------------------------------------------------------------------
+
+vocabularyBlock  = "vocabulary" , "{"
+                 , [ "locale" , ( identifier | stringLiteral ) ]   // intl, fr, "en-GB", …
+                 , [ "pack" , stringLiteral ]                      // a pack file next to the scenario
+                 , { comment | wordList }
+                 , "}" ;
+
+wordList         = path , "words"
+                 , ( stringLiteral                                 // a file: one value per line, or a JSON list
+                   | "[" , [ stringLiteral , { [ "," ] , stringLiteral } ] , "]" )
+                 , [ description ] ;
+
+// -----------------------------------------------------------------------------
+// Distributions  (metamodel: Distributions)
+// -----------------------------------------------------------------------------
+
+distributionsBlock = "distributions" , "{" , { comment | distribution } , "}" ;
+
+distribution     = path
+                 , ( "uniform"
+                   | "lognormal" , [ "median" , number ] , [ "sigma" , number ]
+                   | "zipf" , [ number ] )
+                 , [ description ] ;
+
+// -----------------------------------------------------------------------------
+// Options  (metamodel: Options)
+// -----------------------------------------------------------------------------
+
+optionsBlock     = "options" , "{" , { comment | optionEntry } , "}" ;
+
+optionEntry      = "alpha" , number
+                 | "decimals" , number
+                 | "null-rate" , fraction
+                 | "default-dwell" , durationText
+                 | dwellBlock
+                 | "reaction-latency" , durationText    // longest delay between an event and the command a reaction issues
+                 | "rejections" , number ;              // commands per precondition that must be refused
+
+// Mean dwell per transition, written with the machine's own arrow.
+dwellBlock       = "dwell" , "{" , { comment | dwellEntry } , "}" ;
+dwellEntry       = stateName , "-->" , stateName , ":" , durationText , [ "," ] ;
+
+// 4h, 2d, 45min, 30s, 500ms, 1w — or any string synthy's duration parser reads.
+durationText     = duration | stringLiteral ;
+
+// -----------------------------------------------------------------------------
+// Dot-paths into the domain  (metamodel: Dot-path)
+//
+// The root is a row source: an entity, aggregate, read-only entity or value
+// type. Each step is a member of what the previous segment resolved to.
+// -----------------------------------------------------------------------------
+
+path             = entityRef , { "." , memberRef } ;
+
+entityRef        = typeName ;                     // resolves to a row source
+memberRef        = memberName ;                   // resolves to an identity, field, reference, machine or enum member
+stateRef         = memberName ;                   // resolves to a state of the mix's machine
+memberName       = identifier | typeName | keywordAsIdent ;
+stateName        = memberName ;
+
+// Keywords of this grammar that may also name a field, state or enum member.
+keywordAsIdent   = "count" | "per" | "by" | "rows" | "over" | "csv" | "json" | "alpha" | "decimals" | "dwell"
+                 | "clock" | "seed" | "horizon" | "scenario" | "populations" | "outcomes" | "givens" | "options"
+                 | "curve" | "total" | "share" | "mix" | "rate" | "rollup" | "exactly" | "from"
+                 | "day" | "week" | "month" | "quarter" | "year" | "given" | "rejections"
+                 | "vocabulary" | "locale" | "pack" | "words" | "distributions" | "uniform" | "lognormal"
+                 | "median" | "sigma" | "zipf" | "since" ;
+
+// -----------------------------------------------------------------------------
+// Shared with the domain grammar (src/grammars/domain.ebnf)
+// -----------------------------------------------------------------------------
+
+description      = "::" , stringLiteral ;
+satisfiesDecl    = "satisfies" , "[" , requirementId , { "," , requirementId } , "]" ;
+
+// -----------------------------------------------------------------------------
+// Literals
+// -----------------------------------------------------------------------------
+
+period           = "day" | "week" | "month" | "quarter" | "year" ;
+
+// 2025-01 (month) · 2025-01-15 (day) · 2025-Q1 · 2025-W03 · 2025 (year)
+periodKey        = periodLiteral | date | number ;
+
+// 0.72 and 72% are the same number.
+fraction         = number , [ "%" ] ;
+
+booleanLiteral   = "true" | "false" ;
+
+// -----------------------------------------------------------------------------
+// Lexical elements
+// -----------------------------------------------------------------------------
+
+identifier       = ( letter | "_" ) , { letter | digit | "_" } ;
+typeName         = upperLetter , { letter | digit } ;
+requirementId    = "REQ-" , upperLetter , { upperLetter | digit } , { "-" , upperLetter , { upperLetter | digit } } , "-" , digit , digit , digit ;
+cardinality      = digit , { digit } , ".." , ( digit , { digit } | "n" | "N" ) ;
+number           = [ "-" ] , digit , { digit } , [ "." , digit , { digit } ] ;
+stringLiteral    = '"' , { character - '"' } , '"' ;
+date             = digit , digit , digit , digit , "-" , digit , digit , [ "-" , digit , digit ] ;
+dateTime         = date , "T" , digit , digit , ":" , digit , digit , [ ":" , digit , digit , [ "." , digit , { digit } ] ] , [ "Z" | ( "+" | "-" ) , digit , digit , ":" , digit , digit ] ;
+periodLiteral    = digit , digit , digit , digit , "-" , ( "W" , digit , digit | "Q" , ( "1" | "2" | "3" | "4" ) ) ;
+duration         = digit , { digit } , [ "." , digit , { digit } ] , ( "ms" | "min" | "s" | "h" | "d" | "w" ) ;
+comment          = "//" , { character - newline } , newline
+                 | "#" , { character - newline } , newline ;
+
+// =============================================================================
+// Semantic rules — what the grammar cannot say
+//
+// Each rule carries the conflict code synthy raises when it is broken; the
+// Langium validator raises the same code at edit time.
+// =============================================================================
+//
+//  1. domain-source names a .domain file; every entityRef, memberRef and stateRef
+//     resolves in it. An unknown name is a linking error naming what was expected
+//     and the closest candidate.                                       (SYN-E001, E005)
+//  2. entityRef resolves to an entity, aggregate, read-only entity or value type.
+//  3. A memberRef after a row source is its identity, a field, a reference or a
+//     state machine; after a value-typed field, a field of the value type; after
+//     a reference or an entity-typed field, a member of the target.
+//  4. An outcome's path must name a column of its root's OWN table: it may descend
+//     into value types but not cross a reference.                         (SYN-E006)
+//  5. A measure is numeric (int, integer, long, decimal); a `by` and a `clock` are
+//     date or datetime; a dimension, a `given` and each atom of a rate predicate
+//     are enum or boolean. A `by` is a field of the outcome's entity or of its per
+//     parent (the rows then take their parent's period).                (SYN-E006)
+//  6. Each entity has at most one population; `per` names an entity that has a
+//     population or a given; the range is finite and min <= max; the range
+//     respects the parent's declared cardinality.                   (SYN-E002, E003)
+//  7. horizon.from precedes horizon.to; as-of does not precede horizon.from; a
+//     population's since is a date before horizon.to, on a clock no outcome places
+//     in periods.                                                         (SYN-E010)
+//  8. A curve's and a per-period rate's keys match the period (month 2025-01,
+//     quarter 2025-Q1, week 2025-W03, day 2025-01-15, year 2025) and intersect
+//     the horizon; `over n rows` is given for every period or none, and the rows
+//     sum to the population's count.                                 (SYN-E010, E011)
+//  9. A total needs a count population; so do a curve and a per-period rate by a
+//     field of their own entity. Keyed by the per parent's field, they take the
+//     rows the parent's periods hold, and declare no `over n rows`.      (SYN-E011)
+// 10. Shares list members of the dimension's enum (true/false for a boolean) and
+//     sum to 1; a rate's fraction lies in [0, 1].                    (SYN-E007, E009)
+// 11. A mix names Entity or Entity.Machine; its states are states of that machine,
+//     reachable from [*]; they sum to 1.                                  (SYN-E008)
+// 12. A rate atom on an enum field compares to a member with = or !=; on a boolean
+//     field, to true or false (true when omitted). A rate's atoms read one entity. (SYN-E009)
+// 13. A column a state machine drives is not set by a share or a rate: a compound
+//     rate may read it, a single-atom rate on it is a mix.                (SYN-E009)
+// 14. A rollup's parts entity is declared per the total's entity.         (SYN-E013)
+// 15. One outcome sets a column (a rollup sets its parts); outcomes on one time
+//     axis agree on the period; one mix per entity. A share's `given` is the state
+//     or a column an unconditioned share sets, never the dimension itself. (SYN-E012)
+//     With `given`, every entry is a split per value; without, none is.   (SYN-E007)
+// 16. Each entity has at most one given; a given entity has no per population;
+//     no outcome sets a column the given maps, and no mix applies to given rows;
+//     an enum given is an enum of a value type, which has no population.  (SYN-E014)
+// 16a. A given's columns name columns of its own table (a reference names its key),
+//     each once; an enum given's value type declares a code field. The rows are
+//     read when generating: each cell fits its column's type and constraints,
+//     the state of a walked entity is supplied.                          (SYN-E023)
+// 16b. A locale is a built-in pack; a word list names a text field of a row
+//     source with rows, once, and its values fit the field's length and pattern. (SYN-E024)
+// 16c. A distribution's shape fits its field (numbers: uniform, lognormal, zipf
+//     on whole numbers; dates: uniform; enums, word-listed text, references:
+//     uniform, zipf); sigma and exponent in (0, 5]; median > 0 and within the
+//     field's bounds; one distribution per field.                         (SYN-E025)
+//     On a column a share, a rate or a mix sets, a shape never applies; on a
+//     column a curve, total or rollup sums, a median is ignored.   (warning SYN-W013)
+// 17. alpha > 0; decimals in 0..9; null-rate in [0, 1]; rejections a non-negative
+//     integer; durations are readable.                                    (SYN-E015)
+// 18. A dwell names a transition some machine of the domain declares (warning otherwise).
+// 19. An outcome name is a camelCase identifier; `satisfies` ids are REQ-… identifiers.
+//
+// The same document stored as JSON or YAML is described by the JSON Schema
+// src/schemas/synth-scenario.schema.json (SYNTH-METAMODEL.md, Storage formats);
+// a document that breaks it is refused by synthy with SYN-E022.

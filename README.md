@@ -54,6 +54,8 @@ specy:domain-design       # model a domain from requirements or prose
 specy:architecture-design # design a C4-inspired architecture (.arch) from a .sysreq + .domain
 specy:domain-build-code   # generate code (Java/Spring, TS/NestJS, Clojure) from a .domain
 specy:domain-extract-from-code   # reverse-engineer a .domain from an existing codebase
+specy:synth-design        # a synthetic-data scenario (.synth) from prose: "give me a bad quarter"
+specy:domain-build-fixtures      # certified synthetic data in a project's tests (dbt, Java, TS, Clojure)
 ```
 
 Full options in [Setup](#setup); browse complete models in [`examples/`](./examples).
@@ -109,7 +111,7 @@ The same model can also be rendered to JSON/YAML/Markdown, explored conversation
 
 ## Skills
 
-Specy ships as a single Claude Code plugin — **`specy`** — providing 11 AI-assisted skills: 10 **core**
+Specy ships as a single Claude Code plugin — **`specy`** — providing 13 AI-assisted skills: 12 **core**
 skills named after their input→output artefact, plus 1 **auxiliary** skill. Each is invoked as
 `specy:<name>`.
 
@@ -125,6 +127,8 @@ skills named after their input→output artefact, plus 1 **auxiliary** skill. Ea
 | `specy:architecture-design` | `.sysreq` (incl. NFRs) / `.domain` / prose | `.arch` |
 | `specy:architecture-build-code` | `.arch` + stack-binding artifact | source code (scaffolding) |
 | `specy:architecture-extract-from-code` | codebase, or several systems | `.arch` per system (+ level-0 `organization` file) |
+| `specy:synth-design` | `.domain` + prose ("a bad quarter") | `.synth` scenario (+ a certified dataset) |
+| `specy:domain-build-fixtures` | `.domain` + `.synth` + project | fixtures, certificate tests, `fixtures.report` |
 | `specy:domain-dialogue` *(aux)* | `.domain` | — (read-only conversation) |
 
 ### `specy:prd-design` — Product Requirements
@@ -217,6 +221,30 @@ deployment view, and the `realizes` bridge to domain modules when a `.domain` ex
 systems it also recovers level 0 — dependencies and flows backed by integration code; `masters`,
 patterns and criticality only where evidenced. Stack-specific heuristics for Java/Spring,
 TypeScript/NestJS, Clojure. For business entities from code, use `specy:domain-extract-from-code`.
+
+### `specy:synth-design` — Synthetic-Data Scenarios
+
+**Input:** a `.domain` + prose saying what the data should look like. **Output:** a `.synth` scenario
+that synthy checks as sound, and on request a dataset synthy generates and certifies.
+
+Reads the model (entities, cardinalities, machines, preconditions, bounds), turns "a bad quarter" or
+"a holiday peak" into figures (a revenue curve, a lifecycle mix, a payment split), writes the
+scenario and runs `synthy check` until it is sound, explaining each conflict with
+`synthy explain`. It maps the user's own files as givens, picks a locale, and may write word lists
+of single values (wine names, street names) for the model's text fields. It never writes a row: synthy (the `specy-synthy` package) generates them, with a certificate
+DuckDB re-verifies.
+
+### `specy:domain-build-fixtures` — Fixtures in a Project
+
+**Input:** a `.domain`, a `.synth` and a project. **Output:** certified fixtures where the project's
+tests read them, the certificate as tests of the project's runner, loaders and domain tests, and a
+`fixtures.report`.
+
+Exports the data with `synthy export` (dbt seeds and one singular test per certificate question;
+test resources for Java/Spring, TypeScript/NestJS and Clojure), wires a DuckDB harness into JUnit,
+vitest/jest or clojure.test, writes loaders onto the code `specy:domain-build-code` generated, and
+tests that the code refuses the commands synthy proved must be refused. The report maps each
+requirement to its fixture files and questions.
 
 ### `specy:domain-dialogue` — Domain Exploration *(auxiliary)*
 
@@ -519,6 +547,64 @@ organization RetailMediaCo
 
 The Navigator in [`ui/`](./ui/README.md) renders an `architecture` file as a foldable C4 diagram and an `organization` file as a landscape of its systems — see `ui/README.md`.
 
+### Synthetic-data scenarios (`.synth`)
+
+**Purpose:** Declare what a generated data set must *add up to* for a domain model — how many rows, which revenue curve, which lifecycle mix, which payment split — so that synthy (the `specy-synthy` package) can generate rows that satisfy both the model and the scenario, and certify the result with questions re-verified in SQL. It is not a fifth knowledge layer but Specy's fourth verification loop: data that conforms to the model and to a declared business picture exists, and a certificate proves it.
+
+A `.synth` file is written *against* one `.domain` (`domain-source`) and never restates it: every entity, field, state machine, state and enum member it names is a reference into the model, resolved by the language server, so an unknown name is red in the editor before any row exists. It holds **populations** (`count` or `per` parent), **outcomes** of six kinds — `curve`, `total`, `share`, `mix`, `rate`, `rollup` — **givens** (reference data supplied rather than generated), a **vocabulary**, **distributions** and generator **options**. Proportions are written as fractions or percentages.
+
+Realism never costs conformance:
+- a given (a real catalogue, master data, the instances of an `enum X of ValueType`) maps its file's columns to the model, is checked cell by cell, and flows through unchanged while synthy generates the columns it leaves out;
+- a vocabulary picks a locale pack (`intl`, `en`, `fr`, `de`, `es`, `it`, `nl`, `"en-GB"`, or a pack file) and word lists for single text fields, and swapping packs changes text columns only;
+- distributions (`uniform`, `lognormal`, `zipf`) shape values (skewed prices, best sellers, regulars) without moving an outcome; the certificate's plausibility section compares them with the data.
+
+Outcomes go beyond single columns:
+- a rate's predicate combines atoms with `and`, `or`, `not`;
+- a share can be `given` another column (one split per state, say);
+- a curve on a `per` population is keyed by its parent's clock.
+
+The behaviour comes from the model: synthy walks each state machine and honours its transitions' preconditions, including those that read another row. A reaction's command follows its trigger and a temporal event fires on its deadline. Commands that must be refused are generated as negative fixtures.
+
+**Traceability:** an outcome that states a business figure names the requirement that states it with `satisfies [REQ-…]`; the generator copies the identifiers onto the facts it writes, so a passing certificate question is evidence for that requirement.
+
+<details>
+<summary><b>Example — <code>examples/ecommerce/v2/orders.synth</code></b></summary>
+
+```
+scenario OrdersH1_2025 :: "Six months of e-commerce orders" {
+    domain-source "orders.domain"
+    seed 42
+    horizon 2025-01-01 .. 2025-07-01
+    as-of 2025-07-01T00:00:00Z
+
+    populations {
+        Customer  count 200
+        Order     count 1200
+        OrderLine per Order 1..5
+        Payment   per Order exactly 1
+    }
+
+    outcomes {
+        curve monthlyRevenue Order.totalAmount.amount by Order.placedAt per month {
+            2025-01: 180000
+            2025-02: 195000
+        }
+        mix Order.OrderLifecycle { delivered: 72%  shipped: 6%  confirmed: 8%  draft: 4%  cancelled: 10% }
+        share Payment.method { creditCard: 60%  paypal: 30%  bankTransfer: 10% }
+        rollup Order.totalAmount.amount from OrderLine.total.amount
+        rate Product.available = true : 90%
+    }
+
+    options {
+        dwell { draft --> confirmed : 4h  confirmed --> shipped : 2d }
+    }
+}
+```
+
+</details>
+
+The metamodel is [`src/metamodels/SYNTH-METAMODEL.md`](./src/metamodels/SYNTH-METAMODEL.md), the grammar [`src/grammars/synth.ebnf`](./src/grammars/synth.ebnf). The same scenario is also stored as **JSON or YAML**, for programs and language models: one document in three encodings, described by the JSON Schema [`src/schemas/synth-scenario.schema.json`](./src/schemas/synth-scenario.schema.json) and converted between them without loss (metamodel, [Storage formats](./src/metamodels/SYNTH-METAMODEL.md#storage-formats)). `specy-synth parse -f json|yaml` writes that document from a `.synth` (see [LSP Server](#lsp-server)).
+
 ## Folder Structure
 
 ```
@@ -537,25 +623,32 @@ specy-skill/
 │   │   ├── architecture-design/  # specy:architecture-design source
 │   │   ├── architecture-build-code/    # specy:architecture-build-code source (main.md + heuristics/)
 │   │   ├── architecture-extract-from-code/   # specy:architecture-extract-from-code source (main.md + heuristics/)
+│   │   ├── synth-design/         # specy:synth-design source
+│   │   ├── domain-build-fixtures/      # specy:domain-build-fixtures source (main.md + heuristics/)
 │   │   └── domain-dialogue/      # specy:domain-dialogue source (auxiliary)
 │   ├── grammars/                 # Canonical EBNF grammars (source of truth)
 │   │   ├── domain.ebnf           # Domain model grammar (.domain)
 │   │   ├── architecture.ebnf     # Software architecture grammar (.arch)
 │   │   ├── prd.ebnf              # Product requirements grammar (.prd)
-│   │   └── sysreq.ebnf           # System requirements grammar (.sysreq)
+│   │   ├── sysreq.ebnf           # System requirements grammar (.sysreq)
+│   │   └── synth.ebnf            # Synthetic-data scenario grammar (.synth)
 │   ├── metamodels/               # Metamodel documentation
 │   │   ├── DOMAIN-METAMODEL.md
 │   │   ├── SOFTWARE-ARCHITECTURE-METAMODEL.md
 │   │   ├── PRODUCT-REQ-METAMODEL.md
-│   │   └── SYSTEM-REQ-METAMODEL.md
+│   │   ├── SYSTEM-REQ-METAMODEL.md
+│   │   └── SYNTH-METAMODEL.md    # .synth scenarios written against a .domain
+│   ├── schemas/                  # JSON Schemas of the documents stored as JSON or YAML
+│   │   └── synth-scenario.schema.json  # a scenario as JSON or YAML (the .synth document)
 │   ├── tree-sitters/             # Tree-sitter parser generators + build script
 │   │   ├── build.sh
 │   │   ├── tree-sitter-specy-domain/
 │   │   ├── tree-sitter-specy-architecture/
 │   │   ├── tree-sitter-specy-prd/
-│   │   └── tree-sitter-specy-sysreq/
-│   └── langium/                  # Langium-based LSP server + parser CLI
-│       └── specy-domain/         # .domain language server (parse/validate/JSON)
+│   │   ├── tree-sitter-specy-sysreq/
+│   │   └── tree-sitter-specy-synth/
+│   └── langium/                  # Langium-based LSP server + parser CLIs
+│       └── specy-domain/         # .domain and .synth languages (specy-domain, specy-synth)
 │
 ├── dist/                         # Built `specy` plugin (generated — do not edit)
 │   ├── .claude-plugin/
@@ -571,6 +664,8 @@ specy-skill/
 │       ├── architecture-design/  # SKILL.md + grammar/ + references/
 │       ├── architecture-build-code/    # SKILL.md + heuristics/ + grammar/ + references/
 │       ├── architecture-extract-from-code/   # SKILL.md + heuristics/ + grammars/ + references/
+│       ├── synth-design/         # SKILL.md + grammar/ + references/ + examples/
+│       ├── domain-build-fixtures/      # SKILL.md + heuristics/ + references/
 │       └── domain-dialogue/      # SKILL.md (auxiliary)
 │
 ├── examples/                     # Example Specy projects
@@ -606,7 +701,7 @@ specy-skill/
 
 **`src/tree-sitters/`** — Tree-sitter parser generators for Specy file formats. Used for syntax highlighting, parsing validation, and tooling integration.
 
-**`src/langium/`** — [Langium](https://langium.org/)-based LSP server and parser CLI for the `.domain` DSL. Provides editor diagnostics, AST access, and a `parse` command that emits JSON, YAML, or Markdown. See [LSP Server](#lsp-server) below.
+**`src/langium/`** — [Langium](https://langium.org/)-based LSP server and parser CLIs for the `.domain` and `.synth` DSLs, on one shared service set so a scenario's references resolve into its domain model. Provides editor diagnostics, AST access, `specy-domain parse` (JSON, YAML, Markdown) and `specy-synth parse` (the scenario document synthy reads, as JSON or YAML). See [LSP Server](#lsp-server) below.
 
 **`examples/`** — Complete example projects demonstrating Specy files across different domains. `url-shortener/` carries a single-system `.arch`; `retail-media/` an `organization` landscape with its `.domain`.
 
@@ -666,7 +761,9 @@ The typical workflow follows the traceability chain:
    specy:architecture-extract-from-code Reverse-engineer the architecture from existing code    → .arch
    specy:domain-refactor                Redesign an extracted model from first principles       → .refactored.domain
    specy:sysreq-extract-from-code       Recover EARS requirements from existing code            → .sysreq
-6. specy:domain-dialogue                Explore and question a domain model                     → (read-only)
+6. specy:synth-design                   Declare synthetic data the domain allows                → .synth (+ data)
+   specy:domain-build-fixtures          Put certified data into a project's tests               → fixtures + tests
+7. specy:domain-dialogue                Explore and question a domain model                     → (read-only)
 ```
 
 | Workflow | What to run |
@@ -681,16 +778,19 @@ The typical workflow follows the traceability chain:
 | Reverse-engineer the architecture from code | `specy:architecture-extract-from-code` in your project, or across several repositories |
 | Redesign an extracted model into proper DDD | `specy:domain-refactor` on the extracted `.domain` |
 | Recover EARS requirements from code | `specy:sysreq-extract-from-code` in your project |
+| Declare synthetic data for a domain | `specy:synth-design` with the `.domain` and what the data should show |
+| Seed a project's tests with certified data | `specy:domain-build-fixtures` after the code is generated |
 | Explore and question a domain model | `specy:domain-dialogue` in a project with `*.domain` files |
 
 In your target project, Specy files live under `specy/` at the project root.
 
 ## LSP Server
 
-Specy ships a [Langium](https://langium.org/)-based Language Server and parser CLI for `.domain` files, located in `src/langium/specy-domain/`. It provides:
+Specy ships a [Langium](https://langium.org/)-based Language Server and parser CLIs for `.domain` and `.synth` files, located in `src/langium/specy-domain/`. The two languages run on one shared service set, so a `.synth` scenario resolves its dot-paths into the `.domain` it names with `domain-source`. It provides:
 
-- **Editor integration** — diagnostics, syntax validation, and AST navigation via LSP (VS Code extension entrypoint in `src/extension/main.ts`).
+- **Editor integration** — diagnostics, syntax validation, and AST navigation via LSP (VS Code extension entrypoint in `src/extension/main.ts`; neovim through `vim.lsp.config`). In a `.synth` file, an unknown entity, field, state or enum member is an error naming what was expected and the closest candidate; completion after `Order.totalAmount.` offers the fields of `Money`; editing the `.domain` revalidates the scenarios written against it.
 - **Parser CLI** (`specy-domain`) — parses a `.domain` file into **JSON, YAML, or Markdown**, or validates it from the command line. Since 1.1.0 the JSON output opens with a `parser: { name, version }` header, so consumers such as synthy can pin the shape they understand.
+- **Scenario CLI** (`specy-synth`) — parses a `.synth` file against its `domain-source` into the scenario document synthy reads, as JSON or YAML (`specy-synth parse orders.synth -f yaml`), or validates it (`specy-synth validate`). Semantic rules carry the conflict code synthy would raise (`SYN-E006`, …), so a scenario clean in the editor is one the generator accepts.
 
 ### Build
 
@@ -698,7 +798,7 @@ Specy ships a [Langium](https://langium.org/)-based Language Server and parser C
 ./src/langium/specy-domain/build.sh
 ```
 
-The script runs `npm install`, generates the Langium artifacts, compiles TypeScript to `out/`, and smoke-tests the CLI against the bundled examples in JSON, YAML, and Markdown.
+The script runs `npm install`, generates the Langium artifacts for both languages, compiles TypeScript to `out/`, smoke-tests the CLIs against the bundled examples (every `.domain`, and `orders.synth` against `orders.domain`), and runs the test suite.
 
 ### Parse a `.domain` file
 
@@ -758,6 +858,31 @@ Example JSON output (truncated) for `examples/ecommerce/v2/orders.domain`:
 ```
 
 Parse errors are written to `stderr` with `line:column` locations, and the process exits non-zero.
+
+### Parse a `.synth` scenario
+
+```bash
+cd src/langium/specy-domain
+node out/cli/synth.js validate ../../../examples/ecommerce/v2/orders.synth
+node out/cli/synth.js parse ../../../examples/ecommerce/v2/orders.synth --pretty > orders.synth.json
+node out/cli/synth.js parse ../../../examples/ecommerce/v2/orders.synth -f yaml > orders.synth.yaml
+```
+
+| Flag | Description |
+|------|-------------|
+| `-f, --format <fmt>` | `json` (default) or `yaml`: the same document, valid against `src/schemas/synth-scenario.schema.json` |
+| `--pretty` | Pretty-print JSON output |
+| `--strict` | Exit 1 on any error instead of emitting best-effort output |
+
+The scenario names its model with `domain-source "orders.domain"`, resolved relative to the `.synth` file; the CLI loads both and links every reference. `parse` emits best-effort output on errors unless `--strict` is given. The output opens with `$schema` and `parser: { name: "specy-synth", version }` and carries `domain`, so synthy can run `synthy check orders.synth.yaml` without a second argument. YAML follows the 1.2 core schema and quotes every scalar a YAML 1.1 reader would retype (dates, `yes`, `on`); keys come in the canonical order synthy's writer also uses, so both tools write the same bytes.
+
+A broken scenario reads like compiler output:
+
+```
+orders.synth:12:21 [error SYN-E005] 'totalAmout' is not a member of entity Order. Did you mean 'totalAmount'?
+orders.synth:19:9  [error SYN-E008] Mix of Order.OrderLifecycle sum to 0.9, not 1. Make them sum to 1, or omit a member to leave it at 0.
+orders.synth:23:46 [error SYN-E013] Payment must be declared per Order for the rollup to hold.
+```
 
 ### Validate a `.domain` file
 

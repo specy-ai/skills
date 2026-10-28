@@ -1,7 +1,7 @@
 {
   "name": "specy",
-  "version": "1.0.0",
-  "description": "Specy — a Domain-Driven Design toolkit. Design PRDs, system requirements (EARS), and domain models; generate code from a domain model; and extract requirements or a domain model from existing code.",
+  "version": "1.1.0",
+  "description": "Specy — a Domain-Driven Design toolkit. Design PRDs, system requirements (EARS), and domain models; generate code from a domain model; extract requirements or a domain model from existing code; and write synthetic-data scenarios whose certified data becomes a project's test fixtures.",
   "author": {
     "name": "Jeremie Grodziski",
     "email": "jeremie@defsquare.com"
@@ -16,6 +16,8 @@
     "requirements",
     "ears",
     "code-generation",
-    "reverse-engineering"
+    "reverse-engineering",
+    "synthetic-data",
+    "test-fixtures"
   ]
 }

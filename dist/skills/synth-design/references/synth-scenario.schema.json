@@ -1,0 +1,1082 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specy.ai/schemas/synth-scenario/1.json",
+  "title": "Specy synthetic-data scenario",
+  "description": "A synthetic-data scenario stored as JSON or YAML: the same document `specy-synth parse` emits from a .synth file and synthy reads. Structure only: whether each dot-path, member and state resolves in the .domain is checked by `synthy check`. Metamodel: src/metamodels/SYNTH-METAMODEL.md (Storage formats).",
+  "type": "object",
+  "required": [
+    "populations"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "This schema: https://specy.ai/schemas/synth-scenario/1.json. The trailing major number is the format version synthy checks."
+    },
+    "parser": {
+      "type": "object",
+      "description": "Provenance written by `specy-synth parse`. Writers other than the parser leave it out.",
+      "required": [
+        "name",
+        "version"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      }
+    },
+    "name": {
+      "$ref": "#/$defs/identifier",
+      "description": "Scenario name, an identifier (`scenario Name` in .synth)."
+    },
+    "description": {
+      "type": "string",
+      "description": "What the scenario stands for (`:: \"…\"` in .synth)."
+    },
+    "domain": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The .domain the scenario is written against, relative to the scenario file (`domain-source`). With it, `synthy check <scenario>` needs no domain argument."
+    },
+    "requirementsSource": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The .sysreq the `satisfies` ids come from (`requirements-source`)."
+    },
+    "satisfies": {
+      "$ref": "#/$defs/requirementIds",
+      "description": "Requirement ids the scenario as a whole evidences."
+    },
+    "seed": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        }
+      ],
+      "description": "Seed of every anchored random stream. Same seed and same declarations, same bytes."
+    },
+    "horizon": {
+      "type": "object",
+      "description": "The window every clock falls in, [from, to). Without it clocks fall in 2024 (SYN-W004).",
+      "required": [
+        "from",
+        "to"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "$ref": "#/$defs/instant",
+          "description": "First instant, inclusive (2025-01-01)."
+        },
+        "to": {
+          "$ref": "#/$defs/instant",
+          "description": "End, exclusive (2025-07-01)."
+        }
+      }
+    },
+    "asOf": {
+      "$ref": "#/$defs/instant",
+      "description": "Instant the snapshot tables are observed at (`as-of`). Defaults to the horizon's end."
+    },
+    "populations": {
+      "type": "array",
+      "description": "How many rows of each row source: a count, or a number per parent row.",
+      "items": {
+        "$ref": "#/$defs/population"
+      }
+    },
+    "outcomes": {
+      "type": "array",
+      "description": "What the data must add up to: curve, total, share, mix, rate, rollup.",
+      "items": {
+        "$ref": "#/$defs/outcome"
+      }
+    },
+    "givens": {
+      "type": "array",
+      "description": "Rows supplied rather than generated: inline rows, or a CSV or JSON file next to the scenario.",
+      "items": {
+        "$ref": "#/$defs/given"
+      }
+    },
+    "vocabulary": {
+      "$ref": "#/$defs/vocabulary"
+    },
+    "distributions": {
+      "type": "array",
+      "description": "How single fields' values spread: advisory shapes, never facts. An outcome that fixes a column's sum keeps it; the shape only decides the split.",
+      "items": {
+        "$ref": "#/$defs/distribution"
+      }
+    },
+    "options": {
+      "$ref": "#/$defs/options"
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+    },
+    "path": {
+      "type": "string",
+      "description": "A dot-path into the domain, starting at an entity: Order.totalAmount.amount.",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$"
+    },
+    "requirementIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^REQ-[A-Z][A-Z0-9]*(-[A-Z][A-Z0-9]*)*-\\d{3}$"
+      }
+    },
+    "instant": {
+      "type": "string",
+      "description": "An ISO date (2025-01-01) or date-time (2025-07-01T00:00:00Z). A date-time without offset is UTC.",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}(T\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?(Z|[+-]\\d{2}:\\d{2})?)?$"
+    },
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "fraction": {
+      "description": "A proportion: a number in [0, 1] (0.72) or a percentage string (\"72%\").",
+      "anyOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        {
+          "type": "string",
+          "pattern": "^(100(\\.0+)?|\\d{1,2}(\\.\\d+)?)%$"
+        }
+      ]
+    },
+    "period": {
+      "enum": [
+        "day",
+        "week",
+        "month",
+        "quarter",
+        "year"
+      ]
+    },
+    "periodKey": {
+      "type": "string",
+      "description": "2025 (year), 2025-Q1 (quarter), 2025-01 (month), 2025-W03 (ISO week), 2025-01-15 (day).",
+      "pattern": "^\\d{4}(-(\\d{2}(-\\d{2})?|W\\d{2}|Q[1-4]))?$"
+    },
+    "duration": {
+      "type": "string",
+      "description": "4h, 2d, 45min, 30s, 500ms, 1w, or an ISO duration such as PT2H.",
+      "anyOf": [
+        {
+          "pattern": "^\\s*[Pp](?=.*\\d)([0-9]+(\\.[0-9]+)?[Ww])?([0-9]+(\\.[0-9]+)?[Dd])?([Tt]([0-9]+(\\.[0-9]+)?[Hh])?([0-9]+(\\.[0-9]+)?[Mm])?([0-9]+(\\.[0-9]+)?[Ss])?)?\\s*$"
+        },
+        {
+          "pattern": "^\\s*[0-9]+(\\.[0-9]+)?\\s*([Mm][Ss]|[Ss]([Ee][Cc]([Ss]|[Oo][Nn][Dd][Ss]?)?)?|[Mm]([Ii][Nn]([Ss]|[Uu][Tt][Ee][Ss]?)?)?|[Hh]([Oo][Uu][Rr][Ss]?)?|[Dd]([Aa][Yy][Ss]?)?|[Ww]([Ee][Ee][Kk][Ss]?)?)\\s*$"
+        }
+      ]
+    },
+    "population": {
+      "type": "object",
+      "description": "{ entity, count } or { entity, per, exactly } or { entity, per, min, max }.",
+      "required": [
+        "entity"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "entity": {
+          "$ref": "#/$defs/identifier",
+          "description": "Entity, aggregate root or value type of the domain."
+        },
+        "count": {
+          "$ref": "#/$defs/nonNegativeInteger",
+          "description": "A fixed number of rows."
+        },
+        "per": {
+          "$ref": "#/$defs/identifier",
+          "description": "The parent entity: rows are generated per parent row."
+        },
+        "exactly": {
+          "$ref": "#/$defs/nonNegativeInteger",
+          "description": "Rows per parent, exactly (`per Order exactly 1`)."
+        },
+        "min": {
+          "$ref": "#/$defs/nonNegativeInteger",
+          "description": "Fewest rows per parent (`per Order 1..5`)."
+        },
+        "max": {
+          "$ref": "#/$defs/nonNegativeInteger",
+          "description": "Most rows per parent (`per Order 1..5`)."
+        },
+        "since": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "With count: the rows' clocks fall from this date to the horizon's end, so rows exist before the window (customers who signed up years ago)."
+        },
+        "clock": {
+          "$ref": "#/$defs/identifier",
+          "description": "The date or datetime field that places a row in time. Inferred when omitted."
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "count"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "per"
+                ]
+              },
+              {
+                "required": [
+                  "exactly"
+                ]
+              },
+              {
+                "required": [
+                  "min"
+                ]
+              },
+              {
+                "required": [
+                  "max"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "required": [
+            "per",
+            "exactly"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "count"
+                ]
+              },
+              {
+                "required": [
+                  "min"
+                ]
+              },
+              {
+                "required": [
+                  "max"
+                ]
+              },
+              {
+                "required": [
+                  "since"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "required": [
+            "per",
+            "min",
+            "max"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "count"
+                ]
+              },
+              {
+                "required": [
+                  "exactly"
+                ]
+              },
+              {
+                "required": [
+                  "since"
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "outcome": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "curve",
+            "total",
+            "share",
+            "mix",
+            "rate",
+            "rollup"
+          ],
+          "description": "Which figure the outcome pins."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "curve"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "$ref": "#/$defs/curve"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "total"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "$ref": "#/$defs/total"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "share"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "$ref": "#/$defs/share"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "mix"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "$ref": "#/$defs/mix"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "rate"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "$ref": "#/$defs/rate"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "rollup"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "$ref": "#/$defs/rollup"
+          }
+        }
+      ]
+    },
+    "curve": {
+      "description": "SUM(measure) per period of `by` equals the declared value, exactly, in cents.",
+      "type": "object",
+      "required": [
+        "kind",
+        "measure",
+        "by",
+        "period",
+        "values"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "curve"
+        },
+        "name": {
+          "$ref": "#/$defs/identifier"
+        },
+        "description": {
+          "type": "string"
+        },
+        "satisfies": {
+          "$ref": "#/$defs/requirementIds"
+        },
+        "measure": {
+          "$ref": "#/$defs/path",
+          "description": "A numeric column of a count population: Order.totalAmount.amount."
+        },
+        "by": {
+          "$ref": "#/$defs/path",
+          "description": "The date or datetime column that places a row in a period: Order.placedAt."
+        },
+        "period": {
+          "$ref": "#/$defs/period"
+        },
+        "alpha": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Dirichlet concentration of the split across rows: lower is more skewed."
+        },
+        "values": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/periodKey"
+          },
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "The sum per period: { \"2025-01\": 180000 }."
+        },
+        "counts": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/periodKey"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/nonNegativeInteger"
+          },
+          "description": "Rows per period (`over n rows`). Derived from the values when omitted."
+        }
+      }
+    },
+    "total": {
+      "description": "SUM(measure) over the whole population equals the declared value.",
+      "type": "object",
+      "required": [
+        "kind",
+        "measure",
+        "value"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "total"
+        },
+        "name": {
+          "$ref": "#/$defs/identifier"
+        },
+        "description": {
+          "type": "string"
+        },
+        "satisfies": {
+          "$ref": "#/$defs/requirementIds"
+        },
+        "measure": {
+          "$ref": "#/$defs/path"
+        },
+        "value": {
+          "type": "number"
+        },
+        "alpha": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "share": {
+      "description": "Fraction of rows per member of an enum field, or per true/false of a boolean field. Counts are made exact. With `given`, one split per value of another column of the same rows (the state, or a column another share sets).",
+      "type": "object",
+      "required": [
+        "kind",
+        "dimension",
+        "values"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "share"
+        },
+        "name": {
+          "$ref": "#/$defs/identifier"
+        },
+        "description": {
+          "type": "string"
+        },
+        "satisfies": {
+          "$ref": "#/$defs/requirementIds"
+        },
+        "dimension": {
+          "$ref": "#/$defs/path",
+          "description": "An enum or boolean column: Payment.method."
+        },
+        "given": {
+          "$ref": "#/$defs/path",
+          "description": "The column whose value selects the split: Payment.status."
+        },
+        "values": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/identifier"
+          },
+          "description": "Member to fraction, the fractions summing to 1; with `given`, each value of that column to such a map."
+        }
+      },
+      "if": {
+        "required": [
+          "given"
+        ]
+      },
+      "then": {
+        "properties": {
+          "values": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/split"
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "values": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/fraction"
+            }
+          }
+        }
+      }
+    },
+    "split": {
+      "description": "Member to fraction; the fractions sum to 1.",
+      "type": "object",
+      "propertyNames": {
+        "$ref": "#/$defs/identifier"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/fraction"
+      }
+    },
+    "mix": {
+      "description": "Fraction of rows whose state-machine walk ends in each state. Counts are made exact.",
+      "type": "object",
+      "required": [
+        "kind",
+        "machine",
+        "values"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "mix"
+        },
+        "name": {
+          "$ref": "#/$defs/identifier"
+        },
+        "description": {
+          "type": "string"
+        },
+        "satisfies": {
+          "$ref": "#/$defs/requirementIds"
+        },
+        "machine": {
+          "$ref": "#/$defs/path",
+          "description": "Entity (its first machine) or Entity.Machine: Order.OrderLifecycle."
+        },
+        "values": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/identifier"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/fraction"
+          },
+          "description": "State to fraction; the fractions sum to 1."
+        }
+      }
+    },
+    "rate": {
+      "description": "Fraction of rows satisfying a predicate, overall or per period.",
+      "type": "object",
+      "required": [
+        "kind",
+        "predicate",
+        "values"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "rate"
+        },
+        "name": {
+          "$ref": "#/$defs/identifier"
+        },
+        "description": {
+          "type": "string"
+        },
+        "satisfies": {
+          "$ref": "#/$defs/requirementIds"
+        },
+        "predicate": {
+          "type": "string",
+          "description": "Atoms over enum and boolean columns of one entity (Entity.booleanField, Entity.booleanField = false, Entity.enumField = member, !=) combined with and, or, not and parentheses.",
+          "pattern": "^\\s*(not\\s+|\\(\\s*)*[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*(\\s*!?=\\s*(\"[A-Za-z_][A-Za-z0-9_]*\"|'[A-Za-z_][A-Za-z0-9_]*'|[A-Za-z_][A-Za-z0-9_]*))?(\\s*\\))*(\\s+(and|or)\\s+(not\\s+|\\(\\s*)*[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*(\\s*!?=\\s*(\"[A-Za-z_][A-Za-z0-9_]*\"|'[A-Za-z_][A-Za-z0-9_]*'|[A-Za-z_][A-Za-z0-9_]*))?(\\s*\\))*)*\\s*$"
+        },
+        "by": {
+          "$ref": "#/$defs/path"
+        },
+        "period": {
+          "$ref": "#/$defs/period"
+        },
+        "values": {
+          "description": "One fraction for the whole population, or a fraction per period (then `by` and `period` are required).",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/fraction"
+            },
+            {
+              "type": "object",
+              "propertyNames": {
+                "$ref": "#/$defs/periodKey"
+              },
+              "additionalProperties": {
+                "$ref": "#/$defs/fraction"
+              }
+            }
+          ]
+        }
+      },
+      "if": {
+        "properties": {
+          "values": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "values"
+        ]
+      },
+      "then": {
+        "required": [
+          "by",
+          "period"
+        ]
+      }
+    },
+    "rollup": {
+      "description": "A parent total equals the sum of a child measure over the parent's children.",
+      "type": "object",
+      "required": [
+        "kind",
+        "total",
+        "parts"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "rollup"
+        },
+        "name": {
+          "$ref": "#/$defs/identifier"
+        },
+        "description": {
+          "type": "string"
+        },
+        "satisfies": {
+          "$ref": "#/$defs/requirementIds"
+        },
+        "total": {
+          "$ref": "#/$defs/path",
+          "description": "The parent column: Order.totalAmount.amount."
+        },
+        "parts": {
+          "$ref": "#/$defs/path",
+          "description": "The child column summed per parent: OrderLine.total.amount."
+        }
+      }
+    },
+    "given": {
+      "type": "object",
+      "description": "Rows supplied rather than generated (a catalogue, master data, the instances of an enum of a value type): exactly one of rows, csv, json. Columns the rows do not supply are generated.",
+      "required": [
+        "entity"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "entity": {
+          "$ref": "#/$defs/identifier",
+          "description": "An entity, aggregate, read-only entity or value type, or an enum whose members are instances of a value type."
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          },
+          "description": "Inline rows: [{ \"code\": \"FR\", \"name\": \"France\" }]."
+        },
+        "csv": {
+          "type": "string",
+          "minLength": 1,
+          "description": "A CSV file with a header row, relative to the scenario."
+        },
+        "json": {
+          "type": "string",
+          "minLength": 1,
+          "description": "A JSON file holding an array of rows, relative to the scenario."
+        },
+        "columns": {
+          "type": "object",
+          "description": "Where a path within the entity takes its values when the file spells it otherwise: { \"price.amount\": \"price_eur\" }. Paths not named here match a file column spelled like the path or like the table column (price_amount).",
+          "propertyNames": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "rows"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "csv"
+                ]
+              },
+              {
+                "required": [
+                  "json"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "required": [
+            "csv"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "rows"
+                ]
+              },
+              {
+                "required": [
+                  "json"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "required": [
+            "json"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "rows"
+                ]
+              },
+              {
+                "required": [
+                  "csv"
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "vocabulary": {
+      "type": "object",
+      "description": "Where text columns take their words. Swapping packs changes text columns only.",
+      "additionalProperties": false,
+      "properties": {
+        "locale": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+          "description": "A built-in pack: intl (the default, a European mix), en-US, en-GB, fr-FR, de-DE, es-ES, it-IT, nl-NL, or a language alone (en, fr, de, es, it, nl)."
+        },
+        "pack": {
+          "type": "string",
+          "minLength": 1,
+          "description": "A vocabulary pack file (JSON) next to the scenario; it may extend a built-in pack."
+        },
+        "words": {
+          "type": "array",
+          "description": "Word lists for single text fields.",
+          "items": {
+            "$ref": "#/$defs/wordList"
+          }
+        }
+      }
+    },
+    "wordList": {
+      "type": "object",
+      "description": "The values one text field draws from: a file (one per line, or a JSON list) or the list itself. Exactly one of file, values.",
+      "required": [
+        "field"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "$ref": "#/$defs/fieldPath"
+        },
+        "file": {
+          "type": "string",
+          "minLength": 1
+        },
+        "values": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "file"
+          ],
+          "not": {
+            "required": [
+              "values"
+            ]
+          }
+        },
+        {
+          "required": [
+            "values"
+          ],
+          "not": {
+            "required": [
+              "file"
+            ]
+          }
+        }
+      ]
+    },
+    "distribution": {
+      "type": "object",
+      "description": "One field's shape: uniform; lognormal (median, sigma); zipf (exponent). Numbers, dates (uniform), enums, word-listed text, references.",
+      "required": [
+        "field",
+        "shape"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "$ref": "#/$defs/fieldPath"
+        },
+        "shape": {
+          "enum": [
+            "uniform",
+            "lognormal",
+            "zipf"
+          ]
+        },
+        "median": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "sigma": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "The spread of log values: 0.25 is tight, 1.5 is wide; check refuses more than 5."
+        },
+        "exponent": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "How fast popularity falls with rank; 1 is the classic law; check refuses more than 5."
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "shape": {
+                "const": "uniform"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "median"
+                  ]
+                },
+                {
+                  "required": [
+                    "sigma"
+                  ]
+                },
+                {
+                  "required": [
+                    "exponent"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "shape": {
+                "const": "lognormal"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": [
+                "exponent"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "shape": {
+                "const": "zipf"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "median"
+                  ]
+                },
+                {
+                  "required": [
+                    "sigma"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "options": {
+      "type": "object",
+      "description": "Generation knobs. None of them can break an invariant or an outcome.",
+      "additionalProperties": false,
+      "properties": {
+        "alpha": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Default Dirichlet concentration of exact splits (2 when omitted)."
+        },
+        "decimals": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9,
+          "description": "Decimal places of money-like measures (2 when omitted)."
+        },
+        "nullRate": {
+          "$ref": "#/$defs/fraction",
+          "description": "Probability an optional field is left null when nothing else decides it (0.2 when omitted)."
+        },
+        "defaultDwell": {
+          "$ref": "#/$defs/duration",
+          "description": "Mean dwell of a transition the dwell table does not list (1d when omitted)."
+        },
+        "dwell": {
+          "type": "object",
+          "description": "Mean dwell per transition: { \"draft->confirmed\": \"4h\" } (`draft --> confirmed : 4h` in .synth).",
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^\\s*[A-Za-z_][A-Za-z0-9_]*\\s*->\\s*[A-Za-z_][A-Za-z0-9_]*\\s*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/duration"
+          }
+        },
+        "reactionLatency": {
+          "$ref": "#/$defs/duration",
+          "description": "Longest delay between an event and the command a reaction issues in response (1 minute when omitted)."
+        },
+        "rejections": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Commands to generate per precondition that must be rejected: negative fixtures (3 when omitted, 0 for none)."
+        }
+      }
+    },
+    "fieldPath": {
+      "type": "string",
+      "description": "A path from a row source to one of its fields: Product.name, Customer.shippingAddress.city.",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)+$"
+    }
+  }
+}

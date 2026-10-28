@@ -205,6 +205,31 @@ copy_runtime_files() {
   cp "$REPO_ROOT/src/grammars/architecture.ebnf" "$abc_grammar/architecture.ebnf"
   cp "$REPO_ROOT/src/metamodels/SOFTWARE-ARCHITECTURE-METAMODEL.md" "$abc_refs/SOFTWARE-ARCHITECTURE-METAMODEL.md"
   echo "  architecture-build-code/: 3 heuristics + 1 grammar + 1 reference copied"
+
+  # synth-design: synth grammar + metamodels + scenario schema + a sound example pair
+  local sd_grammar="$SKILLS_OUT/synth-design/grammar"
+  local sd_refs="$SKILLS_OUT/synth-design/references"
+  local sd_examples="$SKILLS_OUT/synth-design/examples"
+  mkdir -p "$sd_grammar" "$sd_refs" "$sd_examples"
+  cp "$REPO_ROOT/src/grammars/synth.ebnf" "$sd_grammar/synth.ebnf"
+  cp "$REPO_ROOT/src/metamodels/SYNTH-METAMODEL.md" "$sd_refs/SYNTH-METAMODEL.md"
+  cp "$REPO_ROOT/src/metamodels/DOMAIN-METAMODEL.md" "$sd_refs/DOMAIN-METAMODEL.md"
+  cp "$REPO_ROOT/src/schemas/synth-scenario.schema.json" "$sd_refs/synth-scenario.schema.json"
+  cp "$REPO_ROOT/examples/ecommerce/v2/orders.domain" "$sd_examples/orders.domain"
+  cp "$REPO_ROOT/examples/ecommerce/v2/orders.synth" "$sd_examples/orders.synth"
+  cp "$REPO_ROOT/examples/ecommerce/v2/catalogue.synth" "$sd_examples/catalogue.synth"
+  cp "$REPO_ROOT/examples/ecommerce/v2/catalogue.csv" "$sd_examples/catalogue.csv"
+  echo "  synth-design/: 1 grammar + 3 references + 4 examples copied"
+
+  # domain-build-fixtures: stack heuristics + synth metamodel
+  local dbf_heuristics="$SKILLS_OUT/domain-build-fixtures/heuristics"
+  local dbf_refs="$SKILLS_OUT/domain-build-fixtures/references"
+  mkdir -p "$dbf_heuristics" "$dbf_refs"
+  for f in dbt.md java-spring.md typescript-nestjs.md clojure.md; do
+    cp "$SCRIPT_DIR/domain-build-fixtures/heuristics/$f" "$dbf_heuristics/$f"
+  done
+  cp "$REPO_ROOT/src/metamodels/SYNTH-METAMODEL.md" "$dbf_refs/SYNTH-METAMODEL.md"
+  echo "  domain-build-fixtures/: 4 heuristics + 1 reference copied"
 }
 
 # -----------------------------------------------------------------------------
@@ -239,6 +264,9 @@ else
   build_skill architecture-design
   build_skill architecture-extract-from-code
   build_skill architecture-build-code
+  # Synthetic data (synthy)
+  build_skill synth-design
+  build_skill domain-build-fixtures
   # Auxiliary skills
   build_skill domain-dialogue
 fi
