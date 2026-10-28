@@ -8,6 +8,8 @@
   <link rel="stylesheet" href="app.css?v=2026-10-20" />
   <!-- node kinds of the organization landscape (areas, systems with their concepts) -->
   <link rel="stylesheet" href="arch-landscape.css?v=2026-10-20" />
+  <!-- Synthetic data tab (synth-view.js) -->
+  <link rel="stylesheet" href="synth.css?v=2026-10-28m7" />
 </head>
 <body>
   <div class="app">
@@ -18,6 +20,7 @@
         <button class="tab" data-view="diagram">Domain Diagram</button>
         <button class="tab" data-view="arch">Architecture diagram</button>
         <button class="tab" data-view="req">Requirements Navigator</button>
+        <button class="tab" data-view="synth">Synthetic data</button>
       </nav>
       <span class="spacer"></span>
       <div class="org-picker">
@@ -57,6 +60,13 @@
   <script src="arch-parser.js?v=2026-10-06"></script>
   <script src="arch-to-diagram.js?v=2026-10-20"></script>
   <script src="arch-concepts.js?v=2026-10-06"></script>
-  <script src="app.js?v=2026-10-20"></script>
+  <!-- Synthetic data tab: the Langium .domain parser and synthy, both built for the
+       browser (specy-skill/src/langium/specy-domain `npm run build:browser`;
+       specy-synthy `npm run build`), copied to vendor/. DuckDB-wasm's worker and
+       module are fetched from jsDelivr the first time a certificate is verified. -->
+  <script src="vendor/specy-domain-langium.js?v=2026-10-28m7"></script>
+  <script src="vendor/synthy.js?v=2026-10-28m7"></script>
+  <script src="synth-view.js?v=2026-10-28m7"></script>
+  <script src="app.js?v=2026-10-24"></script>
 </body>
 </html>

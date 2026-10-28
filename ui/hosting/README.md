@@ -17,6 +17,18 @@ own user records (KV) and serves the models published for the signed-in tenant
 | 5 | CSP, end-to-end tests, checklist | — |
 | 6 | First client | — |
 
+## Synthetic data tab and the CSP (step 5)
+
+The Synthetic data tab runs two vendored bundles (`vendor/synthy.js`,
+`vendor/specy-domain-langium.js`, both in `build.sh`) and, the first time a
+certificate is verified, fetches DuckDB-wasm's worker and module from
+`https://cdn.jsdelivr.net` and starts the worker through a same-origin blob
+URL. When the Content-Security-Policy of step 5 is written it must allow:
+`script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval'`,
+`worker-src 'self' blob:`, `connect-src 'self' https://cdn.jsdelivr.net`.
+Self-hosting the DuckDB files instead (about 36 MB) is a matter of serving
+them and passing `bundles` to `Synthy.createBrowserEngine` in `synth-view.js`.
+
 ## Commands
 
 ```bash

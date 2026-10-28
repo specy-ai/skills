@@ -57,6 +57,7 @@ const MODELS_API = "api/models";
 const NO_CACHE = { cache: "no-cache", headers: { "X-Requested-With": "XMLHttpRequest" } };
 
 const ARCHS = [];            // parsed .arch architectures (arch-parser.js)
+const DOMAIN_TEXT = {};      // organization id → .domain source, for the Synthetic data tab (synth-view.js parses it in the page)
 
 const REQSETS = [];          // parsed requirement sets
 const REQ_BY_ID = {};        // "REQ-FIPRO-001" → requirement object
@@ -130,7 +131,7 @@ buildIndex();
 
 /* ---- State ---- */
 const state = {
-  view: "domain",            // "domain" | "diagram" | "arch" | "req"
+  view: "domain",            // "domain" | "diagram" | "arch" | "req" | "synth"
   /* null until boot when data.js ships no sample (the hosted build) */
   orgId: MODEL.organizations[0]?.id ?? null,
   ctxId: MODEL.organizations[0]?.contexts[0]?.id ?? null,
@@ -597,6 +598,7 @@ function renderTree() {
   if (state.view === "req") { renderReqTree(); return; }
   if (state.view === "diagram") { renderDiagramTree(); return; }
   if (state.view === "arch") { renderArchTree(); return; }
+  if (state.view === "synth") { SpecySynth.renderTree(document.getElementById("tree")); return; }
   const c = ctx();
   const f = state.filter.trim().toLowerCase();
   let html = `<ul><li>${treeRow({ id: "ctx:" + c.id, name: c.name + " — context map", k: null, depth: 0, hasChildren: false })}</li>`;
@@ -1962,6 +1964,7 @@ function renderDetail() {
   document.getElementById("main").classList.toggle("diagram-mode", state.view === "diagram" || state.view === "arch");
   if (state.view === "diagram") { renderDiagramView(target); return; }
   if (state.view === "arch") { renderArchView(target); return; }
+  if (state.view === "synth") { SpecySynth.renderMain(target); return; }
   const hit = INDEX[state.view === "req" ? state.reqSelected : state.selected];
   let html;
   if (!hit) {
@@ -1998,13 +2001,16 @@ function renderHeader() {
 function renderContextSelect() {
   const label = document.getElementById("panel-label");
   const sel = document.getElementById("context-select");
-  document.getElementById("tree-filter").style.display = state.view === "arch" ? "none" : "";
+  document.getElementById("tree-filter").style.display = state.view === "arch" || state.view === "synth" ? "none" : "";
   if (state.view === "arch") {
     const cur = curArch();
     label.textContent = "Architecture";
     sel.innerHTML = ARCHS.map(a =>
       `<option value="${esc(a.id)}"${cur && a.id === cur.id ? " selected" : ""}>${esc(archTitle(a))} (${esc(a.id)}.arch)</option>`).join("")
       || `<option>— no .arch loaded —</option>`;
+  } else if (state.view === "synth") {
+    label.textContent = "Scenario";
+    sel.innerHTML = SpecySynth.selectOptions();
   } else if (state.view === "req") {
     label.textContent = "Requirement set";
     sel.innerHTML = REQSETS.map(s =>
@@ -2104,6 +2110,14 @@ function currentHash() {
   try { return decodeURIComponent(location.hash.slice(1)); } catch (e) { return location.hash.slice(1); }
 }
 function applyHash(hash) {
+  /* `#synth[:<org id>]` — the Synthetic data tab of an organization */
+  if (hash === "synth" || hash.startsWith("synth:")) {
+    if (!MODEL.organizations.length) return false;
+    const o = MODEL.organizations.find(x => x.id === hash.slice("synth:".length));
+    if (o && o.id !== state.orgId) enterOrg(o);
+    state.view = "synth";
+    return true;
+  }
   if (hash.startsWith("arch:")) {
     if (!ARCHS.length) return false;
     const rest = hash.slice("arch:".length), cut = rest.indexOf("/");
@@ -2173,6 +2187,7 @@ document.addEventListener("click", e => {
       if (!ARCHS.some(a => a.id === state.archId)) state.archId = ARCHS.length ? ARCHS[0].id : null;
       syncArchHash();
     }
+    if (state.view === "synth") history.replaceState(null, "", "#synth:" + org().id);
     state.returnTo = null;   // a tab click starts a new path
     state.filter = "";
     document.getElementById("tree-filter").value = "";
@@ -2254,6 +2269,9 @@ document.getElementById("context-select").addEventListener("change", e => {
   } else if (state.view === "req") {
     state.reqSetId = e.target.value;
     state.reqSelected = "reqset:" + e.target.value;
+  } else if (state.view === "synth") {
+    SpecySynth.onSelect(e.target.value);
+    return;
   } else {
     state.ctxId = e.target.value;
     state.selected = "ctx:" + state.ctxId;
@@ -2403,7 +2421,7 @@ function renderEmpty() {
   const byKind = kind => loaded.filter(x => kindOfFile(x.f) === kind).sort((a, b) => a.f.name.localeCompare(b.f.name));
   const stem = (f, ext) => f.name.slice(0, -ext.length);
   for (const { f, text, error } of byKind("domain")) {
-    try { if (error) throw error; MODEL.organizations.push(parseDomain(text, stem(f, ".domain"))); }
+    try { if (error) throw error; const o = parseDomain(text, stem(f, ".domain")); MODEL.organizations.push(o); DOMAIN_TEXT[o.id] = text; }
     catch (e) { console.warn("could not load " + f.name + ":", e); }
   }
   for (const { f, text, error } of byKind("sysreq")) {
@@ -2421,7 +2439,7 @@ function renderEmpty() {
   if (!MODEL.organizations.length) {
     /* architectures or requirements only (a landscape published without its
        .domain): the two domain tabs have nothing to show */
-    document.querySelectorAll(".tab[data-view=domain], .tab[data-view=diagram]").forEach(t => { t.disabled = true; t.title = "No domain model loaded"; });
+    document.querySelectorAll(".tab[data-view=domain], .tab[data-view=diagram], .tab[data-view=synth]").forEach(t => { t.disabled = true; t.title = "No domain model loaded"; });
     if (state.view === "domain" || state.view === "diagram") {
       if (ARCHS.length) { state.view = "arch"; state.archId = ARCHS[0].id; }
       else { state.view = "req"; state.reqSetId = REQSETS[0].id; state.reqSelected = "reqset:" + REQSETS[0].id; }

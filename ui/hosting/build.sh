@@ -24,8 +24,12 @@ domain-to-diagram.js
 arch-parser.js
 arch-to-diagram.js
 arch-concepts.js
+synth-view.js
+synth.css
 assets/specy-ai-logo-white-orbitron.svg
 vendor/specy-diagram-engine.js
+vendor/specy-domain-langium.js
+vendor/synthy.js
 "
 
 rm -rf "$OUT"

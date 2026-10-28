@@ -1,12 +1,13 @@
 # Specy Navigator — HTML prototype
 
-Four header tabs: **Domain Navigator** (browse `.domain` models),
+Five header tabs: **Domain Navigator** (browse `.domain` models),
 **Domain Diagram** (per-module UML-like class diagram rendered by the Specy
 Diagram Engine), **Architecture diagram** (a `.arch` software architecture as
 a nested, foldable C4 diagram — or, for an `organization` file, the landscape
 of its systems with a sheet per system — also rendered by the engine) and
 **Requirements Navigator** (browse `.sysreq` requirement sets per
-SYSTEM-REQ-METAMODEL.md). Traceability is bidirectional: a domain element's
+SYSTEM-REQ-METAMODEL.md) and **Synthetic data** (generate and certify data
+from a `.domain` in the page, see below). Traceability is bidirectional: a domain element's
 `satisfies REQ-…` chips link to the requirement, and each requirement computes
 its **Satisfied by** table by scanning the `satisfies` lists of every loaded
 domain model — with the satisfaction role derived from the element's kind
@@ -376,6 +377,71 @@ symlinks too, to the mission's `specy/` folder (`ffm.domain`, `ffm.arch`,
 `ffm-paysage.arch` — the level-0 file behind `#concepts:ffm`), so the
 Navigator always shows the regenerated models.
 
+## Synthetic data tab
+
+[synthy](../../specy-synthy) in the browser: from the organization's `.domain`
+and a **scenario** — what the data must add up to — it generates tables that
+satisfy both the model (bounds, enums, references, state machines, invariants)
+and the scenario (populations, curves, shares, mixes, rates, rollups), then
+asks DuckDB-wasm every question of a **certificate**. Everything runs in the
+page; nothing is sent anywhere.
+
+- **Left panel** — the scenarios of the organization (kept in `localStorage`
+  under `specy-synth:<org id>`, so they survive a reload and never leave the
+  browser), `new scenario…`, and the plan outline once the scenario checks:
+  each entity, its population and the rows it will produce.
+- **Scenario dropdown** (in place of the bounded-context one) — the same list,
+  plus `+ new scenario`.
+- **Main panel** — the scenario editor: `.synth` text, parsed in the page against
+  the organization's `.domain` by the Langium bundle, so an unknown entity, field,
+  state or member is an error with its line and the closest name before synthy
+  runs; the same scenario as JSON or YAML is read too (a `YAML` or `JSON` chip and
+  `Convert to .synth` then show in the toolbar), `Import…` opens a `.synth`,
+  `.synth.json` or `.synth.yaml` file as a new scenario (JSON and YAML arrive as
+  `.synth`), and `Download scenario` writes it in any of the three; a `Reset to
+  starter` that derives a feasible first scenario from
+  the model (one population per entity, children `per` their parent when a
+  collection reference or a lifecycle says so); the **check** card, updated as
+  you type: conflicts as compiler errors (`SYN-E…` code, the declarations that
+  cannot all hold, the arithmetic, a remedy) or `Feasible` with the plan table
+  and the warnings (`SYN-W…`, what synthy reports but does not enforce);
+  **Generate**, **Verify with DuckDB**, **Download .zip**; the certificate
+  (hard questions that must hold, advisory ones for soft bounds, each
+  expandable to its SQL, expected and observed, `certificate.json` to
+  download); the table preview — one tab per table including the
+  `synthy_events` / `synthy_commands` / `synthy_transitions` logs, column
+  roles (identity, fk, state, clock, synthetic), first 50 rows, CSV per table.
+- Deep link: `#synth:<org id>`.
+
+A scenario above 50 000 rows is refused in the page (`SYN-E020`) and pointed
+to the command line (`synthy generate`); the zip is the folder the CLI writes
+(`<Table>.csv`, `manifest.json`, `questions.json`, `questions.sql`,
+`certificate.json`, `scenario.json`), so `synthy verify <dir>` re-certifies a
+download with nothing but the files.
+
+Two vendored bundles do the work, both built elsewhere and copied into
+`vendor/` like the diagram engine:
+
+- `vendor/specy-domain-langium.js` — the Langium `.domain` parser of
+  `src/langium/specy-domain` (`npm run build:browser` there), exposing
+  `window.SpecyDomainLangium.parseDomain(text, name) → { model, diagnostics, ok }`,
+  the same clean model `specy-domain parse` prints: strict where
+  `domain-parser.js` is tolerant, so a model with parse errors shows them here
+  and still browses in the other tabs. The source text of every `.domain` the
+  server listed is kept at boot (`DOMAIN_TEXT`); the `data.js` samples have
+  none and the tab says so.
+- `vendor/synthy.js` — `specy-synthy` (`npm run build` there, from
+  `dist/bundle/synthy.js`), exposing `window.Synthy`. DuckDB-wasm's worker and
+  module (about 36 MB) are fetched from jsDelivr the first time a certificate
+  is verified, not before, and kept for the session.
+
+`synth-view.js` (`window.SpecySynth`) renders the tab; `app.js` only routes to
+it (`renderTree`, `renderMain`, `selectOptions`, `onSelect`) when
+`state.view === "synth"`. `synth.css` holds its styles. The end-to-end test
+lives with synthy (`specy-synthy/test/app.test.ts`: serves this folder like
+`serve.sh`, drives the tab in Chromium, answers the jsDelivr requests from
+`node_modules`).
+
 ## Checking the converters
 
 ```bash
@@ -517,6 +583,11 @@ and `emits` gives each event its `raised by`).
   `proposals/navigator-hosting.md`)
 - `vendor/specy-diagram-engine.js` — the Specy Diagram Engine bundle
   (built in `../diagram-engine` with `npm run build`, copied here)
+- `vendor/specy-domain-langium.js` — the Langium `.domain` parser for the page
+  (built in `src/langium/specy-domain` with `npm run build:browser`, copied here)
+- `vendor/synthy.js` — specy-synthy for the page (built in `../../specy-synthy`
+  with `npm run build`, `dist/bundle/synthy.js` copied here)
+- `synth-view.js` / `synth.css` — the Synthetic data tab (`SpecySynth`)
 - `scripts/check-diagram-export.mjs` — converter contract check + engine fixtures
 - `scripts/merge-arch.mjs` — merges single-system `.arch` files into one landscape (`ffm.arch` from `ffm.arch-sources/`)
 - `scripts/check-arch-export.mjs` — architecture converter contract check +
