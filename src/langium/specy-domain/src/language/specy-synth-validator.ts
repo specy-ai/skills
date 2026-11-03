@@ -8,12 +8,13 @@
  * outcome has a kind, a given has one source. What the linker enforces is absent
  * too: an unknown entity, field, state or member is a linking error.
  */
-import { DefaultDocumentValidator, type AstNode, type LangiumCoreServices, type LangiumDocument, type LangiumDocuments, type ValidationAcceptor, type ValidationChecks, type ValidationOptions } from 'langium';
+import { AstUtils, DefaultDocumentValidator, type AstNode, type LangiumCoreServices, type LangiumDocument, type LangiumDocuments, type ValidationAcceptor, type ValidationChecks, type ValidationOptions } from 'langium';
 import type { Diagnostic } from 'vscode-languageserver-types';
 import * as ast from '../generated/ast.js';
 import type { SpecySynthServices } from './specy-synth-module.js';
-import { DomainAstIndex, NUMERIC_PRIMITIVES, TEMPORAL_PRIMITIVES, domainOf, givenRowsOf, isEntityLike, isMachineStep, isRowSource, previousOf, type ResolvedSynthPath } from './specy-synth-domain-index.js';
-import { pathText } from './specy-synth-linker.js';
+import { DomainAstIndex, NUMERIC_PRIMITIVES, TEMPORAL_PRIMITIVES, domainOf, givenRowsOf, isEntityLike, isMachineStep, isRowSource, previousOf, type LeafType, type ResolvedSynthPath } from './specy-synth-domain-index.js';
+import { closestName, pathText } from './specy-synth-linker.js';
+import { SYNTH_KIND_NAMES, synthKind, type KindTarget } from './synth-kinds.js';
 
 export function registerSynthValidationChecks(services: SpecySynthServices): void {
     const registry = services.validation.ValidationRegistry;
@@ -38,6 +39,7 @@ export function registerSynthValidationChecks(services: SpecySynthServices): voi
         GivenDecl: validator.checkGiven,
         VocabularyBlock: validator.checkVocabulary,
         WordListDecl: validator.checkWordList,
+        BindingDecl: validator.checkBinding,
         DistributionsBlock: validator.checkDistributionsDistinct,
         DistributionDecl: validator.checkDistribution,
     };
@@ -529,6 +531,12 @@ export class SpecySynthValidator {
             if (seen.has(text)) accept('error', `${text} has two word lists.`, { node: w, property: 'field', code: 'SYN-E024' });
             seen.add(text);
         }
+        const bound = new Set<string>();
+        for (const b of v.bindings) {
+            const text = pathText(b.target);
+            if (bound.has(text)) accept('error', `${text} has two bindings.`, { node: b, property: 'target', code: 'SYN-E024' });
+            bound.add(text);
+        }
     }
 
     checkWordList(w: ast.WordListDecl, accept: ValidationAcceptor): void {
@@ -560,6 +568,81 @@ export class SpecySynthValidator {
             else if (minLength !== undefined && x.length < Number(minLength)) accept('error', `"${x}" is shorter than minLength(${minLength}) of ${text}.`, { node: w, property: 'values', index: i, code: 'SYN-E024' });
             else if (re && !re.test(x)) accept('error', `"${x}" does not match pattern(${pattern}) of ${text}.`, { node: w, property: 'values', index: i, code: 'SYN-E024' });
         });
+    }
+
+    /**
+     * `Iban as iban`, `Customer.email as email`: a known kind, on a leaf it applies to
+     * (a text, numeric or money-shaped field, or a value type with one such field),
+     * whose minLength/maxLength leave room for what the kind produces. Any entity or
+     * value type may head the path, with or without rows: synthy applies the binding
+     * wherever the type occurs.
+     */
+    checkBinding(b: ast.BindingDecl, accept: ValidationAcceptor): void {
+        if (!b.kind) return;
+        const kind = synthKind(b.kind);
+        if (!kind) {
+            const best = closestName(b.kind, SYNTH_KIND_NAMES);
+            accept('error', `Unknown kind "${b.kind}".${best ? ` Did you mean '${best}'?` : ''} Kinds: ${SYNTH_KIND_NAMES.join(', ')}.`, { node: b, property: 'kind', code: 'SYN-E024' });
+            return;
+        }
+        const index = this.indexOf(b);
+        const r = index && b.target ? index.resolvePath(b.target) : undefined;
+        if (!index || !r) return; // a linking error already marks the unknown segment
+        const text = pathText(b.target);
+        const at = { node: b, property: 'target' as const, code: 'SYN-E024' };
+        const refuse = (why: string) => accept('error', `${kind.name} applies to ${KIND_TARGETS[kind.applies]}; ${why}`, at);
+        const last = r.last;
+        if (r.viaReference) {
+            const owner = AstUtils.getContainerOfType(last, isRowSource);
+            const fix = (ast.isFieldDecl(last) || ast.isIdentityDecl(last)) && owner && !(r.leaf.kind === 'entity' || r.leaf.kind === 'collection') ? ` Bind ${owner.name}.${last.name} as ${kind.name} instead.` : '';
+            return refuse(`${text} is reached through a reference.${fix}`);
+        }
+        const leaf = r.leaf.kind === 'collection' && r.leaf.element ? r.leaf.element : r.leaf;
+        let field: ast.FieldDecl | ast.IdentityDecl | undefined;
+        let fieldText = text;
+        if (leaf.kind === 'entity') {
+            return refuse(`${text} is an entity: name one of its fields (${text}.<field> as ${kind.name}).`);
+        } else if (leaf.kind === 'value' && ast.isValueDef(leaf.def)) {
+            const vt = leaf.def;
+            const fields = vt.fields?.fields ?? [];
+            const texts = fields.filter(f => isTextType(index.typeOf(f.type)));
+            const numbers = fields.filter(f => isNumericType(index.typeOf(f.type)));
+            const what = kind.applies === 'text' ? 'text' : 'numeric';
+            const wanted = kind.applies === 'text' ? texts : numbers;
+            const subject = last === r.root ? vt.name : `${text} (${vt.name})`;
+            if (wanted.length === 0) return refuse(`${subject} has no ${what} field.`);
+            if (wanted.length > 1) {
+                accept('error', `${subject} has ${wanted.length} ${what} fields (${wanted.map(f => f.name).join(', ')}); name the one ${kind.name} applies to: ${text}.${wanted[0].name} as ${kind.name}.`, at);
+                return;
+            }
+            if (kind.applies === 'money' && texts.length > 1) {
+                accept('error', `money takes a value type with one numeric field (the amount) and at most one text field (the currency); ${subject} has ${texts.length} text fields (${texts.map(f => f.name).join(', ')}). Name the amount: ${text}.${wanted[0].name} as money.`, at);
+                return;
+            }
+            field = wanted[0];
+            fieldText = `${text}.${field.name}`;
+        } else if (leaf.kind === 'primitive') {
+            if (!(kind.applies === 'text' ? isTextType(leaf) : isNumericType(leaf))) return refuse(`${text} is ${leaf.name}.`);
+            field = ast.isFieldDecl(last) || ast.isIdentityDecl(last) ? last : undefined;
+        } else if (leaf.kind === 'unknown') {
+            return; // a type the domain does not define here: synthy decides
+        } else {
+            return refuse(`${text} is ${leaf.kind === 'machine' ? 'a state machine' : leaf.kind === 'enum' ? `enum ${leaf.name}` : leaf.name}.`);
+        }
+        // the lengths the kind produces must meet the field's minLength..maxLength
+        if (!kind.length || !ast.isFieldDecl(field)) return;
+        const bound = (k: 'minLength' | 'maxLength') => {
+            const v = field.constraints.find(c => c.kind === k)?.numValue;
+            return v === undefined || Number.isNaN(Number(v)) ? undefined : Number(v);
+        };
+        const minLength = bound('minLength');
+        const maxLength = bound('maxLength');
+        const produces = kind.length.min === kind.length.max ? `${kind.length.min} characters` : `${kind.length.min} to ${kind.length.max} characters`;
+        if (maxLength !== undefined && kind.length.min > maxLength) {
+            accept('error', `${kind.name} produces ${produces}; ${fieldText} allows at most ${maxLength} (maxLength(${maxLength})).`, at);
+        } else if (minLength !== undefined && kind.length.max < minLength) {
+            accept('error', `${kind.name} produces ${produces}; ${fieldText} needs at least ${minLength} (minLength(${minLength})).`, at);
+        }
     }
 
     // ------------------------------------------------------------ distributions
@@ -740,6 +823,21 @@ export class SpecySynthValidator {
  */
 export const BUILT_IN_LOCALES = ['intl', 'en-US', 'en-GB', 'fr-FR', 'de-DE', 'es-ES', 'it-IT', 'nl-NL'];
 const LOCALE_ALIASES: Record<string, string> = { en: 'en-US', fr: 'fr-FR', de: 'de-DE', es: 'es-ES', it: 'it-IT', nl: 'nl-NL', gb: 'en-GB', us: 'en-US' };
+
+/** What a kind applies to, as SYN-E024 says it. */
+const KIND_TARGETS: Record<KindTarget, string> = {
+    text: 'text fields, or a value type with one text field',
+    number: 'numeric fields, or a value type with one numeric field',
+    money: 'numeric fields, or a value type with one numeric field (the amount) and at most one text field (the currency)',
+};
+
+function isTextType(t: LeafType): boolean {
+    return t.kind === 'primitive' && (t.name === 'string' || t.name === 'text');
+}
+
+function isNumericType(t: LeafType): boolean {
+    return t.kind === 'primitive' && NUMERIC_PRIMITIVES.has(t.name);
+}
 
 export function canonicalLocale(locale: string): string | undefined {
     const t = locale.trim().toLowerCase();

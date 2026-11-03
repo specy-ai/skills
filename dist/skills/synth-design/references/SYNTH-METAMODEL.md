@@ -20,6 +20,7 @@
   - [Dot-path](#dot-path)
   - [Given](#given)
   - [Vocabulary](#vocabulary)
+  - [Typed values](#typed-values)
   - [Distributions](#distributions)
   - [Options](#options)
   - [The domain's behaviour in the data](#the-domains-behaviour-in-the-data)
@@ -322,6 +323,7 @@ vocabulary {
     pack "vocab/fr-ch.json"                     // a pack file, next to the scenario
     Product.name words "vocab/wines.txt"        // one value per line, or a JSON list of strings
     Customer.segment words [ "retail", "pro" ]
+    AccountNumber as iban                       // a kind of typed value (see Typed values)
 }
 ```
 
@@ -333,6 +335,52 @@ vocabulary {
 Relations:
 - 0..1 "draws from" relation with a vocabulary pack
 - 0..n "lists the words of" relation with text fields of the domain model
+- 0..n "binds a kind to" relation with value types and fields of the domain model (see Typed values)
+
+## Typed values
+
+A value type of the domain names a concept: `EmailAddress`, `Iban`, `Siret`, `Percentage`. synthy generates valid instances of that concept, not strings that look like one, and the certificate asks what the model declares about them. A **kind** is such a concept with a generator and a test of validity:
+
+| Kind | Generates | The certificate also asks |
+|---|---|---|
+| `email` | the row's person at an example domain: `camille.martin214@example.org` | |
+| `phone` | a number in the pack's reserved fiction ranges, in the row's country | |
+| `url` | an https URL at `www.example.com` | |
+| `slug` | lowercase words joined by hyphens | |
+| `postcode` | the postal code of the row's place | |
+| `iban` | an IBAN of the row's country, its national and mod-97 check digits right | mod-97 and the country's length |
+| `bic` | a BIC of a bank in the row's country | |
+| `siren` | a French company number, the row's company | Luhn |
+| `siret` | the row's SIREN, an establishment number, Luhn over the 14 digits | Luhn |
+| `vat` | a VAT number of the row's country (FR, DE, IT, ES, NL, BE, GB) | the country's check |
+| `isbn` | an ISBN-13 in the registration group of the row's language | GS1 check digit |
+| `ean` | an EAN-13 with the GS1 prefix of the row's country | GS1 check digit |
+| `card` | a payment card number in a processor test range | Luhn |
+| `color` | a hex color, `#rrggbb` | |
+| `ip` | an IPv4 address in the documentation blocks (RFC 5737) | |
+| `plate` | a licence plate shaped like the row's country's | |
+| `percentage` | a number in `[0, 100]`, within the field's own bounds | |
+| `money` | an amount of the scenario's decimals, never negative, and the pack's currency | |
+| `text` | no kind: the field's pattern or its name decides | |
+
+A field gets its kind by precedence:
+
+1. **A binding** in the vocabulary: `Iban as iban` (a value type with one text field), `Iban.value as iban` (one field of a value type, wherever it is used), `BankAccount.iban as iban` or `Customer.contact as phone` (a field reached from an entity, at that place only). `percentage` binds a numeric field; `money` a value type with one numeric field and at most one text field, or a numeric field.
+2. **A name**: of the value type that holds the field (`EmailAddress.value`, `PhoneNumber.number`), of the field itself (`Customer.email`, `Company.siret`), or of the field that holds its value type (`BankAccount.iban : AccountNumber`). A name calls for a kind only when the kind's values can satisfy the field's pattern and lengths.
+3. **The pattern**: without a kind, a text field with a `pattern(...)` is generated from the pattern.
+4. Otherwise, the field's name chooses words from the pack: a person, a place, a company, a sentence, a code.
+
+- **The pattern constrains every kind.** A kind's value that does not match the field's pattern or lengths is drawn again, then the pattern's own generator takes over. A kind reads a country the pattern fixes: `pattern("^FR\\d{2}[A-Z0-9]{23}$")` gives French IBANs whatever the pack. Otherwise it writes the row's country, and Germany for a country it has no format for.
+- **One row, one company.** The SIREN, the SIRET and the French VAT number of a row agree, and an IBAN and a BIC carry the row's country.
+- **Safe values.** Phones lie in the ranges regulators keep for fiction, addresses at example domains, IPs in the documentation blocks, card numbers in processor test ranges.
+- **Text only.** A typed value draws from a stream of its own, like every text value: swapping packs still changes text columns only.
+- **Bindings are checked** (SYN-E024): an unknown kind, a target that is an entity alone, a field of another sort than the kind's, a value type with several candidate fields, a path through a reference, or a kind none of whose values fits the field's lengths or pattern. A name whose kind the field's constraints rule out is a warning (SYN-W017), and `text` says on purpose that a field is not what its name suggests.
+- **Givens meet the same definition.** A given cell of a typed column must be a valid instance of the kind: an IBAN failing mod-97 in a file is SYN-E023.
+- **Patterns** are read in the subset synthy generates from and DuckDB reads as JavaScript does: literals and escapes, classes (`[a-z0-9_]`, `[^@]`), `.`, `\d \w \s` and their negations, quantifiers (`* + ? {n} {n,} {n,m}`), groups (`( )`, `(?: )`, `(?<name> )`), alternation and the anchors `^ $`. Lookahead, lookbehind, backreferences, `\b`, `\p{…}` and POSIX classes are a warning (SYN-W016): values come from the field's kind or name and may not match, and no question asks about the pattern.
+- **The domain stays free of generation concerns.** No annotation is added to the domain language; the value type's name and constraints are the domain's own words, and the binding lives in the scenario.
+
+Relations:
+- 0..1 "realised by" relation between a value type or a field of the domain model and a kind
 
 ## Distributions
 
@@ -486,6 +534,7 @@ options:
 | `Product csv "c.csv" { price.amount from "price_eur" }` | `{ entity: Product, csv: c.csv, columns: { "price.amount": price_eur } }` |
 | `vocabulary { locale fr  pack "p.json" }` | `vocabulary: { locale: fr, pack: p.json }` |
 | `Product.name words "w.txt"` · `words [ "a", "b" ]` | `vocabulary: { words: [ { field: Product.name, file: w.txt } ] }` · `values: [a, b]` |
+| `Iban as iban` · `Customer.contact as phone :: "…"` | `vocabulary: { bindings: [ { target: Iban, kind: iban } ] }` · `description` |
 | `P lognormal median 25 sigma 0.9` · `P zipf 1.6` · `P uniform` | `distributions: [ { field: P, shape: lognormal, median: 25, sigma: 0.9 } ]` · `{ shape: zipf, exponent: 1.6 }` |
 | `alpha 2` · `decimals 2` · `null-rate 5%` · `default-dwell 1d` | `options: { alpha, decimals, nullRate: 0.05, defaultDwell: 1d }` |
 | `dwell { draft --> confirmed : 4h }` | `options: { dwell: { "draft->confirmed": 4h } }` |
@@ -560,8 +609,8 @@ The generator refuses only on arithmetic impossibility and dangling references, 
 | `SYN-E020` | the in-browser build would produce more than 50 000 rows (the CLI has no such cap) |
 | `SYN-E021` | the parsed domain model comes from a `specy-domain` older than 1.1.0, or from an unknown tool |
 | `SYN-E022` | a JSON or YAML document is malformed: an unknown key, a wrong type, a form `.synth` cannot write, YAML outside the core schema |
-| `SYN-E023` | a given does not fit the model: a cell of the wrong type, out of a bound, length or pattern, not a member, empty where required, repeated where unique, breaking an invariant, a state the machine lacks; a mapped column or file column that does not exist; an enum given whose value type has no code field |
-| `SYN-E024` | the vocabulary names an unknown locale or a malformed pack, or a word list does not fit its field (not text, too long, against the pattern, too few words for a unique field) |
+| `SYN-E023` | a given does not fit the model: a cell of the wrong type, out of a bound, length or pattern, not a member, empty where required, repeated where unique, breaking an invariant, a state the machine lacks, a value that is not a valid instance of its column's kind; a mapped column or file column that does not exist; an enum given whose value type has no code field |
+| `SYN-E024` | the vocabulary names an unknown locale or a malformed pack; a word list does not fit its field (not text, too long, against the pattern, too few words for a unique field); a binding names an unknown kind, a target it cannot apply to, or a kind whose values cannot fit the field's lengths or pattern |
 | `SYN-E025` | a distribution does not fit its field, has a parameter out of range or a median outside the bounds, or shapes text that has no word list |
 
 Warnings (`SYN-Wxxx`) report what the generator decided for the author:
@@ -583,6 +632,8 @@ Warnings (`SYN-Wxxx`) report what the generator decided for the author:
 | `SYN-W013` | a declaration that never applies: a distribution or a word list on a column an outcome sets, a given supplies or an invariant computes; a median on a summed column; `since` on an entity without a clock |
 | `SYN-W014` | a column of a given file that matches no field: it is ignored |
 | `SYN-W015` | an enum of a value type with no given instance for some members |
+| `SYN-W016` | a pattern synthy cannot generate from (lookaround, backreference, `\b`, `\p{…}`): its values may not match, and no question asks about it |
+| `SYN-W017` | a value type or field named like a kind whose values its pattern or lengths rule out: it follows the pattern or its name instead |
 
 The Langium language server raises the same codes at edit time, including for a name that does not resolve: `SYN-E001` for an entity, `SYN-E005` for a path segment, `SYN-E007`, `SYN-E008` and `SYN-E009` for a member, a machine or a state, `SYN-E023` for a given's column. A `.synth` that is clean in the editor is one the generator accepts. `synthy explain <code>`, and the `explain_conflict` tool of synthy's MCP server, give each code's rule, its usual causes, what to change and a before/after written against the orders example.
 
@@ -611,6 +662,7 @@ Every outcome becomes one or more **facts**, written from the declaration before
 
 The domain contributes its own facts:
 - cardinalities of references, bounds of fields, enum members;
+- the pattern, minimum and maximum length of every text column, and, for a column whose kind has a check digit (IBAN, SIREN, SIRET, VAT number, ISBN, EAN, card number), that every value has a valid one;
 - the state column's allowed values and the consistency of a walk's timestamps;
 - each enforced precondition, held at every transition it guards: the state a joined row was in at that instant is read from the transition log;
 - each forced transition, which happened within the reaction latency of its trigger;

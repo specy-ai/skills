@@ -273,12 +273,16 @@ RowArray:
 // Vocabulary — where text columns take their words: a locale pack (built-in, or a
 // pack file that may extend one) and word lists for single text fields. Swapping
 // packs changes text columns only; numbers, dates, enums stay byte-identical.
+// A binding names the kind of value synthy generates for a value type or a field
+// (the kinds are listed in synth-kinds.ts). Word lists and bindings interleave.
 //
 //   vocabulary {
 //       locale fr                                       intl (default), en, fr, de, es, it, nl, "en-GB", ...
 //       pack "vocab/fr-ch.json"                         a pack file
 //       Product.name words "vocab/wines.txt"            one value per line, or a JSON list
 //       Customer.segment words [ "retail", "pro" ]
+//       Iban as iban                                    a value type with one text field
+//       BankAccount.holder.contact as phone             a field, as word lists name it
 //   }
 // -----------------------------------------------------------------------------
 
@@ -286,7 +290,7 @@ VocabularyBlock:
     'vocabulary' '{'
         ('locale' locale=LocaleName)?
         ('pack' pack=STRING)?
-        (words+=WordListDecl)*
+        (words+=WordListDecl | bindings+=BindingDecl)*
     '}';
 
 LocaleName returns string:
@@ -294,6 +298,12 @@ LocaleName returns string:
 
 WordListDecl:
     field=SynthPath 'words' (file=STRING | '[' (values+=STRING (','? values+=STRING)*)? ']')
+    description=Description?;
+
+// The kind is an identifier, not a keyword per kind: an unknown one is a
+// validation error naming the closest kind, not a syntax error.
+BindingDecl:
+    target=SynthPath 'as' kind=SynthIdent
     description=Description?;
 
 // -----------------------------------------------------------------------------
@@ -401,7 +411,7 @@ SynthKeywordAsIdent returns string:
     | 'curve' | 'total' | 'share' | 'mix' | 'rate' | 'rollup' | 'exactly' | 'from'
     | 'day' | 'week' | 'month' | 'quarter' | 'year' | 'given' | 'rejections'
     | 'vocabulary' | 'locale' | 'pack' | 'words' | 'distributions' | 'uniform' | 'lognormal' | 'median' | 'sigma' | 'zipf'
-    | 'since';
+    | 'since' | 'as';
 
 SynthIdent returns string:
     ID | TYPE_NAME | SynthKeywordAsIdent;

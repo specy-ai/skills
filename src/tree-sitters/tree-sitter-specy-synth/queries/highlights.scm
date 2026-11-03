@@ -42,11 +42,13 @@
 "since" @keyword
 "pack" @keyword
 "words" @keyword
+"as" @keyword
 "median" @keyword
 "sigma" @keyword
 "uniform" @function.builtin
 "lognormal" @function.builtin
 "zipf" @function.builtin
+(kind_name) @function.builtin
 "dwell" @keyword
 "satisfies" @keyword
 "alpha" @keyword

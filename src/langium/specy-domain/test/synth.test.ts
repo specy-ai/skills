@@ -7,6 +7,10 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseDomain, parseSynth, type ParseDiagnostic } from '../src/browser.js';
+import { EmptyFileSystem } from 'langium';
+import { expectCompletion } from 'langium/test';
+import { createSpecyLspServices } from '../src/language/specy-synth-module.js';
+import { SYNTH_KIND_NAMES } from '../src/language/synth-kinds.js';
 
 const examples = resolve(import.meta.dirname, '../../../../examples/ecommerce/v2');
 const domainText = readFileSync(resolve(examples, 'orders.domain'), 'utf8');
@@ -234,6 +238,8 @@ describe("the planner's rules at edit time", () => {
         const ok = await parseSynth(scenario('populations { Customer count 10 }\n vocabulary {\n locale "en-GB"\n pack "vocab/uk.json"\n Customer.name words "names.txt" :: "real names"\n Customer.shippingAddress.city words [ "Leeds", "York" ]\n }'), domainText);
         expect(errors(ok.diagnostics)).toEqual([]);
         expect(ok.scenario.vocabulary).toEqual({ locale: 'en-GB', pack: 'vocab/uk.json', words: [{ field: 'Customer.name', file: 'names.txt', description: 'real names' }, { field: 'Customer.shippingAddress.city', values: ['Leeds', 'York'] }] });
+        // no bindings, no key for them: a document written before bindings keeps its bytes
+        expect(JSON.stringify(ok.scenario.vocabulary)).toBe('{"locale":"en-GB","pack":"vocab/uk.json","words":[{"field":"Customer.name","file":"names.txt","description":"real names"},{"field":"Customer.shippingAddress.city","values":["Leeds","York"]}]}');
         const bad = await parseSynth(scenario('populations { Customer count 10\n Order count 5 }\n vocabulary {\n locale klingon\n Order.totalAmount.amount words [ "x" ]\n Customer.shippingAddress.zipCode words [ "75001", "SW1A 1AA-LONDON" ]\n Customer.name words [ "a" ]\n Customer.name words [ "b" ]\n }'), domainText);
         expect(messages(errors(bad.diagnostics)).map(m => m.split(';')[0].split('. ')[0])).toEqual([
             'SYN-E024 Unknown locale "klingon"',
@@ -274,3 +280,101 @@ describe("the planner's rules at edit time", () => {
     });
 });
 
+describe('typed values: vocabulary bindings', () => {
+    it('parses bindings among word lists, in the canonical key order', async () => {
+        const r = await parseSynth(scenario('populations { Customer count 10 }\n vocabulary {\n EmailAddress as email :: "the customer\'s own"\n }'), domainText);
+        expect(errors(r.diagnostics)).toEqual([]);
+        const mixed = await parseSynth(scenario('populations { Customer count 10 }\n vocabulary {\n locale fr\n EmailAddress as email :: "the customer\'s own"\n Customer.name words [ "Ada" ]\n Address.zipCode as postcode\n Customer.shippingAddress.country as text\n }'), domainText);
+        expect(messages(errors(mixed.diagnostics))).toEqual([]);
+        expect(JSON.stringify(mixed.scenario.vocabulary)).toBe(
+            '{"locale":"fr","words":[{"field":"Customer.name","values":["Ada"]}],"bindings":[{"target":"EmailAddress","kind":"email","description":"the customer\'s own"},{"target":"Address.zipCode","kind":"postcode"},{"target":"Customer.shippingAddress.country","kind":"text"}]}',
+        );
+        expect(r.scenario.vocabulary).toEqual({ bindings: [{ target: 'EmailAddress', kind: 'email', description: "the customer's own" }] });
+    });
+
+    it('reads every kind as a kind, and needs no population for the type it binds', async () => {
+        const body = SYNTH_KIND_NAMES.map(k => `Customer.name as ${k}`).join('\n ');
+        const r = await parseSynth(scenario(`populations { }\n vocabulary {\n ${body}\n }`), domainText);
+        // percentage and money do not apply to a string, and Customer.name is bound once: no syntax or linking error
+        expect(errors(r.diagnostics).every(d => d.code === 'SYN-E024')).toBe(true);
+        expect((r.scenario.vocabulary?.bindings as { kind: string }[]).map(b => b.kind)).toEqual([...SYNTH_KIND_NAMES]);
+        const free = await parseSynth(scenario('populations { }\n vocabulary { EmailAddress as email\n Order.totalAmount as money\n Product.rating as percentage }'), domainText);
+        expect(errors(free.diagnostics)).toEqual([]);
+    });
+
+    it('resolves a field named as', async () => {
+        const domain = domainText.replace('country : string\n', 'country : string\n            as : string\n');
+        expect(domain).not.toBe(domainText);
+        const r = await parseSynth(scenario('populations { Customer count 10 }\n vocabulary {\n Address.as as text\n Customer.shippingAddress.as words [ "x" ]\n }'), domain);
+        expect(messages(errors(r.diagnostics))).toEqual([]);
+        expect(r.scenario.vocabulary).toEqual({ words: [{ field: 'Customer.shippingAddress.as', values: ['x'] }], bindings: [{ target: 'Address.as', kind: 'text' }] });
+    });
+
+    it('completes the kind after as, and only the kinds', async () => {
+        const { SpecySynth } = createSpecyLspServices(EmptyFileSystem);
+        await expectCompletion(SpecySynth)({
+            text: 'scenario T {\n domain-source "orders.domain"\n populations { }\n vocabulary { Iban as <|> }\n}',
+            index: 0,
+            expectedItems: [...SYNTH_KIND_NAMES],
+        });
+    });
+
+    it('names the closest kind for an unknown one, and lists the kinds (SYN-E024)', async () => {
+        const r = await parseSynth(scenario('populations { }\n vocabulary { EmailAddress as emial\n Address.zipCode as zzzzzzzz }'), domainText);
+        const kinds = SYNTH_KIND_NAMES.join(', ');
+        expect(messages(errors(r.diagnostics))).toEqual([
+            `SYN-E024 Unknown kind "emial". Did you mean 'email'? Kinds: ${kinds}.`,
+            `SYN-E024 Unknown kind "zzzzzzzz". Kinds: ${kinds}.`,
+        ]);
+    });
+
+    it('resolves the target as word lists do (SYN-E001, SYN-E005)', async () => {
+        const r = await parseSynth(scenario('populations { }\n vocabulary { Adress.zipCode as postcode\n Address.zipCod as postcode }'), domainText);
+        expect(messages(errors(r.diagnostics))).toEqual([
+            "SYN-E001 'Adress' is not an entity, aggregate, read-only entity or value type of orders.domain. Did you mean 'Address'?",
+            "SYN-E005 'zipCod' is not a member of value type Address. Did you mean 'zipCode'?",
+        ]);
+    });
+
+    it('wants a leaf the kind applies to (SYN-E024)', async () => {
+        const r = await parseSynth(scenario('populations { }\n vocabulary {\n Order.placedAt as email\n Customer.status as phone\n Customer as email\n Order.customer.email as email\n Customer.name as percentage\n OrderLine as email\n Address as money\n }'), domainText);
+        expect(messages(errors(r.diagnostics))).toEqual([
+            'SYN-E024 email applies to text fields, or a value type with one text field; Order.placedAt is datetime.',
+            'SYN-E024 phone applies to text fields, or a value type with one text field; Customer.status is enum CustomerStatus.',
+            'SYN-E024 email applies to text fields, or a value type with one text field; Customer is an entity: name one of its fields (Customer.<field> as email).',
+            'SYN-E024 email applies to text fields, or a value type with one text field; Order.customer.email is reached through a reference. Bind Customer.email as email instead.',
+            'SYN-E024 percentage applies to numeric fields, or a value type with one numeric field; Customer.name is string.',
+            'SYN-E024 email applies to text fields, or a value type with one text field; OrderLine has no text field.',
+            'SYN-E024 money applies to numeric fields, or a value type with one numeric field (the amount) and at most one text field (the currency); Address has no numeric field.',
+        ]);
+    });
+
+    it('asks for Type.field when a value type has several candidate fields (SYN-E024)', async () => {
+        const r = await parseSynth(scenario('populations { }\n vocabulary {\n Address as iban\n Order.shippingAddress as postcode\n Address.zipCode as postcode\n }'), domainText);
+        expect(messages(errors(r.diagnostics))).toEqual([
+            'SYN-E024 Address has 4 text fields (street, city, zipCode, country); name the one iban applies to: Address.street as iban.',
+            'SYN-E024 Order.shippingAddress (Address) has 4 text fields (street, city, zipCode, country); name the one postcode applies to: Order.shippingAddress.street as postcode.',
+        ]);
+        const twoTexts = domainText.replace('currency : string default("EUR") maxLength(3)', 'currency : string default("EUR") maxLength(3)\n            label : string');
+        const money = await parseSynth(scenario('populations { }\n vocabulary { Money as money\n Money.amount as money }'), twoTexts);
+        expect(messages(errors(money.diagnostics))).toEqual([
+            'SYN-E024 money takes a value type with one numeric field (the amount) and at most one text field (the currency); Money has 2 text fields (currency, label). Name the amount: Money.amount as money.',
+        ]);
+    });
+
+    it('refuses two bindings for one target (SYN-E024)', async () => {
+        const r = await parseSynth(scenario('populations { }\n vocabulary { EmailAddress as email\n EmailAddress.value as email\n EmailAddress as text }'), domainText);
+        expect(messages(errors(r.diagnostics))).toEqual(['SYN-E024 EmailAddress has two bindings.']);
+    });
+
+    it("refuses a kind whose lengths the field's minLength/maxLength exclude (SYN-E024)", async () => {
+        const r = await parseSynth(scenario('populations { }\n vocabulary {\n Address.zipCode as iban\n Money as siren\n Order.shippingAddress.zipCode as postcode\n Customer.name as url\n }'), domainText);
+        expect(messages(errors(r.diagnostics))).toEqual([
+            'SYN-E024 iban produces 16 to 27 characters; Address.zipCode allows at most 10 (maxLength(10)).',
+            'SYN-E024 siren produces 9 characters; Money.currency allows at most 3 (maxLength(3)).',
+        ]);
+        const long = domainText.replace('zipCode : string maxLength(10)', 'zipCode : string minLength(12)');
+        const short = await parseSynth(scenario('populations { }\n vocabulary { Customer.shippingAddress.zipCode as postcode\n Address.zipCode as text }'), long);
+        expect(messages(errors(short.diagnostics))).toEqual(['SYN-E024 postcode produces 3 to 10 characters; Customer.shippingAddress.zipCode needs at least 12 (minLength(12)).']);
+    });
+});

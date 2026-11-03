@@ -845,7 +845,7 @@
     },
     "vocabulary": {
       "type": "object",
-      "description": "Where text columns take their words. Swapping packs changes text columns only.",
+      "description": "Where text columns take their words, and the kind of value a value type or a field holds. Swapping packs changes text columns only.",
       "additionalProperties": false,
       "properties": {
         "locale": {
@@ -863,6 +863,13 @@
           "description": "Word lists for single text fields.",
           "items": {
             "$ref": "#/$defs/wordList"
+          }
+        },
+        "bindings": {
+          "type": "array",
+          "description": "Typed values: the kind of value synthy generates for a value type or a field.",
+          "items": {
+            "$ref": "#/$defs/binding"
           }
         }
       }
@@ -915,6 +922,46 @@
           }
         }
       ]
+    },
+    "binding": {
+      "type": "object",
+      "description": "A value type (Iban), one of its fields (Iban.value) or a field path (Customer.email) and the kind of value synthy generates for it. A text kind takes a text field; percentage a numeric one; money a numeric field, or a value type with one numeric field and at most one text field (the currency). text turns name-based inference off.",
+      "required": [
+        "target",
+        "kind"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "$ref": "#/$defs/path"
+        },
+        "kind": {
+          "enum": [
+            "email",
+            "phone",
+            "url",
+            "slug",
+            "postcode",
+            "iban",
+            "bic",
+            "siren",
+            "siret",
+            "vat",
+            "isbn",
+            "ean",
+            "card",
+            "color",
+            "ip",
+            "plate",
+            "text",
+            "percentage",
+            "money"
+          ]
+        },
+        "description": {
+          "type": "string"
+        }
+      }
     },
     "distribution": {
       "type": "object",

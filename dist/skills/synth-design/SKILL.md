@@ -166,6 +166,13 @@ Map each figure to a construct with the phrasebook below, then decide the header
 - **How the text reads**: `vocabulary { locale fr }` for the user's market (`intl`, the default, is a
   European mix; built-in: `en`, `fr`, `de`, `es`, `it`, `nl`, `"en-GB"`). A pack only changes text
   columns, so it never moves a figure.
+- **What identifiers hold**: a value type named like a concept (`EmailAddress`, `Iban`, `Siret`,
+  `Percentage`) already yields valid instances of it: IBANs that pass mod-97, SIRETs that pass Luhn,
+  and the certificate checks their check digits. Its pattern constrains the kind (`^FR…` gives
+  French IBANs). Bind a kind only when the model's names do not say it: `AccountNumber as iban`,
+  `Customer.contact as phone`, or `as text` for a field that is not what its name suggests. The
+  kinds: email, phone, url, slug, postcode, iban, bic, siren, siret, vat, isbn, ean, card, color, ip,
+  plate, percentage, money, text. Never write identifiers in a word list.
 - **How values spread** where no outcome fixes them: `distributions { … }`. They are hints, never
   facts: an outcome always wins, and the certificate reports them in its plausibility section.
 - **Mixes on a parent and its children.** Declare the parent's mix first; add a child's mix only
@@ -285,6 +292,10 @@ data, never by editing rows.
 | "with our real product catalogue" | `givens { Product csv "products.csv" { name from "title"  price.amount from "price_eur" } }` (headers mapped; ids generated) |
 | "French customers", "a UK shop" | `vocabulary { locale fr }`, `vocabulary { locale "en-GB" }` |
 | "real wine names", "our store names" | a word list: `vocabulary { Product.name words "vocab/wines.txt" }` (Phase 3b) |
+| "French IBANs", "valid IBANs" | nothing when the model has an `Iban` type (or an `iban` field): the IBAN country is the pack's (`locale fr`) unless its pattern fixes one; otherwise `vocabulary { AccountNumber as iban }` |
+| "valid SIRET numbers", "real-looking company numbers" | nothing for fields named `siren`, `siret`, `vatNumber`: they are valid and agree within a row; otherwise `vocabulary { Supplier.registration as siret }` |
+| "test card numbers", "barcodes", "ISBNs" | `Payment.pan as card`, `Product.code as ean`, `Book.ref as isbn` when the names do not say it (cards stay in processor test ranges) |
+| "emails and phones that look real" | nothing: `email` and `phone` fields follow the row's person and country; bind `as email`/`as phone` on a field named otherwise |
 | "a few best sellers" | `distributions { OrderLine.productId zipf 1.1 }` (a reference, or a key synthy infers); over a given, the file's first rows sell most, so say which ones they are, or ask for the file in best-seller order |
 | "regulars order more often" | `distributions { Order.customer zipf 0.8 }` (the oldest customers are the regulars) |
 | "most prices around 30 €, a few expensive items" | `distributions { Product.price.amount lognormal median 30 sigma 0.8 }` (a field the model stores; not a line price that an invariant computes) |

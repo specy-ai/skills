@@ -35,6 +35,7 @@ import {
     type SpecyDomainServices,
 } from './specy-domain-module.js';
 import { registerValidationChecks as registerDomainChecks } from './specy-domain-validator.js';
+import { SpecySynthCompletionProvider } from './specy-synth-completion.js';
 import { SpecySynthLinker } from './specy-synth-linker.js';
 import { SpecySynthScopeProvider } from './specy-synth-scope.js';
 import { SpecySynthDocumentValidator, SpecySynthValidator, registerSynthValidationChecks } from './specy-synth-validator.js';
@@ -63,6 +64,9 @@ export const SpecySynthLspModule: Module<SpecySynthLspServices, PartialLangiumSe
     references: {
         ScopeProvider: services => new SpecySynthScopeProvider(services),
         Linker: services => new SpecySynthLinker(services),
+    },
+    lsp: {
+        CompletionProvider: services => new SpecySynthCompletionProvider(services),
     },
     validation: {
         DocumentValidator: services => new SpecySynthDocumentValidator(services),

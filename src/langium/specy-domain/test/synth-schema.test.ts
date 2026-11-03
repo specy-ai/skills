@@ -5,13 +5,15 @@
  * Semantic checks (does Order.totalAmount resolve?) stay with synthy check.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { parse as parseYaml } from 'yaml';
 import Ajv2020 from 'ajv/dist/2020.js';
 import { parseSynth } from '../src/browser.js';
 import { SYNTH_SCENARIO_SCHEMA } from '../src/cli/version.js';
+import { SYNTH_KIND_NAMES } from '../src/language/synth-kinds.js';
 
 const root = resolve(import.meta.dirname, '..');
 const examples = resolve(root, '../../../examples/ecommerce/v2');
@@ -131,6 +133,37 @@ describe('the scenario schema', () => {
         }
     });
 
+    it('accepts vocabulary bindings and refuses an unknown kind', async () => {
+        const text = `scenario Typed {
+    domain-source "orders.domain"
+    populations { Customer count 10 }
+    vocabulary {
+        locale fr
+        EmailAddress as email :: "the customer's own"
+        Customer.name words [ "Ada" ]
+        Address.zipCode as postcode
+    }
+}`;
+        const r = await parseSynth(text, domainText, 'typed.synth');
+        expect(r.diagnostics.filter(d => d.severity === 'error')).toEqual([]);
+        const doc = JSON.parse(JSON.stringify(r.scenario)) as Record<string, any>;
+        expect(errorsOf(doc)).toEqual([]);
+        expect(Object.keys(doc.vocabulary)).toEqual(['locale', 'words', 'bindings']);
+        expect(doc.vocabulary.bindings).toEqual([{ target: 'EmailAddress', kind: 'email', description: "the customer's own" }, { target: 'Address.zipCode', kind: 'postcode' }]);
+        // the schema's enum is the parser's list of kinds
+        expect(schema.$defs.binding.properties.kind.enum).toEqual([...SYNTH_KIND_NAMES]);
+        const cases: [string, unknown, string][] = [
+            ['unknown kind', { target: 'Iban', kind: 'IBAN' }, 'must be equal to one of the allowed values'],
+            ['missing target', { kind: 'iban' }, "must have required property 'target'"],
+            ['missing kind', { target: 'Iban' }, "must have required property 'kind'"],
+            ['unknown key', { target: 'Iban', kind: 'iban', as: 'iban' }, 'must NOT have additional properties'],
+            ['target path', { target: 'Iban..value', kind: 'iban' }, 'must match pattern'],
+        ];
+        for (const [label, binding, expected] of cases) {
+            expect(errorsOf({ ...doc, vocabulary: { bindings: [binding] } }).join('\n'), label).toContain(expected);
+        }
+    });
+
     it('accepts percentage strings and ISO durations where the loader does', async () => {
         const doc = await orders();
         doc.outcomes[2].values = { creditCard: '60%', paypal: '30%', bankTransfer: '10%' };
@@ -164,6 +197,23 @@ describe('specy-synth parse -f yaml', () => {
         expect(yaml).toContain('predicate: Product.available = true');
         expect(yaml).toContain('draft->confirmed: 4h');
     });
+
+    it('writes vocabulary bindings in YAML as in JSON', () => {
+        const dir = mkdtempSync(join(tmpdir(), 'specy-synth-'));
+        try {
+            const scenarioFile = join(dir, 'typed.synth');
+            writeFileSync(scenarioFile, `scenario Typed {\n    domain-source ${JSON.stringify(resolve(examples, 'orders.domain'))}\n    populations { Customer count 10 }\n    vocabulary {\n        EmailAddress as email :: "the customer's own"\n        Address.zipCode as postcode\n    }\n}\n`);
+            const json = synthCli('parse', scenarioFile, '--strict');
+            const yaml = synthCli('parse', scenarioFile, '--strict', '-f', 'yaml');
+            expect(json.stderr).toBe('');
+            expect(yaml.status).toBe(0);
+            expect(parseYaml(yaml.stdout, { schema: 'core' })).toEqual(JSON.parse(json.stdout));
+            expect(yaml.stdout).toContain('vocabulary:\n  bindings:\n    - target: EmailAddress\n      kind: email\n');
+            expect(errorsOf(parseYaml(yaml.stdout))).toEqual([]);
+        } finally {
+            rmSync(dir, { recursive: true, force: true });
+        }
+    }, 20_000);
 
     it('refuses an unknown format', () => {
         const r = synthCli('parse', file, '-f', 'xml');

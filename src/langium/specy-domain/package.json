@@ -1,6 +1,6 @@
 {
   "name": "specy-domain-langium",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Langium-based parsers and LSP server for the Specy DSLs: .domain (domain model) and .synth (synthetic-data scenario)",
   "type": "module",
   "main": "out/language/specy-domain-module.js",

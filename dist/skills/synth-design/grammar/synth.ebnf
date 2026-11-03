@@ -168,13 +168,25 @@ rowArray         = "[" , [ rowValue , { [ "," ] , rowValue } ] , "]" ;
 vocabularyBlock  = "vocabulary" , "{"
                  , [ "locale" , ( identifier | stringLiteral ) ]   // intl, fr, "en-GB", …
                  , [ "pack" , stringLiteral ]                      // a pack file next to the scenario
-                 , { comment | wordList }
+                 , { comment | wordList | binding }                // in any order
                  , "}" ;
 
 wordList         = path , "words"
                  , ( stringLiteral                                 // a file: one value per line, or a JSON list
                    | "[" , [ stringLiteral , { [ "," ] , stringLiteral } ] , "]" )
                  , [ description ] ;
+
+// A typed value: the kind of value synthy generates for a value type (Iban), one
+// of its fields (Iban.value) or a field path (Customer.email).
+binding          = path , "as" , kindName
+                 , [ description ] ;
+
+// The parsers read an identifier here: a misspelt kind is refused by rule 16d,
+// naming the closest kind, rather than being a syntax error.
+kindName         = "email" | "phone" | "url" | "slug" | "postcode" | "iban" | "bic"
+                 | "siren" | "siret" | "vat" | "isbn" | "ean" | "card" | "color" | "ip" | "plate"
+                 | "text"                                          // no generator: turns name-based inference off
+                 | "percentage" | "money" ;
 
 // -----------------------------------------------------------------------------
 // Distributions  (metamodel: Distributions)
@@ -230,7 +242,7 @@ keywordAsIdent   = "count" | "per" | "by" | "rows" | "over" | "csv" | "json" | "
                  | "curve" | "total" | "share" | "mix" | "rate" | "rollup" | "exactly" | "from"
                  | "day" | "week" | "month" | "quarter" | "year" | "given" | "rejections"
                  | "vocabulary" | "locale" | "pack" | "words" | "distributions" | "uniform" | "lognormal"
-                 | "median" | "sigma" | "zipf" | "since" ;
+                 | "median" | "sigma" | "zipf" | "since" | "as" ;
 
 // -----------------------------------------------------------------------------
 // Shared with the domain grammar (src/grammars/domain.ebnf)
@@ -331,6 +343,16 @@ comment          = "//" , { character - newline } , newline
 //     field's bounds; one distribution per field.                         (SYN-E025)
 //     On a column a share, a rate or a mix sets, a shape never applies; on a
 //     column a curve, total or rollup sums, a median is ignored.   (warning SYN-W013)
+// 16d. A binding names a known kind, once per target. Its target is a value type,
+//     one of its fields, or a path from any entity or value type (no population
+//     needed) that does not cross a reference. A text kind (email … plate, text)
+//     takes a text field, percentage a numeric field, money a numeric field; a
+//     value type named alone has exactly one such field, and for money at most one
+//     text field besides (the currency); otherwise name the field (Iban.value as
+//     iban). The lengths the kind produces meet the field's minLength..maxLength:
+//       email 14..64  phone 10..20  url 20..80  slug 3..48  postcode 3..10
+//       iban 16..27  bic 8..11  siren 9  siret 14  vat 11..14  isbn 13  ean 13
+//       card 15..16  color 7  ip 7..15  plate 7..10                    (SYN-E024)
 // 17. alpha > 0; decimals in 0..9; null-rate in [0, 1]; rejections a non-negative
 //     integer; durations are readable.                                    (SYN-E015)
 // 18. A dwell names a transition some machine of the domain declares (warning otherwise).

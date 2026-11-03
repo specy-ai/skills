@@ -10,7 +10,7 @@
     },
     {
       "name": "keyword.control.specy-synth",
-      "match": "\\b(alpha|and|as-of|by|clock|count|csv|curve|day|decimals|default-dwell|distributions|domain-source|dwell|exactly|false|from|given|givens|horizon|json|locale|lognormal|median|mix|month|not|null|null-rate|options|or|outcomes|over|pack|per|populations|quarter|rate|reaction-latency|rejections|requirements-source|rollup|rows|satisfies|scenario|seed|share|sigma|since|total|true|uniform|vocabulary|week|words|year|zipf)\\b"
+      "match": "\\b(alpha|and|as|as-of|by|clock|count|csv|curve|day|decimals|default-dwell|distributions|domain-source|dwell|exactly|false|from|given|givens|horizon|json|locale|lognormal|median|mix|month|not|null|null-rate|options|or|outcomes|over|pack|per|populations|quarter|rate|reaction-latency|rejections|requirements-source|rollup|rows|satisfies|scenario|seed|share|sigma|since|total|true|uniform|vocabulary|week|words|year|zipf)\\b"
     },
     {
       "name": "string.quoted.double.specy-synth",

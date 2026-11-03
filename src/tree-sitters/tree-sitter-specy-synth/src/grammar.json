@@ -2003,8 +2003,17 @@
         {
           "type": "REPEAT",
           "content": {
-            "type": "SYMBOL",
-            "name": "word_list"
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "word_list"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "binding"
+              }
+            ]
           }
         },
         {
@@ -2108,6 +2117,47 @@
           ]
         }
       ]
+    },
+    "binding": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "FIELD",
+          "name": "target",
+          "content": {
+            "type": "SYMBOL",
+            "name": "path"
+          }
+        },
+        {
+          "type": "STRING",
+          "value": "as"
+        },
+        {
+          "type": "FIELD",
+          "name": "kind",
+          "content": {
+            "type": "SYMBOL",
+            "name": "kind_name"
+          }
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "description"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        }
+      ]
+    },
+    "kind_name": {
+      "type": "SYMBOL",
+      "name": "member_name"
     },
     "distributions_block": {
       "type": "SEQ",
@@ -2715,6 +2765,10 @@
         {
           "type": "STRING",
           "value": "since"
+        },
+        {
+          "type": "STRING",
+          "value": "as"
         }
       ]
     },

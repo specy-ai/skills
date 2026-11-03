@@ -123,6 +123,8 @@ function vocabulary(v: ast.VocabularyBlock): Record<string, unknown> | undefined
         words: v.words.length
             ? v.words.map(w => compact({ field: path(w.field), file: w.file, values: w.file === undefined ? [...w.values] : undefined, description: w.description?.text }))
             : undefined,
+        // after words, so a document without bindings keeps its bytes
+        bindings: v.bindings.length ? v.bindings.map(b => compact({ target: path(b.target), kind: b.kind, description: b.description?.text })) : undefined,
     });
     return Object.keys(out).length ? out : undefined;
 }

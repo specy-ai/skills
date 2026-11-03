@@ -78,16 +78,23 @@ export function pathText(path: ast.SynthPath | undefined): string {
 }
 
 /** " Did you mean 'x'?" for the closest name, or " Known: a, b, c." when the list is short. */
-export function suggest(text: string, names: string[]): string {
+export function suggest(text: string, names: readonly string[]): string {
     if (names.length === 0) return '';
+    const best = closestName(text, names);
+    if (best !== undefined) return ` Did you mean '${best}'?`;
+    const shown = names.slice(0, 8).join(', ');
+    return ` Known: ${shown}${names.length > 8 ? ', …' : ''}.`;
+}
+
+/** The name `text` is most likely a misspelling of, if one is close enough. */
+export function closestName(text: string, names: readonly string[]): string | undefined {
+    if (names.length === 0) return undefined;
     const lower = text.toLowerCase();
     const ranked = names
         .map(n => ({ n, d: n.toLowerCase() === lower ? 0 : n.toLowerCase().startsWith(lower) || lower.startsWith(n.toLowerCase()) ? 1 : levenshtein(lower, n.toLowerCase()) }))
         .sort((a, b) => a.d - b.d);
     const best = ranked[0];
-    if (best.d <= Math.max(2, Math.floor(text.length / 3))) return ` Did you mean '${best.n}'?`;
-    const shown = names.slice(0, 8).join(', ');
-    return ` Known: ${shown}${names.length > 8 ? ', …' : ''}.`;
+    return best.d <= Math.max(2, Math.floor(text.length / 3)) ? best.n : undefined;
 }
 
 function levenshtein(a: string, b: string): number {

@@ -14,7 +14,7 @@ const KEYWORDS_AS_IDENT = [
   'curve', 'total', 'share', 'mix', 'rate', 'rollup', 'exactly', 'from',
   'day', 'week', 'month', 'quarter', 'year', 'given', 'rejections',
   'vocabulary', 'locale', 'pack', 'words', 'distributions', 'uniform', 'lognormal', 'median', 'sigma', 'zipf',
-  'since',
+  'since', 'as',
 ];
 
 module.exports = grammar({
@@ -240,7 +240,7 @@ module.exports = grammar({
       'vocabulary', '{',
       optional(seq('locale', field('locale', choice($.identifier, $.string_literal)))),
       optional(seq('pack', field('pack', $.string_literal))),
-      repeat($.word_list),
+      repeat(choice($.word_list, $.binding)),
       '}',
     ),
 
@@ -253,6 +253,17 @@ module.exports = grammar({
       ),
       optional($.description),
     ),
+
+    // A typed value: `Iban as iban`, `Customer.email as email`. The kind is any
+    // name here; the Langium validator refuses an unknown one (SYN-E024).
+    binding: $ => seq(
+      field('target', $.path),
+      'as',
+      field('kind', $.kind_name),
+      optional($.description),
+    ),
+
+    kind_name: $ => $.member_name,
 
     distributions_block: $ => seq('distributions', '{', repeat($.distribution), '}'),
 
