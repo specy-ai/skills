@@ -19,7 +19,7 @@ You write **code** (harnesses, loaders, tests, build wiring) in the project's id
 or edit **data**: rows come from `synthy generate`, encodings from `synthy export`.
 
 ```
-.domain + .synth ──► synthy generate ──► certified folder ──► synthy export --to dbt|files|edn
+.domain + .synth ──► synthy generate ──► certified folder ──► synthy export --to dbt|files|edn|postgres|parquet
                                                                    │
                          project ◄─────────────────────────────────┘
                            ├─ fixtures (seeds, test resources)
@@ -84,16 +84,21 @@ A folder from `synthy generate --out <dir>` (and the same files after `synthy ex
 | `synthy_events` | every event: `id, name, about, about_id, at, payload, caused_by` |
 | `synthy_commands` | every command: `id, name, about, about_id, at, caused_by` |
 | `synthy_rejections` | commands that must be refused: `id, command, operation, about, about_id, at, state, in_source_state, precondition, condition, reason, error_event, payload` |
-| `manifest.json` | tables, row counts, `asOf`, the warnings, and per column its `type`, `nullable`, `role` (`identity`, `fk`, `state`, `clock`, `field`, `synthetic` for `position` and synthetic `_at`/`_state` columns), `path` in the entity (`["totalAmount","amount"]`) and `target` entity for a foreign key |
-| `questions.json` | the certificate's questions: `id, tier (hard/advisory/plausibility), description, sql, expected, source, satisfies?`, and `tolerance { absolute?, relative? }` on plausibility questions (how far the answer may stray and still read as expected) |
-| `certificate.json` | each question's observed answer and verdict |
+| `manifest.json` | output format 1 (`$schema`); tables, row counts, `asOf`, the warnings, the `inputs` read (model, scenario, givens) with their SHA-256, and per column its `type`, `nullable`, `role` (`identity`, `fk`, `state`, `clock`, `field`, `synthetic` for `position` and synthetic `_at`/`_state` columns), `path` in the entity (`["totalAmount","amount"]`), `target` entity for a foreign key and the `values` an enum or a machine allows |
+| `questions.json` | the certificate's questions, a bare array: `id, kind, tier (hard/advisory/plausibility), description, sql, expected, source, satisfies?`, `tolerance { absolute?, relative? }` on plausibility questions (how far the answer may stray and still read as expected), and `ask`, the question in words |
+| `certificate.json` | each question's observed answer and verdict, and `files`: the SHA-256 of every table file and of `questions.json` |
+| `verify.py` | re-verifies the certificate with Python and `duckdb` alone (`pip install duckdb && python verify.py`): an auditor, or a CI job with no Node, needs nothing else |
+| `report.md`, `report.json` | how the data looks per column (nulls, distinct values, ranges, coverage of enum members and states); advisory, never gating |
 | `load.sql` | DuckDB statements loading every table with exact types, one per line; relative paths (run after `SET file_search_path = '<folder>'`) |
 | `traceability.json` | requirement → declarations → tables → questions → verdicts |
 | `questions.sql` | the same questions as a SQL script, each with its expected answer in a comment |
 | `scenario.json` | the scenario as a JSON document |
 
 Exports: `--to files` (Java, TypeScript; `--format csv|json`), `--to edn` (Clojure: the files plus
-`edn/<Entity>.edn` and `edn/questions.edn`), `--to dbt` (seeds, singular tests, `synthy/` metadata).
+`edn/<Entity>.edn` and `edn/questions.edn`), `--to dbt` (seeds, singular tests, `synthy/` metadata),
+`--to postgres` (the CSV files plus `postgres.sql`: `CREATE TABLE` and `INSERT`s, for integration tests
+against PostgreSQL, as a Testcontainers init script or through `psql -f`), `--to parquet` (the tables as
+Parquet). The certificate's questions stay DuckDB SQL whatever the target: run them on the CSVs.
 A new export removes the files an earlier one wrote and this one does not (a table or a question that
 no longer exists); it leaves every other file alone.
 
