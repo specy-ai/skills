@@ -1,0 +1,362 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specy.ai/schemas/domain-model/1.json",
+  "title": "Specy domain model",
+  "description": "A .domain model as a document: what `specy-domain parse` (or `specy convert --to json|yaml`) emits, and what `specy convert` reads back into a .domain file. Definitions are grouped by kind under their owning organization > context > module; a file whose outer containers are elided keeps them at the top level. Expressions (invariants, guards, duplicate detection, operation clauses) are trees of plain objects whose `kind` discriminates the ambiguous nodes.",
+  "type": "object",
+  "properties": {
+    "$schema": { "type": "string" },
+    "parser": { "$ref": "#/$defs/parser" },
+    "organizations": { "type": "array", "items": { "$ref": "#/$defs/organization" } },
+    "contexts": { "type": "array", "items": { "$ref": "#/$defs/context" } },
+    "modules": { "type": "array", "items": { "$ref": "#/$defs/module" } },
+    "definitions": { "$ref": "#/$defs/definitionGroups" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "parser": {
+      "type": "object",
+      "description": "Which parser wrote the document; consumers pin the minimum version whose shape they understand.",
+      "properties": { "name": { "type": "string" }, "version": { "type": "string" } },
+      "required": ["name", "version"],
+      "additionalProperties": false
+    },
+    "metadata": {
+      "type": "object",
+      "description": "The `meta { key = value }` block: free key/value annotations.",
+      "additionalProperties": { "type": ["string", "number", "boolean", "null"] }
+    },
+    "satisfies": {
+      "type": "array",
+      "description": "Requirement ids (REQ-…) this element satisfies.",
+      "items": { "type": "string" }
+    },
+    "names": { "type": "array", "items": { "type": "string" } },
+    "expression": {
+      "description": "An expression tree: objects with `kind` (paren, not, if, conditional, every, exists, forall, isDefined, isNotDefined, isNull, isNotNull, in, notIn, matches, contains, duration, call, null), binary nodes `{ left, op, right }`, dot paths `{ path }`, literals `{ value }` and array literals `{ first, more }`.",
+      "type": ["object", "string", "number", "boolean"]
+    },
+    "organization": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "metadata": { "$ref": "#/$defs/metadata" },
+        "satisfies": { "$ref": "#/$defs/satisfies" },
+        "requirementsSource": { "type": "string", "description": "Path of the .sysreq file, as written." },
+        "subdomains": { "type": "array", "items": { "$ref": "#/$defs/subdomain" } },
+        "contexts": { "type": "array", "items": { "$ref": "#/$defs/context" } }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    },
+    "subdomain": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "classification": { "type": "string", "enum": ["core", "supporting", "generic"] },
+        "description": { "type": "string" },
+        "metadata": { "$ref": "#/$defs/metadata" }
+      },
+      "required": ["name", "classification"],
+      "additionalProperties": false
+    },
+    "context": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "shortname": { "type": "string" },
+        "description": { "type": "string" },
+        "metadata": { "$ref": "#/$defs/metadata" },
+        "satisfies": { "$ref": "#/$defs/satisfies" },
+        "requirementsSource": { "type": "string" },
+        "models": { "$ref": "#/$defs/names", "description": "The subdomains this context is a model of." },
+        "contextMap": { "type": "array", "items": { "$ref": "#/$defs/relation" } },
+        "modules": { "type": "array", "items": { "$ref": "#/$defs/module" } },
+        "definitions": { "$ref": "#/$defs/definitionGroups" }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    },
+    "relation": {
+      "type": "object",
+      "description": "A context-map entry written by this context about itself: `downstream Y : ACL` means this context is downstream of Y and protects itself with an ACL.",
+      "properties": {
+        "direction": { "type": "string", "enum": ["upstream", "downstream", "symmetric"] },
+        "pattern": { "type": "string", "enum": ["OHS", "CS", "Conformist", "ACL", "SharedKernel", "PublishedLanguage", "Partnership", "SeparateWays"] },
+        "target": { "type": "string" }
+      },
+      "required": ["direction", "pattern", "target"],
+      "additionalProperties": false
+    },
+    "module": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "metadata": { "$ref": "#/$defs/metadata" },
+        "satisfies": { "$ref": "#/$defs/satisfies" },
+        "requirementsSource": { "type": "string" },
+        "exposes": { "$ref": "#/$defs/names", "description": "API interfaces: the module's public surface." },
+        "requires": { "$ref": "#/$defs/names", "description": "SPI interfaces: what the module needs from outside." },
+        "dependencies": { "$ref": "#/$defs/names", "description": "Other modules this one depends on." },
+        "definitions": { "$ref": "#/$defs/definitionGroups" }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    },
+    "definitionGroups": {
+      "type": "object",
+      "description": "Definitions grouped by kind. Each group is an array of constructs whose `kind` is the precise one (entities holds entity and read-only-entity; events holds the four event kinds; services the three service kinds).",
+      "properties": {
+        "enums": { "$ref": "#/$defs/constructs" },
+        "values": { "$ref": "#/$defs/constructs" },
+        "entities": { "$ref": "#/$defs/constructs" },
+        "aggregates": { "$ref": "#/$defs/constructs" },
+        "commands": { "$ref": "#/$defs/constructs" },
+        "queries": { "$ref": "#/$defs/constructs" },
+        "events": { "$ref": "#/$defs/constructs" },
+        "services": { "$ref": "#/$defs/constructs" },
+        "repositories": { "$ref": "#/$defs/constructs" },
+        "interfaces": { "$ref": "#/$defs/constructs" },
+        "reactions": { "$ref": "#/$defs/constructs" },
+        "invariants": { "$ref": "#/$defs/constructs" },
+        "agreements": { "$ref": "#/$defs/constructs" },
+        "other": { "$ref": "#/$defs/constructs" }
+      },
+      "additionalProperties": false
+    },
+    "constructs": { "type": "array", "items": { "$ref": "#/$defs/construct" } },
+    "construct": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "enum", "value", "entity", "read-only-entity", "aggregate", "command", "query",
+            "event", "external-event", "error-event", "temporal-event",
+            "domain-service", "application-service", "infrastructure-service",
+            "repository", "interface", "reaction", "invariant", "agreement"
+          ]
+        },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "metadata": { "$ref": "#/$defs/metadata" },
+        "satisfies": { "$ref": "#/$defs/satisfies" },
+        "fields": { "type": "array", "items": { "$ref": "#/$defs/field" } },
+        "identity": { "$ref": "#/$defs/identity" },
+        "duplicateDetection": { "$ref": "#/$defs/expression" },
+        "references": { "type": "array", "items": { "$ref": "#/$defs/reference" } },
+        "operations": { "type": "array", "items": { "$ref": "#/$defs/operation" } },
+        "stateMachines": { "type": "array", "items": { "$ref": "#/$defs/stateMachine" } },
+        "invariants": { "type": "array", "items": { "$ref": "#/$defs/scopedInvariant" } },
+        "valueType": { "type": "string", "description": "enum: `of ValueType`." },
+        "values": { "type": "array", "items": { "$ref": "#/$defs/enumValue" } },
+        "entities": { "$ref": "#/$defs/names", "description": "aggregate: the non-root entities of the cluster." },
+        "sourcedFrom": { "type": "string" },
+        "syncedVia": { "type": "string", "enum": ["synchronous-query", "asynchronous-projection"] },
+        "projectedBy": { "type": "string" },
+        "readsFrom": { "type": "string" },
+        "returns": { "type": "string" },
+        "about": { "type": "string" },
+        "causedBy": { "type": "string" },
+        "from": { "type": "string", "description": "external event: the source context or system." },
+        "anchor": { "$ref": "#/$defs/anchor" },
+        "guard": { "$ref": "#/$defs/expression" },
+        "calls": { "$ref": "#/$defs/names" },
+        "exposedBy": { "type": "string" },
+        "describedBy": { "type": "string" },
+        "for": { "type": "string", "description": "repository: the entity or aggregate it persists." },
+        "readOnly": { "type": "boolean" },
+        "role": { "type": "string", "enum": ["api", "spi"] },
+        "exposes": { "$ref": "#/$defs/names", "description": "api interface: dot paths of the operations it selects." },
+        "describes": { "type": "string" },
+        "triggeredBy": { "$ref": "#/$defs/names" },
+        "effects": { "type": "string" },
+        "on": { "type": "string", "description": "invariant: the dot path it holds on." },
+        "must": { "$ref": "#/$defs/expression" },
+        "enforcement": { "type": "string" },
+        "participants": { "$ref": "#/$defs/names" },
+        "predicate": { "$ref": "#/$defs/expression" },
+        "reconciliation": { "$ref": "#/$defs/reconciliation" },
+        "_unparsed": { "type": "boolean" }
+      },
+      "required": ["kind", "name"],
+      "additionalProperties": false
+    },
+    "field": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "optional": { "type": "boolean" },
+        "constraints": { "type": "array", "items": { "type": "string" }, "description": "As the DSL spells them, one per entry: required, unique, min(0), range(1..5), pattern(…), default(…)." },
+        "description": { "type": "string" },
+        "satisfies": { "$ref": "#/$defs/satisfies" }
+      },
+      "required": ["name", "type"],
+      "additionalProperties": false
+    },
+    "identity": {
+      "type": "object",
+      "properties": { "name": { "type": "string" }, "type": { "type": "string" } },
+      "required": ["name", "type"],
+      "additionalProperties": false
+    },
+    "reference": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "target": { "type": "string" },
+        "cardinality": { "type": "string", "pattern": "^\\d+\\.\\.(\\d+|[nN])$" },
+        "description": { "type": "string" }
+      },
+      "required": ["name", "target", "cardinality"],
+      "additionalProperties": false
+    },
+    "enumValue": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "value": { "type": ["string", "number", "boolean"] },
+        "description": { "type": "string" }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    },
+    "operation": {
+      "type": "object",
+      "description": "One shape for the four operation forms: command-triggered (`on`), internal (`accepts`/`returns`), value, signature. `detail` keeps every body clause in order; `emits` summarizes the events the body emits.",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "metadata": { "$ref": "#/$defs/metadata" },
+        "satisfies": { "$ref": "#/$defs/satisfies" },
+        "on": { "type": "string", "description": "The triggering command." },
+        "trigger": { "type": "object", "properties": { "command": { "type": "string" } }, "additionalProperties": false },
+        "accepts": { "type": "array", "items": { "type": "string" }, "description": "Parameters as `name : Type[?]`." },
+        "returns": { "type": "string" },
+        "safety": { "type": "string", "enum": ["safe", "unsafe"] },
+        "idempotent": { "type": "boolean" },
+        "emits": { "$ref": "#/$defs/names" },
+        "detail": { "type": "array", "items": { "type": "object" } }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    },
+    "stateMachine": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "metadata": { "$ref": "#/$defs/metadata" },
+        "satisfies": { "$ref": "#/$defs/satisfies" },
+        "states": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "kind": { "type": "string", "enum": ["state", "final"] },
+              "description": { "type": "string" },
+              "metadata": { "$ref": "#/$defs/metadata" },
+              "satisfies": { "$ref": "#/$defs/satisfies" },
+              "invariants": { "type": "array", "items": { "$ref": "#/$defs/scopedInvariant" } }
+            },
+            "required": ["name"],
+            "additionalProperties": false
+          }
+        },
+        "transitions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "from": { "type": "string" },
+              "to": { "type": "string" },
+              "on": { "type": "string" },
+              "description": { "type": "string" },
+              "metadata": { "$ref": "#/$defs/metadata" },
+              "satisfies": { "$ref": "#/$defs/satisfies" },
+              "conditions": { "type": "array", "items": { "type": "object" } }
+            },
+            "required": ["from", "to", "on"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    },
+    "scopedInvariant": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "metadata": { "$ref": "#/$defs/metadata" },
+        "satisfies": { "$ref": "#/$defs/satisfies" },
+        "params": { "type": "array", "items": { "type": "string" } },
+        "expression": { "$ref": "#/$defs/expression" },
+        "enforcement": { "type": "string" }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    },
+    "anchor": {
+      "type": "object",
+      "properties": {
+        "kind": { "type": "string", "enum": ["relative", "absolute", "recurring"] },
+        "reference": { "type": "string" },
+        "offset": { "$ref": "#/$defs/expression" },
+        "instant": { "type": "string" },
+        "schedule": { "type": "string" }
+      },
+      "required": ["kind"],
+      "additionalProperties": false
+    },
+    "reconciliation": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "metadata": { "$ref": "#/$defs/metadata" },
+        "satisfies": { "$ref": "#/$defs/satisfies" },
+        "trigger": {
+          "type": "object",
+          "properties": { "schedule": { "type": "string" }, "events": { "$ref": "#/$defs/names" } },
+          "additionalProperties": false
+        },
+        "detection": { "type": "string", "enum": ["query", "event-sourced"] },
+        "compensation": { "$ref": "#/$defs/names" },
+        "coordination": { "type": "string", "enum": ["choreography", "orchestration"] },
+        "escalation": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "metadata": { "$ref": "#/$defs/metadata" },
+            "satisfies": { "$ref": "#/$defs/satisfies" },
+            "steps": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "description": { "type": "string" },
+                  "metadata": { "$ref": "#/$defs/metadata" },
+                  "satisfies": { "$ref": "#/$defs/satisfies" },
+                  "when": { "$ref": "#/$defs/expression" },
+                  "action": { "type": "object" }
+                },
+                "required": ["name"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    }
+  }
+}

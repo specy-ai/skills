@@ -9,7 +9,7 @@ import { resolve } from 'node:path';
 import { parseDomain, parseSynth, type ParseDiagnostic } from '../src/browser.js';
 import { EmptyFileSystem } from 'langium';
 import { expectCompletion } from 'langium/test';
-import { createSpecyLspServices } from '../src/language/specy-synth-module.js';
+import { createSpecyLspServices } from '../src/language/specy-module.js';
 import { SYNTH_KIND_NAMES } from '../src/language/synth-kinds.js';
 
 const examples = resolve(import.meta.dirname, '../../../../examples/ecommerce/v2');

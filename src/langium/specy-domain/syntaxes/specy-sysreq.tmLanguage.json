@@ -1,0 +1,56 @@
+{
+  "name": "specy-sysreq",
+  "scopeName": "source.specy-sysreq",
+  "fileTypes": [
+    ".sysreq"
+  ],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "name": "keyword.control.specy-sysreq",
+      "match": "\\b(complex|conflicts-with|could|decomposed-into|depends-on|detected-by|enforced-by|event-driven|implemented-by|module|must|optional|prd-source|priority|quality-constrained-by|requirements|satisfied-by|satisfied-by-infrastructure|scoped-to|should|source|state-driven|structured-by|ubiquitous|unwanted|wont)\\b"
+    },
+    {
+      "name": "string.quoted.double.specy-sysreq",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "include": "#string-character-escape"
+        }
+      ]
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "begin": "//",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.whitespace.comment.leading.specy-sysreq"
+            }
+          },
+          "end": "(?=$)",
+          "name": "comment.line.specy-sysreq"
+        },
+        {
+          "begin": "#",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.whitespace.comment.leading.specy-sysreq"
+            }
+          },
+          "end": "(?=$)",
+          "name": "comment.line.specy-sysreq"
+        }
+      ]
+    },
+    "string-character-escape": {
+      "name": "constant.character.escape.specy-sysreq",
+      "match": "\\\\(x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|u\\{[0-9A-Fa-f]+\\}|[0-2][0-7]{0,2}|3[0-6][0-7]?|37[0-7]?|[4-7][0-7]?|.|$)"
+    }
+  }
+}

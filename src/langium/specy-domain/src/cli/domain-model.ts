@@ -1,6 +1,7 @@
 import type { AstNode, Reference } from 'langium';
-import { PARSER_VERSION } from './version.js';
+import { DOMAIN_MODEL_SCHEMA, PARSER_VERSION } from './version.js';
 import * as ast from '../generated/ast.js';
+import { collapse } from '../formats/kit/text.js';
 
 /**
  * Normalizer: Langium AST -> clean domain model (plain JS objects).
@@ -32,6 +33,7 @@ export interface FieldModel {
 export interface OperationModel {
     name: string;
     description?: string;
+    metadata?: Record<string, unknown>;
     satisfies?: string[];
     /** Triggering command for command-triggered operations. */
     on?: string;
@@ -108,6 +110,8 @@ export interface OrganizationModel {
 }
 
 export interface DomainModel {
+    /** The JSON Schema of this document (src/schemas/domain-model.schema.json); JSON and YAML share it. */
+    $schema?: string;
     /** Which parser wrote this JSON, so consumers can pin the minimum shape they understand. */
     parser?: { name: string; version: string };
     organizations?: OrganizationModel[];
@@ -145,7 +149,7 @@ function cleanValue(value: unknown): unknown {
         return typeToString(value);
     }
     if (ast.isDescription(value)) {
-        return value.text;
+        return collapse(value.text);
     }
     if (ast.isDotPath(value)) {
         return dotPathToString(value);
@@ -168,7 +172,8 @@ function literalScalar(lit: ast.LiteralValue): string | number | boolean {
 
 /**
  * Discriminators for nodes whose cleaned shape would otherwise be ambiguous.
- * `x is defined`, `x is not defined` and a bare `x` all reduce to `{ path }`;
+ * A number literal keeps the text of its NUMBER token, so `{ value: "0" }` would
+ * be a string without its `kind`; `x is defined`, `x is not defined` and a bare `x` all reduce to `{ path }`;
  * `in` / `not in` share `{ path, values }`; `sets` / `creates` share
  * `{ type, assignments }`. Consumers that evaluate or invert expressions (the
  * synthetic-data generator, for one) must tell them apart, so the node kind is
@@ -176,6 +181,10 @@ function literalScalar(lit: ast.LiteralValue): string | number | boolean {
  * Nodes not listed here are unambiguous from their own properties.
  */
 const NODE_KIND: Record<string, string> = {
+    StringLiteralExpr: 'string',
+    NumberLiteralExpr: 'number',
+    BooleanLiteralExpr: 'boolean',
+    NullLiteralExpr: 'null',
     IsDefinedExpr: 'isDefined',
     IsNotDefinedExpr: 'isNotDefined',
     IsNullExpr: 'isNull',
@@ -249,7 +258,7 @@ function nameOf(value: unknown): string {
 }
 
 function descOf(d?: ast.Description): string | undefined {
-    return d?.text;
+    return collapse(d?.text);
 }
 
 function metaOf(m?: ast.MetadataBlock): Record<string, unknown> | undefined {
@@ -361,12 +370,14 @@ function summarizeOperation(op: ast.OperationDef): OperationModel {
         model.on = nameOf(op.command);
         model.trigger = { command: nameOf(op.command) };
         model.description = descOf(op.description);
+        model.metadata = metaOf(op.metadata);
         bodyToModel(op.body, model);
     } else {
         model.name = nameOf(op.name);
         model.accepts = paramsOf(op.params);
         model.returns = op.returnType ? typeToString(op.returnType) : undefined;
         model.description = descOf(op.description);
+        model.metadata = metaOf(op.metadata);
         bodyToModel(op.body, model);
     }
 
@@ -384,6 +395,7 @@ function summarizeSignature(op: ast.OperationSignature): OperationModel {
         accepts: paramsOf(op.params),
         returns: op.returnType ? typeToString(op.returnType) : undefined,
         description: descOf(op.description),
+        metadata: metaOf(op.metadata),
         satisfies: satisfiesOf(op.satisfies),
         detail: nonEmpty(op.conditions.map(cleanValue).filter(v => v !== undefined)),
     });
@@ -395,6 +407,7 @@ function summarizeValueOp(op: ast.ValueOpDef): OperationModel {
         accepts: paramsOf(op.params),
         returns: typeToString(op.returnType),
         description: descOf(op.description),
+        metadata: metaOf(op.metadata),
     };
     bodyToModel(op.body, model);
     return compact(model);
@@ -407,6 +420,7 @@ function summarizeSafeOp(op: ast.SafeOpDef): OperationModel {
         accepts: paramsOf(op.params),
         returns: op.returnType ? typeToString(op.returnType) : undefined,
         description: descOf(op.description),
+        metadata: metaOf(op.metadata),
         satisfies: satisfiesOf(op.satisfies),
         safety: op.safe ? 'safe' : undefined,
         detail: nonEmpty(op.clauses.map(cleanValue).filter(v => v !== undefined)),
@@ -429,6 +443,7 @@ function invariantsOf(block?: ast.InvariantsBlock) {
             compact({
                 name: nameOf(inv.name),
                 description: descOf(inv.description),
+                metadata: metaOf(inv.metadata),
                 satisfies: satisfiesOf(inv.satisfies),
                 params: paramsOf(inv.params),
                 expression: cleanValue(inv.expr),
@@ -445,6 +460,7 @@ function statesOf(block?: ast.StatesBlock) {
             compact({
                 name: nameOf(m.name),
                 description: descOf(m.description),
+                metadata: metaOf(m.metadata),
                 satisfies: satisfiesOf(m.satisfies),
                 states: nonEmpty(
                     m.members.filter(ast.isStateDef).map(s =>
@@ -452,6 +468,8 @@ function statesOf(block?: ast.StatesBlock) {
                             name: nameOf(s.name),
                             kind: s.kind,
                             description: descOf(s.description),
+                            metadata: metaOf(s.metadata),
+                            satisfies: satisfiesOf(s.satisfies),
                             invariants: invariantsOf(s.invariants),
                         }),
                     ),
@@ -463,6 +481,7 @@ function statesOf(block?: ast.StatesBlock) {
                             to: nameOf(t.target),
                             on: nameOf(t.trigger),
                             description: descOf(t.description),
+                            metadata: metaOf(t.metadata),
                             satisfies: satisfiesOf(t.satisfies),
                             conditions: nonEmpty(t.conditions.map(cleanValue).filter(v => v !== undefined)),
                         }),
@@ -663,6 +682,7 @@ function reconciliationOf(r: ast.ReconciliationDef): Record<string, unknown> {
     return compact({
         name: nameOf(r.name),
         description: descOf(r.description),
+        metadata: metaOf(r.metadata),
         satisfies: satisfiesOf(r.satisfies),
         trigger,
         detection: r.detection,
@@ -670,16 +690,23 @@ function reconciliationOf(r: ast.ReconciliationDef): Record<string, unknown> {
         coordination: r.coordination ?? undefined,
         // The chain must terminate: the final action is alert / suspend / manual.
         escalation: r.escalation
-            ? nonEmpty(
-                  r.escalation.steps.map(s =>
-                      compact({
-                          name: nameOf(s.name),
-                          description: descOf(s.description),
-                          when: cleanValue(s.when),
-                          action: cleanValue(s.action),
-                      }),
+            ? compact({
+                  description: descOf(r.escalation.description),
+                  metadata: metaOf(r.escalation.metadata),
+                  satisfies: satisfiesOf(r.escalation.satisfies),
+                  steps: nonEmpty(
+                      r.escalation.steps.map(s =>
+                          compact({
+                              name: nameOf(s.name),
+                              description: descOf(s.description),
+                              metadata: metaOf(s.metadata),
+                              satisfies: satisfiesOf(s.satisfies),
+                              when: cleanValue(s.when),
+                              action: cleanValue(s.action),
+                          }),
+                      ),
                   ),
-              )
+              })
             : undefined,
     });
 }
@@ -792,6 +819,7 @@ export function normalizeDomain(file: ast.DomainFile): DomainModel {
     }
 
     return compact({
+        $schema: DOMAIN_MODEL_SCHEMA,
         parser: { name: 'specy-domain', version: PARSER_VERSION },
         organizations: nonEmpty(organizations),
         contexts: nonEmpty(contexts),

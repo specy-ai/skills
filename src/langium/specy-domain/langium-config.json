@@ -16,6 +16,30 @@
       "textMate": {
         "out": "syntaxes/specy-synth.tmLanguage.json"
       }
+    },
+    {
+      "id": "specy-prd",
+      "grammar": "src/language/specy-prd.langium",
+      "fileExtensions": [".prd"],
+      "textMate": {
+        "out": "syntaxes/specy-prd.tmLanguage.json"
+      }
+    },
+    {
+      "id": "specy-sysreq",
+      "grammar": "src/language/specy-sysreq.langium",
+      "fileExtensions": [".sysreq"],
+      "textMate": {
+        "out": "syntaxes/specy-sysreq.tmLanguage.json"
+      }
+    },
+    {
+      "id": "specy-architecture",
+      "grammar": "src/language/specy-architecture.langium",
+      "fileExtensions": [".arch"],
+      "textMate": {
+        "out": "syntaxes/specy-architecture.tmLanguage.json"
+      }
     }
   ],
   "out": "src/generated",

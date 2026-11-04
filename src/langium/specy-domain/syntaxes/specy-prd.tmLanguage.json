@@ -1,0 +1,71 @@
+{
+  "name": "specy-prd",
+  "scopeName": "source.specy-prd",
+  "fileTypes": [
+    ".prd"
+  ],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "name": "keyword.control.specy-prd",
+      "match": "\\b(accept|acceptance-criteria|accepted|action|addresses|adequately-served|advances|analytics|anxious|app|assumption|avoid|backoffice|baseline|blocks|cancelled|channel|complication|confidence|confident|constrains|constraint|context|contractual|could|critical|current-satisfaction|customer-feedback|date|deadline|deferred|delighted|delivered|depends-on|design-references|desired-outcomes|domain-expertise|email|emotional|emotional-tone|entry-criteria|evidence|excluded|exit-criteria|expected-outcome|external|feature|for|frustrated|frustrations|functional|goal|goals|high|horizon|hypothesis|impact|impact-if-wrong|importance|important|in-progress|includes|inconclusive|indicator|intervention|invalidated|investigating|job|journey|likelihood|long-term|low|market|market-research|measurement|mechanism|medium|metric|mid-term|mitigate|mitigation|moderate|must|neutral|nice-to-have|non-goals|open|open-question|order|organizational|outcome|overserved|owner|persona|physical|planned|predicts|primary|priority|problem|product|proposed|proposes|question|regulatory|rejected|related-to|release|resolution|resolved|risk|role|satisfaction|scope|secondary|shipped|short-term|should|situation|sms|social|source|source-reference|statement|status|step|steps|stories|strong|summary|supported-by|supports|system-response|target|target-date|technical|tested-by|testing|theme|threatens|transfer|trigger|type|underpins|underserved|unserved|unvalidated|user-research|validated|validation-method|validation-plan|value-proposition|vision|weak|web|weight|wont)\\b"
+    },
+    {
+      "name": "string.quoted.double.specy-prd",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "include": "#string-character-escape"
+        }
+      ]
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.block.specy-prd",
+          "begin": "/\\*",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.comment.specy-prd"
+            }
+          },
+          "end": "\\*/",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.comment.specy-prd"
+            }
+          }
+        },
+        {
+          "begin": "//",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.whitespace.comment.leading.specy-prd"
+            }
+          },
+          "end": "(?=$)",
+          "name": "comment.line.specy-prd"
+        },
+        {
+          "begin": "#",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.whitespace.comment.leading.specy-prd"
+            }
+          },
+          "end": "(?=$)",
+          "name": "comment.line.specy-prd"
+        }
+      ]
+    },
+    "string-character-escape": {
+      "name": "constant.character.escape.specy-prd",
+      "match": "\\\\(x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|u\\{[0-9A-Fa-f]+\\}|[0-2][0-7]{0,2}|3[0-6][0-7]?|37[0-7]?|[4-7][0-7]?|.|$)"
+    }
+  }
+}

@@ -111,8 +111,8 @@ The same model can also be rendered to JSON/YAML/Markdown, explored conversation
 
 ## Skills
 
-Specy ships as a single Claude Code plugin — **`specy`** — providing 13 AI-assisted skills: 12 **core**
-skills named after their input→output artefact, plus 1 **auxiliary** skill. Each is invoked as
+Specy ships as a single Claude Code plugin — **`specy`** — providing 14 AI-assisted skills: 12 **core**
+skills named after their input→output artefact, plus 2 **auxiliary** skills. Each is invoked as
 `specy:<name>`.
 
 | Skill | Input | Output |
@@ -130,6 +130,7 @@ skills named after their input→output artefact, plus 1 **auxiliary** skill. Ea
 | `specy:synth-design` | `.domain` + prose ("a bad quarter") | `.synth` scenario (+ a certified dataset) |
 | `specy:domain-build-fixtures` | `.domain` + `.synth` + project | fixtures, certificate tests, `fixtures.report` |
 | `specy:domain-dialogue` *(aux)* | `.domain` | — (read-only conversation) |
+| `specy:model-formats` *(aux)* | any model as DSL / JSON / YAML / Markdown | the same model in another encoding, validated |
 
 ### `specy:prd-design` — Product Requirements
 
@@ -682,6 +683,7 @@ specy-skill/
 │   └── pre-commit                # Ensures dist/ stays in sync with src/
 │
 ├── install-skills-for-user.sh    # Symlinks the built plugin (dist/) to ~/.claude/skills/specy
+├── specy.sh                      # Convert / validate any model between DSL, JSON, YAML and Markdown
 ├── parse-domain.sh               # Render a .domain to JSON / YAML / Markdown
 ├── LICENSE                       # MIT
 ├── VISION.md                     # Specy thesis and design philosophy
@@ -697,11 +699,13 @@ specy-skill/
 
 **`src/grammars/`** — Canonical EBNF grammars for each file format. The build script copies them into the relevant `dist/skills/` directories.
 
-**`src/metamodels/`** — Prose documentation of each metamodel. These describe the concepts, relationships, and constraints that the grammars formalize. Copied to `dist/` as runtime references for skills that need them.
+**`src/metamodels/`** — Prose documentation of each metamodel. These describe the concepts, relationships, and constraints that the grammars formalize. Copied to `dist/` as runtime references for skills that need them. `MODEL-FORMATS.md` is the contract of the four encodings of every model and of the Markdown conventions.
+
+**`src/schemas/`** — The JSON Schemas of the five model documents (`domain-model`, `prd`, `sysreq`, `architecture`, `synth-scenario`), the shape of a model stored as JSON or YAML.
 
 **`src/tree-sitters/`** — Tree-sitter parser generators for Specy file formats. Used for syntax highlighting, parsing validation, and tooling integration.
 
-**`src/langium/`** — [Langium](https://langium.org/)-based LSP server and parser CLIs for the `.domain` and `.synth` DSLs, on one shared service set so a scenario's references resolve into its domain model. Provides editor diagnostics, AST access, `specy-domain parse` (JSON, YAML, Markdown) and `specy-synth parse` (the scenario document synthy reads, as JSON or YAML). See [LSP Server](#lsp-server) below.
+**`src/langium/`** — [Langium](https://langium.org/)-based parsers, format converters and LSP server for the five DSLs (`.domain`, `.prd`, `.sysreq`, `.arch`, `.synth`), on one shared service set so a scenario's references resolve into its domain model. Provides editor diagnostics, AST access, the `specy` CLI (any model between DSL, JSON, YAML and Markdown), `specy-domain parse` and `specy-synth parse`. See [Parsers, formats and LSP](#parsers-formats-and-lsp) below.
 
 **`examples/`** — Complete example projects demonstrating Specy files across different domains. `url-shortener/` carries a single-system `.arch`; `retail-media/` an `organization` landscape with its `.domain`.
 
@@ -784,12 +788,13 @@ The typical workflow follows the traceability chain:
 
 In your target project, Specy files live under `specy/` at the project root.
 
-## LSP Server
+## Parsers, formats and LSP
 
-Specy ships a [Langium](https://langium.org/)-based Language Server and parser CLIs for `.domain` and `.synth` files, located in `src/langium/specy-domain/`. The two languages run on one shared service set, so a `.synth` scenario resolves its dot-paths into the `.domain` it names with `domain-source`. It provides:
+Specy ships [Langium](https://langium.org/)-based parsers for the five languages — `.domain`, `.prd`, `.sysreq`, `.arch`, `.synth` — on one shared service set (so a `.synth` scenario resolves its dot-paths into the `.domain` it names with `domain-source`), a language server, and format converters, all in `src/langium/specy-domain/`. It provides:
 
+- **One document, four encodings** — every model is read and written as **DSL, JSON, YAML or Markdown** (`specy convert`, `specy validate`). JSON and YAML are described by the JSON Schemas in `src/schemas/`; Markdown follows the conventions of [`src/metamodels/MODEL-FORMATS.md`](./src/metamodels/MODEL-FORMATS.md), which a person or a language model can write loosely: the reader transpiles what it recognizes to the DSL, the parser validates it, and what it could not place is reported line by line. The `specy:model-formats` skill drives the loop.
 - **Editor integration** — diagnostics, syntax validation, and AST navigation via LSP (VS Code extension entrypoint in `src/extension/main.ts`; neovim through `vim.lsp.config`). In a `.synth` file, an unknown entity, field, state or enum member is an error naming what was expected and the closest candidate; completion after `Order.totalAmount.` offers the fields of `Money`; editing the `.domain` revalidates the scenarios written against it.
-- **Parser CLI** (`specy-domain`) — parses a `.domain` file into **JSON, YAML, or Markdown**, or validates it from the command line. Since 1.1.0 the JSON output opens with a `parser: { name, version }` header, so consumers such as synthy can pin the shape they understand.
+- **Parser CLI** (`specy-domain`) — parses a `.domain` file into **JSON, YAML, or Markdown**, or validates it from the command line. Since 1.1.0 the JSON output opens with a `parser: { name, version }` header, so consumers such as synthy can pin the shape they understand; since 1.7.0 it also opens with `$schema` and keeps every `meta` block and literal kind, so the DSL can be printed back from it.
 - **Scenario CLI** (`specy-synth`) — parses a `.synth` file against its `domain-source` into the scenario document synthy reads, as JSON or YAML (`specy-synth parse orders.synth -f yaml`), or validates it (`specy-synth validate`). Semantic rules carry the conflict code synthy would raise (`SYN-E006`, …), so a scenario clean in the editor is one the generator accepts.
 
 ### Build
@@ -798,7 +803,28 @@ Specy ships a [Langium](https://langium.org/)-based Language Server and parser C
 ./src/langium/specy-domain/build.sh
 ```
 
-The script runs `npm install`, generates the Langium artifacts for both languages, compiles TypeScript to `out/`, smoke-tests the CLIs against the bundled examples (every `.domain`, and `orders.synth` against `orders.domain`), and runs the test suite.
+The script runs `npm install`, generates the Langium artifacts for the five languages, embeds the JSON Schemas, compiles TypeScript to `out/`, validates every example file of `examples/` with the `specy` CLI, converts one file per language to the four encodings, runs the test suite (which round-trips every example through DSL, JSON, YAML and Markdown and expects the same model back) and bundles the parsers for the browser.
+
+### Convert and validate any model: `specy`
+
+The `specy.sh` wrapper at the repository root builds the CLI on first use and works from any directory:
+
+```bash
+./specy.sh convert examples/ecommerce/v2/orders.domain --to markdown -o      # writes orders.domain.md next to it
+./specy.sh convert examples/url-shortener/url-shortener.prd --to yaml
+./specy.sh convert sniplink.sysreq.md --to dsl -o sniplink.sysreq            # Markdown -> DSL, through the parser
+./specy.sh validate catalogue.synth.yaml                                     # schema + grammar + references into the domain
+./specy.sh detect notes.md                                                   # which language and encoding it is read as
+./specy.sh formats
+```
+
+| Command | Description |
+|---|---|
+| `convert <file> --to dsl\|json\|yaml\|markdown` | Convert between encodings; `-o [file]` writes `<name>.<language>.<ext>` next to the input, `--pretty` indents JSON, `--strict` writes nothing on an error, `--language` / `--from` override the detection |
+| `validate <file>` | Any encoding: JSON Schema for json/yaml, the Markdown mapping for md, then grammar, semantic rules and references; `--dsl` prints the DSL a document was checked as |
+| `detect <file>` | The language and encoding a file is read as |
+
+File names carry the encoding: `<name>.domain`, `<name>.domain.json`, `<name>.domain.yaml`, `<name>.domain.md` (same for `.prd`, `.sysreq`, `.arch`, `.synth`). Reading JSON, YAML or Markdown always ends in the parser, so a document in any encoding is judged by the same grammar and rules as the DSL, and the output is the canonical model. Diagnostics are `file:line:col [severity] (stage) message`, with Markdown line numbers for a Markdown input.
 
 ### Parse a `.domain` file
 

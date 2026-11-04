@@ -5,7 +5,7 @@
 
 import type { LangiumSharedCoreServices, LangiumCoreServices, LangiumGeneratedCoreServices, LangiumGeneratedSharedCoreServices, LanguageMetaData, Module } from 'langium';
 import { SpecyDomainAstReflection } from './ast.js';
-import { SpecyDomainGrammar, SpecySynthGrammar } from './grammar.js';
+import { SpecyDomainGrammar, SpecySynthGrammar, SpecyPrdGrammar, SpecySysreqGrammar, SpecyArchitectureGrammar } from './grammar.js';
 
 export const SpecyDomainLanguageMetaData = {
     languageId: 'specy-domain',
@@ -17,6 +17,27 @@ export const SpecyDomainLanguageMetaData = {
 export const SpecySynthLanguageMetaData = {
     languageId: 'specy-synth',
     fileExtensions: ['.synth'],
+    caseInsensitive: false,
+    mode: 'production'
+} as const satisfies LanguageMetaData;
+
+export const SpecyPrdLanguageMetaData = {
+    languageId: 'specy-prd',
+    fileExtensions: ['.prd'],
+    caseInsensitive: false,
+    mode: 'production'
+} as const satisfies LanguageMetaData;
+
+export const SpecySysreqLanguageMetaData = {
+    languageId: 'specy-sysreq',
+    fileExtensions: ['.sysreq'],
+    caseInsensitive: false,
+    mode: 'production'
+} as const satisfies LanguageMetaData;
+
+export const SpecyArchitectureLanguageMetaData = {
+    languageId: 'specy-architecture',
+    fileExtensions: ['.arch'],
     caseInsensitive: false,
     mode: 'production'
 } as const satisfies LanguageMetaData;
@@ -34,5 +55,23 @@ export const SpecyDomainGeneratedModule: Module<LangiumCoreServices, LangiumGene
 export const SpecySynthGeneratedModule: Module<LangiumCoreServices, LangiumGeneratedCoreServices> = {
     Grammar: () => SpecySynthGrammar(),
     LanguageMetaData: () => SpecySynthLanguageMetaData,
+    parser: {}
+};
+
+export const SpecyPrdGeneratedModule: Module<LangiumCoreServices, LangiumGeneratedCoreServices> = {
+    Grammar: () => SpecyPrdGrammar(),
+    LanguageMetaData: () => SpecyPrdLanguageMetaData,
+    parser: {}
+};
+
+export const SpecySysreqGeneratedModule: Module<LangiumCoreServices, LangiumGeneratedCoreServices> = {
+    Grammar: () => SpecySysreqGrammar(),
+    LanguageMetaData: () => SpecySysreqLanguageMetaData,
+    parser: {}
+};
+
+export const SpecyArchitectureGeneratedModule: Module<LangiumCoreServices, LangiumGeneratedCoreServices> = {
+    Grammar: () => SpecyArchitectureGrammar(),
+    LanguageMetaData: () => SpecyArchitectureLanguageMetaData,
     parser: {}
 };

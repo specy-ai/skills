@@ -994,7 +994,7 @@ NotExpr infers Expression:
 Comparison infers Expression:
     Addition ({infer BinaryExpr.left=current} op=CompOp right=Addition
         | {infer MatchesExpr.left=current} 'matches' pattern=MatchPattern
-        | {infer ContainsExpr.left=current} 'does' 'not' 'contain' target=DotPath
+        | {infer ContainsExpr.left=current} negated?='does' 'not' 'contain' target=DotPath
         | {infer ContainsExpr.left=current} 'contains' target=DotPath
     )?;
 

@@ -21,6 +21,11 @@ export const SpecyDomainTerminals = {
     PERIOD_KEY: /\d{4}-(W\d{2}|Q[1-4])(?!\w)/,
     DATE: /\d{4}-\d{2}(-\d{2})?(?!\d)/,
     DURATION: /\d+(\.\d+)?(ms|min|s|h|d|w)(?!\w)/,
+    FEAT_ID: /FEAT-\d{3}/,
+    US_ID: /US-\d{3}/,
+    AC_ID: /AC-\d{3}-\d{2}/,
+    PRD_DATE: /\d{4}-\d{2}-\d{2}/,
+    ML_COMMENT: /\/\*[\s\S]*?\*\//,
 };
 
 export type SpecyDomainTerminalNames = keyof typeof SpecyDomainTerminals;
@@ -35,6 +40,7 @@ export type SpecyDomainKeywordNames =
     | ","
     | "-"
     | "-->"
+    | "->"
     | "."
     | ".."
     | "/"
@@ -60,237 +66,659 @@ export type SpecyDomainKeywordNames =
     | "[*]"
     | "]"
     | "about"
+    | "accept"
+    | "acceptance-criteria"
+    | "accepted"
     | "action"
+    | "addresses"
+    | "adequately-served"
+    | "advances"
     | "aggregate"
     | "agreement"
     | "alert"
     | "alpha"
+    | "analytics"
     | "and"
+    | "anxious"
     | "api"
+    | "app"
     | "application"
+    | "architecture"
+    | "area"
     | "as"
     | "as-of"
+    | "assumption"
+    | "async"
     | "asynchronous-projection"
+    | "automated"
+    | "avoid"
+    | "backoffice"
+    | "baseline"
+    | "binary"
+    | "blocks"
     | "boolean"
+    | "boundedContext"
     | "businessDay"
     | "businessDays"
     | "by"
     | "calls"
+    | "cancelled"
+    | "carries"
     | "caused-by"
+    | "channel"
     | "choreography"
     | "clock"
     | "code"
     | "command"
     | "compensate"
     | "compensation"
+    | "complex"
+    | "complication"
+    | "component"
+    | "concerns"
+    | "confidence"
+    | "confident"
+    | "conflicts-with"
+    | "connect"
+    | "constrains"
+    | "constraint"
+    | "consumes"
     | "contain"
+    | "container"
     | "contains"
     | "context"
+    | "contractual"
     | "coordination"
     | "core"
+    | "could"
     | "count"
     | "creates"
+    | "critical"
+    | "criticality"
     | "csv"
+    | "current-satisfaction"
     | "curve"
+    | "customer-feedback"
     | "d"
     | "date"
     | "datetime"
     | "day"
     | "days"
+    | "deadline"
     | "decimal"
     | "decimals"
+    | "decomposed-into"
+    | "dedicated"
     | "default"
     | "default-dwell"
+    | "deferred"
     | "defined"
+    | "degraded"
+    | "delighted"
+    | "delivered"
+    | "dependency"
     | "depends"
+    | "depends-on"
+    | "deploy"
     | "described-by"
     | "describes"
+    | "design-references"
+    | "desired-outcomes"
+    | "detailed-in"
+    | "detected-by"
     | "detection"
     | "distributions"
     | "does"
     | "domain"
+    | "domain-expertise"
     | "domain-source"
+    | "double"
     | "downstream"
     | "duplicate"
     | "duration"
     | "dwell"
     | "effects"
     | "else"
+    | "email"
     | "emits"
+    | "emotional"
+    | "emotional-tone"
+    | "enforced-by"
     | "enforcement"
     | "entities"
     | "entity"
+    | "entry-criteria"
     | "enum"
+    | "environment"
     | "error"
     | "escalation"
     | "event"
+    | "event-driven"
     | "event-sourced"
     | "every"
+    | "evidence"
     | "exactly"
+    | "exception"
+    | "excluded"
     | "exists"
+    | "exit-criteria"
+    | "expected-outcome"
     | "exposed-by"
     | "exposes"
     | "external"
+    | "externalSystem"
     | "false"
+    | "feature"
     | "fields"
     | "final"
+    | "flow"
     | "for"
     | "forall"
     | "foreach"
     | "from"
+    | "frustrated"
+    | "frustrations"
+    | "functional"
     | "future"
     | "futureOrPresent"
     | "generic"
     | "given"
     | "givens"
+    | "goal"
+    | "goals"
     | "guard"
     | "h"
+    | "handles"
+    | "high"
     | "horizon"
+    | "hotspot"
     | "hours"
+    | "hypothesis"
     | "id"
     | "idempotent"
     | "identity"
     | "if"
     | "immutable"
+    | "impact"
+    | "impact-if-wrong"
+    | "implemented-by"
+    | "import"
+    | "importance"
+    | "important"
     | "in"
+    | "in-progress"
+    | "includes"
+    | "inconclusive"
+    | "indicator"
     | "infrastructure"
     | "instant"
+    | "instantiates"
     | "int"
     | "integer"
     | "interface"
+    | "intervention"
+    | "invalidated"
     | "invariant"
     | "invariants"
+    | "investigating"
     | "is"
+    | "job"
+    | "journey"
     | "json"
+    | "likelihood"
     | "list"
     | "locale"
     | "lognormal"
     | "long"
+    | "long-term"
+    | "low"
     | "machine"
     | "manual"
     | "map"
+    | "market"
+    | "market-research"
+    | "masters"
     | "matches"
     | "max"
     | "maxLength"
+    | "measurement"
+    | "mechanism"
     | "median"
+    | "medium"
     | "message"
     | "meta"
+    | "metric"
+    | "mid-term"
     | "min"
     | "minLength"
     | "minutes"
+    | "mitigate"
+    | "mitigation"
     | "mix"
     | "models"
+    | "moderate"
     | "module"
     | "month"
     | "months"
     | "ms"
     | "must"
     | "name"
+    | "neutral"
+    | "nice-to-have"
+    | "node"
+    | "non-goals"
     | "not"
     | "null"
     | "null-rate"
     | "of"
     | "offset"
     | "on"
+    | "oneway"
+    | "open"
+    | "open-question"
     | "operations"
     | "optional"
     | "options"
     | "or"
     | "orchestration"
+    | "order"
     | "ordered"
     | "organization"
+    | "organizational"
+    | "outcome"
     | "outcomes"
     | "over"
+    | "overserved"
+    | "owner"
     | "pack"
     | "participants"
     | "past"
     | "pastOrPresent"
     | "pattern"
     | "per"
+    | "person"
+    | "persona"
+    | "phase"
+    | "physical"
+    | "planned"
     | "populations"
     | "postcondition"
+    | "prd-source"
     | "precondition"
     | "predicate"
+    | "predicts"
+    | "primary"
+    | "priority"
+    | "problem"
+    | "product"
     | "projected-by"
+    | "proposed"
+    | "proposes"
+    | "provider"
+    | "provides"
+    | "publishes"
+    | "quality-constrained-by"
     | "quarter"
     | "query"
+    | "question"
     | "range"
     | "rate"
     | "reaction"
     | "reaction-latency"
     | "read-only"
     | "reads-from"
+    | "realizes"
     | "reconciliation"
     | "reference"
     | "references"
+    | "region"
+    | "regulatory"
+    | "rejected"
     | "rejection"
     | "rejections"
     | "rejects"
+    | "related-to"
+    | "release"
+    | "replicas"
     | "repository"
     | "required"
+    | "requirements"
     | "requirements-source"
     | "requires"
+    | "resolution"
+    | "resolved"
     | "resolves"
+    | "resource"
     | "retry"
     | "returns"
+    | "risk"
+    | "role"
     | "rollup"
     | "rows"
     | "s"
     | "safe"
+    | "satisfaction"
+    | "satisfied-by"
+    | "satisfied-by-infrastructure"
     | "satisfies"
     | "scenario"
     | "schedule"
+    | "scope"
+    | "scoped-to"
+    | "secondary"
     | "seconds"
     | "seed"
     | "service"
     | "set"
     | "sets"
     | "share"
+    | "shared"
+    | "shipped"
+    | "short-term"
+    | "should"
     | "sigma"
     | "since"
+    | "situation"
+    | "sms"
+    | "social"
+    | "source"
+    | "source-reference"
     | "sourced-from"
     | "spi"
     | "state"
+    | "state-driven"
+    | "statement"
     | "states"
     | "status"
     | "step"
+    | "steps"
+    | "stores"
+    | "stories"
+    | "streaming"
     | "string"
+    | "strong"
+    | "struct"
+    | "structured-by"
     | "subdomain"
+    | "subscribes"
+    | "summary"
+    | "supported-by"
     | "supporting"
+    | "supports"
     | "suspend"
     | "symmetric"
+    | "sync"
     | "synced-via"
     | "synchronous-query"
+    | "system"
+    | "system-response"
+    | "target"
+    | "target-date"
+    | "technical"
+    | "technology"
     | "temporal"
+    | "tenancy"
+    | "tested-by"
+    | "testing"
+    | "theme"
     | "then"
+    | "threatens"
+    | "throws"
     | "time"
+    | "to"
+    | "tolerant"
     | "total"
+    | "transfer"
     | "trigger"
     | "triggered-by"
     | "true"
     | "type"
+    | "typedef"
+    | "ubiquitous"
+    | "underpins"
+    | "underserved"
     | "uniform"
+    | "union"
     | "unique"
     | "unsafe"
+    | "unserved"
+    | "unvalidated"
+    | "unwanted"
     | "upstream"
+    | "used-by"
+    | "user-research"
     | "uuid"
+    | "validated"
+    | "validation-method"
+    | "validation-plan"
     | "value"
+    | "value-proposition"
+    | "vision"
     | "vocabulary"
     | "void"
     | "w"
+    | "weak"
+    | "web"
     | "week"
     | "weeks"
+    | "weight"
     | "when"
     | "where"
+    | "wont"
     | "words"
     | "y"
     | "year"
     | "years"
     | "zipf"
+    | "zone"
     | "{"
     | "}";
 
 export type SpecyDomainTokenNames = SpecyDomainTerminalNames | SpecyDomainKeywordNames;
+
+export type ArchArchitectureMember = ArchDomainSourceDecl | ArchExternalSystemDef | ArchPersonDef | ArchRequirementsSourceDecl | ArchSystemDef;
+
+export const ArchArchitectureMember = 'ArchArchitectureMember';
+
+export function isArchArchitectureMember(item: unknown): item is ArchArchitectureMember {
+    return reflection.isInstance(item, ArchArchitectureMember);
+}
+
+export type ArchCollectionKind = 'list' | 'map' | 'set';
+
+export function isArchCollectionKind(item: unknown): item is ArchCollectionKind {
+    return item === 'list' || item === 'set' || item === 'map';
+}
+
+export type ArchComponentClause = ArchBoundedContextRef | ArchProvidesClause | ArchPublishesClause | ArchRequiresClause | ArchSubscribesClause;
+
+export const ArchComponentClause = 'ArchComponentClause';
+
+export function isArchComponentClause(item: unknown): item is ArchComponentClause {
+    return reflection.isInstance(item, ArchComponentClause);
+}
+
+export type ArchConcernRef = ArchConceptRef | ArchFlowConcern;
+
+export const ArchConcernRef = 'ArchConcernRef';
+
+export function isArchConcernRef(item: unknown): item is ArchConcernRef {
+    return reflection.isInstance(item, ArchConcernRef);
+}
+
+export type ArchConnectorStyle = 'async' | 'streaming' | 'sync';
+
+export function isArchConnectorStyle(item: unknown): item is ArchConnectorStyle {
+    return item === 'sync' || item === 'async' || item === 'streaming';
+}
+
+export type ArchContainerClause = ArchComponentDef | ArchProvidesClause | ArchRequiresClause;
+
+export const ArchContainerClause = 'ArchContainerClause';
+
+export function isArchContainerClause(item: unknown): item is ArchContainerClause {
+    return reflection.isInstance(item, ArchContainerClause);
+}
+
+export type ArchCriticality = 'critical' | 'degraded' | 'tolerant';
+
+export function isArchCriticality(item: unknown): item is ArchCriticality {
+    return item === 'critical' || item === 'degraded' || item === 'tolerant';
+}
+
+export type ArchDependencyPattern = 'ACL' | 'CS' | 'Conformist' | 'OHS' | 'Partnership' | 'PublishedLanguage' | 'SharedKernel';
+
+export function isArchDependencyPattern(item: unknown): item is ArchDependencyPattern {
+    return item === 'CS' || item === 'Conformist' || item === 'ACL' || item === 'OHS' || item === 'SharedKernel' || item === 'PublishedLanguage' || item === 'Partnership';
+}
+
+export type ArchDomainName = ArchTypeName | string;
+
+export function isArchDomainName(item: unknown): item is ArchDomainName {
+    return isArchTypeName(item) || (typeof item === 'string' && (/"[^"]*"/.test(item)));
+}
+
+export type ArchEnvironmentMember = ArchDeployClause | ArchNodeDef;
+
+export const ArchEnvironmentMember = 'ArchEnvironmentMember';
+
+export function isArchEnvironmentMember(item: unknown): item is ArchEnvironmentMember {
+    return reflection.isInstance(item, ArchEnvironmentMember);
+}
+
+export type ArchExternalSystemClause = ArchConsumesClause | ArchProvidesClause;
+
+export const ArchExternalSystemClause = 'ArchExternalSystemClause';
+
+export function isArchExternalSystemClause(item: unknown): item is ArchExternalSystemClause {
+    return reflection.isInstance(item, ArchExternalSystemClause);
+}
+
+export type ArchFieldType = ArchCollectionType | ArchNamedType | ArchPrimitiveType;
+
+export const ArchFieldType = 'ArchFieldType';
+
+export function isArchFieldType(item: unknown): item is ArchFieldType {
+    return reflection.isInstance(item, ArchFieldType);
+}
+
+export type ArchIdent = ArchKeywordAsIdent | string;
+
+export function isArchIdent(item: unknown): item is ArchIdent {
+    return isArchKeywordAsIdent(item) || (typeof item === 'string' && (/[a-zA-Z_][a-zA-Z0-9_]*/.test(item)));
+}
+
+export type ArchKeywordAsIdent = 'architecture' | 'area' | 'as' | 'async' | 'automated' | 'binary' | 'boolean' | 'boundedContext' | 'carries' | 'channel' | 'component' | 'concerns' | 'connect' | 'consumes' | 'container' | 'context' | 'critical' | 'criticality' | 'date' | 'datetime' | 'decimal' | 'dedicated' | 'degraded' | 'dependency' | 'deploy' | 'domain' | 'double' | 'duration' | 'enum' | 'environment' | 'event' | 'exception' | 'externalSystem' | 'false' | 'flow' | 'from' | 'handles' | 'hotspot' | 'import' | 'instant' | 'instantiates' | 'int' | 'integer' | 'interface' | 'list' | 'long' | 'manual' | 'map' | 'masters' | 'meta' | 'module' | 'node' | 'null' | 'on' | 'oneway' | 'optional' | 'organization' | 'over' | 'person' | 'phase' | 'provider' | 'provides' | 'publishes' | 'realizes' | 'region' | 'replicas' | 'required' | 'requires' | 'resource' | 'returns' | 'safe' | 'satisfies' | 'set' | 'shared' | 'stores' | 'streaming' | 'string' | 'struct' | 'subscribes' | 'sync' | 'system' | 'technology' | 'tenancy' | 'throws' | 'time' | 'to' | 'tolerant' | 'true' | 'type' | 'typedef' | 'union' | 'uuid' | 'value' | 'void' | 'zone';
+
+export function isArchKeywordAsIdent(item: unknown): item is ArchKeywordAsIdent {
+    return item === 'architecture' || item === 'organization' || item === 'phase' || item === 'area' || item === 'person' || item === 'externalSystem' || item === 'system' || item === 'dependency' || item === 'masters' || item === 'handles' || item === 'hotspot' || item === 'concerns' || item === 'criticality' || item === 'critical' || item === 'degraded' || item === 'tolerant' || item === 'flow' || item === 'carries' || item === 'as' || item === 'to' || item === 'over' || item === 'manual' || item === 'automated' || item === 'boundedContext' || item === 'container' || item === 'technology' || item === 'component' || item === 'provides' || item === 'requires' || item === 'consumes' || item === 'publishes' || item === 'subscribes' || item === 'interface' || item === 'safe' || item === 'oneway' || item === 'streaming' || item === 'returns' || item === 'void' || item === 'throws' || item === 'required' || item === 'optional' || item === 'struct' || item === 'exception' || item === 'union' || item === 'enum' || item === 'typedef' || item === 'import' || item === 'value' || item === 'type' || item === 'event' || item === 'from' || item === 'domain' || item === 'channel' || item === 'on' || item === 'connect' || item === 'sync' || item === 'async' || item === 'environment' || item === 'deploy' || item === 'replicas' || item === 'node' || item === 'provider' || item === 'region' || item === 'zone' || item === 'resource' || item === 'instantiates' || item === 'tenancy' || item === 'shared' || item === 'dedicated' || item === 'stores' || item === 'realizes' || item === 'module' || item === 'context' || item === 'satisfies' || item === 'meta' || item === 'string' || item === 'int' || item === 'integer' || item === 'long' || item === 'double' || item === 'decimal' || item === 'boolean' || item === 'date' || item === 'datetime' || item === 'time' || item === 'instant' || item === 'duration' || item === 'uuid' || item === 'binary' || item === 'list' || item === 'set' || item === 'map' || item === 'true' || item === 'false' || item === 'null';
+}
+
+export type ArchLevel0Clause = ArchAreaRef | ArchDetailedInDecl | ArchHandlesClause | ArchHotspotDef | ArchMastersClause | ArchUsedByClause;
+
+export const ArchLevel0Clause = 'ArchLevel0Clause';
+
+export function isArchLevel0Clause(item: unknown): item is ArchLevel0Clause {
+    return reflection.isInstance(item, ArchLevel0Clause);
+}
+
+export type ArchLiteral = ArchBooleanLiteral | ArchNullLiteral | ArchNumberLiteral | ArchStringLiteral;
+
+export const ArchLiteral = 'ArchLiteral';
+
+export function isArchLiteral(item: unknown): item is ArchLiteral {
+    return reflection.isInstance(item, ArchLiteral);
+}
+
+export type ArchNamedTypeDef = ArchEnumDef | ArchExceptionDef | ArchImportDecl | ArchStructDef | ArchTypedefDef | ArchUnionDef;
+
+export const ArchNamedTypeDef = 'ArchNamedTypeDef';
+
+export function isArchNamedTypeDef(item: unknown): item is ArchNamedTypeDef {
+    return reflection.isInstance(item, ArchNamedTypeDef);
+}
+
+export type ArchNodeMember = ArchDeployClause | ArchNodeDef | ArchResourceDef;
+
+export const ArchNodeMember = 'ArchNodeMember';
+
+export function isArchNodeMember(item: unknown): item is ArchNodeMember {
+    return reflection.isInstance(item, ArchNodeMember);
+}
+
+export type ArchOperationStyle = 'oneway' | 'safe' | 'streaming';
+
+export function isArchOperationStyle(item: unknown): item is ArchOperationStyle {
+    return item === 'safe' || item === 'oneway' || item === 'streaming';
+}
+
+export type ArchOrganizationMember = ArchAreaDef | ArchDependencyDef | ArchDomainSourceDecl | ArchOrgExternalSystemDef | ArchOrgSystemDef | ArchPersonDef | ArchPhaseDef | ArchRequirementsSourceDecl;
+
+export const ArchOrganizationMember = 'ArchOrganizationMember';
+
+export function isArchOrganizationMember(item: unknown): item is ArchOrganizationMember {
+    return reflection.isInstance(item, ArchOrganizationMember);
+}
+
+export type ArchOrgExternalSystemClause = ArchConsumesClause | ArchMastersClause | ArchProvidesClause;
+
+export const ArchOrgExternalSystemClause = 'ArchOrgExternalSystemClause';
+
+export function isArchOrgExternalSystemClause(item: unknown): item is ArchOrgExternalSystemClause {
+    return reflection.isInstance(item, ArchOrgExternalSystemClause);
+}
+
+export type ArchPrimitiveTypeKw = 'binary' | 'boolean' | 'date' | 'datetime' | 'decimal' | 'double' | 'duration' | 'instant' | 'int' | 'integer' | 'long' | 'string' | 'time' | 'uuid';
+
+export function isArchPrimitiveTypeKw(item: unknown): item is ArchPrimitiveTypeKw {
+    return item === 'string' || item === 'int' || item === 'integer' || item === 'long' || item === 'double' || item === 'decimal' || item === 'boolean' || item === 'date' || item === 'datetime' || item === 'time' || item === 'instant' || item === 'duration' || item === 'uuid' || item === 'binary';
+}
+
+export type ArchRequiredness = 'optional' | 'required';
+
+export function isArchRequiredness(item: unknown): item is ArchRequiredness {
+    return item === 'required' || item === 'optional';
+}
+
+export type ArchRoot = ArchArchitectureDef | ArchOrganizationDef;
+
+export const ArchRoot = 'ArchRoot';
+
+export function isArchRoot(item: unknown): item is ArchRoot {
+    return reflection.isInstance(item, ArchRoot);
+}
+
+export type ArchSystemMember = ArchBoundedContextDecl | ArchChannelDef | ArchConnectorDef | ArchContainerDef | ArchEnvironmentDef | ArchInterfaceDef | ArchNamedTypeDef;
+
+export const ArchSystemMember = 'ArchSystemMember';
+
+export function isArchSystemMember(item: unknown): item is ArchSystemMember {
+    return reflection.isInstance(item, ArchSystemMember);
+}
+
+export type ArchSystemName = ArchTypeName | string;
+
+export function isArchSystemName(item: unknown): item is ArchSystemName {
+    return isArchTypeName(item) || (typeof item === 'string' && (/"[^"]*"/.test(item)));
+}
+
+export type ArchTenancy = 'dedicated' | 'shared';
+
+export function isArchTenancy(item: unknown): item is ArchTenancy {
+    return item === 'shared' || item === 'dedicated';
+}
+
+export type ArchTransferMode = 'automated' | 'manual';
+
+export function isArchTransferMode(item: unknown): item is ArchTransferMode {
+    return item === 'manual' || item === 'automated';
+}
+
+export type ArchTypeName = 'ACL' | 'CS' | 'Conformist' | 'OHS' | 'Partnership' | 'PublishedLanguage' | 'SharedKernel' | string;
+
+export function isArchTypeName(item: unknown): item is ArchTypeName {
+    return item === 'CS' || item === 'Conformist' || item === 'ACL' || item === 'OHS' || item === 'SharedKernel' || item === 'PublishedLanguage' || item === 'Partnership' || (typeof item === 'string' && (/[A-Z][a-zA-Z0-9]*(?!\w)/.test(item)));
+}
 
 export type Binder = Ident | TypeName;
 
@@ -508,6 +936,144 @@ export function isPeriodKey(item: unknown): item is PeriodKey {
     return (typeof item === 'string' && (/\d{4}-(W\d{2}|Q[1-4])(?!\w)/.test(item) || /\d{4}-\d{2}(-\d{2})?(?!\d)/.test(item) || /-?\d+(\.\d+)?/.test(item)));
 }
 
+export type PrdAssumptionStatus = 'invalidated' | 'unvalidated' | 'validated';
+
+export function isPrdAssumptionStatus(item: unknown): item is PrdAssumptionStatus {
+    return item === 'unvalidated' || item === 'validated' || item === 'invalidated';
+}
+
+export type PrdChannel = 'app' | 'backoffice' | 'email' | 'external' | 'physical' | 'sms' | 'web';
+
+export function isPrdChannel(item: unknown): item is PrdChannel {
+    return item === 'app' || item === 'web' || item === 'sms' || item === 'email' || item === 'physical' || item === 'backoffice' || item === 'external';
+}
+
+export type PrdConfidence = 'moderate' | 'strong' | 'weak';
+
+export function isPrdConfidence(item: unknown): item is PrdConfidence {
+    return item === 'strong' || item === 'moderate' || item === 'weak';
+}
+
+export type PrdConstraintSource = 'contractual' | 'market' | 'organizational' | 'regulatory' | 'technical';
+
+export function isPrdConstraintSource(item: unknown): item is PrdConstraintSource {
+    return item === 'regulatory' || item === 'contractual' || item === 'technical' || item === 'organizational' || item === 'market';
+}
+
+export type PrdEvidenceType = 'analytics' | 'customer-feedback' | 'domain-expertise' | 'market-research' | 'user-research';
+
+export function isPrdEvidenceType(item: unknown): item is PrdEvidenceType {
+    return item === 'user-research' || item === 'analytics' || item === 'market-research' || item === 'customer-feedback' || item === 'domain-expertise';
+}
+
+export type PrdFeatureStatus = 'accepted' | 'deferred' | 'delivered' | 'in-progress' | 'proposed' | 'rejected';
+
+export function isPrdFeatureStatus(item: unknown): item is PrdFeatureStatus {
+    return item === 'proposed' || item === 'accepted' || item === 'in-progress' || item === 'delivered' || item === 'deferred' || item === 'rejected';
+}
+
+export type PrdHorizon = 'long-term' | 'mid-term' | 'short-term';
+
+export function isPrdHorizon(item: unknown): item is PrdHorizon {
+    return item === 'short-term' || item === 'mid-term' || item === 'long-term';
+}
+
+export type PrdHypothesisStatus = 'inconclusive' | 'invalidated' | 'proposed' | 'testing' | 'validated';
+
+export function isPrdHypothesisStatus(item: unknown): item is PrdHypothesisStatus {
+    return item === 'proposed' || item === 'testing' || item === 'validated' || item === 'invalidated' || item === 'inconclusive';
+}
+
+export type PrdImpact = 'critical' | 'high' | 'low' | 'medium';
+
+export function isPrdImpact(item: unknown): item is PrdImpact {
+    return item === 'low' || item === 'medium' || item === 'high' || item === 'critical';
+}
+
+export type PrdJobImportance = 'critical' | 'important' | 'nice-to-have';
+
+export function isPrdJobImportance(item: unknown): item is PrdJobImportance {
+    return item === 'critical' || item === 'important' || item === 'nice-to-have';
+}
+
+export type PrdJobSatisfaction = 'adequately-served' | 'overserved' | 'underserved' | 'unserved';
+
+export function isPrdJobSatisfaction(item: unknown): item is PrdJobSatisfaction {
+    return item === 'unserved' || item === 'underserved' || item === 'adequately-served' || item === 'overserved';
+}
+
+export type PrdJobType = 'emotional' | 'functional' | 'social';
+
+export function isPrdJobType(item: unknown): item is PrdJobType {
+    return item === 'functional' || item === 'emotional' || item === 'social';
+}
+
+export type PrdLevel = 'high' | 'low' | 'medium';
+
+export function isPrdLevel(item: unknown): item is PrdLevel {
+    return item === 'high' || item === 'medium' || item === 'low';
+}
+
+export type PrdMember = PrdAssumptionDef | PrdConstraintDef | PrdEvidenceDef | PrdFeatureDef | PrdGoalDef | PrdHypothesisDef | PrdJobDef | PrdJourneyDef | PrdNonGoalsBlock | PrdOpenQuestionDef | PrdPersonaDef | PrdProblemBlock | PrdReleaseDef | PrdRiskDef | PrdScopeBlock | PrdVisionDecl;
+
+export const PrdMember = 'PrdMember';
+
+export function isPrdMember(item: unknown): item is PrdMember {
+    return reflection.isInstance(item, PrdMember);
+}
+
+export type PrdMitigation = 'accept' | 'avoid' | 'mitigate' | 'transfer';
+
+export function isPrdMitigation(item: unknown): item is PrdMitigation {
+    return item === 'accept' || item === 'mitigate' || item === 'avoid' || item === 'transfer';
+}
+
+export type PrdPersonaWeight = 'excluded' | 'primary' | 'secondary';
+
+export function isPrdPersonaWeight(item: unknown): item is PrdPersonaWeight {
+    return item === 'primary' || item === 'secondary' || item === 'excluded';
+}
+
+export type PrdPriority = 'could' | 'must' | 'should' | 'wont';
+
+export function isPrdPriority(item: unknown): item is PrdPriority {
+    return item === 'must' || item === 'should' || item === 'could' || item === 'wont';
+}
+
+export type PrdQuestionStatus = 'deferred' | 'investigating' | 'open' | 'resolved';
+
+export function isPrdQuestionStatus(item: unknown): item is PrdQuestionStatus {
+    return item === 'open' || item === 'investigating' || item === 'resolved' || item === 'deferred';
+}
+
+export type PrdReleaseMember = PrdDependsOnDecl | PrdEntryCriteriaBlock | PrdExitCriteriaBlock | PrdIncludesBlock | PrdReleaseStatusDecl | PrdTargetDateDecl | PrdThemeDecl;
+
+export const PrdReleaseMember = 'PrdReleaseMember';
+
+export function isPrdReleaseMember(item: unknown): item is PrdReleaseMember {
+    return reflection.isInstance(item, PrdReleaseMember);
+}
+
+export type PrdReleaseStatus = 'cancelled' | 'in-progress' | 'planned' | 'shipped';
+
+export function isPrdReleaseStatus(item: unknown): item is PrdReleaseStatus {
+    return item === 'planned' || item === 'in-progress' || item === 'shipped' || item === 'cancelled';
+}
+
+export type PrdStepMember = PrdStepActionDecl | PrdStepChannelDecl | PrdStepOrderDecl | PrdStepSystemResponseDecl | PrdStepToneDecl;
+
+export const PrdStepMember = 'PrdStepMember';
+
+export function isPrdStepMember(item: unknown): item is PrdStepMember {
+    return reflection.isInstance(item, PrdStepMember);
+}
+
+export type PrdTone = 'anxious' | 'confident' | 'delighted' | 'frustrated' | 'neutral';
+
+export function isPrdTone(item: unknown): item is PrdTone {
+    return item === 'confident' || item === 'anxious' || item === 'frustrated' || item === 'delighted' || item === 'neutral';
+}
+
 export type PrimitiveTypeKw = 'boolean' | 'date' | 'datetime' | 'decimal' | 'duration' | 'int' | 'integer' | 'long' | 'string' | 'time' | 'uuid' | 'void';
 
 export function isPrimitiveTypeKw(item: unknown): item is PrimitiveTypeKw {
@@ -520,6 +1086,60 @@ export const RateExpr = 'RateExpr';
 
 export function isRateExpr(item: unknown): item is RateExpr {
     return reflection.isInstance(item, RateExpr);
+}
+
+export type ReqClause = ReqRationale | ReqSourceDecl | ReqTraceClause;
+
+export const ReqClause = 'ReqClause';
+
+export function isReqClause(item: unknown): item is ReqClause {
+    return reflection.isInstance(item, ReqClause);
+}
+
+export type ReqEarsPattern = 'complex' | 'event-driven' | 'optional' | 'state-driven' | 'ubiquitous' | 'unwanted';
+
+export function isReqEarsPattern(item: unknown): item is ReqEarsPattern {
+    return item === 'ubiquitous' || item === 'state-driven' || item === 'event-driven' || item === 'unwanted' || item === 'optional' || item === 'complex';
+}
+
+export type ReqKeywordAsIdent = 'complex' | 'could' | 'module' | 'must' | 'optional' | 'priority' | 'requirements' | 'should' | 'source' | 'ubiquitous' | 'unwanted' | 'wont';
+
+export function isReqKeywordAsIdent(item: unknown): item is ReqKeywordAsIdent {
+    return item === 'module' || item === 'source' || item === 'priority' || item === 'requirements' || item === 'must' || item === 'should' || item === 'could' || item === 'wont' || item === 'ubiquitous' || item === 'unwanted' || item === 'optional' || item === 'complex';
+}
+
+export type ReqLinkRole = 'detected-by' | 'enforced-by' | 'implemented-by' | 'quality-constrained-by' | 'structured-by';
+
+export function isReqLinkRole(item: unknown): item is ReqLinkRole {
+    return item === 'implemented-by' || item === 'structured-by' || item === 'enforced-by' || item === 'detected-by' || item === 'quality-constrained-by';
+}
+
+export type ReqMoscowPriority = 'could' | 'must' | 'should' | 'wont';
+
+export function isReqMoscowPriority(item: unknown): item is ReqMoscowPriority {
+    return item === 'must' || item === 'should' || item === 'could' || item === 'wont';
+}
+
+export type ReqRefName = ReqKeywordAsIdent | string;
+
+export function isReqRefName(item: unknown): item is ReqRefName {
+    return isReqKeywordAsIdent(item) || (typeof item === 'string' && (/[A-Z][a-zA-Z0-9]*(?!\w)/.test(item) || /[a-zA-Z_][a-zA-Z0-9_]*/.test(item)));
+}
+
+export type ReqSetMember = ReqModuleBlock | ReqPrdSourceDecl | ReqRequirementDef;
+
+export const ReqSetMember = 'ReqSetMember';
+
+export function isReqSetMember(item: unknown): item is ReqSetMember {
+    return reflection.isInstance(item, ReqSetMember);
+}
+
+export type ReqTraceClause = ReqConflictsWith | ReqDecomposedInto | ReqDependsOn | ReqSatisfiedBy;
+
+export const ReqTraceClause = 'ReqTraceClause';
+
+export function isReqTraceClause(item: unknown): item is ReqTraceClause {
+    return reflection.isInstance(item, ReqTraceClause);
 }
 
 export type RowKey = SynthIdent | string;
@@ -744,6 +1364,931 @@ export const ApplicationServiceDef = 'ApplicationServiceDef';
 
 export function isApplicationServiceDef(item: unknown): item is ApplicationServiceDef {
     return reflection.isInstance(item, ApplicationServiceDef);
+}
+
+export interface ArchArchitectureDef extends langium.AstNode {
+    readonly $container: ArchFile;
+    readonly $type: 'ArchArchitectureDef';
+    description?: Description;
+    members: Array<ArchArchitectureMember>;
+    metadata?: ArchMetadataBlock;
+    name: ArchSystemName;
+}
+
+export const ArchArchitectureDef = 'ArchArchitectureDef';
+
+export function isArchArchitectureDef(item: unknown): item is ArchArchitectureDef {
+    return reflection.isInstance(item, ArchArchitectureDef);
+}
+
+export interface ArchAreaDef extends langium.AstNode {
+    readonly $container: ArchOrganizationDef;
+    readonly $type: 'ArchAreaDef';
+    description?: Description;
+    metadata?: ArchMetadataBlock;
+    name: ArchTypeName;
+}
+
+export const ArchAreaDef = 'ArchAreaDef';
+
+export function isArchAreaDef(item: unknown): item is ArchAreaDef {
+    return reflection.isInstance(item, ArchAreaDef);
+}
+
+export interface ArchAreaRef extends langium.AstNode {
+    readonly $container: ArchOrgSystemDef;
+    readonly $type: 'ArchAreaRef';
+    name: ArchTypeName;
+}
+
+export const ArchAreaRef = 'ArchAreaRef';
+
+export function isArchAreaRef(item: unknown): item is ArchAreaRef {
+    return reflection.isInstance(item, ArchAreaRef);
+}
+
+export interface ArchArgDecl extends langium.AstNode {
+    readonly $container: ArchOperationDef;
+    readonly $type: 'ArchArgDecl';
+    default?: ArchLiteral;
+    name: ArchIdent;
+    ordinal: string;
+    requiredness: ArchRequiredness;
+    type: ArchFieldType;
+}
+
+export const ArchArgDecl = 'ArchArgDecl';
+
+export function isArchArgDecl(item: unknown): item is ArchArgDecl {
+    return reflection.isInstance(item, ArchArgDecl);
+}
+
+export interface ArchBooleanLiteral extends langium.AstNode {
+    readonly $container: ArchArgDecl | ArchFieldDef | ArchMetadataEntry;
+    readonly $type: 'ArchBooleanLiteral';
+    value: 'false' | 'true';
+}
+
+export const ArchBooleanLiteral = 'ArchBooleanLiteral';
+
+export function isArchBooleanLiteral(item: unknown): item is ArchBooleanLiteral {
+    return reflection.isInstance(item, ArchBooleanLiteral);
+}
+
+export interface ArchBoundedContextDecl extends langium.AstNode {
+    readonly $container: ArchOrgSystemDef | ArchSystemDef;
+    readonly $type: 'ArchBoundedContextDecl';
+    description?: Description;
+    metadata?: ArchMetadataBlock;
+    name: ArchTypeName;
+}
+
+export const ArchBoundedContextDecl = 'ArchBoundedContextDecl';
+
+export function isArchBoundedContextDecl(item: unknown): item is ArchBoundedContextDecl {
+    return reflection.isInstance(item, ArchBoundedContextDecl);
+}
+
+export interface ArchBoundedContextRef extends langium.AstNode {
+    readonly $container: ArchComponentDef;
+    readonly $type: 'ArchBoundedContextRef';
+    name: ArchTypeName;
+}
+
+export const ArchBoundedContextRef = 'ArchBoundedContextRef';
+
+export function isArchBoundedContextRef(item: unknown): item is ArchBoundedContextRef {
+    return reflection.isInstance(item, ArchBoundedContextRef);
+}
+
+export interface ArchCarriedConcept extends langium.AstNode {
+    readonly $container: ArchFlowDef;
+    readonly $type: 'ArchCarriedConcept';
+    becomes?: ArchConceptRef;
+    concept: ArchConceptRef;
+}
+
+export const ArchCarriedConcept = 'ArchCarriedConcept';
+
+export function isArchCarriedConcept(item: unknown): item is ArchCarriedConcept {
+    return reflection.isInstance(item, ArchCarriedConcept);
+}
+
+export interface ArchChannelDef extends langium.AstNode {
+    readonly $container: ArchOrgSystemDef | ArchSystemDef;
+    readonly $type: 'ArchChannelDef';
+    broker: ArchTypeName;
+    carries: Array<ArchTypeName>;
+    description?: Description;
+    metadata?: ArchMetadataBlock;
+    name: ArchIdent;
+}
+
+export const ArchChannelDef = 'ArchChannelDef';
+
+export function isArchChannelDef(item: unknown): item is ArchChannelDef {
+    return reflection.isInstance(item, ArchChannelDef);
+}
+
+export interface ArchCollectionType extends langium.AstNode {
+    readonly $container: ArchArgDecl | ArchCollectionType | ArchFieldDef | ArchOperationDef | ArchTypedefDef | ArchUnionMember;
+    readonly $type: 'ArchCollectionType';
+    elementType: ArchFieldType;
+    kind: ArchCollectionKind;
+    valueType?: ArchFieldType;
+}
+
+export const ArchCollectionType = 'ArchCollectionType';
+
+export function isArchCollectionType(item: unknown): item is ArchCollectionType {
+    return reflection.isInstance(item, ArchCollectionType);
+}
+
+export interface ArchComponentDef extends langium.AstNode {
+    readonly $container: ArchContainerDef;
+    readonly $type: 'ArchComponentDef';
+    clauses: Array<ArchComponentClause>;
+    description?: Description;
+    metadata?: ArchMetadataBlock;
+    name: ArchTypeName;
+    realizes?: ArchRealizesDecl;
+    satisfies?: SatisfiesDecl;
+}
+
+export const ArchComponentDef = 'ArchComponentDef';
+
+export function isArchComponentDef(item: unknown): item is ArchComponentDef {
+    return reflection.isInstance(item, ArchComponentDef);
+}
+
+export interface ArchConceptRef extends langium.AstNode {
+    readonly $container: ArchCarriedConcept | ArchHandlesClause | ArchHotspotDef | ArchMastersClause;
+    readonly $type: 'ArchConceptRef';
+    context?: ArchTypeName;
+    name: ArchTypeName;
+}
+
+export const ArchConceptRef = 'ArchConceptRef';
+
+export function isArchConceptRef(item: unknown): item is ArchConceptRef {
+    return reflection.isInstance(item, ArchConceptRef);
+}
+
+export interface ArchConnectorDef extends langium.AstNode {
+    readonly $container: ArchOrgSystemDef | ArchSystemDef;
+    readonly $type: 'ArchConnectorDef';
+    description?: Description;
+    from: ArchConnectorRef;
+    metadata?: ArchMetadataBlock;
+    protocol: string;
+    style: ArchConnectorStyle;
+    to: ArchConnectorRef;
+}
+
+export const ArchConnectorDef = 'ArchConnectorDef';
+
+export function isArchConnectorDef(item: unknown): item is ArchConnectorDef {
+    return reflection.isInstance(item, ArchConnectorDef);
+}
+
+export interface ArchConnectorRef extends langium.AstNode {
+    readonly $container: ArchConnectorDef;
+    readonly $type: 'ArchConnectorRef';
+    segments: Array<ArchTypeName>;
+}
+
+export const ArchConnectorRef = 'ArchConnectorRef';
+
+export function isArchConnectorRef(item: unknown): item is ArchConnectorRef {
+    return reflection.isInstance(item, ArchConnectorRef);
+}
+
+export interface ArchConsumesClause extends langium.AstNode {
+    readonly $container: ArchExternalSystemDef | ArchOrgExternalSystemDef;
+    readonly $type: 'ArchConsumesClause';
+    interface: ArchTypeName;
+}
+
+export const ArchConsumesClause = 'ArchConsumesClause';
+
+export function isArchConsumesClause(item: unknown): item is ArchConsumesClause {
+    return reflection.isInstance(item, ArchConsumesClause);
+}
+
+export interface ArchContainerDef extends langium.AstNode {
+    readonly $container: ArchOrgSystemDef | ArchSystemDef;
+    readonly $type: 'ArchContainerDef';
+    clauses: Array<ArchContainerClause>;
+    description?: Description;
+    metadata?: ArchMetadataBlock;
+    name: ArchTypeName;
+    realizes?: ArchRealizesDecl;
+    satisfies?: SatisfiesDecl;
+    technology?: ArchTechnologyDecl;
+}
+
+export const ArchContainerDef = 'ArchContainerDef';
+
+export function isArchContainerDef(item: unknown): item is ArchContainerDef {
+    return reflection.isInstance(item, ArchContainerDef);
+}
+
+export interface ArchDependencyDef extends langium.AstNode {
+    readonly $container: ArchOrganizationDef;
+    readonly $type: 'ArchDependencyDef';
+    criticality?: ArchCriticality;
+    description?: Description;
+    downstream: ArchTypeName;
+    flows: Array<ArchFlowDef>;
+    metadata?: ArchMetadataBlock;
+    patterns: Array<ArchDependencyPattern>;
+    upstream: ArchTypeName;
+}
+
+export const ArchDependencyDef = 'ArchDependencyDef';
+
+export function isArchDependencyDef(item: unknown): item is ArchDependencyDef {
+    return reflection.isInstance(item, ArchDependencyDef);
+}
+
+export interface ArchDeployClause extends langium.AstNode {
+    readonly $container: ArchEnvironmentDef | ArchNodeDef;
+    readonly $type: 'ArchDeployClause';
+    containers: Array<ArchTypeName>;
+    replicas?: string;
+}
+
+export const ArchDeployClause = 'ArchDeployClause';
+
+export function isArchDeployClause(item: unknown): item is ArchDeployClause {
+    return reflection.isInstance(item, ArchDeployClause);
+}
+
+export interface ArchDetailedInDecl extends langium.AstNode {
+    readonly $container: ArchOrgSystemDef;
+    readonly $type: 'ArchDetailedInDecl';
+    path: string;
+}
+
+export const ArchDetailedInDecl = 'ArchDetailedInDecl';
+
+export function isArchDetailedInDecl(item: unknown): item is ArchDetailedInDecl {
+    return reflection.isInstance(item, ArchDetailedInDecl);
+}
+
+export interface ArchDomainSourceDecl extends langium.AstNode {
+    readonly $container: ArchArchitectureDef | ArchOrganizationDef;
+    readonly $type: 'ArchDomainSourceDecl';
+    path: string;
+}
+
+export const ArchDomainSourceDecl = 'ArchDomainSourceDecl';
+
+export function isArchDomainSourceDecl(item: unknown): item is ArchDomainSourceDecl {
+    return reflection.isInstance(item, ArchDomainSourceDecl);
+}
+
+export interface ArchEnumDef extends langium.AstNode {
+    readonly $container: ArchOrgSystemDef | ArchSystemDef;
+    readonly $type: 'ArchEnumDef';
+    description?: Description;
+    members: Array<ArchEnumMember>;
+    metadata?: ArchMetadataBlock;
+    name: ArchTypeName;
+}
+
+export const ArchEnumDef = 'ArchEnumDef';
+
+export function isArchEnumDef(item: unknown): item is ArchEnumDef {
+    return reflection.isInstance(item, ArchEnumDef);
+}
+
+export interface ArchEnumMember extends langium.AstNode {
+    readonly $container: ArchEnumDef;
+    readonly $type: 'ArchEnumMember';
+    name: ArchIdent;
+    value: string;
+}
+
+export const ArchEnumMember = 'ArchEnumMember';
+
+export function isArchEnumMember(item: unknown): item is ArchEnumMember {
+    return reflection.isInstance(item, ArchEnumMember);
+}
+
+export interface ArchEnvironmentDef extends langium.AstNode {
+    readonly $container: ArchOrgSystemDef | ArchSystemDef;
+    readonly $type: 'ArchEnvironmentDef';
+    description?: Description;
+    members: Array<ArchEnvironmentMember>;
+    metadata?: ArchMetadataBlock;
+    name: ArchIdent;
+}
+
+export const ArchEnvironmentDef = 'ArchEnvironmentDef';
+
+export function isArchEnvironmentDef(item: unknown): item is ArchEnvironmentDef {
+    return reflection.isInstance(item, ArchEnvironmentDef);
+}
+
+export interface ArchExceptionDef extends langium.AstNode {
+    readonly $container: ArchOrgSystemDef | ArchSystemDef;
+    readonly $type: 'ArchExceptionDef';
+    description?: Description;
+    fields: Array<ArchFieldDef>;
+    metadata?: ArchMetadataBlock;
+    name: ArchTypeName;
+}
+
+export const ArchExceptionDef = 'ArchExceptionDef';
+
+export function isArchExceptionDef(item: unknown): item is ArchExceptionDef {
+    return reflection.isInstance(item, ArchExceptionDef);
+}
+
+export interface ArchExternalSystemDef extends langium.AstNode {
+    readonly $container: ArchArchitectureDef;
+    readonly $type: 'ArchExternalSystemDef';
+    clauses: Array<ArchExternalSystemClause>;
+    description?: Description;
+    metadata?: ArchMetadataBlock;
+    name: ArchTypeName;
+    realizes?: ArchRealizesDecl;
+}
+
+export const ArchExternalSystemDef = 'ArchExternalSystemDef';
+
+export function isArchExternalSystemDef(item: unknown): item is ArchExternalSystemDef {
+    return reflection.isInstance(item, ArchExternalSystemDef);
+}
+
+export interface ArchFieldDef extends langium.AstNode {
+    readonly $container: ArchExceptionDef | ArchStructDef;
+    readonly $type: 'ArchFieldDef';
+    default?: ArchLiteral;
+    description?: Description;
+    name: ArchIdent;
+    ordinal: string;
+    requiredness: ArchRequiredness;
+    type: ArchFieldType;
+}
+
+export const ArchFieldDef = 'ArchFieldDef';
+
+export function isArchFieldDef(item: unknown): item is ArchFieldDef {
+    return reflection.isInstance(item, ArchFieldDef);
+}
+
+export interface ArchFile extends langium.AstNode {
+    readonly $type: 'ArchFile';
+    roots: Array<ArchRoot>;
+}
+
+export const ArchFile = 'ArchFile';
+
+export function isArchFile(item: unknown): item is ArchFile {
+    return reflection.isInstance(item, ArchFile);
+}
+
+export interface ArchFlowConcern extends langium.AstNode {
+    readonly $container: ArchHotspotDef;
+    readonly $type: 'ArchFlowConcern';
+    number: string;
+}
+
+export const ArchFlowConcern = 'ArchFlowConcern';
+
+export function isArchFlowConcern(item: unknown): item is ArchFlowConcern {
+    return reflection.isInstance(item, ArchFlowConcern);
+}
+
+export interface ArchFlowDef extends langium.AstNode {
+    readonly $container: ArchDependencyDef;
+    readonly $type: 'ArchFlowDef';
+    carries: Array<ArchCarriedConcept>;
+    description?: Description;
+    label: string;
+    mechanism?: ArchMechanism;
+    metadata?: ArchMetadataBlock;
+    number: string;
+    phases: Array<ArchPhasedMechanism>;
+    to?: ArchTypeName;
+}
+
+export const ArchFlowDef = 'ArchFlowDef';
+
+export function isArchFlowDef(item: unknown): item is ArchFlowDef {
+    return reflection.isInstance(item, ArchFlowDef);
+}
+
+export interface ArchHandlesClause extends langium.AstNode {
+    readonly $container: ArchOrgSystemDef;
+    readonly $type: 'ArchHandlesClause';
+    concepts: Array<ArchConceptRef>;
+}
+
+export const ArchHandlesClause = 'ArchHandlesClause';
+
+export function isArchHandlesClause(item: unknown): item is ArchHandlesClause {
+    return reflection.isInstance(item, ArchHandlesClause);
+}
+
+export interface ArchHotspotDef extends langium.AstNode {
+    readonly $container: ArchOrgSystemDef;
+    readonly $type: 'ArchHotspotDef';
+    concerns: Array<ArchConcernRef>;
+    description: Description;
+    metadata?: ArchMetadataBlock;
+    name: ArchTypeName;
+}
+
+export const ArchHotspotDef = 'ArchHotspotDef';
+
+export function isArchHotspotDef(item: unknown): item is ArchHotspotDef {
+    return reflection.isInstance(item, ArchHotspotDef);
+}
+
+export interface ArchImportDecl extends langium.AstNode {
+    readonly $container: ArchOrgSystemDef | ArchSystemDef;
+    readonly $type: 'ArchImportDecl';
+    event: boolean;
+    name: ArchTypeName;
+    valueType: boolean;
+}
+
+export const ArchImportDecl = 'ArchImportDecl';
+
+export function isArchImportDecl(item: unknown): item is ArchImportDecl {
+    return reflection.isInstance(item, ArchImportDecl);
+}
+
+export interface ArchInterfaceDef extends langium.AstNode {
+    readonly $container: ArchOrgSystemDef | ArchSystemDef;
+    readonly $type: 'ArchInterfaceDef';
+    description?: Description;
+    metadata?: ArchMetadataBlock;
+    name: ArchTypeName;
+    operations: Array<ArchOperationDef>;
+    realizes?: ArchRealizesDecl;
+    satisfies?: SatisfiesDecl;
+}
+
+export const ArchInterfaceDef = 'ArchInterfaceDef';
+
+export function isArchInterfaceDef(item: unknown): item is ArchInterfaceDef {
+    return reflection.isInstance(item, ArchInterfaceDef);
+}
+
+export interface ArchMastersClause extends langium.AstNode {
+    readonly $container: ArchOrgExternalSystemDef | ArchOrgSystemDef;
+    readonly $type: 'ArchMastersClause';
+    concepts: Array<ArchConceptRef>;
+}
+
+export const ArchMastersClause = 'ArchMastersClause';
+
+export function isArchMastersClause(item: unknown): item is ArchMastersClause {
+    return reflection.isInstance(item, ArchMastersClause);
+}
+
+export interface ArchMechanism extends langium.AstNode {
+    readonly $container: ArchFlowDef | ArchPhasedMechanism;
+    readonly $type: 'ArchMechanism';
+    medium?: string;
+    mode?: ArchTransferMode;
+}
+
+export const ArchMechanism = 'ArchMechanism';
+
+export function isArchMechanism(item: unknown): item is ArchMechanism {
+    return reflection.isInstance(item, ArchMechanism);
+}
+
+export interface ArchMetadataBlock extends langium.AstNode {
+    readonly $container: ArchArchitectureDef | ArchAreaDef | ArchBoundedContextDecl | ArchChannelDef | ArchComponentDef | ArchConnectorDef | ArchContainerDef | ArchDependencyDef | ArchEnumDef | ArchEnvironmentDef | ArchExceptionDef | ArchExternalSystemDef | ArchFlowDef | ArchHotspotDef | ArchInterfaceDef | ArchNodeDef | ArchOperationDef | ArchOrgExternalSystemDef | ArchOrgSystemDef | ArchOrganizationDef | ArchPersonDef | ArchPhaseDef | ArchResourceDef | ArchStructDef | ArchSystemDef | ArchUnionDef;
+    readonly $type: 'ArchMetadataBlock';
+    entries: Array<ArchMetadataEntry>;
+}
+
+export const ArchMetadataBlock = 'ArchMetadataBlock';
+
+export function isArchMetadataBlock(item: unknown): item is ArchMetadataBlock {
+    return reflection.isInstance(item, ArchMetadataBlock);
+}
+
+export interface ArchMetadataEntry extends langium.AstNode {
+    readonly $container: ArchMetadataBlock;
+    readonly $type: 'ArchMetadataEntry';
+    key: ArchIdent;
+    value: ArchLiteral;
+}
+
+export const ArchMetadataEntry = 'ArchMetadataEntry';
+
+export function isArchMetadataEntry(item: unknown): item is ArchMetadataEntry {
+    return reflection.isInstance(item, ArchMetadataEntry);
+}
+
+export interface ArchNamedType extends langium.AstNode {
+    readonly $container: ArchArgDecl | ArchCollectionType | ArchFieldDef | ArchOperationDef | ArchTypedefDef | ArchUnionMember;
+    readonly $type: 'ArchNamedType';
+    typeName: ArchTypeName;
+}
+
+export const ArchNamedType = 'ArchNamedType';
+
+export function isArchNamedType(item: unknown): item is ArchNamedType {
+    return reflection.isInstance(item, ArchNamedType);
+}
+
+export interface ArchNodeAttribute extends langium.AstNode {
+    readonly $container: ArchNodeDef;
+    readonly $type: 'ArchNodeAttribute';
+    kind?: 'provider' | 'region' | 'zone';
+    value?: string;
+}
+
+export const ArchNodeAttribute = 'ArchNodeAttribute';
+
+export function isArchNodeAttribute(item: unknown): item is ArchNodeAttribute {
+    return reflection.isInstance(item, ArchNodeAttribute);
+}
+
+export interface ArchNodeDef extends langium.AstNode {
+    readonly $container: ArchEnvironmentDef | ArchNodeDef;
+    readonly $type: 'ArchNodeDef';
+    attributes: Array<ArchNodeAttribute>;
+    description?: Description;
+    members: Array<ArchNodeMember>;
+    metadata?: ArchMetadataBlock;
+    name: ArchIdent;
+}
+
+export const ArchNodeDef = 'ArchNodeDef';
+
+export function isArchNodeDef(item: unknown): item is ArchNodeDef {
+    return reflection.isInstance(item, ArchNodeDef);
+}
+
+export interface ArchNullLiteral extends langium.AstNode {
+    readonly $container: ArchArgDecl | ArchFieldDef | ArchMetadataEntry;
+    readonly $type: 'ArchNullLiteral';
+    value: 'null';
+}
+
+export const ArchNullLiteral = 'ArchNullLiteral';
+
+export function isArchNullLiteral(item: unknown): item is ArchNullLiteral {
+    return reflection.isInstance(item, ArchNullLiteral);
+}
+
+export interface ArchNumberLiteral extends langium.AstNode {
+    readonly $container: ArchArgDecl | ArchFieldDef | ArchMetadataEntry;
+    readonly $type: 'ArchNumberLiteral';
+    value: string;
+}
+
+export const ArchNumberLiteral = 'ArchNumberLiteral';
+
+export function isArchNumberLiteral(item: unknown): item is ArchNumberLiteral {
+    return reflection.isInstance(item, ArchNumberLiteral);
+}
+
+export interface ArchOperationDef extends langium.AstNode {
+    readonly $container: ArchInterfaceDef;
+    readonly $type: 'ArchOperationDef';
+    args: Array<ArchArgDecl>;
+    description?: Description;
+    metadata?: ArchMetadataBlock;
+    name: ArchIdent;
+    returnType?: ArchFieldType;
+    style?: ArchOperationStyle;
+    throws: Array<ArchTypeName>;
+    void: boolean;
+}
+
+export const ArchOperationDef = 'ArchOperationDef';
+
+export function isArchOperationDef(item: unknown): item is ArchOperationDef {
+    return reflection.isInstance(item, ArchOperationDef);
+}
+
+export interface ArchOrganizationDef extends langium.AstNode {
+    readonly $container: ArchFile;
+    readonly $type: 'ArchOrganizationDef';
+    description?: Description;
+    members: Array<ArchOrganizationMember>;
+    metadata?: ArchMetadataBlock;
+    name: ArchTypeName;
+}
+
+export const ArchOrganizationDef = 'ArchOrganizationDef';
+
+export function isArchOrganizationDef(item: unknown): item is ArchOrganizationDef {
+    return reflection.isInstance(item, ArchOrganizationDef);
+}
+
+export interface ArchOrgExternalSystemDef extends langium.AstNode {
+    readonly $container: ArchOrganizationDef;
+    readonly $type: 'ArchOrgExternalSystemDef';
+    clauses: Array<ArchOrgExternalSystemClause>;
+    description?: Description;
+    metadata?: ArchMetadataBlock;
+    name: ArchTypeName;
+    realizes?: ArchRealizesDecl;
+}
+
+export const ArchOrgExternalSystemDef = 'ArchOrgExternalSystemDef';
+
+export function isArchOrgExternalSystemDef(item: unknown): item is ArchOrgExternalSystemDef {
+    return reflection.isInstance(item, ArchOrgExternalSystemDef);
+}
+
+export interface ArchOrgSystemDef extends langium.AstNode {
+    readonly $container: ArchOrganizationDef;
+    readonly $type: 'ArchOrgSystemDef';
+    description?: Description;
+    level0: Array<ArchLevel0Clause>;
+    members: Array<ArchSystemMember>;
+    metadata?: ArchMetadataBlock;
+    name: ArchTypeName;
+    realizes?: ArchRealizesDecl;
+    satisfies?: SatisfiesDecl;
+    technology?: ArchTechnologyDecl;
+}
+
+export const ArchOrgSystemDef = 'ArchOrgSystemDef';
+
+export function isArchOrgSystemDef(item: unknown): item is ArchOrgSystemDef {
+    return reflection.isInstance(item, ArchOrgSystemDef);
+}
+
+export interface ArchPersonDef extends langium.AstNode {
+    readonly $container: ArchArchitectureDef | ArchOrganizationDef;
+    readonly $type: 'ArchPersonDef';
+    description?: Description;
+    metadata?: ArchMetadataBlock;
+    name: ArchTypeName;
+}
+
+export const ArchPersonDef = 'ArchPersonDef';
+
+export function isArchPersonDef(item: unknown): item is ArchPersonDef {
+    return reflection.isInstance(item, ArchPersonDef);
+}
+
+export interface ArchPhaseDef extends langium.AstNode {
+    readonly $container: ArchOrganizationDef;
+    readonly $type: 'ArchPhaseDef';
+    description?: Description;
+    metadata?: ArchMetadataBlock;
+    name: ArchTypeName;
+}
+
+export const ArchPhaseDef = 'ArchPhaseDef';
+
+export function isArchPhaseDef(item: unknown): item is ArchPhaseDef {
+    return reflection.isInstance(item, ArchPhaseDef);
+}
+
+export interface ArchPhasedMechanism extends langium.AstNode {
+    readonly $container: ArchFlowDef;
+    readonly $type: 'ArchPhasedMechanism';
+    mechanism: ArchMechanism;
+    phase: ArchTypeName;
+}
+
+export const ArchPhasedMechanism = 'ArchPhasedMechanism';
+
+export function isArchPhasedMechanism(item: unknown): item is ArchPhasedMechanism {
+    return reflection.isInstance(item, ArchPhasedMechanism);
+}
+
+export interface ArchPrimitiveType extends langium.AstNode {
+    readonly $container: ArchArgDecl | ArchCollectionType | ArchFieldDef | ArchOperationDef | ArchTypedefDef | ArchUnionMember;
+    readonly $type: 'ArchPrimitiveType';
+    value: ArchPrimitiveTypeKw;
+}
+
+export const ArchPrimitiveType = 'ArchPrimitiveType';
+
+export function isArchPrimitiveType(item: unknown): item is ArchPrimitiveType {
+    return reflection.isInstance(item, ArchPrimitiveType);
+}
+
+export interface ArchProvidesClause extends langium.AstNode {
+    readonly $container: ArchComponentDef | ArchContainerDef | ArchExternalSystemDef | ArchOrgExternalSystemDef;
+    readonly $type: 'ArchProvidesClause';
+    interface: ArchTypeName;
+}
+
+export const ArchProvidesClause = 'ArchProvidesClause';
+
+export function isArchProvidesClause(item: unknown): item is ArchProvidesClause {
+    return reflection.isInstance(item, ArchProvidesClause);
+}
+
+export interface ArchPublishesClause extends langium.AstNode {
+    readonly $container: ArchComponentDef;
+    readonly $type: 'ArchPublishesClause';
+    channel: ArchIdent;
+    message: ArchTypeName;
+}
+
+export const ArchPublishesClause = 'ArchPublishesClause';
+
+export function isArchPublishesClause(item: unknown): item is ArchPublishesClause {
+    return reflection.isInstance(item, ArchPublishesClause);
+}
+
+export interface ArchRealizesDecl extends langium.AstNode {
+    readonly $container: ArchComponentDef | ArchContainerDef | ArchExternalSystemDef | ArchInterfaceDef | ArchOrgExternalSystemDef | ArchOrgSystemDef | ArchSystemDef;
+    readonly $type: 'ArchRealizesDecl';
+    refs: Array<ArchRealizesRef>;
+}
+
+export const ArchRealizesDecl = 'ArchRealizesDecl';
+
+export function isArchRealizesDecl(item: unknown): item is ArchRealizesDecl {
+    return reflection.isInstance(item, ArchRealizesDecl);
+}
+
+export interface ArchRealizesRef extends langium.AstNode {
+    readonly $container: ArchRealizesDecl;
+    readonly $type: 'ArchRealizesRef';
+    kind?: 'context' | 'event' | 'interface' | 'module' | 'value';
+    name?: ArchDomainName | ArchTypeName;
+}
+
+export const ArchRealizesRef = 'ArchRealizesRef';
+
+export function isArchRealizesRef(item: unknown): item is ArchRealizesRef {
+    return reflection.isInstance(item, ArchRealizesRef);
+}
+
+export interface ArchRequirementsSourceDecl extends langium.AstNode {
+    readonly $container: ArchArchitectureDef | ArchOrganizationDef;
+    readonly $type: 'ArchRequirementsSourceDecl';
+    path: string;
+}
+
+export const ArchRequirementsSourceDecl = 'ArchRequirementsSourceDecl';
+
+export function isArchRequirementsSourceDecl(item: unknown): item is ArchRequirementsSourceDecl {
+    return reflection.isInstance(item, ArchRequirementsSourceDecl);
+}
+
+export interface ArchRequiresClause extends langium.AstNode {
+    readonly $container: ArchComponentDef | ArchContainerDef;
+    readonly $type: 'ArchRequiresClause';
+    interface: ArchTypeName;
+}
+
+export const ArchRequiresClause = 'ArchRequiresClause';
+
+export function isArchRequiresClause(item: unknown): item is ArchRequiresClause {
+    return reflection.isInstance(item, ArchRequiresClause);
+}
+
+export interface ArchResourceDef extends langium.AstNode {
+    readonly $container: ArchNodeDef;
+    readonly $type: 'ArchResourceDef';
+    description?: Description;
+    instantiates?: ArchTypeName;
+    metadata?: ArchMetadataBlock;
+    name: ArchIdent;
+    stores: Array<ArchTypeName>;
+    technology?: ArchTechnologyDecl;
+    tenancy?: ArchTenancy;
+}
+
+export const ArchResourceDef = 'ArchResourceDef';
+
+export function isArchResourceDef(item: unknown): item is ArchResourceDef {
+    return reflection.isInstance(item, ArchResourceDef);
+}
+
+export interface ArchStringLiteral extends langium.AstNode {
+    readonly $container: ArchArgDecl | ArchFieldDef | ArchMetadataEntry;
+    readonly $type: 'ArchStringLiteral';
+    value: string;
+}
+
+export const ArchStringLiteral = 'ArchStringLiteral';
+
+export function isArchStringLiteral(item: unknown): item is ArchStringLiteral {
+    return reflection.isInstance(item, ArchStringLiteral);
+}
+
+export interface ArchStructDef extends langium.AstNode {
+    readonly $container: ArchOrgSystemDef | ArchSystemDef;
+    readonly $type: 'ArchStructDef';
+    description?: Description;
+    fields: Array<ArchFieldDef>;
+    metadata?: ArchMetadataBlock;
+    name: ArchTypeName;
+    satisfies?: SatisfiesDecl;
+}
+
+export const ArchStructDef = 'ArchStructDef';
+
+export function isArchStructDef(item: unknown): item is ArchStructDef {
+    return reflection.isInstance(item, ArchStructDef);
+}
+
+export interface ArchSubscribesClause extends langium.AstNode {
+    readonly $container: ArchComponentDef;
+    readonly $type: 'ArchSubscribesClause';
+    channel: ArchIdent;
+}
+
+export const ArchSubscribesClause = 'ArchSubscribesClause';
+
+export function isArchSubscribesClause(item: unknown): item is ArchSubscribesClause {
+    return reflection.isInstance(item, ArchSubscribesClause);
+}
+
+export interface ArchSystemDef extends langium.AstNode {
+    readonly $container: ArchArchitectureDef;
+    readonly $type: 'ArchSystemDef';
+    description?: Description;
+    members: Array<ArchSystemMember>;
+    metadata?: ArchMetadataBlock;
+    name: ArchSystemName;
+    realizes?: ArchRealizesDecl;
+    satisfies?: SatisfiesDecl;
+}
+
+export const ArchSystemDef = 'ArchSystemDef';
+
+export function isArchSystemDef(item: unknown): item is ArchSystemDef {
+    return reflection.isInstance(item, ArchSystemDef);
+}
+
+export interface ArchTechnologyDecl extends langium.AstNode {
+    readonly $container: ArchContainerDef | ArchOrgSystemDef | ArchResourceDef;
+    readonly $type: 'ArchTechnologyDecl';
+    value: string;
+}
+
+export const ArchTechnologyDecl = 'ArchTechnologyDecl';
+
+export function isArchTechnologyDecl(item: unknown): item is ArchTechnologyDecl {
+    return reflection.isInstance(item, ArchTechnologyDecl);
+}
+
+export interface ArchTypedefDef extends langium.AstNode {
+    readonly $container: ArchOrgSystemDef | ArchSystemDef;
+    readonly $type: 'ArchTypedefDef';
+    name: ArchTypeName;
+    type: ArchFieldType;
+}
+
+export const ArchTypedefDef = 'ArchTypedefDef';
+
+export function isArchTypedefDef(item: unknown): item is ArchTypedefDef {
+    return reflection.isInstance(item, ArchTypedefDef);
+}
+
+export interface ArchUnionDef extends langium.AstNode {
+    readonly $container: ArchOrgSystemDef | ArchSystemDef;
+    readonly $type: 'ArchUnionDef';
+    description?: Description;
+    members: Array<ArchUnionMember>;
+    metadata?: ArchMetadataBlock;
+    name: ArchTypeName;
+}
+
+export const ArchUnionDef = 'ArchUnionDef';
+
+export function isArchUnionDef(item: unknown): item is ArchUnionDef {
+    return reflection.isInstance(item, ArchUnionDef);
+}
+
+export interface ArchUnionMember extends langium.AstNode {
+    readonly $container: ArchUnionDef;
+    readonly $type: 'ArchUnionMember';
+    name: ArchIdent;
+    ordinal: string;
+    type: ArchFieldType;
+}
+
+export const ArchUnionMember = 'ArchUnionMember';
+
+export function isArchUnionMember(item: unknown): item is ArchUnionMember {
+    return reflection.isInstance(item, ArchUnionMember);
+}
+
+export interface ArchUsedByClause extends langium.AstNode {
+    readonly $container: ArchOrgSystemDef;
+    readonly $type: 'ArchUsedByClause';
+    persons: Array<ArchTypeName>;
+}
+
+export const ArchUsedByClause = 'ArchUsedByClause';
+
+export function isArchUsedByClause(item: unknown): item is ArchUsedByClause {
+    return reflection.isInstance(item, ArchUsedByClause);
 }
 
 export interface ArgList extends langium.AstNode {
@@ -978,6 +2523,7 @@ export interface ContainsExpr extends langium.AstNode {
     readonly $container: ArgList | ArrayIndex | ArrayLiteral | AssignmentClause | BinaryExpr | ConditionalExpr | ContainsExpr | DuplicateDetection | EscalationStep | EveryExpr | GuardBlock | IfExpr | MatchesExpr | MustBlock | NamedArg | ParenExpr | PostconditionClause | PreconditionClause | PredicateBlock | QuantifierExpr | RelativeAnchor | ReturnsClause | ScopedInvariantDef | UnaryExpr | ValueList;
     readonly $type: 'ContainsExpr';
     left: Expression;
+    negated: boolean;
     target: DotPath;
 }
 
@@ -1126,7 +2672,7 @@ export function isDescribesClause(item: unknown): item is DescribesClause {
 }
 
 export interface Description extends langium.AstNode {
-    readonly $container: AggregateDef | AgreementDef | ApplicationServiceDef | BindingDecl | CommandDef | CommandTriggeredOp | ContextDef | CurveOutcome | DistributionDecl | DomainServiceDef | EntityDef | EnumDef | EnumValue | ErrorEventDef | EscalationChainDef | EscalationStep | EventDef | ExternalEventDef | FieldDecl | GivenDecl | InfrastructureServiceDef | InterfaceDef | InternalOp | InvariantDef | MixOutcome | ModuleDef | OperationSignature | OrganizationDef | PopulationDecl | PostconditionClause | PreconditionClause | QueryDef | RateOutcome | ReactionDef | ReadOnlyEntityDef | ReconciliationDef | ReferenceDecl | RepositoryDef | RollupOutcome | SafeOpDef | ScenarioDef | ScopedInvariantDef | ServiceCallClause | ShareOutcome | StateDef | StateMachineDef | SubdomainDecl | TemporalEventDef | TotalOutcome | TransitionDef | ValueDef | ValueOpDef | WordListDecl;
+    readonly $container: AggregateDef | AgreementDef | ApplicationServiceDef | ArchArchitectureDef | ArchAreaDef | ArchBoundedContextDecl | ArchChannelDef | ArchComponentDef | ArchConnectorDef | ArchContainerDef | ArchDependencyDef | ArchEnumDef | ArchEnvironmentDef | ArchExceptionDef | ArchExternalSystemDef | ArchFieldDef | ArchFlowDef | ArchHotspotDef | ArchInterfaceDef | ArchNodeDef | ArchOperationDef | ArchOrgExternalSystemDef | ArchOrgSystemDef | ArchOrganizationDef | ArchPersonDef | ArchPhaseDef | ArchResourceDef | ArchStructDef | ArchSystemDef | ArchUnionDef | BindingDecl | CommandDef | CommandTriggeredOp | ContextDef | CurveOutcome | DistributionDecl | DomainServiceDef | EntityDef | EnumDef | EnumValue | ErrorEventDef | EscalationChainDef | EscalationStep | EventDef | ExternalEventDef | FieldDecl | GivenDecl | InfrastructureServiceDef | InterfaceDef | InternalOp | InvariantDef | MixOutcome | ModuleDef | OperationSignature | OrganizationDef | PopulationDecl | PostconditionClause | PreconditionClause | QueryDef | RateOutcome | ReactionDef | ReadOnlyEntityDef | ReconciliationDef | ReferenceDecl | RepositoryDef | RollupOutcome | SafeOpDef | ScenarioDef | ScopedInvariantDef | ServiceCallClause | ShareOutcome | StateDef | StateMachineDef | SubdomainDecl | TemporalEventDef | TotalOutcome | TransitionDef | ValueDef | ValueOpDef | WordListDecl;
     readonly $type: 'Description';
     text: string;
 }
@@ -2246,6 +3792,568 @@ export function isPostconditionClause(item: unknown): item is PostconditionClaus
     return reflection.isInstance(item, PostconditionClause);
 }
 
+export interface PrdAcceptanceCriterion extends langium.AstNode {
+    readonly $container: PrdStoryDef;
+    readonly $type: 'PrdAcceptanceCriterion';
+    id?: string;
+    text: string;
+}
+
+export const PrdAcceptanceCriterion = 'PrdAcceptanceCriterion';
+
+export function isPrdAcceptanceCriterion(item: unknown): item is PrdAcceptanceCriterion {
+    return reflection.isInstance(item, PrdAcceptanceCriterion);
+}
+
+export interface PrdAssumptionDef extends langium.AstNode {
+    readonly $container: PrdProductDef;
+    readonly $type: 'PrdAssumptionDef';
+    impactIfWrong: string;
+    name: string;
+    statement: string;
+    status: PrdAssumptionStatus;
+    underpins: Array<string>;
+    validationPlan: string;
+}
+
+export const PrdAssumptionDef = 'PrdAssumptionDef';
+
+export function isPrdAssumptionDef(item: unknown): item is PrdAssumptionDef {
+    return reflection.isInstance(item, PrdAssumptionDef);
+}
+
+export interface PrdConstraintDef extends langium.AstNode {
+    readonly $container: PrdProductDef;
+    readonly $type: 'PrdConstraintDef';
+    constrains: Array<string>;
+    name: string;
+    source: PrdConstraintSource;
+    statement: string;
+}
+
+export const PrdConstraintDef = 'PrdConstraintDef';
+
+export function isPrdConstraintDef(item: unknown): item is PrdConstraintDef {
+    return reflection.isInstance(item, PrdConstraintDef);
+}
+
+export interface PrdDependsOnDecl extends langium.AstNode {
+    readonly $container: PrdReleaseDef;
+    readonly $type: 'PrdDependsOnDecl';
+    items: Array<string>;
+}
+
+export const PrdDependsOnDecl = 'PrdDependsOnDecl';
+
+export function isPrdDependsOnDecl(item: unknown): item is PrdDependsOnDecl {
+    return reflection.isInstance(item, PrdDependsOnDecl);
+}
+
+export interface PrdDesignReference extends langium.AstNode {
+    readonly $container: PrdDesignReferencesBlock;
+    readonly $type: 'PrdDesignReference';
+    name: string;
+    url: string;
+}
+
+export const PrdDesignReference = 'PrdDesignReference';
+
+export function isPrdDesignReference(item: unknown): item is PrdDesignReference {
+    return reflection.isInstance(item, PrdDesignReference);
+}
+
+export interface PrdDesignReferencesBlock extends langium.AstNode {
+    readonly $container: PrdFeatureDef | PrdJourneyDef;
+    readonly $type: 'PrdDesignReferencesBlock';
+    references: Array<PrdDesignReference>;
+}
+
+export const PrdDesignReferencesBlock = 'PrdDesignReferencesBlock';
+
+export function isPrdDesignReferencesBlock(item: unknown): item is PrdDesignReferencesBlock {
+    return reflection.isInstance(item, PrdDesignReferencesBlock);
+}
+
+export interface PrdDesiredOutcome extends langium.AstNode {
+    readonly $container: PrdDesiredOutcomesBlock;
+    readonly $type: 'PrdDesiredOutcome';
+    currentSatisfaction: PrdLevel;
+    importance: PrdLevel;
+    statement: string;
+}
+
+export const PrdDesiredOutcome = 'PrdDesiredOutcome';
+
+export function isPrdDesiredOutcome(item: unknown): item is PrdDesiredOutcome {
+    return reflection.isInstance(item, PrdDesiredOutcome);
+}
+
+export interface PrdDesiredOutcomesBlock extends langium.AstNode {
+    readonly $container: PrdJobDef;
+    readonly $type: 'PrdDesiredOutcomesBlock';
+    outcomes: Array<PrdDesiredOutcome>;
+}
+
+export const PrdDesiredOutcomesBlock = 'PrdDesiredOutcomesBlock';
+
+export function isPrdDesiredOutcomesBlock(item: unknown): item is PrdDesiredOutcomesBlock {
+    return reflection.isInstance(item, PrdDesiredOutcomesBlock);
+}
+
+export interface PrdEntryCriteriaBlock extends langium.AstNode {
+    readonly $container: PrdReleaseDef;
+    readonly $type: 'PrdEntryCriteriaBlock';
+    items: Array<string>;
+}
+
+export const PrdEntryCriteriaBlock = 'PrdEntryCriteriaBlock';
+
+export function isPrdEntryCriteriaBlock(item: unknown): item is PrdEntryCriteriaBlock {
+    return reflection.isInstance(item, PrdEntryCriteriaBlock);
+}
+
+export interface PrdEvidenceDef extends langium.AstNode {
+    readonly $container: PrdProductDef;
+    readonly $type: 'PrdEvidenceDef';
+    confidence: PrdConfidence;
+    date: string;
+    name: string;
+    sourceReference: string;
+    summary: string;
+    supports: string;
+    type: PrdEvidenceType;
+}
+
+export const PrdEvidenceDef = 'PrdEvidenceDef';
+
+export function isPrdEvidenceDef(item: unknown): item is PrdEvidenceDef {
+    return reflection.isInstance(item, PrdEvidenceDef);
+}
+
+export interface PrdExitCriteriaBlock extends langium.AstNode {
+    readonly $container: PrdReleaseDef;
+    readonly $type: 'PrdExitCriteriaBlock';
+    items: Array<string>;
+}
+
+export const PrdExitCriteriaBlock = 'PrdExitCriteriaBlock';
+
+export function isPrdExitCriteriaBlock(item: unknown): item is PrdExitCriteriaBlock {
+    return reflection.isInstance(item, PrdExitCriteriaBlock);
+}
+
+export interface PrdFeatureDef extends langium.AstNode {
+    readonly $container: PrdProductDef;
+    readonly $type: 'PrdFeatureDef';
+    addresses: Array<string>;
+    advances: Array<string>;
+    designReferences?: PrdDesignReferencesBlock;
+    id?: string;
+    name: string;
+    nonGoals?: PrdNonGoalsBlock;
+    persona: string;
+    priority: PrdPriority;
+    status: PrdFeatureStatus;
+    stories?: PrdStoriesBlock;
+    summary: string;
+    testedBy?: string;
+    valueProposition: string;
+}
+
+export const PrdFeatureDef = 'PrdFeatureDef';
+
+export function isPrdFeatureDef(item: unknown): item is PrdFeatureDef {
+    return reflection.isInstance(item, PrdFeatureDef);
+}
+
+export interface PrdFile extends langium.AstNode {
+    readonly $type: 'PrdFile';
+    products: Array<PrdProductDef>;
+}
+
+export const PrdFile = 'PrdFile';
+
+export function isPrdFile(item: unknown): item is PrdFile {
+    return reflection.isInstance(item, PrdFile);
+}
+
+export interface PrdGoalDef extends langium.AstNode {
+    readonly $container: PrdProductDef;
+    readonly $type: 'PrdGoalDef';
+    horizon: PrdHorizon;
+    metrics: Array<PrdMetricBlock>;
+    name: string;
+    owner: string;
+    statement: string;
+}
+
+export const PrdGoalDef = 'PrdGoalDef';
+
+export function isPrdGoalDef(item: unknown): item is PrdGoalDef {
+    return reflection.isInstance(item, PrdGoalDef);
+}
+
+export interface PrdHypothesisDef extends langium.AstNode {
+    readonly $container: PrdProductDef;
+    readonly $type: 'PrdHypothesisDef';
+    expectedOutcome: string;
+    intervention: string;
+    mechanism: string;
+    name: string;
+    predicts: string;
+    proposes: string;
+    status: PrdHypothesisStatus;
+    supportedBy: Array<string>;
+    validationMethod: string;
+}
+
+export const PrdHypothesisDef = 'PrdHypothesisDef';
+
+export function isPrdHypothesisDef(item: unknown): item is PrdHypothesisDef {
+    return reflection.isInstance(item, PrdHypothesisDef);
+}
+
+export interface PrdIncludesBlock extends langium.AstNode {
+    readonly $container: PrdReleaseDef;
+    readonly $type: 'PrdIncludesBlock';
+    items: Array<string>;
+}
+
+export const PrdIncludesBlock = 'PrdIncludesBlock';
+
+export function isPrdIncludesBlock(item: unknown): item is PrdIncludesBlock {
+    return reflection.isInstance(item, PrdIncludesBlock);
+}
+
+export interface PrdJobDef extends langium.AstNode {
+    readonly $container: PrdProductDef;
+    readonly $type: 'PrdJobDef';
+    importance: PrdJobImportance;
+    name: string;
+    outcomes?: PrdDesiredOutcomesBlock;
+    persona: string;
+    relatedTo: Array<string>;
+    satisfaction: PrdJobSatisfaction;
+    statement: string;
+    type: PrdJobType;
+}
+
+export const PrdJobDef = 'PrdJobDef';
+
+export function isPrdJobDef(item: unknown): item is PrdJobDef {
+    return reflection.isInstance(item, PrdJobDef);
+}
+
+export interface PrdJourneyDef extends langium.AstNode {
+    readonly $container: PrdProductDef;
+    readonly $type: 'PrdJourneyDef';
+    designReferences?: PrdDesignReferencesBlock;
+    name: string;
+    outcome: string;
+    persona: string;
+    steps?: PrdStepsBlock;
+    trigger: string;
+}
+
+export const PrdJourneyDef = 'PrdJourneyDef';
+
+export function isPrdJourneyDef(item: unknown): item is PrdJourneyDef {
+    return reflection.isInstance(item, PrdJourneyDef);
+}
+
+export interface PrdMetricBlock extends langium.AstNode {
+    readonly $container: PrdGoalDef;
+    readonly $type: 'PrdMetricBlock';
+    baseline?: string;
+    indicator: string;
+    measurement: string;
+    target: string;
+}
+
+export const PrdMetricBlock = 'PrdMetricBlock';
+
+export function isPrdMetricBlock(item: unknown): item is PrdMetricBlock {
+    return reflection.isInstance(item, PrdMetricBlock);
+}
+
+export interface PrdNonGoalsBlock extends langium.AstNode {
+    readonly $container: PrdFeatureDef | PrdProductDef;
+    readonly $type: 'PrdNonGoalsBlock';
+    items: Array<string>;
+}
+
+export const PrdNonGoalsBlock = 'PrdNonGoalsBlock';
+
+export function isPrdNonGoalsBlock(item: unknown): item is PrdNonGoalsBlock {
+    return reflection.isInstance(item, PrdNonGoalsBlock);
+}
+
+export interface PrdOpenQuestionDef extends langium.AstNode {
+    readonly $container: PrdProductDef;
+    readonly $type: 'PrdOpenQuestionDef';
+    blocks: Array<string>;
+    context: string;
+    deadline: string;
+    name: string;
+    owner: string;
+    question: string;
+    resolution?: string;
+    status: PrdQuestionStatus;
+}
+
+export const PrdOpenQuestionDef = 'PrdOpenQuestionDef';
+
+export function isPrdOpenQuestionDef(item: unknown): item is PrdOpenQuestionDef {
+    return reflection.isInstance(item, PrdOpenQuestionDef);
+}
+
+export interface PrdPersonaDef extends langium.AstNode {
+    readonly $container: PrdProductDef;
+    readonly $type: 'PrdPersonaDef';
+    context: string;
+    frustrations: Array<string>;
+    goals: Array<string>;
+    name: string;
+    role: string;
+    weight: PrdPersonaWeight;
+}
+
+export const PrdPersonaDef = 'PrdPersonaDef';
+
+export function isPrdPersonaDef(item: unknown): item is PrdPersonaDef {
+    return reflection.isInstance(item, PrdPersonaDef);
+}
+
+export interface PrdProblemBlock extends langium.AstNode {
+    readonly $container: PrdProductDef;
+    readonly $type: 'PrdProblemBlock';
+    complication: string;
+    question: string;
+    situation: string;
+}
+
+export const PrdProblemBlock = 'PrdProblemBlock';
+
+export function isPrdProblemBlock(item: unknown): item is PrdProblemBlock {
+    return reflection.isInstance(item, PrdProblemBlock);
+}
+
+export interface PrdProductDef extends langium.AstNode {
+    readonly $container: PrdFile;
+    readonly $type: 'PrdProductDef';
+    members: Array<PrdMember>;
+    name: string;
+}
+
+export const PrdProductDef = 'PrdProductDef';
+
+export function isPrdProductDef(item: unknown): item is PrdProductDef {
+    return reflection.isInstance(item, PrdProductDef);
+}
+
+export interface PrdReleaseDef extends langium.AstNode {
+    readonly $container: PrdProductDef;
+    readonly $type: 'PrdReleaseDef';
+    members: Array<PrdReleaseMember>;
+    name: string;
+}
+
+export const PrdReleaseDef = 'PrdReleaseDef';
+
+export function isPrdReleaseDef(item: unknown): item is PrdReleaseDef {
+    return reflection.isInstance(item, PrdReleaseDef);
+}
+
+export interface PrdReleaseStatusDecl extends langium.AstNode {
+    readonly $container: PrdReleaseDef;
+    readonly $type: 'PrdReleaseStatusDecl';
+    value: PrdReleaseStatus;
+}
+
+export const PrdReleaseStatusDecl = 'PrdReleaseStatusDecl';
+
+export function isPrdReleaseStatusDecl(item: unknown): item is PrdReleaseStatusDecl {
+    return reflection.isInstance(item, PrdReleaseStatusDecl);
+}
+
+export interface PrdRiskDef extends langium.AstNode {
+    readonly $container: PrdProductDef;
+    readonly $type: 'PrdRiskDef';
+    impact: PrdImpact;
+    likelihood: PrdLevel;
+    mitigation: PrdMitigation;
+    name: string;
+    owner: string;
+    statement: string;
+    threatens: Array<string>;
+}
+
+export const PrdRiskDef = 'PrdRiskDef';
+
+export function isPrdRiskDef(item: unknown): item is PrdRiskDef {
+    return reflection.isInstance(item, PrdRiskDef);
+}
+
+export interface PrdScopeBlock extends langium.AstNode {
+    readonly $container: PrdProductDef;
+    readonly $type: 'PrdScopeBlock';
+    items: Array<string>;
+}
+
+export const PrdScopeBlock = 'PrdScopeBlock';
+
+export function isPrdScopeBlock(item: unknown): item is PrdScopeBlock {
+    return reflection.isInstance(item, PrdScopeBlock);
+}
+
+export interface PrdStepActionDecl extends langium.AstNode {
+    readonly $container: PrdStepDef;
+    readonly $type: 'PrdStepActionDecl';
+    value: string;
+}
+
+export const PrdStepActionDecl = 'PrdStepActionDecl';
+
+export function isPrdStepActionDecl(item: unknown): item is PrdStepActionDecl {
+    return reflection.isInstance(item, PrdStepActionDecl);
+}
+
+export interface PrdStepChannelDecl extends langium.AstNode {
+    readonly $container: PrdStepDef;
+    readonly $type: 'PrdStepChannelDecl';
+    value: PrdChannel;
+}
+
+export const PrdStepChannelDecl = 'PrdStepChannelDecl';
+
+export function isPrdStepChannelDecl(item: unknown): item is PrdStepChannelDecl {
+    return reflection.isInstance(item, PrdStepChannelDecl);
+}
+
+export interface PrdStepDef extends langium.AstNode {
+    readonly $container: PrdStepsBlock;
+    readonly $type: 'PrdStepDef';
+    members: Array<PrdStepMember>;
+    name?: string;
+    number?: string;
+}
+
+export const PrdStepDef = 'PrdStepDef';
+
+export function isPrdStepDef(item: unknown): item is PrdStepDef {
+    return reflection.isInstance(item, PrdStepDef);
+}
+
+export interface PrdStepOrderDecl extends langium.AstNode {
+    readonly $container: PrdStepDef;
+    readonly $type: 'PrdStepOrderDecl';
+    value: string;
+}
+
+export const PrdStepOrderDecl = 'PrdStepOrderDecl';
+
+export function isPrdStepOrderDecl(item: unknown): item is PrdStepOrderDecl {
+    return reflection.isInstance(item, PrdStepOrderDecl);
+}
+
+export interface PrdStepsBlock extends langium.AstNode {
+    readonly $container: PrdJourneyDef;
+    readonly $type: 'PrdStepsBlock';
+    steps: Array<PrdStepDef>;
+}
+
+export const PrdStepsBlock = 'PrdStepsBlock';
+
+export function isPrdStepsBlock(item: unknown): item is PrdStepsBlock {
+    return reflection.isInstance(item, PrdStepsBlock);
+}
+
+export interface PrdStepSystemResponseDecl extends langium.AstNode {
+    readonly $container: PrdStepDef;
+    readonly $type: 'PrdStepSystemResponseDecl';
+    value: string;
+}
+
+export const PrdStepSystemResponseDecl = 'PrdStepSystemResponseDecl';
+
+export function isPrdStepSystemResponseDecl(item: unknown): item is PrdStepSystemResponseDecl {
+    return reflection.isInstance(item, PrdStepSystemResponseDecl);
+}
+
+export interface PrdStepToneDecl extends langium.AstNode {
+    readonly $container: PrdStepDef;
+    readonly $type: 'PrdStepToneDecl';
+    value: PrdTone;
+}
+
+export const PrdStepToneDecl = 'PrdStepToneDecl';
+
+export function isPrdStepToneDecl(item: unknown): item is PrdStepToneDecl {
+    return reflection.isInstance(item, PrdStepToneDecl);
+}
+
+export interface PrdStoriesBlock extends langium.AstNode {
+    readonly $container: PrdFeatureDef;
+    readonly $type: 'PrdStoriesBlock';
+    stories: Array<PrdStoryDef>;
+}
+
+export const PrdStoriesBlock = 'PrdStoriesBlock';
+
+export function isPrdStoriesBlock(item: unknown): item is PrdStoriesBlock {
+    return reflection.isInstance(item, PrdStoriesBlock);
+}
+
+export interface PrdStoryDef extends langium.AstNode {
+    readonly $container: PrdStoriesBlock;
+    readonly $type: 'PrdStoryDef';
+    criteria: Array<PrdAcceptanceCriterion>;
+    id?: string;
+    title: string;
+}
+
+export const PrdStoryDef = 'PrdStoryDef';
+
+export function isPrdStoryDef(item: unknown): item is PrdStoryDef {
+    return reflection.isInstance(item, PrdStoryDef);
+}
+
+export interface PrdTargetDateDecl extends langium.AstNode {
+    readonly $container: PrdReleaseDef;
+    readonly $type: 'PrdTargetDateDecl';
+    value: string;
+}
+
+export const PrdTargetDateDecl = 'PrdTargetDateDecl';
+
+export function isPrdTargetDateDecl(item: unknown): item is PrdTargetDateDecl {
+    return reflection.isInstance(item, PrdTargetDateDecl);
+}
+
+export interface PrdThemeDecl extends langium.AstNode {
+    readonly $container: PrdReleaseDef;
+    readonly $type: 'PrdThemeDecl';
+    value: string;
+}
+
+export const PrdThemeDecl = 'PrdThemeDecl';
+
+export function isPrdThemeDecl(item: unknown): item is PrdThemeDecl {
+    return reflection.isInstance(item, PrdThemeDecl);
+}
+
+export interface PrdVisionDecl extends langium.AstNode {
+    readonly $container: PrdProductDef;
+    readonly $type: 'PrdVisionDecl';
+    text: string;
+}
+
+export const PrdVisionDecl = 'PrdVisionDecl';
+
+export function isPrdVisionDecl(item: unknown): item is PrdVisionDecl {
+    return reflection.isInstance(item, PrdVisionDecl);
+}
+
 export interface PreconditionClause extends langium.AstNode {
     readonly $container: ForeachClause | OperationBody | OperationSignature | SafeForeachClause | SafeOpDef | TransitionDef;
     readonly $type: 'PreconditionClause';
@@ -2574,6 +4682,172 @@ export function isRepositoryDef(item: unknown): item is RepositoryDef {
     return reflection.isInstance(item, RepositoryDef);
 }
 
+export interface ReqConflictsWith extends langium.AstNode {
+    readonly $container: ReqRequirementDef;
+    readonly $type: 'ReqConflictsWith';
+    ids: Array<string>;
+}
+
+export const ReqConflictsWith = 'ReqConflictsWith';
+
+export function isReqConflictsWith(item: unknown): item is ReqConflictsWith {
+    return reflection.isInstance(item, ReqConflictsWith);
+}
+
+export interface ReqDecomposedInto extends langium.AstNode {
+    readonly $container: ReqRequirementDef;
+    readonly $type: 'ReqDecomposedInto';
+    ids: Array<string>;
+}
+
+export const ReqDecomposedInto = 'ReqDecomposedInto';
+
+export function isReqDecomposedInto(item: unknown): item is ReqDecomposedInto {
+    return reflection.isInstance(item, ReqDecomposedInto);
+}
+
+export interface ReqDependsOn extends langium.AstNode {
+    readonly $container: ReqRequirementDef;
+    readonly $type: 'ReqDependsOn';
+    ids: Array<string>;
+}
+
+export const ReqDependsOn = 'ReqDependsOn';
+
+export function isReqDependsOn(item: unknown): item is ReqDependsOn {
+    return reflection.isInstance(item, ReqDependsOn);
+}
+
+export interface ReqDomainRef extends langium.AstNode {
+    readonly $container: ReqSatisfactionLink;
+    readonly $type: 'ReqDomainRef';
+    head: ReqRefName;
+    label?: string;
+    member?: ReqRefName;
+}
+
+export const ReqDomainRef = 'ReqDomainRef';
+
+export function isReqDomainRef(item: unknown): item is ReqDomainRef {
+    return reflection.isInstance(item, ReqDomainRef);
+}
+
+export interface ReqFile extends langium.AstNode {
+    readonly $type: 'ReqFile';
+    sets: Array<ReqSetDef>;
+}
+
+export const ReqFile = 'ReqFile';
+
+export function isReqFile(item: unknown): item is ReqFile {
+    return reflection.isInstance(item, ReqFile);
+}
+
+export interface ReqModuleBlock extends langium.AstNode {
+    readonly $container: ReqSetDef;
+    readonly $type: 'ReqModuleBlock';
+    name: string;
+    requirements: Array<ReqRequirementDef>;
+}
+
+export const ReqModuleBlock = 'ReqModuleBlock';
+
+export function isReqModuleBlock(item: unknown): item is ReqModuleBlock {
+    return reflection.isInstance(item, ReqModuleBlock);
+}
+
+export interface ReqPrdSourceDecl extends langium.AstNode {
+    readonly $container: ReqSetDef;
+    readonly $type: 'ReqPrdSourceDecl';
+    path: string;
+}
+
+export const ReqPrdSourceDecl = 'ReqPrdSourceDecl';
+
+export function isReqPrdSourceDecl(item: unknown): item is ReqPrdSourceDecl {
+    return reflection.isInstance(item, ReqPrdSourceDecl);
+}
+
+export interface ReqRationale extends langium.AstNode {
+    readonly $container: ReqRequirementDef;
+    readonly $type: 'ReqRationale';
+    text: string;
+}
+
+export const ReqRationale = 'ReqRationale';
+
+export function isReqRationale(item: unknown): item is ReqRationale {
+    return reflection.isInstance(item, ReqRationale);
+}
+
+export interface ReqRequirementDef extends langium.AstNode {
+    readonly $container: ReqModuleBlock | ReqSetDef;
+    readonly $type: 'ReqRequirementDef';
+    clauses: Array<ReqClause | ReqTraceClause>;
+    id: string;
+    name: string;
+    pattern: ReqEarsPattern;
+    priority: ReqMoscowPriority;
+    statement: string;
+}
+
+export const ReqRequirementDef = 'ReqRequirementDef';
+
+export function isReqRequirementDef(item: unknown): item is ReqRequirementDef {
+    return reflection.isInstance(item, ReqRequirementDef);
+}
+
+export interface ReqSatisfactionLink extends langium.AstNode {
+    readonly $container: ReqSatisfiedBy;
+    readonly $type: 'ReqSatisfactionLink';
+    role?: 'satisfied-by-infrastructure' | ReqLinkRole;
+    target?: ReqDomainRef;
+}
+
+export const ReqSatisfactionLink = 'ReqSatisfactionLink';
+
+export function isReqSatisfactionLink(item: unknown): item is ReqSatisfactionLink {
+    return reflection.isInstance(item, ReqSatisfactionLink);
+}
+
+export interface ReqSatisfiedBy extends langium.AstNode {
+    readonly $container: ReqRequirementDef;
+    readonly $type: 'ReqSatisfiedBy';
+    links: Array<ReqSatisfactionLink>;
+}
+
+export const ReqSatisfiedBy = 'ReqSatisfiedBy';
+
+export function isReqSatisfiedBy(item: unknown): item is ReqSatisfiedBy {
+    return reflection.isInstance(item, ReqSatisfiedBy);
+}
+
+export interface ReqSetDef extends langium.AstNode {
+    readonly $container: ReqFile;
+    readonly $type: 'ReqSetDef';
+    members: Array<ReqSetMember>;
+    name: string;
+    scope: TypeName;
+}
+
+export const ReqSetDef = 'ReqSetDef';
+
+export function isReqSetDef(item: unknown): item is ReqSetDef {
+    return reflection.isInstance(item, ReqSetDef);
+}
+
+export interface ReqSourceDecl extends langium.AstNode {
+    readonly $container: ReqRequirementDef;
+    readonly $type: 'ReqSourceDecl';
+    reference: string;
+}
+
+export const ReqSourceDecl = 'ReqSourceDecl';
+
+export function isReqSourceDecl(item: unknown): item is ReqSourceDecl {
+    return reflection.isInstance(item, ReqSourceDecl);
+}
+
 export interface RequirementsSourceDecl extends langium.AstNode {
     readonly $container: ContextDef | ModuleDef | OrganizationDef | ScenarioDef;
     readonly $type: 'RequirementsSourceDecl';
@@ -2770,7 +5044,7 @@ export function isSafeOperationsBlock(item: unknown): item is SafeOperationsBloc
 }
 
 export interface SatisfiesDecl extends langium.AstNode {
-    readonly $container: AggregateDef | AgreementDef | ApplicationServiceDef | CommandDef | ContextDef | CurveOutcome | DomainServiceDef | EntityDef | EnumDef | ErrorEventDef | EscalationChainDef | EscalationStep | EventDef | ExternalEventDef | FieldDecl | InfrastructureServiceDef | InterfaceDef | InvariantDef | MixOutcome | ModuleDef | OperationBody | OperationSignature | OrganizationDef | PostconditionClause | PreconditionClause | QueryDef | RateOutcome | ReactionDef | ReadOnlyEntityDef | ReconciliationDef | RepositoryDef | RollupOutcome | SafeOpDef | ScenarioDef | ScopedInvariantDef | ShareOutcome | StateDef | StateMachineDef | TemporalEventDef | TotalOutcome | TransitionDef | ValueDef;
+    readonly $container: AggregateDef | AgreementDef | ApplicationServiceDef | ArchComponentDef | ArchContainerDef | ArchInterfaceDef | ArchOrgSystemDef | ArchStructDef | ArchSystemDef | CommandDef | ContextDef | CurveOutcome | DomainServiceDef | EntityDef | EnumDef | ErrorEventDef | EscalationChainDef | EscalationStep | EventDef | ExternalEventDef | FieldDecl | InfrastructureServiceDef | InterfaceDef | InvariantDef | MixOutcome | ModuleDef | OperationBody | OperationSignature | OrganizationDef | PostconditionClause | PreconditionClause | QueryDef | RateOutcome | ReactionDef | ReadOnlyEntityDef | ReconciliationDef | RepositoryDef | RollupOutcome | SafeOpDef | ScenarioDef | ScopedInvariantDef | ShareOutcome | StateDef | StateMachineDef | TemporalEventDef | TotalOutcome | TransitionDef | ValueDef;
     readonly $type: 'SatisfiesDecl';
     ids: Array<string>;
 }
@@ -3317,6 +5591,87 @@ export type SpecyDomainAstType = {
     AgreementDef: AgreementDef
     AlphaOption: AlphaOption
     ApplicationServiceDef: ApplicationServiceDef
+    ArchArchitectureDef: ArchArchitectureDef
+    ArchArchitectureMember: ArchArchitectureMember
+    ArchAreaDef: ArchAreaDef
+    ArchAreaRef: ArchAreaRef
+    ArchArgDecl: ArchArgDecl
+    ArchBooleanLiteral: ArchBooleanLiteral
+    ArchBoundedContextDecl: ArchBoundedContextDecl
+    ArchBoundedContextRef: ArchBoundedContextRef
+    ArchCarriedConcept: ArchCarriedConcept
+    ArchChannelDef: ArchChannelDef
+    ArchCollectionType: ArchCollectionType
+    ArchComponentClause: ArchComponentClause
+    ArchComponentDef: ArchComponentDef
+    ArchConceptRef: ArchConceptRef
+    ArchConcernRef: ArchConcernRef
+    ArchConnectorDef: ArchConnectorDef
+    ArchConnectorRef: ArchConnectorRef
+    ArchConsumesClause: ArchConsumesClause
+    ArchContainerClause: ArchContainerClause
+    ArchContainerDef: ArchContainerDef
+    ArchDependencyDef: ArchDependencyDef
+    ArchDeployClause: ArchDeployClause
+    ArchDetailedInDecl: ArchDetailedInDecl
+    ArchDomainSourceDecl: ArchDomainSourceDecl
+    ArchEnumDef: ArchEnumDef
+    ArchEnumMember: ArchEnumMember
+    ArchEnvironmentDef: ArchEnvironmentDef
+    ArchEnvironmentMember: ArchEnvironmentMember
+    ArchExceptionDef: ArchExceptionDef
+    ArchExternalSystemClause: ArchExternalSystemClause
+    ArchExternalSystemDef: ArchExternalSystemDef
+    ArchFieldDef: ArchFieldDef
+    ArchFieldType: ArchFieldType
+    ArchFile: ArchFile
+    ArchFlowConcern: ArchFlowConcern
+    ArchFlowDef: ArchFlowDef
+    ArchHandlesClause: ArchHandlesClause
+    ArchHotspotDef: ArchHotspotDef
+    ArchImportDecl: ArchImportDecl
+    ArchInterfaceDef: ArchInterfaceDef
+    ArchLevel0Clause: ArchLevel0Clause
+    ArchLiteral: ArchLiteral
+    ArchMastersClause: ArchMastersClause
+    ArchMechanism: ArchMechanism
+    ArchMetadataBlock: ArchMetadataBlock
+    ArchMetadataEntry: ArchMetadataEntry
+    ArchNamedType: ArchNamedType
+    ArchNamedTypeDef: ArchNamedTypeDef
+    ArchNodeAttribute: ArchNodeAttribute
+    ArchNodeDef: ArchNodeDef
+    ArchNodeMember: ArchNodeMember
+    ArchNullLiteral: ArchNullLiteral
+    ArchNumberLiteral: ArchNumberLiteral
+    ArchOperationDef: ArchOperationDef
+    ArchOrgExternalSystemClause: ArchOrgExternalSystemClause
+    ArchOrgExternalSystemDef: ArchOrgExternalSystemDef
+    ArchOrgSystemDef: ArchOrgSystemDef
+    ArchOrganizationDef: ArchOrganizationDef
+    ArchOrganizationMember: ArchOrganizationMember
+    ArchPersonDef: ArchPersonDef
+    ArchPhaseDef: ArchPhaseDef
+    ArchPhasedMechanism: ArchPhasedMechanism
+    ArchPrimitiveType: ArchPrimitiveType
+    ArchProvidesClause: ArchProvidesClause
+    ArchPublishesClause: ArchPublishesClause
+    ArchRealizesDecl: ArchRealizesDecl
+    ArchRealizesRef: ArchRealizesRef
+    ArchRequirementsSourceDecl: ArchRequirementsSourceDecl
+    ArchRequiresClause: ArchRequiresClause
+    ArchResourceDef: ArchResourceDef
+    ArchRoot: ArchRoot
+    ArchStringLiteral: ArchStringLiteral
+    ArchStructDef: ArchStructDef
+    ArchSubscribesClause: ArchSubscribesClause
+    ArchSystemDef: ArchSystemDef
+    ArchSystemMember: ArchSystemMember
+    ArchTechnologyDecl: ArchTechnologyDecl
+    ArchTypedefDef: ArchTypedefDef
+    ArchUnionDef: ArchUnionDef
+    ArchUnionMember: ArchUnionMember
+    ArchUsedByClause: ArchUsedByClause
     ArgList: ArgList
     ArrayIndex: ArrayIndex
     ArrayLiteral: ArrayLiteral
@@ -3440,6 +5795,49 @@ export type SpecyDomainAstType = {
     PopulationDecl: PopulationDecl
     PopulationsBlock: PopulationsBlock
     PostconditionClause: PostconditionClause
+    PrdAcceptanceCriterion: PrdAcceptanceCriterion
+    PrdAssumptionDef: PrdAssumptionDef
+    PrdConstraintDef: PrdConstraintDef
+    PrdDependsOnDecl: PrdDependsOnDecl
+    PrdDesignReference: PrdDesignReference
+    PrdDesignReferencesBlock: PrdDesignReferencesBlock
+    PrdDesiredOutcome: PrdDesiredOutcome
+    PrdDesiredOutcomesBlock: PrdDesiredOutcomesBlock
+    PrdEntryCriteriaBlock: PrdEntryCriteriaBlock
+    PrdEvidenceDef: PrdEvidenceDef
+    PrdExitCriteriaBlock: PrdExitCriteriaBlock
+    PrdFeatureDef: PrdFeatureDef
+    PrdFile: PrdFile
+    PrdGoalDef: PrdGoalDef
+    PrdHypothesisDef: PrdHypothesisDef
+    PrdIncludesBlock: PrdIncludesBlock
+    PrdJobDef: PrdJobDef
+    PrdJourneyDef: PrdJourneyDef
+    PrdMember: PrdMember
+    PrdMetricBlock: PrdMetricBlock
+    PrdNonGoalsBlock: PrdNonGoalsBlock
+    PrdOpenQuestionDef: PrdOpenQuestionDef
+    PrdPersonaDef: PrdPersonaDef
+    PrdProblemBlock: PrdProblemBlock
+    PrdProductDef: PrdProductDef
+    PrdReleaseDef: PrdReleaseDef
+    PrdReleaseMember: PrdReleaseMember
+    PrdReleaseStatusDecl: PrdReleaseStatusDecl
+    PrdRiskDef: PrdRiskDef
+    PrdScopeBlock: PrdScopeBlock
+    PrdStepActionDecl: PrdStepActionDecl
+    PrdStepChannelDecl: PrdStepChannelDecl
+    PrdStepDef: PrdStepDef
+    PrdStepMember: PrdStepMember
+    PrdStepOrderDecl: PrdStepOrderDecl
+    PrdStepSystemResponseDecl: PrdStepSystemResponseDecl
+    PrdStepToneDecl: PrdStepToneDecl
+    PrdStepsBlock: PrdStepsBlock
+    PrdStoriesBlock: PrdStoriesBlock
+    PrdStoryDef: PrdStoryDef
+    PrdTargetDateDecl: PrdTargetDateDecl
+    PrdThemeDecl: PrdThemeDecl
+    PrdVisionDecl: PrdVisionDecl
     PreconditionClause: PreconditionClause
     PredicateBlock: PredicateBlock
     PrimitiveType: PrimitiveType
@@ -3464,6 +5862,22 @@ export type SpecyDomainAstType = {
     RejectionsOption: RejectionsOption
     RelativeAnchor: RelativeAnchor
     RepositoryDef: RepositoryDef
+    ReqClause: ReqClause
+    ReqConflictsWith: ReqConflictsWith
+    ReqDecomposedInto: ReqDecomposedInto
+    ReqDependsOn: ReqDependsOn
+    ReqDomainRef: ReqDomainRef
+    ReqFile: ReqFile
+    ReqModuleBlock: ReqModuleBlock
+    ReqPrdSourceDecl: ReqPrdSourceDecl
+    ReqRationale: ReqRationale
+    ReqRequirementDef: ReqRequirementDef
+    ReqSatisfactionLink: ReqSatisfactionLink
+    ReqSatisfiedBy: ReqSatisfiedBy
+    ReqSetDef: ReqSetDef
+    ReqSetMember: ReqSetMember
+    ReqSourceDecl: ReqSourceDecl
+    ReqTraceClause: ReqTraceClause
     RequirementsSourceDecl: RequirementsSourceDecl
     RequiresBlock: RequiresBlock
     ResolvesClause: ResolvesClause
@@ -3524,7 +5938,7 @@ export type SpecyDomainAstType = {
 export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
 
     getAllTypes(): string[] {
-        return [AboutClause, AbsoluteAnchor, AggregateDef, AggregateEntitiesDecl, AgreementDef, AlphaOption, ApplicationServiceDef, ArgList, ArrayIndex, ArrayLiteral, AsOfDecl, AssignmentClause, BinaryExpr, BindingDecl, BooleanLiteral, BooleanLiteralExpr, CallExpr, CallsBlock, CausedByClause, CollectionType, CommandDef, CommandTriggeredOp, CompensationClause, ConditionClause, ConditionalExpr, Constraint, ContainsExpr, ContextDef, ContextMapBlock, ContextRelation, CreatesClause, CurveOutcome, CurvePoint, DecimalsOption, DefaultDwellOption, Definition, DependsBlock, DescribedByClause, DescribesClause, Description, DistributionDecl, DistributionsBlock, DomainFile, DomainRef, DomainServiceDef, DomainSourceDecl, DotPath, DotPathExpr, DownstreamRelation, DuplicateDetection, DurationLiteral, DwellBlock, DwellEntry, EffectsClause, EmitsClause, EnforcementStrategy, EntityDef, EnumDef, EnumValue, ErrorEventDef, EscalationAction, EscalationChainDef, EscalationStep, EventDef, EveryExpr, ExposedByClause, ExposesBlock, ExposesClause, Expression, ExternalEventDef, FieldDecl, FieldType, FieldsBlock, ForeachClause, Fraction, GenericType, GivenColumn, GivenDecl, GivenTarget, GivensBlock, GuardBlock, HorizonDecl, IdentityDecl, IfExpr, InExpr, InfrastructureServiceDef, InterfaceDef, InterfaceMember, InternalOp, InvariantDef, InvariantsBlock, IsDefinedExpr, IsNotDefinedExpr, IsNotNullExpr, IsNullExpr, LiteralValue, MatchPattern, MatchesExpr, MetadataBlock, MetadataEntry, MixEntry, MixOutcome, ModelsClause, ModuleDef, MustBlock, NamedArg, NamedArgList, NotInExpr, NullLiteralExpr, NullRateOption, NumberLiteral, NumberLiteralExpr, OperationBody, OperationClause, OperationDef, OperationSignature, OperationsBlock, OptionEntry, OptionsBlock, OrganizationDef, OutcomeDecl, OutcomesBlock, ParamDecl, ParamList, ParenExpr, ParticipantsClause, PathSegment, PopulationDecl, PopulationsBlock, PostconditionClause, PreconditionClause, PredicateBlock, PrimitiveType, ProjectedByClause, QuantifierExpr, QueryDef, RateBinary, RateExpr, RateNot, RateOutcome, RatePoint, RatePredicate, ReactionDef, ReactionLatencyOption, ReadOnlyEntityDef, ReadsFromClause, ReconciliationDef, ReconciliationTrigger, RecurringAnchor, ReferenceDecl, ReferencesBlock, RejectionsOption, RelativeAnchor, RepositoryDef, RequirementsSourceDecl, RequiresBlock, ResolvesClause, ReturnsClause, RollupOutcome, RowArray, RowBoolean, RowEntry, RowLiteral, RowNull, RowNumber, RowString, RowValue, SafeForeachClause, SafeOpDef, SafeOperationClause, SafeOperationsBlock, SatisfiesDecl, ScenarioDef, ScopedInvariantDef, SeedDecl, ServiceCallClause, SetsClause, ShareEntry, ShareGroup, ShareOutcome, Shortname, SignatureOperationsBlock, SourcedFromClause, StateDef, StateMachineDef, StatesBlock, StringLiteral, StringLiteralExpr, SubdomainDecl, SymmetricRelation, SyncedViaClause, SynthFile, SynthPath, SynthPathStep, TemporalAnchor, TemporalEventDef, TopLevelElement, TotalOutcome, TransitionDef, TriggeredByClause, UnaryExpr, UpstreamRelation, ValueDef, ValueExpr, ValueList, ValueOpDef, ValueOperationsBlock, VocabularyBlock, WordListDecl];
+        return [AboutClause, AbsoluteAnchor, AggregateDef, AggregateEntitiesDecl, AgreementDef, AlphaOption, ApplicationServiceDef, ArchArchitectureDef, ArchArchitectureMember, ArchAreaDef, ArchAreaRef, ArchArgDecl, ArchBooleanLiteral, ArchBoundedContextDecl, ArchBoundedContextRef, ArchCarriedConcept, ArchChannelDef, ArchCollectionType, ArchComponentClause, ArchComponentDef, ArchConceptRef, ArchConcernRef, ArchConnectorDef, ArchConnectorRef, ArchConsumesClause, ArchContainerClause, ArchContainerDef, ArchDependencyDef, ArchDeployClause, ArchDetailedInDecl, ArchDomainSourceDecl, ArchEnumDef, ArchEnumMember, ArchEnvironmentDef, ArchEnvironmentMember, ArchExceptionDef, ArchExternalSystemClause, ArchExternalSystemDef, ArchFieldDef, ArchFieldType, ArchFile, ArchFlowConcern, ArchFlowDef, ArchHandlesClause, ArchHotspotDef, ArchImportDecl, ArchInterfaceDef, ArchLevel0Clause, ArchLiteral, ArchMastersClause, ArchMechanism, ArchMetadataBlock, ArchMetadataEntry, ArchNamedType, ArchNamedTypeDef, ArchNodeAttribute, ArchNodeDef, ArchNodeMember, ArchNullLiteral, ArchNumberLiteral, ArchOperationDef, ArchOrgExternalSystemClause, ArchOrgExternalSystemDef, ArchOrgSystemDef, ArchOrganizationDef, ArchOrganizationMember, ArchPersonDef, ArchPhaseDef, ArchPhasedMechanism, ArchPrimitiveType, ArchProvidesClause, ArchPublishesClause, ArchRealizesDecl, ArchRealizesRef, ArchRequirementsSourceDecl, ArchRequiresClause, ArchResourceDef, ArchRoot, ArchStringLiteral, ArchStructDef, ArchSubscribesClause, ArchSystemDef, ArchSystemMember, ArchTechnologyDecl, ArchTypedefDef, ArchUnionDef, ArchUnionMember, ArchUsedByClause, ArgList, ArrayIndex, ArrayLiteral, AsOfDecl, AssignmentClause, BinaryExpr, BindingDecl, BooleanLiteral, BooleanLiteralExpr, CallExpr, CallsBlock, CausedByClause, CollectionType, CommandDef, CommandTriggeredOp, CompensationClause, ConditionClause, ConditionalExpr, Constraint, ContainsExpr, ContextDef, ContextMapBlock, ContextRelation, CreatesClause, CurveOutcome, CurvePoint, DecimalsOption, DefaultDwellOption, Definition, DependsBlock, DescribedByClause, DescribesClause, Description, DistributionDecl, DistributionsBlock, DomainFile, DomainRef, DomainServiceDef, DomainSourceDecl, DotPath, DotPathExpr, DownstreamRelation, DuplicateDetection, DurationLiteral, DwellBlock, DwellEntry, EffectsClause, EmitsClause, EnforcementStrategy, EntityDef, EnumDef, EnumValue, ErrorEventDef, EscalationAction, EscalationChainDef, EscalationStep, EventDef, EveryExpr, ExposedByClause, ExposesBlock, ExposesClause, Expression, ExternalEventDef, FieldDecl, FieldType, FieldsBlock, ForeachClause, Fraction, GenericType, GivenColumn, GivenDecl, GivenTarget, GivensBlock, GuardBlock, HorizonDecl, IdentityDecl, IfExpr, InExpr, InfrastructureServiceDef, InterfaceDef, InterfaceMember, InternalOp, InvariantDef, InvariantsBlock, IsDefinedExpr, IsNotDefinedExpr, IsNotNullExpr, IsNullExpr, LiteralValue, MatchPattern, MatchesExpr, MetadataBlock, MetadataEntry, MixEntry, MixOutcome, ModelsClause, ModuleDef, MustBlock, NamedArg, NamedArgList, NotInExpr, NullLiteralExpr, NullRateOption, NumberLiteral, NumberLiteralExpr, OperationBody, OperationClause, OperationDef, OperationSignature, OperationsBlock, OptionEntry, OptionsBlock, OrganizationDef, OutcomeDecl, OutcomesBlock, ParamDecl, ParamList, ParenExpr, ParticipantsClause, PathSegment, PopulationDecl, PopulationsBlock, PostconditionClause, PrdAcceptanceCriterion, PrdAssumptionDef, PrdConstraintDef, PrdDependsOnDecl, PrdDesignReference, PrdDesignReferencesBlock, PrdDesiredOutcome, PrdDesiredOutcomesBlock, PrdEntryCriteriaBlock, PrdEvidenceDef, PrdExitCriteriaBlock, PrdFeatureDef, PrdFile, PrdGoalDef, PrdHypothesisDef, PrdIncludesBlock, PrdJobDef, PrdJourneyDef, PrdMember, PrdMetricBlock, PrdNonGoalsBlock, PrdOpenQuestionDef, PrdPersonaDef, PrdProblemBlock, PrdProductDef, PrdReleaseDef, PrdReleaseMember, PrdReleaseStatusDecl, PrdRiskDef, PrdScopeBlock, PrdStepActionDecl, PrdStepChannelDecl, PrdStepDef, PrdStepMember, PrdStepOrderDecl, PrdStepSystemResponseDecl, PrdStepToneDecl, PrdStepsBlock, PrdStoriesBlock, PrdStoryDef, PrdTargetDateDecl, PrdThemeDecl, PrdVisionDecl, PreconditionClause, PredicateBlock, PrimitiveType, ProjectedByClause, QuantifierExpr, QueryDef, RateBinary, RateExpr, RateNot, RateOutcome, RatePoint, RatePredicate, ReactionDef, ReactionLatencyOption, ReadOnlyEntityDef, ReadsFromClause, ReconciliationDef, ReconciliationTrigger, RecurringAnchor, ReferenceDecl, ReferencesBlock, RejectionsOption, RelativeAnchor, RepositoryDef, ReqClause, ReqConflictsWith, ReqDecomposedInto, ReqDependsOn, ReqDomainRef, ReqFile, ReqModuleBlock, ReqPrdSourceDecl, ReqRationale, ReqRequirementDef, ReqSatisfactionLink, ReqSatisfiedBy, ReqSetDef, ReqSetMember, ReqSourceDecl, ReqTraceClause, RequirementsSourceDecl, RequiresBlock, ResolvesClause, ReturnsClause, RollupOutcome, RowArray, RowBoolean, RowEntry, RowLiteral, RowNull, RowNumber, RowString, RowValue, SafeForeachClause, SafeOpDef, SafeOperationClause, SafeOperationsBlock, SatisfiesDecl, ScenarioDef, ScopedInvariantDef, SeedDecl, ServiceCallClause, SetsClause, ShareEntry, ShareGroup, ShareOutcome, Shortname, SignatureOperationsBlock, SourcedFromClause, StateDef, StateMachineDef, StatesBlock, StringLiteral, StringLiteralExpr, SubdomainDecl, SymmetricRelation, SyncedViaClause, SynthFile, SynthPath, SynthPathStep, TemporalAnchor, TemporalEventDef, TopLevelElement, TotalOutcome, TransitionDef, TriggeredByClause, UnaryExpr, UpstreamRelation, ValueDef, ValueExpr, ValueList, ValueOpDef, ValueOperationsBlock, VocabularyBlock, WordListDecl];
     }
 
     protected override computeIsSubtype(subtype: string, supertype: string): boolean {
@@ -3564,6 +5978,92 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
             case ReactionLatencyOption:
             case RejectionsOption: {
                 return this.isSubtype(OptionEntry, supertype);
+            }
+            case ArchArchitectureDef:
+            case ArchOrganizationDef: {
+                return this.isSubtype(ArchRoot, supertype);
+            }
+            case ArchAreaDef:
+            case ArchDependencyDef:
+            case ArchOrgExternalSystemDef:
+            case ArchOrgSystemDef:
+            case ArchPhaseDef: {
+                return this.isSubtype(ArchOrganizationMember, supertype);
+            }
+            case ArchAreaRef:
+            case ArchDetailedInDecl:
+            case ArchHandlesClause:
+            case ArchHotspotDef:
+            case ArchUsedByClause: {
+                return this.isSubtype(ArchLevel0Clause, supertype);
+            }
+            case ArchBooleanLiteral:
+            case ArchNullLiteral:
+            case ArchNumberLiteral:
+            case ArchStringLiteral: {
+                return this.isSubtype(ArchLiteral, supertype);
+            }
+            case ArchBoundedContextDecl:
+            case ArchChannelDef:
+            case ArchConnectorDef:
+            case ArchContainerDef:
+            case ArchEnvironmentDef:
+            case ArchInterfaceDef:
+            case ArchNamedTypeDef: {
+                return this.isSubtype(ArchSystemMember, supertype);
+            }
+            case ArchBoundedContextRef:
+            case ArchPublishesClause:
+            case ArchSubscribesClause: {
+                return this.isSubtype(ArchComponentClause, supertype);
+            }
+            case ArchCollectionType:
+            case ArchNamedType:
+            case ArchPrimitiveType: {
+                return this.isSubtype(ArchFieldType, supertype);
+            }
+            case ArchComponentDef: {
+                return this.isSubtype(ArchContainerClause, supertype);
+            }
+            case ArchConceptRef:
+            case ArchFlowConcern: {
+                return this.isSubtype(ArchConcernRef, supertype);
+            }
+            case ArchConsumesClause: {
+                return this.isSubtype(ArchExternalSystemClause, supertype) || this.isSubtype(ArchOrgExternalSystemClause, supertype);
+            }
+            case ArchDeployClause:
+            case ArchNodeDef: {
+                return this.isSubtype(ArchEnvironmentMember, supertype) || this.isSubtype(ArchNodeMember, supertype);
+            }
+            case ArchDomainSourceDecl:
+            case ArchPersonDef:
+            case ArchRequirementsSourceDecl: {
+                return this.isSubtype(ArchArchitectureMember, supertype) || this.isSubtype(ArchOrganizationMember, supertype);
+            }
+            case ArchEnumDef:
+            case ArchExceptionDef:
+            case ArchImportDecl:
+            case ArchStructDef:
+            case ArchTypedefDef:
+            case ArchUnionDef: {
+                return this.isSubtype(ArchNamedTypeDef, supertype);
+            }
+            case ArchExternalSystemDef:
+            case ArchSystemDef: {
+                return this.isSubtype(ArchArchitectureMember, supertype);
+            }
+            case ArchMastersClause: {
+                return this.isSubtype(ArchLevel0Clause, supertype) || this.isSubtype(ArchOrgExternalSystemClause, supertype);
+            }
+            case ArchProvidesClause: {
+                return this.isSubtype(ArchComponentClause, supertype) || this.isSubtype(ArchContainerClause, supertype) || this.isSubtype(ArchExternalSystemClause, supertype) || this.isSubtype(ArchOrgExternalSystemClause, supertype);
+            }
+            case ArchRequiresClause: {
+                return this.isSubtype(ArchComponentClause, supertype) || this.isSubtype(ArchContainerClause, supertype);
+            }
+            case ArchResourceDef: {
+                return this.isSubtype(ArchNodeMember, supertype);
             }
             case ArrayLiteral:
             case Expression: {
@@ -3650,10 +6150,60 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
             case PreconditionClause: {
                 return this.isSubtype(ConditionClause, supertype) || this.isSubtype(OperationClause, supertype) || this.isSubtype(SafeOperationClause, supertype);
             }
+            case PrdAssumptionDef:
+            case PrdConstraintDef:
+            case PrdEvidenceDef:
+            case PrdFeatureDef:
+            case PrdGoalDef:
+            case PrdHypothesisDef:
+            case PrdJobDef:
+            case PrdJourneyDef:
+            case PrdNonGoalsBlock:
+            case PrdOpenQuestionDef:
+            case PrdPersonaDef:
+            case PrdProblemBlock:
+            case PrdReleaseDef:
+            case PrdRiskDef:
+            case PrdScopeBlock:
+            case PrdVisionDecl: {
+                return this.isSubtype(PrdMember, supertype);
+            }
+            case PrdDependsOnDecl:
+            case PrdEntryCriteriaBlock:
+            case PrdExitCriteriaBlock:
+            case PrdIncludesBlock:
+            case PrdReleaseStatusDecl:
+            case PrdTargetDateDecl:
+            case PrdThemeDecl: {
+                return this.isSubtype(PrdReleaseMember, supertype);
+            }
+            case PrdStepActionDecl:
+            case PrdStepChannelDecl:
+            case PrdStepOrderDecl:
+            case PrdStepSystemResponseDecl:
+            case PrdStepToneDecl: {
+                return this.isSubtype(PrdStepMember, supertype);
+            }
             case RateBinary:
             case RateNot:
             case RatePredicate: {
                 return this.isSubtype(RateExpr, supertype);
+            }
+            case ReqConflictsWith:
+            case ReqDecomposedInto:
+            case ReqDependsOn:
+            case ReqSatisfiedBy: {
+                return this.isSubtype(ReqTraceClause, supertype);
+            }
+            case ReqModuleBlock:
+            case ReqPrdSourceDecl:
+            case ReqRequirementDef: {
+                return this.isSubtype(ReqSetMember, supertype);
+            }
+            case ReqRationale:
+            case ReqSourceDecl:
+            case ReqTraceClause: {
+                return this.isSubtype(ReqClause, supertype);
             }
             case ResolvesClause:
             case ReturnsClause:
@@ -3781,6 +6331,668 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                         { name: 'name' },
                         { name: 'operations' },
                         { name: 'satisfies' }
+                    ]
+                };
+            }
+            case ArchArchitectureDef: {
+                return {
+                    name: ArchArchitectureDef,
+                    properties: [
+                        { name: 'description' },
+                        { name: 'members', defaultValue: [] },
+                        { name: 'metadata' },
+                        { name: 'name' }
+                    ]
+                };
+            }
+            case ArchAreaDef: {
+                return {
+                    name: ArchAreaDef,
+                    properties: [
+                        { name: 'description' },
+                        { name: 'metadata' },
+                        { name: 'name' }
+                    ]
+                };
+            }
+            case ArchAreaRef: {
+                return {
+                    name: ArchAreaRef,
+                    properties: [
+                        { name: 'name' }
+                    ]
+                };
+            }
+            case ArchArgDecl: {
+                return {
+                    name: ArchArgDecl,
+                    properties: [
+                        { name: 'default' },
+                        { name: 'name' },
+                        { name: 'ordinal' },
+                        { name: 'requiredness' },
+                        { name: 'type' }
+                    ]
+                };
+            }
+            case ArchBooleanLiteral: {
+                return {
+                    name: ArchBooleanLiteral,
+                    properties: [
+                        { name: 'value' }
+                    ]
+                };
+            }
+            case ArchBoundedContextDecl: {
+                return {
+                    name: ArchBoundedContextDecl,
+                    properties: [
+                        { name: 'description' },
+                        { name: 'metadata' },
+                        { name: 'name' }
+                    ]
+                };
+            }
+            case ArchBoundedContextRef: {
+                return {
+                    name: ArchBoundedContextRef,
+                    properties: [
+                        { name: 'name' }
+                    ]
+                };
+            }
+            case ArchCarriedConcept: {
+                return {
+                    name: ArchCarriedConcept,
+                    properties: [
+                        { name: 'becomes' },
+                        { name: 'concept' }
+                    ]
+                };
+            }
+            case ArchChannelDef: {
+                return {
+                    name: ArchChannelDef,
+                    properties: [
+                        { name: 'broker' },
+                        { name: 'carries', defaultValue: [] },
+                        { name: 'description' },
+                        { name: 'metadata' },
+                        { name: 'name' }
+                    ]
+                };
+            }
+            case ArchCollectionType: {
+                return {
+                    name: ArchCollectionType,
+                    properties: [
+                        { name: 'elementType' },
+                        { name: 'kind' },
+                        { name: 'valueType' }
+                    ]
+                };
+            }
+            case ArchComponentDef: {
+                return {
+                    name: ArchComponentDef,
+                    properties: [
+                        { name: 'clauses', defaultValue: [] },
+                        { name: 'description' },
+                        { name: 'metadata' },
+                        { name: 'name' },
+                        { name: 'realizes' },
+                        { name: 'satisfies' }
+                    ]
+                };
+            }
+            case ArchConceptRef: {
+                return {
+                    name: ArchConceptRef,
+                    properties: [
+                        { name: 'context' },
+                        { name: 'name' }
+                    ]
+                };
+            }
+            case ArchConnectorDef: {
+                return {
+                    name: ArchConnectorDef,
+                    properties: [
+                        { name: 'description' },
+                        { name: 'from' },
+                        { name: 'metadata' },
+                        { name: 'protocol' },
+                        { name: 'style' },
+                        { name: 'to' }
+                    ]
+                };
+            }
+            case ArchConnectorRef: {
+                return {
+                    name: ArchConnectorRef,
+                    properties: [
+                        { name: 'segments', defaultValue: [] }
+                    ]
+                };
+            }
+            case ArchConsumesClause: {
+                return {
+                    name: ArchConsumesClause,
+                    properties: [
+                        { name: 'interface' }
+                    ]
+                };
+            }
+            case ArchContainerDef: {
+                return {
+                    name: ArchContainerDef,
+                    properties: [
+                        { name: 'clauses', defaultValue: [] },
+                        { name: 'description' },
+                        { name: 'metadata' },
+                        { name: 'name' },
+                        { name: 'realizes' },
+                        { name: 'satisfies' },
+                        { name: 'technology' }
+                    ]
+                };
+            }
+            case ArchDependencyDef: {
+                return {
+                    name: ArchDependencyDef,
+                    properties: [
+                        { name: 'criticality' },
+                        { name: 'description' },
+                        { name: 'downstream' },
+                        { name: 'flows', defaultValue: [] },
+                        { name: 'metadata' },
+                        { name: 'patterns', defaultValue: [] },
+                        { name: 'upstream' }
+                    ]
+                };
+            }
+            case ArchDeployClause: {
+                return {
+                    name: ArchDeployClause,
+                    properties: [
+                        { name: 'containers', defaultValue: [] },
+                        { name: 'replicas' }
+                    ]
+                };
+            }
+            case ArchDetailedInDecl: {
+                return {
+                    name: ArchDetailedInDecl,
+                    properties: [
+                        { name: 'path' }
+                    ]
+                };
+            }
+            case ArchDomainSourceDecl: {
+                return {
+                    name: ArchDomainSourceDecl,
+                    properties: [
+                        { name: 'path' }
+                    ]
+                };
+            }
+            case ArchEnumDef: {
+                return {
+                    name: ArchEnumDef,
+                    properties: [
+                        { name: 'description' },
+                        { name: 'members', defaultValue: [] },
+                        { name: 'metadata' },
+                        { name: 'name' }
+                    ]
+                };
+            }
+            case ArchEnumMember: {
+                return {
+                    name: ArchEnumMember,
+                    properties: [
+                        { name: 'name' },
+                        { name: 'value' }
+                    ]
+                };
+            }
+            case ArchEnvironmentDef: {
+                return {
+                    name: ArchEnvironmentDef,
+                    properties: [
+                        { name: 'description' },
+                        { name: 'members', defaultValue: [] },
+                        { name: 'metadata' },
+                        { name: 'name' }
+                    ]
+                };
+            }
+            case ArchExceptionDef: {
+                return {
+                    name: ArchExceptionDef,
+                    properties: [
+                        { name: 'description' },
+                        { name: 'fields', defaultValue: [] },
+                        { name: 'metadata' },
+                        { name: 'name' }
+                    ]
+                };
+            }
+            case ArchExternalSystemDef: {
+                return {
+                    name: ArchExternalSystemDef,
+                    properties: [
+                        { name: 'clauses', defaultValue: [] },
+                        { name: 'description' },
+                        { name: 'metadata' },
+                        { name: 'name' },
+                        { name: 'realizes' }
+                    ]
+                };
+            }
+            case ArchFieldDef: {
+                return {
+                    name: ArchFieldDef,
+                    properties: [
+                        { name: 'default' },
+                        { name: 'description' },
+                        { name: 'name' },
+                        { name: 'ordinal' },
+                        { name: 'requiredness' },
+                        { name: 'type' }
+                    ]
+                };
+            }
+            case ArchFile: {
+                return {
+                    name: ArchFile,
+                    properties: [
+                        { name: 'roots', defaultValue: [] }
+                    ]
+                };
+            }
+            case ArchFlowConcern: {
+                return {
+                    name: ArchFlowConcern,
+                    properties: [
+                        { name: 'number' }
+                    ]
+                };
+            }
+            case ArchFlowDef: {
+                return {
+                    name: ArchFlowDef,
+                    properties: [
+                        { name: 'carries', defaultValue: [] },
+                        { name: 'description' },
+                        { name: 'label' },
+                        { name: 'mechanism' },
+                        { name: 'metadata' },
+                        { name: 'number' },
+                        { name: 'phases', defaultValue: [] },
+                        { name: 'to' }
+                    ]
+                };
+            }
+            case ArchHandlesClause: {
+                return {
+                    name: ArchHandlesClause,
+                    properties: [
+                        { name: 'concepts', defaultValue: [] }
+                    ]
+                };
+            }
+            case ArchHotspotDef: {
+                return {
+                    name: ArchHotspotDef,
+                    properties: [
+                        { name: 'concerns', defaultValue: [] },
+                        { name: 'description' },
+                        { name: 'metadata' },
+                        { name: 'name' }
+                    ]
+                };
+            }
+            case ArchImportDecl: {
+                return {
+                    name: ArchImportDecl,
+                    properties: [
+                        { name: 'event', defaultValue: false },
+                        { name: 'name' },
+                        { name: 'valueType', defaultValue: false }
+                    ]
+                };
+            }
+            case ArchInterfaceDef: {
+                return {
+                    name: ArchInterfaceDef,
+                    properties: [
+                        { name: 'description' },
+                        { name: 'metadata' },
+                        { name: 'name' },
+                        { name: 'operations', defaultValue: [] },
+                        { name: 'realizes' },
+                        { name: 'satisfies' }
+                    ]
+                };
+            }
+            case ArchMastersClause: {
+                return {
+                    name: ArchMastersClause,
+                    properties: [
+                        { name: 'concepts', defaultValue: [] }
+                    ]
+                };
+            }
+            case ArchMechanism: {
+                return {
+                    name: ArchMechanism,
+                    properties: [
+                        { name: 'medium' },
+                        { name: 'mode' }
+                    ]
+                };
+            }
+            case ArchMetadataBlock: {
+                return {
+                    name: ArchMetadataBlock,
+                    properties: [
+                        { name: 'entries', defaultValue: [] }
+                    ]
+                };
+            }
+            case ArchMetadataEntry: {
+                return {
+                    name: ArchMetadataEntry,
+                    properties: [
+                        { name: 'key' },
+                        { name: 'value' }
+                    ]
+                };
+            }
+            case ArchNamedType: {
+                return {
+                    name: ArchNamedType,
+                    properties: [
+                        { name: 'typeName' }
+                    ]
+                };
+            }
+            case ArchNodeAttribute: {
+                return {
+                    name: ArchNodeAttribute,
+                    properties: [
+                        { name: 'kind' },
+                        { name: 'value' }
+                    ]
+                };
+            }
+            case ArchNodeDef: {
+                return {
+                    name: ArchNodeDef,
+                    properties: [
+                        { name: 'attributes', defaultValue: [] },
+                        { name: 'description' },
+                        { name: 'members', defaultValue: [] },
+                        { name: 'metadata' },
+                        { name: 'name' }
+                    ]
+                };
+            }
+            case ArchNullLiteral: {
+                return {
+                    name: ArchNullLiteral,
+                    properties: [
+                        { name: 'value' }
+                    ]
+                };
+            }
+            case ArchNumberLiteral: {
+                return {
+                    name: ArchNumberLiteral,
+                    properties: [
+                        { name: 'value' }
+                    ]
+                };
+            }
+            case ArchOperationDef: {
+                return {
+                    name: ArchOperationDef,
+                    properties: [
+                        { name: 'args', defaultValue: [] },
+                        { name: 'description' },
+                        { name: 'metadata' },
+                        { name: 'name' },
+                        { name: 'returnType' },
+                        { name: 'style' },
+                        { name: 'throws', defaultValue: [] },
+                        { name: 'void', defaultValue: false }
+                    ]
+                };
+            }
+            case ArchOrganizationDef: {
+                return {
+                    name: ArchOrganizationDef,
+                    properties: [
+                        { name: 'description' },
+                        { name: 'members', defaultValue: [] },
+                        { name: 'metadata' },
+                        { name: 'name' }
+                    ]
+                };
+            }
+            case ArchOrgExternalSystemDef: {
+                return {
+                    name: ArchOrgExternalSystemDef,
+                    properties: [
+                        { name: 'clauses', defaultValue: [] },
+                        { name: 'description' },
+                        { name: 'metadata' },
+                        { name: 'name' },
+                        { name: 'realizes' }
+                    ]
+                };
+            }
+            case ArchOrgSystemDef: {
+                return {
+                    name: ArchOrgSystemDef,
+                    properties: [
+                        { name: 'description' },
+                        { name: 'level0', defaultValue: [] },
+                        { name: 'members', defaultValue: [] },
+                        { name: 'metadata' },
+                        { name: 'name' },
+                        { name: 'realizes' },
+                        { name: 'satisfies' },
+                        { name: 'technology' }
+                    ]
+                };
+            }
+            case ArchPersonDef: {
+                return {
+                    name: ArchPersonDef,
+                    properties: [
+                        { name: 'description' },
+                        { name: 'metadata' },
+                        { name: 'name' }
+                    ]
+                };
+            }
+            case ArchPhaseDef: {
+                return {
+                    name: ArchPhaseDef,
+                    properties: [
+                        { name: 'description' },
+                        { name: 'metadata' },
+                        { name: 'name' }
+                    ]
+                };
+            }
+            case ArchPhasedMechanism: {
+                return {
+                    name: ArchPhasedMechanism,
+                    properties: [
+                        { name: 'mechanism' },
+                        { name: 'phase' }
+                    ]
+                };
+            }
+            case ArchPrimitiveType: {
+                return {
+                    name: ArchPrimitiveType,
+                    properties: [
+                        { name: 'value' }
+                    ]
+                };
+            }
+            case ArchProvidesClause: {
+                return {
+                    name: ArchProvidesClause,
+                    properties: [
+                        { name: 'interface' }
+                    ]
+                };
+            }
+            case ArchPublishesClause: {
+                return {
+                    name: ArchPublishesClause,
+                    properties: [
+                        { name: 'channel' },
+                        { name: 'message' }
+                    ]
+                };
+            }
+            case ArchRealizesDecl: {
+                return {
+                    name: ArchRealizesDecl,
+                    properties: [
+                        { name: 'refs', defaultValue: [] }
+                    ]
+                };
+            }
+            case ArchRealizesRef: {
+                return {
+                    name: ArchRealizesRef,
+                    properties: [
+                        { name: 'kind' },
+                        { name: 'name' }
+                    ]
+                };
+            }
+            case ArchRequirementsSourceDecl: {
+                return {
+                    name: ArchRequirementsSourceDecl,
+                    properties: [
+                        { name: 'path' }
+                    ]
+                };
+            }
+            case ArchRequiresClause: {
+                return {
+                    name: ArchRequiresClause,
+                    properties: [
+                        { name: 'interface' }
+                    ]
+                };
+            }
+            case ArchResourceDef: {
+                return {
+                    name: ArchResourceDef,
+                    properties: [
+                        { name: 'description' },
+                        { name: 'instantiates' },
+                        { name: 'metadata' },
+                        { name: 'name' },
+                        { name: 'stores', defaultValue: [] },
+                        { name: 'technology' },
+                        { name: 'tenancy' }
+                    ]
+                };
+            }
+            case ArchStringLiteral: {
+                return {
+                    name: ArchStringLiteral,
+                    properties: [
+                        { name: 'value' }
+                    ]
+                };
+            }
+            case ArchStructDef: {
+                return {
+                    name: ArchStructDef,
+                    properties: [
+                        { name: 'description' },
+                        { name: 'fields', defaultValue: [] },
+                        { name: 'metadata' },
+                        { name: 'name' },
+                        { name: 'satisfies' }
+                    ]
+                };
+            }
+            case ArchSubscribesClause: {
+                return {
+                    name: ArchSubscribesClause,
+                    properties: [
+                        { name: 'channel' }
+                    ]
+                };
+            }
+            case ArchSystemDef: {
+                return {
+                    name: ArchSystemDef,
+                    properties: [
+                        { name: 'description' },
+                        { name: 'members', defaultValue: [] },
+                        { name: 'metadata' },
+                        { name: 'name' },
+                        { name: 'realizes' },
+                        { name: 'satisfies' }
+                    ]
+                };
+            }
+            case ArchTechnologyDecl: {
+                return {
+                    name: ArchTechnologyDecl,
+                    properties: [
+                        { name: 'value' }
+                    ]
+                };
+            }
+            case ArchTypedefDef: {
+                return {
+                    name: ArchTypedefDef,
+                    properties: [
+                        { name: 'name' },
+                        { name: 'type' }
+                    ]
+                };
+            }
+            case ArchUnionDef: {
+                return {
+                    name: ArchUnionDef,
+                    properties: [
+                        { name: 'description' },
+                        { name: 'members', defaultValue: [] },
+                        { name: 'metadata' },
+                        { name: 'name' }
+                    ]
+                };
+            }
+            case ArchUnionMember: {
+                return {
+                    name: ArchUnionMember,
+                    properties: [
+                        { name: 'name' },
+                        { name: 'ordinal' },
+                        { name: 'type' }
+                    ]
+                };
+            }
+            case ArchUsedByClause: {
+                return {
+                    name: ArchUsedByClause,
+                    properties: [
+                        { name: 'persons', defaultValue: [] }
                     ]
                 };
             }
@@ -3949,6 +7161,7 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     name: ContainsExpr,
                     properties: [
                         { name: 'left' },
+                        { name: 'negated', defaultValue: false },
                         { name: 'target' }
                     ]
                 };
@@ -4850,6 +8063,409 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     ]
                 };
             }
+            case PrdAcceptanceCriterion: {
+                return {
+                    name: PrdAcceptanceCriterion,
+                    properties: [
+                        { name: 'id' },
+                        { name: 'text' }
+                    ]
+                };
+            }
+            case PrdAssumptionDef: {
+                return {
+                    name: PrdAssumptionDef,
+                    properties: [
+                        { name: 'impactIfWrong' },
+                        { name: 'name' },
+                        { name: 'statement' },
+                        { name: 'status' },
+                        { name: 'underpins', defaultValue: [] },
+                        { name: 'validationPlan' }
+                    ]
+                };
+            }
+            case PrdConstraintDef: {
+                return {
+                    name: PrdConstraintDef,
+                    properties: [
+                        { name: 'constrains', defaultValue: [] },
+                        { name: 'name' },
+                        { name: 'source' },
+                        { name: 'statement' }
+                    ]
+                };
+            }
+            case PrdDependsOnDecl: {
+                return {
+                    name: PrdDependsOnDecl,
+                    properties: [
+                        { name: 'items', defaultValue: [] }
+                    ]
+                };
+            }
+            case PrdDesignReference: {
+                return {
+                    name: PrdDesignReference,
+                    properties: [
+                        { name: 'name' },
+                        { name: 'url' }
+                    ]
+                };
+            }
+            case PrdDesignReferencesBlock: {
+                return {
+                    name: PrdDesignReferencesBlock,
+                    properties: [
+                        { name: 'references', defaultValue: [] }
+                    ]
+                };
+            }
+            case PrdDesiredOutcome: {
+                return {
+                    name: PrdDesiredOutcome,
+                    properties: [
+                        { name: 'currentSatisfaction' },
+                        { name: 'importance' },
+                        { name: 'statement' }
+                    ]
+                };
+            }
+            case PrdDesiredOutcomesBlock: {
+                return {
+                    name: PrdDesiredOutcomesBlock,
+                    properties: [
+                        { name: 'outcomes', defaultValue: [] }
+                    ]
+                };
+            }
+            case PrdEntryCriteriaBlock: {
+                return {
+                    name: PrdEntryCriteriaBlock,
+                    properties: [
+                        { name: 'items', defaultValue: [] }
+                    ]
+                };
+            }
+            case PrdEvidenceDef: {
+                return {
+                    name: PrdEvidenceDef,
+                    properties: [
+                        { name: 'confidence' },
+                        { name: 'date' },
+                        { name: 'name' },
+                        { name: 'sourceReference' },
+                        { name: 'summary' },
+                        { name: 'supports' },
+                        { name: 'type' }
+                    ]
+                };
+            }
+            case PrdExitCriteriaBlock: {
+                return {
+                    name: PrdExitCriteriaBlock,
+                    properties: [
+                        { name: 'items', defaultValue: [] }
+                    ]
+                };
+            }
+            case PrdFeatureDef: {
+                return {
+                    name: PrdFeatureDef,
+                    properties: [
+                        { name: 'addresses', defaultValue: [] },
+                        { name: 'advances', defaultValue: [] },
+                        { name: 'designReferences' },
+                        { name: 'id' },
+                        { name: 'name' },
+                        { name: 'nonGoals' },
+                        { name: 'persona' },
+                        { name: 'priority' },
+                        { name: 'status' },
+                        { name: 'stories' },
+                        { name: 'summary' },
+                        { name: 'testedBy' },
+                        { name: 'valueProposition' }
+                    ]
+                };
+            }
+            case PrdFile: {
+                return {
+                    name: PrdFile,
+                    properties: [
+                        { name: 'products', defaultValue: [] }
+                    ]
+                };
+            }
+            case PrdGoalDef: {
+                return {
+                    name: PrdGoalDef,
+                    properties: [
+                        { name: 'horizon' },
+                        { name: 'metrics', defaultValue: [] },
+                        { name: 'name' },
+                        { name: 'owner' },
+                        { name: 'statement' }
+                    ]
+                };
+            }
+            case PrdHypothesisDef: {
+                return {
+                    name: PrdHypothesisDef,
+                    properties: [
+                        { name: 'expectedOutcome' },
+                        { name: 'intervention' },
+                        { name: 'mechanism' },
+                        { name: 'name' },
+                        { name: 'predicts' },
+                        { name: 'proposes' },
+                        { name: 'status' },
+                        { name: 'supportedBy', defaultValue: [] },
+                        { name: 'validationMethod' }
+                    ]
+                };
+            }
+            case PrdIncludesBlock: {
+                return {
+                    name: PrdIncludesBlock,
+                    properties: [
+                        { name: 'items', defaultValue: [] }
+                    ]
+                };
+            }
+            case PrdJobDef: {
+                return {
+                    name: PrdJobDef,
+                    properties: [
+                        { name: 'importance' },
+                        { name: 'name' },
+                        { name: 'outcomes' },
+                        { name: 'persona' },
+                        { name: 'relatedTo', defaultValue: [] },
+                        { name: 'satisfaction' },
+                        { name: 'statement' },
+                        { name: 'type' }
+                    ]
+                };
+            }
+            case PrdJourneyDef: {
+                return {
+                    name: PrdJourneyDef,
+                    properties: [
+                        { name: 'designReferences' },
+                        { name: 'name' },
+                        { name: 'outcome' },
+                        { name: 'persona' },
+                        { name: 'steps' },
+                        { name: 'trigger' }
+                    ]
+                };
+            }
+            case PrdMetricBlock: {
+                return {
+                    name: PrdMetricBlock,
+                    properties: [
+                        { name: 'baseline' },
+                        { name: 'indicator' },
+                        { name: 'measurement' },
+                        { name: 'target' }
+                    ]
+                };
+            }
+            case PrdNonGoalsBlock: {
+                return {
+                    name: PrdNonGoalsBlock,
+                    properties: [
+                        { name: 'items', defaultValue: [] }
+                    ]
+                };
+            }
+            case PrdOpenQuestionDef: {
+                return {
+                    name: PrdOpenQuestionDef,
+                    properties: [
+                        { name: 'blocks', defaultValue: [] },
+                        { name: 'context' },
+                        { name: 'deadline' },
+                        { name: 'name' },
+                        { name: 'owner' },
+                        { name: 'question' },
+                        { name: 'resolution' },
+                        { name: 'status' }
+                    ]
+                };
+            }
+            case PrdPersonaDef: {
+                return {
+                    name: PrdPersonaDef,
+                    properties: [
+                        { name: 'context' },
+                        { name: 'frustrations', defaultValue: [] },
+                        { name: 'goals', defaultValue: [] },
+                        { name: 'name' },
+                        { name: 'role' },
+                        { name: 'weight' }
+                    ]
+                };
+            }
+            case PrdProblemBlock: {
+                return {
+                    name: PrdProblemBlock,
+                    properties: [
+                        { name: 'complication' },
+                        { name: 'question' },
+                        { name: 'situation' }
+                    ]
+                };
+            }
+            case PrdProductDef: {
+                return {
+                    name: PrdProductDef,
+                    properties: [
+                        { name: 'members', defaultValue: [] },
+                        { name: 'name' }
+                    ]
+                };
+            }
+            case PrdReleaseDef: {
+                return {
+                    name: PrdReleaseDef,
+                    properties: [
+                        { name: 'members', defaultValue: [] },
+                        { name: 'name' }
+                    ]
+                };
+            }
+            case PrdReleaseStatusDecl: {
+                return {
+                    name: PrdReleaseStatusDecl,
+                    properties: [
+                        { name: 'value' }
+                    ]
+                };
+            }
+            case PrdRiskDef: {
+                return {
+                    name: PrdRiskDef,
+                    properties: [
+                        { name: 'impact' },
+                        { name: 'likelihood' },
+                        { name: 'mitigation' },
+                        { name: 'name' },
+                        { name: 'owner' },
+                        { name: 'statement' },
+                        { name: 'threatens', defaultValue: [] }
+                    ]
+                };
+            }
+            case PrdScopeBlock: {
+                return {
+                    name: PrdScopeBlock,
+                    properties: [
+                        { name: 'items', defaultValue: [] }
+                    ]
+                };
+            }
+            case PrdStepActionDecl: {
+                return {
+                    name: PrdStepActionDecl,
+                    properties: [
+                        { name: 'value' }
+                    ]
+                };
+            }
+            case PrdStepChannelDecl: {
+                return {
+                    name: PrdStepChannelDecl,
+                    properties: [
+                        { name: 'value' }
+                    ]
+                };
+            }
+            case PrdStepDef: {
+                return {
+                    name: PrdStepDef,
+                    properties: [
+                        { name: 'members', defaultValue: [] },
+                        { name: 'name' },
+                        { name: 'number' }
+                    ]
+                };
+            }
+            case PrdStepOrderDecl: {
+                return {
+                    name: PrdStepOrderDecl,
+                    properties: [
+                        { name: 'value' }
+                    ]
+                };
+            }
+            case PrdStepsBlock: {
+                return {
+                    name: PrdStepsBlock,
+                    properties: [
+                        { name: 'steps', defaultValue: [] }
+                    ]
+                };
+            }
+            case PrdStepSystemResponseDecl: {
+                return {
+                    name: PrdStepSystemResponseDecl,
+                    properties: [
+                        { name: 'value' }
+                    ]
+                };
+            }
+            case PrdStepToneDecl: {
+                return {
+                    name: PrdStepToneDecl,
+                    properties: [
+                        { name: 'value' }
+                    ]
+                };
+            }
+            case PrdStoriesBlock: {
+                return {
+                    name: PrdStoriesBlock,
+                    properties: [
+                        { name: 'stories', defaultValue: [] }
+                    ]
+                };
+            }
+            case PrdStoryDef: {
+                return {
+                    name: PrdStoryDef,
+                    properties: [
+                        { name: 'criteria', defaultValue: [] },
+                        { name: 'id' },
+                        { name: 'title' }
+                    ]
+                };
+            }
+            case PrdTargetDateDecl: {
+                return {
+                    name: PrdTargetDateDecl,
+                    properties: [
+                        { name: 'value' }
+                    ]
+                };
+            }
+            case PrdThemeDecl: {
+                return {
+                    name: PrdThemeDecl,
+                    properties: [
+                        { name: 'value' }
+                    ]
+                };
+            }
+            case PrdVisionDecl: {
+                return {
+                    name: PrdVisionDecl,
+                    properties: [
+                        { name: 'text' }
+                    ]
+                };
+            }
             case PreconditionClause: {
                 return {
                     name: PreconditionClause,
@@ -5087,6 +8703,121 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                         { name: 'ops', defaultValue: [] },
                         { name: 'readOnly', defaultValue: false },
                         { name: 'satisfies' }
+                    ]
+                };
+            }
+            case ReqConflictsWith: {
+                return {
+                    name: ReqConflictsWith,
+                    properties: [
+                        { name: 'ids', defaultValue: [] }
+                    ]
+                };
+            }
+            case ReqDecomposedInto: {
+                return {
+                    name: ReqDecomposedInto,
+                    properties: [
+                        { name: 'ids', defaultValue: [] }
+                    ]
+                };
+            }
+            case ReqDependsOn: {
+                return {
+                    name: ReqDependsOn,
+                    properties: [
+                        { name: 'ids', defaultValue: [] }
+                    ]
+                };
+            }
+            case ReqDomainRef: {
+                return {
+                    name: ReqDomainRef,
+                    properties: [
+                        { name: 'head' },
+                        { name: 'label' },
+                        { name: 'member' }
+                    ]
+                };
+            }
+            case ReqFile: {
+                return {
+                    name: ReqFile,
+                    properties: [
+                        { name: 'sets', defaultValue: [] }
+                    ]
+                };
+            }
+            case ReqModuleBlock: {
+                return {
+                    name: ReqModuleBlock,
+                    properties: [
+                        { name: 'name' },
+                        { name: 'requirements', defaultValue: [] }
+                    ]
+                };
+            }
+            case ReqPrdSourceDecl: {
+                return {
+                    name: ReqPrdSourceDecl,
+                    properties: [
+                        { name: 'path' }
+                    ]
+                };
+            }
+            case ReqRationale: {
+                return {
+                    name: ReqRationale,
+                    properties: [
+                        { name: 'text' }
+                    ]
+                };
+            }
+            case ReqRequirementDef: {
+                return {
+                    name: ReqRequirementDef,
+                    properties: [
+                        { name: 'clauses', defaultValue: [] },
+                        { name: 'id' },
+                        { name: 'name' },
+                        { name: 'pattern' },
+                        { name: 'priority' },
+                        { name: 'statement' }
+                    ]
+                };
+            }
+            case ReqSatisfactionLink: {
+                return {
+                    name: ReqSatisfactionLink,
+                    properties: [
+                        { name: 'role' },
+                        { name: 'target' }
+                    ]
+                };
+            }
+            case ReqSatisfiedBy: {
+                return {
+                    name: ReqSatisfiedBy,
+                    properties: [
+                        { name: 'links', defaultValue: [] }
+                    ]
+                };
+            }
+            case ReqSetDef: {
+                return {
+                    name: ReqSetDef,
+                    properties: [
+                        { name: 'members', defaultValue: [] },
+                        { name: 'name' },
+                        { name: 'scope' }
+                    ]
+                };
+            }
+            case ReqSourceDecl: {
+                return {
+                    name: ReqSourceDecl,
+                    properties: [
+                        { name: 'reference' }
                     ]
                 };
             }

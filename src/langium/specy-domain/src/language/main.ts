@@ -11,7 +11,7 @@
 import { startLanguageServer } from 'langium/lsp';
 import { NodeFileSystem } from 'langium/node';
 import { ProposedFeatures, createConnection } from 'vscode-languageserver/node.js';
-import { createSpecyLspServices } from './specy-synth-module.js';
+import { createSpecyLspServices } from './specy-module.js';
 
 // The transport is chosen from argv by vscode-languageserver: --stdio, --node-ipc,
 // or --socket. Nothing here needs to care which one the editor picked.

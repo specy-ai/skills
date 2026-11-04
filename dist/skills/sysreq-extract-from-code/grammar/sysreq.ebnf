@@ -21,6 +21,7 @@ reqFile          = { comment | requirementSetDef } ;
 requirementSetDef = "requirements" , stringLiteral , "scoped-to" , typeName , "{" ,
                   { comment
                   | prdSourceDecl
+                  | moduleBlock
                   | requirementDef
                   } , "}" ;
 
@@ -32,27 +33,35 @@ requirementSetDef = "requirements" , stringLiteral , "scoped-to" , typeName , "{
 prdSourceDecl    = "prd-source" , stringLiteral ;
 
 // -----------------------------------------------------------------------------
+// Module — an optional grouping of requirements within a set (named after the
+// domain module the requirements will fall into). Modules and loose
+// requirements mix in any order.
+// -----------------------------------------------------------------------------
+
+moduleBlock      = "module" , stringLiteral , "{" , { comment | requirementDef } , "}" ;
+
+// -----------------------------------------------------------------------------
 // Requirement — a named EARS statement
 //
 // Structure:
 //   REQ-ID "name" : pattern
-//     :: "rationale"
+//     [:: "rationale" | source "reference" | traceability clause]   (any order)
 //     "EARS statement"
 //     priority <level>
-//     [source "reference"]
-//     [depends-on REQ-ID, ...]
-//     [conflicts-with REQ-ID, ...]
-//     [decomposed-into { REQ-IDs }]
+//     [traceability clause]                                           (any order)
+//
+// The rationale and the source are written before the statement; the
+// traceability clauses (depends-on, conflicts-with, decomposed-into,
+// satisfied-by) may sit on either side of the statement, each at most once.
 // -----------------------------------------------------------------------------
 
 requirementDef   = requirementId , stringLiteral , ":" , earsPattern ,
-                 [ rationale ] ,
+                 { rationale | sourceDecl | traceClause } ,
                  earsStatement ,
                  "priority" , moscowPriority ,
-                 [ sourceDecl ] ,
-                 [ dependsOnDecl ] ,
-                 [ conflictsWithDecl ] ,
-                 [ decomposedIntoBlock ] ;
+                 { traceClause } ;
+
+traceClause      = dependsOnDecl | conflictsWithDecl | decomposedIntoBlock | satisfiedByBlock ;
 
 // -----------------------------------------------------------------------------
 // Requirement ID — stable identifier with context prefix
@@ -145,6 +154,27 @@ conflictsWithDecl = "conflicts-with" , requirementId , { "," , requirementId } ;
 decomposedIntoBlock = "decomposed-into" , "{" ,
                     requirementId , { requirementId } ,
                     "}" ;
+
+// -----------------------------------------------------------------------------
+// Satisfied-by — traceability links to the domain elements that satisfy the
+// requirement, by role (see SYSTEM-REQ-METAMODEL.md, "Satisfaction roles"):
+//   implemented-by         an operation carries out the behaviour
+//   structured-by          a type's fields / identity give the requirement its shape
+//   enforced-by            an invariant or precondition makes it hold
+//   detected-by            an event or reconciliation detects the unwanted case
+//   quality-constrained-by a construct carries the NFR
+//   satisfied-by-infrastructure   met below the domain layer; names no element
+// -----------------------------------------------------------------------------
+
+satisfiedByBlock = "satisfied-by" , "{" , { comment | satisfactionLink } , "}" ;
+
+satisfactionLink = ( linkRole , domainRef ) | "satisfied-by-infrastructure" ;
+
+linkRole         = "implemented-by" | "structured-by" | "enforced-by"
+                 | "detected-by" | "quality-constrained-by" ;
+
+// A domain element: a type, one of its fields, or one of its operations by label.
+domainRef        = ( typeName | identifier ) , [ "." , ( identifier | stringLiteral ) ] ;
 
 // -----------------------------------------------------------------------------
 // Literals and identifiers

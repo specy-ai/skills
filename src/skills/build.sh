@@ -230,6 +230,16 @@ copy_runtime_files() {
   done
   cp "$REPO_ROOT/src/metamodels/SYNTH-METAMODEL.md" "$dbf_refs/SYNTH-METAMODEL.md"
   echo "  domain-build-fixtures/: 4 heuristics + 1 reference copied"
+
+  # model-formats: the format contract + the JSON Schemas of the five documents
+  local mf_refs="$SKILLS_OUT/model-formats/references"
+  local mf_schemas="$mf_refs/schemas"
+  mkdir -p "$mf_schemas"
+  cp "$REPO_ROOT/src/metamodels/MODEL-FORMATS.md" "$mf_refs/MODEL-FORMATS.md"
+  for f in domain-model prd sysreq architecture synth-scenario; do
+    cp "$REPO_ROOT/src/schemas/$f.schema.json" "$mf_schemas/$f.schema.json"
+  done
+  echo "  model-formats/: 1 reference + 5 schemas copied"
 }
 
 # -----------------------------------------------------------------------------
@@ -269,6 +279,7 @@ else
   build_skill domain-build-fixtures
   # Auxiliary skills
   build_skill domain-dialogue
+  build_skill model-formats
 fi
 
 copy_runtime_files

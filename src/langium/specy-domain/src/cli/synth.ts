@@ -18,7 +18,7 @@ import { NodeFileSystem } from 'langium/node';
 import { URI, type LangiumDocument } from 'langium';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createSpecyServices } from '../language/specy-synth-module.js';
+import { createSpecyServices } from '../language/specy-module.js';
 import { normalizeScenario } from './synth-model.js';
 import { PARSER_VERSION } from './version.js';
 import type { SynthFile } from '../generated/ast.js';

@@ -14,7 +14,7 @@
  * them into the file `domain-source` names.
  */
 import { EmptyFileSystem, URI, type LangiumDocument } from 'langium';
-import { createSpecyServices } from './language/specy-synth-module.js';
+import { createSpecyServices } from './language/specy-module.js';
 import { normalizeDomain, type DomainModel } from './cli/domain-model.js';
 import { normalizeScenario, type ScenarioJson } from './cli/synth-model.js';
 import type { DomainFile, SynthFile } from './generated/ast.js';
@@ -121,3 +121,10 @@ export async function parseSynth(synthText: string, domainText: string, fileName
 }
 
 export { PARSER_VERSION as VERSION } from './cli/version.js';
+
+// The format layer: any encoding of any Specy model to any other, on the same
+// services. `convert({ text, fileName, to: 'markdown' })`, `read(...)`,
+// `write(codec, model, 'yaml')`; a scenario's domain comes through
+// `companions: [{ fileName: 'orders.domain', text }]`.
+export { convert, read, write, detect, codecFor, formatDiagnostics, LANGUAGES, FORMATS } from './formats/index.js';
+export type { ConvertRequest, ConvertResult, ReadResult, Diagnostic, Format, Language, ModelCodec } from './formats/index.js';

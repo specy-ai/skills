@@ -141,7 +141,7 @@ goalDef          = "goal" , stringLiteral , "{" ,
                  "statement" , stringLiteral ,
                  "horizon" , goalHorizon ,
                  "owner" , stringLiteral ,
-                 [ metricBlock ] ,
+                 { metricBlock } ,
                  "}" ;
 
 goalHorizon      = "short-term" | "mid-term" | "long-term" ;
@@ -261,13 +261,16 @@ journeyDef       = "journey" , stringLiteral , "for" , stringLiteral , "{" ,
 
 stepsBlock       = "steps" , "{" , stepDef , { stepDef } , "}" ;
 
-stepDef          = "step" , stringLiteral , "{" ,
-                 "action" , stringLiteral ,
-                 [ "system-response" , stringLiteral ] ,
-                 "channel" , channelType ,
-                 [ "emotional-tone" , emotionalTone ] ,
-                 "order" , integer ,
-                 "}" ;
+// A step is named by a string (which doubles as its action when no `action`
+// clause follows) or by its number; the `step` keyword is optional; the clauses
+// come in any order, each at most once (a validation rule).
+stepDef          = [ "step" ] , ( stringLiteral | integer ) , "{" , { stepClause } , "}" ;
+
+stepClause       = ( "action" , stringLiteral )
+                 | ( "system-response" , stringLiteral )
+                 | ( "channel" , channelType )
+                 | ( "emotional-tone" , emotionalTone )
+                 | ( "order" , integer ) ;
 
 channelType      = "app" | "web" | "sms" | "email"
                  | "physical" | "backoffice" | "external" ;
@@ -341,15 +344,17 @@ questionStatus   = "open" | "investigating" | "resolved" | "deferred" ;
 // Release
 // -----------------------------------------------------------------------------
 
-releaseDef       = "release" , stringLiteral , "{" ,
-                 "target-date" , stringLiteral ,
-                 "theme" , stringLiteral ,
-                 "status" , releaseStatus ,
-                 [ "depends-on" , stringLiteral , { "," , stringLiteral } ] ,
-                 [ "includes" , "{" , stringLiteral , { stringLiteral } , "}" ] ,
-                 [ "entry-criteria" , "{" , stringLiteral , { stringLiteral } , "}" ] ,
-                 [ "exit-criteria" , "{" , stringLiteral , { stringLiteral } , "}" ] ,
-                 "}" ;
+// The clauses of a release come in any order, each at most once (a validation
+// rule); target-date, theme and status are expected in practice.
+releaseDef       = "release" , stringLiteral , "{" , { releaseClause } , "}" ;
+
+releaseClause    = ( "target-date" , stringLiteral )
+                 | ( "theme" , stringLiteral )
+                 | ( "status" , releaseStatus )
+                 | ( "depends-on" , stringLiteral , { "," , stringLiteral } )
+                 | ( "includes" , "{" , stringLiteral , { stringLiteral } , "}" )
+                 | ( "entry-criteria" , "{" , stringLiteral , { stringLiteral } , "}" )
+                 | ( "exit-criteria" , "{" , stringLiteral , { stringLiteral } , "}" ) ;
 
 releaseStatus    = "planned" | "in-progress" | "shipped" | "cancelled" ;
 
@@ -381,7 +386,9 @@ camelCaseId      = lowerLetter , { letter | digit } ;
 // Comments
 // -----------------------------------------------------------------------------
 
-comment          = "//" , { character } , newline ;
+comment          = ( "//" , { character } , newline )
+                 | ( "#" , { character } , newline )
+                 | ( "/*" , { character | newline } , "*/" ) ;
 
 // -----------------------------------------------------------------------------
 // Character classes
