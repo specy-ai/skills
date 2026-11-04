@@ -269,6 +269,10 @@ data, never by editing rows.
 - The assumptions you made.
 - The warnings, in plain words: what the certificate does not cover.
 - When the scenario cites requirements, the `trace` summary.
+- When the project's unit or property tests also need single individuals: the same scenario drives
+  `synthy codegen <domain> <scenario> --to fast-check --dest <dir>`, one fast-check arbitrary per
+  value type and entity, drawing each field with the model's kinds and the scenario's mixes and
+  shares. `domain-build-fixtures` places the emitted module next to the fixtures.
 
 ---
 

@@ -101,6 +101,14 @@ Exports: `--to files` (Java, TypeScript; `--format csv|json`), `--to edn` (Cloju
 `--to postgres` (the CSV files plus `postgres.sql`: `CREATE TABLE` and `INSERT`s, for integration tests
 against PostgreSQL, as a Testcontainers init script or through `psql -f`), `--to parquet` (the tables as
 Parquet). The certificate's questions stay DuckDB SQL whatever the target: run them on the CSVs.
+
+**Generators, not only data.** When a TypeScript project's unit or property tests need one valid individual
+rather than a population, `synthy codegen <domain> [<scenario>] --to fast-check --dest test/generators`
+emits one fast-check arbitrary, one type and one check per value type and entity (`arbOrder()`,
+`checkOrder()`), with the model's constraints, kinds (valid IBANs, emails of one persona), the scenario's
+weights, and the derivations and invariants an individual holds on its own; its README says what it does
+not carry (lifecycles, rules across rows, population mixes: those stay synthy's data). The emitted code
+depends on fast-check alone; commit it next to the fixtures and regenerate it with them.
 A new export removes the files an earlier one wrote and this one does not (a table or a question that
 no longer exists); it leaves every other file alone.
 
