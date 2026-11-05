@@ -585,13 +585,15 @@ Anchors and aliases are accepted and expanded. Comments are allowed and dropped.
 
 The schema gives JSON and YAML files completion, hover text from the metamodel, and errors on unknown keys and wrong types, in any editor that reads JSON Schema. Name resolution against the `.domain` stays with `.synth` in the editor and with `synthy check` everywhere.
 
-- **YAML** (VS Code's YAML extension, or any editor running `yaml-language-server`): a first-line modeline pointing at the schema file, which works offline.
+The schema is served at its `$id`, `https://specy.ai/schemas/synth-scenario/1.json` (CORS open, cached a day), as are the domain model's (`…/domain-model/1.json`) and synthy's output formats (`…/synthy-manifest/1.json`, `…/synthy-questions/1.json`, `…/synthy-certificate/1.json`).
+
+- **JSON**: the `$schema` key is enough; VS Code and the other JSON language servers fetch it. Offline, a `json.schemas` setting mapping `*.synth.json` to a local copy, or a file written against one (`synthy convert --schema ../schema/synth-scenario.schema.json`).
+
+- **YAML** (VS Code's YAML extension, or any editor running `yaml-language-server`): a first-line modeline, pointing at the served schema or at a local copy, which works offline; or a `yaml.schemas` setting mapping the `$id` to `*.synth.yaml`.
 
   ```yaml
-  # yaml-language-server: $schema=../schema/synth-scenario.schema.json
+  # yaml-language-server: $schema=https://specy.ai/schemas/synth-scenario/1.json
   ```
-
-- **JSON**: the `$schema` key, or a `json.schemas` setting mapping `*.synth.json` to the schema file. An editor fetches an `https` `$schema` from the network, so a file can point at a local copy instead (`synthy convert --schema ../schema/synth-scenario.schema.json`).
 
 synthy ships a copy of the schema as `specy-synthy/schema`.
 
