@@ -311,6 +311,8 @@ export function distributionShape(d: Rec): string {
         const vs = d.values;
         const items = Array.isArray(vs) ? vs.map(scalarToken) : Object.entries((vs as Record<string, unknown>) ?? {}).map(([k, w]) => `${scalarToken(k)}: ${pct(w)}`);
         parts.push(`[ ${items.join(', ')} ]`);
+    } else if (d.shape === 'from' && d.source !== undefined) {
+        parts.push(String(d.source));
     }
     return parts.join(' ');
 }

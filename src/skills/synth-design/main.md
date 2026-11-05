@@ -184,6 +184,13 @@ Map each figure to a construct with the phrasebook below, then decide the header
   cancelled among [ bankTransfer: 80%, paypal: 20% ]`. One conditioning field per rule; a field
   is drawn after the one it reads. `among` draws fixed values, equally likely or by weight. A
   rule that must always hold is an invariant of the model, not a rule of the scenario.
+- **What a row takes from the row it references**: `from` copies the value one declared reference
+  reaches, a value type whole: `Order.shippingAddress from Order.customer.shippingAddress`. A
+  condition reads through one declared reference likewise: `Order.totalAmount.currency when
+  Order.customer.status = suspended among [ EUR ]`. One declared reference (`references { customer
+  : Customer }` or a field typed by an entity), never a key synthy infers (`OrderLine.productId`),
+  never two, never a collection; the types must agree. Where the model has only the uuid, declare
+  the reference in the `.domain` first.
 - **Composed text** (book titles, product names, blurbs): a grammar, never a word list of
   sentences and never rows (Phase 3b).
 - **Mixes on a parent and its children.** Declare the parent's mix first; add a child's mix only
@@ -337,10 +344,12 @@ data, never by editing rows.
 | "baskets around 60 €" | with the rollup and no curve: `distributions { Order.totalAmount.amount lognormal median 60 sigma 0.6 }` (the lines split each order's total) |
 | "existing customers", "a customer base built over years" | `Customer count 300 since 2023-01-01` |
 | "most lines have a single item" | `distributions { OrderLine.quantity zipf 2 }` (a bounded integer) |
-| "five-star products cost more", "prices depend on the category" | a conditional rule: `distributions { Product.price.amount lognormal median 30 sigma 0.6  Product.price.amount when Product.rating = 5 lognormal median 120 sigma 0.4 }` (one rule per value; the field is drawn after the one it reads) |
+| "five-star products cost more", "prices depend on the rating" | a conditional rule: `distributions { Product.price.amount lognormal median 30 sigma 0.6  Product.price.amount when Product.rating = 5 lognormal median 120 sigma 0.4 }` (one rule per value; the field is drawn after the one it reads) |
 | "UK orders pay in pounds", "the currency follows the country" | `distributions { Order.totalAmount.currency when Order.shippingAddress.country = GB among [ GBP ] }` (a text or enum field, read from the row itself or its per parent) |
 | "cancelled orders were mostly bank transfers" | `distributions { Payment.method when Order.status = cancelled among [ bankTransfer: 80%, paypal: 20% ] }` (the per parent's state; a share on the same column would win, SYN-W013) |
 | "only these three values" | `distributions { Product.rating among [ 3, 4, 5 ] }` (fixed values, uniform; weighted with `a: 50%`) |
+| "the order ships to the customer's address", "the payment is in the order's currency" | a copy through the reference: `distributions { Order.shippingAddress from Order.customer.shippingAddress }` (the same type, a value type whole; `Payment.amount.currency from Payment.order.totalAmount.currency`) |
+| "prices depend on the product's category", "suspended customers pay in euros" | a condition through one declared reference: `distributions { Order.totalAmount.currency when Order.customer.status = suspended among [ EUR ] }`. It needs a declared reference (`references { customer : Customer }` or a field typed by the entity): a line that holds only `productId : uuid` cannot read its product (SYN-E025); declare `product : Product` in the `.domain`, then `OrderLine.productPrice.amount when OrderLine.product.category = premium lognormal median 120` |
 | "book titles that read like titles", "product names in our style" | a grammar: `vocabulary { Book.title grammar "vocab/titles.json" by Book.genre }` (Phase 3b); never sentences in a word list |
 
 Figures are in the field's own unit: `180000` on a Money amount is 180 000.00, not cents.

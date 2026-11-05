@@ -328,12 +328,16 @@ BindingDecl:
 //       Product.price.amount when Product.rating = 5  lognormal median 120 sigma 0.4
 //       Order.totalAmount.currency when Order.shippingAddress.country = GB  among [ GBP ]
 //       Payment.method when Order.status = cancelled  among [ bankTransfer: 80%, paypal: 20% ]
+//       Order.shippingAddress from Order.customer.shippingAddress
+//       Order.totalAmount.currency when Order.customer.status = suspended  among [ EUR ]
 //   }
 //
 // A rule with `when` holds on the rows where one field of the same entity (or
 // of its per parent) equals a value; the rule without `when` on the others. The
 // field a rule reads is drawn before the field it shapes. `among` draws one of
-// the listed values, equally likely or by weight.
+// the listed values, equally likely or by weight. `from` copies the value a
+// path through one declared reference reaches (a value type whole); a condition
+// reads through one declared reference likewise.
 // -----------------------------------------------------------------------------
 
 DistributionsBlock:
@@ -345,6 +349,7 @@ DistributionDecl:
       | shape='lognormal' ('median' median=NUMBER)? ('sigma' sigma=NUMBER)?
       | shape='zipf' exponent=NUMBER?
       | shape='among' '[' (values+=AmongValue (','? values+=AmongValue)*)? ']'
+      | shape='from' source=SynthPath
     )
     description=Description?;
 

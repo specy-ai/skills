@@ -340,6 +340,10 @@
             "named": false
           },
           {
+            "type": "from",
+            "named": false
+          },
+          {
             "type": "lognormal",
             "named": false
           },
@@ -359,6 +363,16 @@
         "types": [
           {
             "type": "number",
+            "named": true
+          }
+        ]
+      },
+      "source": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "path",
             "named": true
           }
         ]

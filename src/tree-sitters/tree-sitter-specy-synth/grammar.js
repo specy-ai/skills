@@ -284,6 +284,8 @@ module.exports = grammar({
         seq(field('shape', 'lognormal'), optional(seq('median', field('median', $.number))), optional(seq('sigma', field('sigma', $.number)))),
         seq(field('shape', 'zipf'), optional(field('exponent', $.number))),
         seq(field('shape', 'among'), '[', optional(seq($.among_value, repeat(seq(optional(','), $.among_value)))), ']'),
+        // `from Order.customer.shippingAddress`: a copy through one declared reference.
+        seq(field('shape', 'from'), field('source', $.path)),
       ),
       optional($.description),
     ),

@@ -2449,6 +2449,27 @@
                   "value": "]"
                 }
               ]
+            },
+            {
+              "type": "SEQ",
+              "members": [
+                {
+                  "type": "FIELD",
+                  "name": "shape",
+                  "content": {
+                    "type": "STRING",
+                    "value": "from"
+                  }
+                },
+                {
+                  "type": "FIELD",
+                  "name": "source",
+                  "content": {
+                    "type": "SYMBOL",
+                    "name": "path"
+                  }
+                }
+              ]
             }
           ]
         },

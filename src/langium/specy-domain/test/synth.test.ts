@@ -316,6 +316,43 @@ describe("the planner's rules at edit time", () => {
         ]);
     });
 
+    it('copies through one declared reference with from, lets a condition and a by read through one, and refuses the rest (SYN-E025)', async () => {
+        const body = 'populations { Customer count 10\n Product count 5\n Order count 20\n OrderLine per Order 1..3\n Payment per Order exactly 1 }\n vocabulary {\n Payment.failureReason grammar "vocab/reasons.json" by Payment.order.status\n }\n distributions {\n Order.shippingAddress from Order.customer.shippingAddress\n Order.shippingAddress when Order.status = draft from Order.customer.shippingAddress :: "drafts too"\n Payment.amount.currency from Payment.order.totalAmount.currency\n Payment.method when Payment.order.status = cancelled among [ bankTransfer ]\n Order.totalAmount.currency when Order.customer.status = suspended among [ EUR ]\n }';
+        const ok = await parseSynth(scenario(body), domainText);
+        expect(messages(errors(ok.diagnostics))).toEqual([]);
+        expect(ok.scenario.vocabulary).toEqual({ grammars: [{ field: 'Payment.failureReason', file: 'vocab/reasons.json', by: 'Payment.order.status' }] });
+        expect(ok.scenario.distributions).toEqual([
+            { field: 'Order.shippingAddress', shape: 'from', source: 'Order.customer.shippingAddress' },
+            { field: 'Order.shippingAddress', when: { field: 'Order.status', value: 'draft' }, shape: 'from', source: 'Order.customer.shippingAddress', description: 'drafts too' },
+            { field: 'Payment.amount.currency', shape: 'from', source: 'Payment.order.totalAmount.currency' },
+            { field: 'Payment.method', when: { field: 'Payment.order.status', value: 'cancelled' }, shape: 'among', values: ['bankTransfer'] },
+            { field: 'Order.totalAmount.currency', when: { field: 'Order.customer.status', value: 'suspended' }, shape: 'among', values: ['EUR'] },
+        ]);
+        expect(JSON.stringify(ok.scenario.distributions![1])).toBe('{"field":"Order.shippingAddress","when":{"field":"Order.status","value":"draft"},"shape":"from","source":"Order.customer.shippingAddress","description":"drafts too"}');
+        const bad = await parseSynth(
+            scenario('populations { Customer count 10\n Product count 5\n Order count 20\n OrderLine per Order 1..3\n Payment per Order exactly 1 }\n vocabulary {\n Payment.failureReason grammar "r.json" by Payment.order.customer.status\n }\n distributions {\n Order.shippingAddress from Order.totalAmount\n Payment.amount from Payment.order.customer.shippingAddress\n OrderLine.productPrice from OrderLine.productId.price\n Order.shippingAddress from Order.lines.total\n Order.totalAmount from Order.customer.shippingAddress\n Order.id from Order.customer.id\n Order.customer from Order.customer.status\n Payment.method from Order.status\n Payment.method when Payment.order.customer.status = suspended among [ paypal ]\n OrderLine.quantity when OrderLine.productId.available = false among [ 1 ]\n Order.totalAmount.currency when Order.lines.quantity = 1 among [ EUR ]\n Order.totalAmount.currency when Order.customer.createdAt = "2025-01-01" among [ EUR ]\n Order.totalAmount.currency when Order.customer = x among [ EUR ]\n }'),
+            domainText,
+        );
+        expect(messages(errors(bad.diagnostics))).toEqual([
+            'SYN-E025 The grammar of Payment.failureReason reads Payment.order.customer.status, which crosses two references.',
+            'SYN-E025 Order.shippingAddress has two distributions.',
+            'SYN-E025 from does not fit Order.shippingAddress: the source stays on the row; a copy reads through a reference (Order.customer.shippingAddress).',
+            'SYN-E025 from does not fit Payment.amount: the source crosses two references; one is read.',
+            'SYN-E025 from does not fit OrderLine.productPrice: the source is an inferred key; a declared reference is read.',
+            'SYN-E025 from does not fit Order.shippingAddress: a collection is not copied.',
+            'SYN-E025 from does not fit Order.totalAmount: the source is a Address while the field is a Money.',
+            'SYN-E025 from does not fit Order.id: the identity is not copied.',
+            'SYN-E025 from does not fit Order.customer: a reference takes uniform or zipf.',
+            'SYN-E025 from does not fit Payment.method: the source is a path from Order, not from Payment.',
+            'SYN-E025 The rule on Payment.method reads Payment.order.customer.status, which crosses two references.',
+            'SYN-E025 The rule on OrderLine.quantity reads OrderLine.productId.available, through an inferred key; a declared reference is read.',
+            'SYN-E025 The rule on Order.totalAmount.currency reads Order.lines.quantity, through a collection.',
+            'SYN-E025 The rule on Order.totalAmount.currency reads Order.customer.createdAt, a datetime: conditions read enums, booleans, whole numbers and text.',
+            'SYN-E025 The rule on Order.totalAmount.currency reads Order.customer, a reference.',
+        ]);
+        expect(bad.diagnostics.filter(d => d.severity === 'warning')).toEqual([]);
+    });
+
     it('places count populations from a since date before the horizon end (SYN-E010)', async () => {
         const ok = await parseSynth(scenario('populations { Customer count 300 since 2023-01-01 clock createdAt :: "the customer base" }'), domainText);
         expect(errors(ok.diagnostics)).toEqual([]);

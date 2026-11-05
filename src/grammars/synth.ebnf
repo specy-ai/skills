@@ -203,15 +203,18 @@ distributionsBlock = "distributions" , "{" , { comment | distribution } , "}" ;
 
 // A rule with `when` holds on the rows where one field of the same entity (or of
 // its per parent) equals a value; the rule without `when` on the others. `among`
-// draws one of the listed values, equally likely or by weight.
+// draws one of the listed values, equally likely or by weight. `from` copies the
+// value a path through one declared reference reaches (a value type whole):
+// `Order.shippingAddress from Order.customer.shippingAddress`.
 distribution     = path , [ "when" , condition ]
                  , ( "uniform"
                    | "lognormal" , [ "median" , number ] , [ "sigma" , number ]
                    | "zipf" , [ number ]
-                   | "among" , "[" , [ amongValue , { [ "," ] , amongValue } ] , "]" )
+                   | "among" , "[" , [ amongValue , { [ "," ] , amongValue } ] , "]"
+                   | "from" , path )                     // the source: through one declared reference
                  , [ description ] ;
 
-condition        = path , "=" , scalarValue ;
+condition        = path , "=" , scalarValue ;              // the path may cross one declared reference
 amongValue       = scalarValue , [ ":" , fraction ] ;
 scalarValue      = stringLiteral | booleanLiteral | number | memberName ;   // a member or a text as an identifier
 
@@ -354,18 +357,23 @@ comment          = "//" , { character - newline } , newline
 //     source with rows, once, and its values fit the field's length and pattern. (SYN-E024)
 // 16c. A distribution's shape fits its field (numbers: uniform, lognormal, zipf
 //     on whole numbers; dates: uniform; enums, word-listed text, references:
-//     uniform, zipf; enums, booleans, numbers, text: among); sigma and exponent in
-//     (0, 5]; median > 0 and within the field's bounds; an among lists values the
-//     field can hold, each once, within its bounds, lengths and pattern, weighted
-//     all or none and summing to 1; one distribution per field and condition. (SYN-E025)
+//     uniform, zipf; enums, booleans, numbers, text: among; any stored field but
+//     the identity: from); sigma and exponent in (0, 5]; median > 0 and within the
+//     field's bounds; an among lists values the field can hold, each once, within
+//     its bounds, lengths and pattern, weighted all or none and summing to 1; a
+//     from's source is a path from the same entity through exactly one declared
+//     reference (not an inferred key, not two, not a collection) to a field of the
+//     same type (the same primitive, value type or enum); one distribution per
+//     field and condition.                                                  (SYN-E025)
 //     On a column a share, a rate or a mix sets, a shape never applies; on a
-//     column a curve, total or rollup sums, a median is ignored and an among
-//     never applies.                                               (warning SYN-W013)
+//     column a curve, total or rollup sums, a median is ignored and an among or
+//     a from never applies.                                         (warning SYN-W013)
 // 16e. A condition (`when`) reads one enum, boolean, whole-number or text field
-//     of the rule's own entity or of its per parent, stored on that table (not a
-//     reference, not through one, not derived), not inside the value the rule
-//     decides, compared with a value the field can hold; a reference takes no
-//     condition.                                                           (SYN-E025)
+//     of the rule's own entity or of its per parent, stored on that table or on
+//     the row one declared reference of it names (not a reference itself, not
+//     through an inferred key, not through two, not derived), not inside the
+//     value the rule decides, compared with a value the field can hold; a
+//     reference takes no condition.                                       (SYN-E025)
 // 16f. A grammar names a text field of a row source with rows, once, not also
 //     listed in words; its `by` reads a field as 16e; the file is a JSON object
 //     of symbol → texts whose #symbol# references are defined (or built-in) and
