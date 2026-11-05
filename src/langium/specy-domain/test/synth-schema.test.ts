@@ -54,6 +54,26 @@ describe('the scenario schema', () => {
         expect(errorsOf({ ...doc, givens: [{ entity: 'Product', csv: 'c.csv', columns: { 'price amount': 'x' } }] })).not.toEqual([]);
     });
 
+    it('accepts conditional rules, among and grammars, and refuses their malformed forms', async () => {
+        const doc = await orders();
+        const base = { ...doc, vocabulary: { grammars: [{ field: 'Product.name', file: 'names.json', by: 'Product.available' }, { field: 'Product.description', rules: { origin: ['#noun.capitalize#'] } }] }, distributions: [
+            { field: 'Product.price.amount', when: { field: 'Product.rating', value: 5 }, shape: 'lognormal', median: 120 },
+            { field: 'Order.totalAmount.currency', when: { field: 'Order.shippingAddress.country', value: 'GB' }, shape: 'among', values: ['GBP'] },
+            { field: 'Payment.method', shape: 'among', values: { creditCard: 0.7, paypal: '30%' } },
+            { field: 'Product.stockQuantity', when: { field: 'Product.available', value: false }, shape: 'among', values: [0] },
+        ] };
+        expect(errorsOf(base)).toEqual([]);
+        expect(errorsOf({ ...base, distributions: [{ field: 'Payment.method', shape: 'among' }] })).not.toEqual([]);
+        expect(errorsOf({ ...base, distributions: [{ field: 'Payment.method', shape: 'zipf', values: ['a'] }] })).not.toEqual([]);
+        expect(errorsOf({ ...base, distributions: [{ field: 'Payment.method', shape: 'among', values: [] }] })).not.toEqual([]);
+        expect(errorsOf({ ...base, distributions: [{ field: 'Payment.method', shape: 'uniform', when: { field: 'Order.status' } }] })).not.toEqual([]);
+        expect(errorsOf({ ...base, distributions: [{ field: 'Payment.method', shape: 'uniform', when: { field: 'Order.status', value: 'x', op: '=' } }] })).not.toEqual([]);
+        expect(errorsOf({ ...base, vocabulary: { grammars: [{ field: 'Product.name' }] } })).not.toEqual([]);
+        expect(errorsOf({ ...base, vocabulary: { grammars: [{ field: 'Product.name', file: 'a.json', rules: { origin: ['x'] } }] } })).not.toEqual([]);
+        expect(errorsOf({ ...base, vocabulary: { grammars: [{ field: 'Product.name', rules: { origin: [] } }] } })).not.toEqual([]);
+        expect(errorsOf({ ...base, vocabulary: { grammars: [{ field: 'Product.name', rules: { 'bad symbol': ['x'] } }] } })).not.toEqual([]);
+    });
+
     it('accepts every outcome kind, givens and options as the parser writes them', async () => {
         const text = `scenario Full :: "all of it" {
     satisfies [REQ-ORD-001]

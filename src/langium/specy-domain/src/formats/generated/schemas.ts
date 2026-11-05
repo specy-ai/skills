@@ -3918,7 +3918,7 @@ export const SCHEMAS: Record<string, Record<string, unknown>> = {
             },
             "vocabulary": {
                 "type": "object",
-                "description": "Where text columns take their words, and the kind of value a value type or a field holds. Swapping packs changes text columns only.",
+                "description": "Where text columns take their words (a locale pack, word lists and grammars for single fields), and the kind of value a value type or a field holds. Swapping packs changes text columns only.",
                 "additionalProperties": false,
                 "properties": {
                     "locale": {
@@ -3936,6 +3936,13 @@ export const SCHEMAS: Record<string, Record<string, unknown>> = {
                         "description": "Word lists for single text fields.",
                         "items": {
                             "$ref": "#/$defs/wordList"
+                        }
+                    },
+                    "grammars": {
+                        "type": "array",
+                        "description": "Generative grammars for single text fields: a file of symbol → rules, expanded from origin or from the symbol the row's `by` value names.",
+                        "items": {
+                            "$ref": "#/$defs/grammar"
                         }
                     },
                     "bindings": {
@@ -3996,6 +4003,68 @@ export const SCHEMAS: Record<string, Record<string, unknown>> = {
                     }
                 ]
             },
+            "grammar": {
+                "type": "object",
+                "description": "A Tracery-style grammar for one text field: each symbol a list of texts in which #symbol# names another symbol and #symbol.capitalize# applies a modifier (capitalize, capitalizeAll, lower, upper, a, s). Built-in symbols: first, last, city, region, country, word, noun, line, company, number. Exactly one of file, rules.",
+                "required": [
+                    "field"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                    "field": {
+                        "$ref": "#/$defs/fieldPath"
+                    },
+                    "file": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "A JSON file next to the scenario."
+                    },
+                    "rules": {
+                        "type": "object",
+                        "description": "The rules themselves: symbol → non-empty list of texts. origin is the start symbol unless `by` names one.",
+                        "minProperties": 1,
+                        "propertyNames": {
+                            "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$"
+                        },
+                        "additionalProperties": {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "by": {
+                        "$ref": "#/$defs/fieldPath",
+                        "description": "An enum, boolean or text field of the same entity (or of its per parent) whose value names the start symbol; origin when the grammar has none of that name."
+                    },
+                    "description": {
+                        "type": "string"
+                    }
+                },
+                "oneOf": [
+                    {
+                        "required": [
+                            "file"
+                        ],
+                        "not": {
+                            "required": [
+                                "rules"
+                            ]
+                        }
+                    },
+                    {
+                        "required": [
+                            "rules"
+                        ],
+                        "not": {
+                            "required": [
+                                "file"
+                            ]
+                        }
+                    }
+                ]
+            },
             "binding": {
                 "type": "object",
                 "description": "A value type (Iban), one of its fields (Iban.value) or a field path (Customer.email) and the kind of value synthy generates for it. A text kind takes a text field; percentage a numeric one; money a numeric field, or a value type with one numeric field and at most one text field (the currency). text turns name-based inference off.",
@@ -4038,7 +4107,7 @@ export const SCHEMAS: Record<string, Record<string, unknown>> = {
             },
             "distribution": {
                 "type": "object",
-                "description": "One field's shape: uniform; lognormal (median, sigma); zipf (exponent). Numbers, dates (uniform), enums, word-listed text, references.",
+                "description": "One field's rule: uniform; lognormal (median, sigma); zipf (exponent); among (values). Numbers, dates (uniform), enums, booleans (among), word-listed text, references. With `when`, the rule holds on the rows the condition selects; the rule without `when` on the others.",
                 "required": [
                     "field",
                     "shape"
@@ -4048,11 +4117,15 @@ export const SCHEMAS: Record<string, Record<string, unknown>> = {
                     "field": {
                         "$ref": "#/$defs/fieldPath"
                     },
+                    "when": {
+                        "$ref": "#/$defs/condition"
+                    },
                     "shape": {
                         "enum": [
                             "uniform",
                             "lognormal",
-                            "zipf"
+                            "zipf",
+                            "among"
                         ]
                     },
                     "median": {
@@ -4068,6 +4141,25 @@ export const SCHEMAS: Record<string, Record<string, unknown>> = {
                         "type": "number",
                         "exclusiveMinimum": 0,
                         "description": "How fast popularity falls with rank; 1 is the classic law; check refuses more than 5."
+                    },
+                    "values": {
+                        "description": "among: the values the field draws from, equally likely (a list) or weighted (a map of value → fraction summing to 1).",
+                        "oneOf": [
+                            {
+                                "type": "array",
+                                "minItems": 1,
+                                "items": {
+                                    "$ref": "#/$defs/scalar"
+                                }
+                            },
+                            {
+                                "type": "object",
+                                "minProperties": 1,
+                                "additionalProperties": {
+                                    "$ref": "#/$defs/fraction"
+                                }
+                            }
+                        ]
                     },
                     "description": {
                         "type": "string"
@@ -4099,6 +4191,11 @@ export const SCHEMAS: Record<string, Record<string, unknown>> = {
                                         "required": [
                                             "exponent"
                                         ]
+                                    },
+                                    {
+                                        "required": [
+                                            "values"
+                                        ]
                                     }
                                 ]
                             }
@@ -4114,8 +4211,17 @@ export const SCHEMAS: Record<string, Record<string, unknown>> = {
                         },
                         "then": {
                             "not": {
-                                "required": [
-                                    "exponent"
+                                "anyOf": [
+                                    {
+                                        "required": [
+                                            "exponent"
+                                        ]
+                                    },
+                                    {
+                                        "required": [
+                                            "values"
+                                        ]
+                                    }
                                 ]
                             }
                         }
@@ -4140,10 +4246,79 @@ export const SCHEMAS: Record<string, Record<string, unknown>> = {
                                         "required": [
                                             "sigma"
                                         ]
+                                    },
+                                    {
+                                        "required": [
+                                            "values"
+                                        ]
                                     }
                                 ]
                             }
                         }
+                    },
+                    {
+                        "if": {
+                            "properties": {
+                                "shape": {
+                                    "const": "among"
+                                }
+                            }
+                        },
+                        "then": {
+                            "required": [
+                                "values"
+                            ],
+                            "not": {
+                                "anyOf": [
+                                    {
+                                        "required": [
+                                            "median"
+                                        ]
+                                    },
+                                    {
+                                        "required": [
+                                            "sigma"
+                                        ]
+                                    },
+                                    {
+                                        "required": [
+                                            "exponent"
+                                        ]
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                ]
+            },
+            "condition": {
+                "type": "object",
+                "description": "The rows a rule applies to: a field of the same entity or of its per parent (an enum, boolean, whole-number or text field) equal to a value.",
+                "required": [
+                    "field",
+                    "value"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                    "field": {
+                        "$ref": "#/$defs/fieldPath"
+                    },
+                    "value": {
+                        "$ref": "#/$defs/scalar"
+                    }
+                }
+            },
+            "scalar": {
+                "description": "An enum member or a text, a number, or a boolean.",
+                "anyOf": [
+                    {
+                        "type": "string"
+                    },
+                    {
+                        "type": "number"
+                    },
+                    {
+                        "type": "boolean"
                     }
                 ]
             },

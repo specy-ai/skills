@@ -276,13 +276,28 @@ export function bindingLine(b: Rec): string {
     return `${b.target} as ${b.kind}${describe(b.description as string | undefined)}`;
 }
 
+/** A grammar names its file; rules given inline in JSON have no .synth form, so a file named after the field stands for them. */
+export function grammarLine(g: Rec): string {
+    const file = g.file !== undefined ? String(g.file) : `${String(g.field).replace(/\./g, '-')}.grammar.json`;
+    return `${g.field} grammar ${quote(file)}${g.by ? ` by ${g.by}` : ''}${describe(g.description as string | undefined)}`;
+}
+
 export function printVocabulary(w: IndentWriter, v: Rec): void {
     w.block('vocabulary', () => {
         if (v.locale !== undefined) w.line(`locale ${isIdent(String(v.locale)) ? v.locale : quote(String(v.locale))}`);
         if (v.pack !== undefined) w.line(`pack ${quote(String(v.pack))}`);
         for (const wd of (v.words as Rec[]) ?? []) w.line(wordListLine(wd));
+        for (const g of (v.grammars as Rec[]) ?? []) w.line(grammarLine(g));
         for (const b of (v.bindings as Rec[]) ?? []) w.line(bindingLine(b));
     });
+}
+
+/** A condition's or an among's value: numbers and booleans as written, a text as an identifier when the grammar reads one, quoted otherwise. */
+export function scalarToken(v: unknown): string {
+    if (typeof v === 'number') return num(v);
+    if (typeof v === 'boolean') return String(v);
+    const s = String(v);
+    return isIdent(s) && !['true', 'false', 'null', 'satisfies'].includes(s) ? s : quote(s);
 }
 
 export function distributionShape(d: Rec): string {
@@ -292,12 +307,22 @@ export function distributionShape(d: Rec): string {
         if (d.sigma !== undefined) parts.push(`sigma ${num(d.sigma)}`);
     } else if (d.shape === 'zipf' && d.exponent !== undefined) {
         parts.push(num(d.exponent));
+    } else if (d.shape === 'among') {
+        const vs = d.values;
+        const items = Array.isArray(vs) ? vs.map(scalarToken) : Object.entries((vs as Record<string, unknown>) ?? {}).map(([k, w]) => `${scalarToken(k)}: ${pct(w)}`);
+        parts.push(`[ ${items.join(', ')} ]`);
     }
     return parts.join(' ');
 }
 
+/** The field and, with `when`, its condition. */
+export function distributionHead(d: Rec): string {
+    const when = d.when as Rec | undefined;
+    return when ? `${d.field} when ${when.field} = ${scalarToken(when.value)}` : String(d.field);
+}
+
 export function distributionLine(d: Rec): string {
-    return `${d.field} ${distributionShape(d)}${describe(d.description as string | undefined)}`;
+    return `${distributionHead(d)} ${distributionShape(d)}${describe(d.description as string | undefined)}`;
 }
 
 export function printOptions(w: IndentWriter, o: Rec): void {

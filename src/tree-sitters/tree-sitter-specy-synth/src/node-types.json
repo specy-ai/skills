@@ -15,6 +15,32 @@
     }
   },
   {
+    "type": "among_value",
+    "named": true,
+    "fields": {
+      "value": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "scalar_value",
+            "named": true
+          }
+        ]
+      },
+      "weight": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "fraction",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "as_of_decl",
     "named": true,
     "fields": {
@@ -70,6 +96,32 @@
     "type": "boolean",
     "named": true,
     "fields": {}
+  },
+  {
+    "type": "condition",
+    "named": true,
+    "fields": {
+      "field": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "path",
+            "named": true
+          }
+        ]
+      },
+      "value": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "scalar_value",
+            "named": true
+          }
+        ]
+      }
+    }
   },
   {
     "type": "curve_outcome",
@@ -284,6 +336,10 @@
         "required": true,
         "types": [
           {
+            "type": "among",
+            "named": false
+          },
+          {
             "type": "lognormal",
             "named": false
           },
@@ -306,12 +362,26 @@
             "named": true
           }
         ]
+      },
+      "when": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "condition",
+            "named": true
+          }
+        ]
       }
     },
     "children": {
-      "multiple": false,
+      "multiple": true,
       "required": false,
       "types": [
+        {
+          "type": "among_value",
+          "named": true
+        },
         {
           "type": "description",
           "named": true
@@ -540,6 +610,52 @@
       "types": [
         {
           "type": "given_decl",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "grammar_decl",
+    "named": true,
+    "fields": {
+      "by": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "path",
+            "named": true
+          }
+        ]
+      },
+      "field": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "path",
+            "named": true
+          }
+        ]
+      },
+      "file": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": false,
+      "required": false,
+      "types": [
+        {
+          "type": "description",
           "named": true
         }
       ]
@@ -1448,6 +1564,33 @@
     }
   },
   {
+    "type": "scalar_value",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "boolean",
+          "named": true
+        },
+        {
+          "type": "member_name",
+          "named": true
+        },
+        {
+          "type": "number",
+          "named": true
+        },
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "scenario_def",
     "named": true,
     "fields": {
@@ -1821,6 +1964,10 @@
           "named": true
         },
         {
+          "type": "grammar_decl",
+          "named": true
+        },
+        {
           "type": "word_list",
           "named": true
         }
@@ -1924,6 +2071,10 @@
     "named": false
   },
   {
+    "type": "among",
+    "named": false
+  },
+  {
     "type": "and",
     "named": false
   },
@@ -2018,6 +2169,10 @@
   },
   {
     "type": "givens",
+    "named": false
+  },
+  {
+    "type": "grammar",
     "named": false
   },
   {
@@ -2182,6 +2337,10 @@
   },
   {
     "type": "week",
+    "named": false
+  },
+  {
+    "type": "when",
     "named": false
   },
   {

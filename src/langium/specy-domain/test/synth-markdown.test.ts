@@ -120,10 +120,42 @@ const TOTALS = `scenario Totals :: "A total and a compound rate" {
 }
 `;
 
+const RULES = `scenario Rules :: "Conditional rules, among and grammars" {
+    domain-source "orders.domain"
+    seed 3
+    horizon 2025-01-01 .. 2025-02-01
+
+    populations {
+        Customer count 20
+        Product count 5
+        Order count 40
+        OrderLine per Order 1..3
+        Payment per Order exactly 1
+    }
+
+    vocabulary {
+        locale fr
+        Product.name grammar "vocab/product-names.json" :: "composed"
+        Product.description grammar "vocab/blurbs.json" by Product.available
+    }
+
+    distributions {
+        Product.price.amount lognormal median 30 sigma 0.6
+        Product.price.amount when Product.rating = 5 lognormal median 120 sigma 0.4 :: "five stars"
+        Order.totalAmount.currency when Order.shippingAddress.country = GB among [ GBP ]
+        Order.totalAmount.currency when Order.shippingAddress.country = "CH" among [ CHF: 80%, EUR: 20% ]
+        Payment.method when Order.status = cancelled among [ bankTransfer ]
+        Product.stockQuantity when Product.available = false among [ 0 ]
+        Product.rating among [ 3, 4, 5 ]
+    }
+}
+`;
+
 describe('every construct round-trips', () => {
     for (const [name, text] of [
         ['full coverage', FULL],
         ['totals and compound rates', TOTALS],
+        ['conditional rules and grammars', RULES],
     ] as const) {
         it(`${name}: DSL -> model -> DSL / JSON / Markdown -> same model`, async () => {
             const a = await read({ text, fileName: 'x.synth', companions });

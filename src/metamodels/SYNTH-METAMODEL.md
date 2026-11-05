@@ -323,6 +323,7 @@ vocabulary {
     pack "vocab/fr-ch.json"                     // a pack file, next to the scenario
     Product.name words "vocab/wines.txt"        // one value per line, or a JSON list of strings
     Customer.segment words [ "retail", "pro" ]
+    Book.title grammar "vocab/titles.json" by Book.genre   // a generative grammar (below)
     AccountNumber as iban                       // a kind of typed value (see Typed values)
 }
 ```
@@ -330,11 +331,19 @@ vocabulary {
 - **One person, one place.** A row's name, email, address and phone come from one person living in one place of the pack, so they agree. The default pack, `intl`, mixes the European ones: each row draws a locale, and product words come from one language.
 - **Text only.** Swapping packs changes text columns only: every number, date, enum, boolean and identity stays byte-identical, because each text value draws from a stream of its own.
 - **Word lists** apply to text fields of a generated or given row source, and to lists and sets of text, whose elements they draw (SYN-E024 otherwise). Their values must fit the field's length and pattern, and a unique field needs at least as many distinct words as rows (SYN-E024). Word lists hold values for one field each: never rows, never numbers or identifiers.
+- **Grammars** compose a text field instead of listing it, in the Tracery style: a JSON file next to the scenario, each key a symbol, each value a list of texts in which `#symbol#` names another symbol and `#symbol.capitalize#` applies a modifier (`capitalize`, `capitalizeAll`, `lower`, `upper`, `a`, `s`). synthy expands `origin`; with `by`, the row's value of that field (an enum, boolean or text field of the same entity or of its per parent) names the start symbol (`fantasy`, `scifi`, `true`), `origin` when the grammar has none of that name. A grammar may name the row's own person and place, `#first#`, `#last#`, `#city#`, `#region#`, `#country#`, and the pack's words, `#word#`, `#noun#`, `#line#`, `#company#`, `#number#`; its own symbol of the same name wins. Each expansion draws from the value's forked stream, so a grammar changes its column only. A field has a word list or a grammar, not both; a grammar on a field that is not text, a file that is not a grammar (a symbol without texts, a `#symbol#` the grammar does not define, an unknown modifier), or one that cannot start (no `origin`, no symbol for a value of `by`) is SYN-E024. A language model may write the grammar once, as data; it never writes a row.
+
+```json
+{ "origin": ["The #adj.capitalize# #noun#", "#noun.capitalize# of #city#"],
+  "fantasy": ["The #adj# #noun# of the #realm#"],
+  "adj": ["silent", "last", "iron"], "noun": ["crown", "harbour", "oath"], "realm": ["north", "deep"] }
+```
 - **Packs.** An unknown locale or a malformed pack file is SYN-E024. A pack file is a JSON object with `locale`, and optionally `extends` (a built-in pack), `country`, `currency`, `people { firstNames, lastNames }`, `places [ { city, postalCode, region } ]` (largest first), `streets { format, names }`, `phones`, `companies { format, names, suffixes }`, `products { format, nouns, lines }`, `words`. In a shape, `#` is a digit and `?` an uppercase letter.
 
 Relations:
 - 0..1 "draws from" relation with a vocabulary pack
 - 0..n "lists the words of" relation with text fields of the domain model
+- 0..n "composes with a grammar" relation with text fields of the domain model, each reading at most one field of the same entity or its per parent
 - 0..n "binds a kind to" relation with value types and fields of the domain model (see Typed values)
 
 ## Typed values
@@ -393,6 +402,9 @@ distributions {
     OrderLine.productId   zipf 1.1              // best sellers: a reference, or a key synthy infers
     Order.customer        zipf 0.8              // regulars: the oldest customers order most
     Customer.createdAt    uniform
+    Product.price.amount when Product.rating = 5              lognormal median 120 sigma 0.4
+    Order.totalAmount.currency when Order.shippingAddress.country = GB   among [ GBP ]
+    Payment.method when Order.status = cancelled              among [ bankTransfer: 80%, paypal: 20% ]
 }
 ```
 
@@ -401,11 +413,15 @@ distributions {
 | `uniform` | numbers, dates, enums, word-listed text, references | every value equally likely |
 | `lognormal median m sigma s` | numbers | a skewed amount: half below `m`; `s` from 0.25 (tight) to 1.5 (wide) |
 | `zipf e` | bounded whole numbers, enums (declared order), word-listed text (list order), references | the first value is the most frequent, the k-th about k^-e as often |
+| `among [ a, b ]` · `among [ a: 70%, b: 30% ]` | enums, booleans, numbers, text | one of the listed values, equally likely or by weight (weights sum to 1) |
 
-A shape that does not fit its field, a parameter out of range (sigma and exponents in (0, 5]), a median outside the field's bounds, or text without a word list is SYN-E025. The certificate's plausibility section compares each shape with the data.
+**Conditional rules.** A rule with `when` holds on the rows where one field equals a value; the rule without `when` (the field's default) on the others. Together, a field's rules are its conditional distribution: the value of one attribute decides how the next is drawn, one conditioning field per rule, like the adjacency rules of a tile-based procedural generator, but over the attributes of a row. The condition reads one enum, boolean, whole-number or text field of the rule's own entity, or of its `per` parent (`Payment.method when Order.status = cancelled`): a field the row stores itself, never a reference, a path through one, or a column an invariant computes, and never a field inside the very value the rule decides (the fields of one value are drawn together). The generator draws a row's fields in an order it fixes from the scenario alone, the conditioning field before the one it decides, so every column stays anchored; rules that read each other in a cycle are SYN-E026. The model still wins: a walked precondition that pins the field, or an invariant the repair pass makes hold, takes precedence on its rows, and the certificate says on how many.
+
+A shape that does not fit its field, a parameter out of range (sigma and exponents in (0, 5]), a median outside the field's bounds, text without a word list, an `among` whose values the field cannot hold (a non-member, a number out of bounds, a text against the pattern, weights that do not sum to 1), a condition that reads what it cannot, or two rules for one field and condition is SYN-E025. The certificate's plausibility section compares each rule with the data where it applies: a conditional rule over the rows its condition selects, the default over the rest.
 
 Relations:
 - 0..n "shapes" relation with fields and references of the domain model
+- 0..1 "reads" relation per rule with one field of the same entity or of its per parent
 
 ## Options
 
@@ -536,6 +552,9 @@ options:
 | `Product.name words "w.txt"` · `words [ "a", "b" ]` | `vocabulary: { words: [ { field: Product.name, file: w.txt } ] }` · `values: [a, b]` |
 | `Iban as iban` · `Customer.contact as phone :: "…"` | `vocabulary: { bindings: [ { target: Iban, kind: iban } ] }` · `description` |
 | `P lognormal median 25 sigma 0.9` · `P zipf 1.6` · `P uniform` | `distributions: [ { field: P, shape: lognormal, median: 25, sigma: 0.9 } ]` · `{ shape: zipf, exponent: 1.6 }` |
+| `P when C = v lognormal median 120` | `{ field: P, when: { field: C, value: v }, shape: lognormal, median: 120 }` (`v` a text, a number or a boolean) |
+| `P among [ a, b ]` · `P among [ a: 70%, b: 30% ]` | `{ field: P, shape: among, values: [a, b] }` · `values: { a: 0.7, b: 0.3 }` |
+| `Book.title grammar "t.json" by Book.genre` | `vocabulary: { grammars: [ { field: Book.title, file: t.json, by: Book.genre } ] }` (`rules: { origin: [ … ] }` in place of `file`, which `.synth` prints as a file named after the field) |
 | `alpha 2` · `decimals 2` · `null-rate 5%` · `default-dwell 1d` | `options: { alpha, decimals, nullRate: 0.05, defaultDwell: 1d }` |
 | `dwell { draft --> confirmed : 4h }` | `options: { dwell: { "draft->confirmed": 4h } }` |
 | `reaction-latency 30s` · `rejections 3` | `options: { reactionLatency: 30s, rejections: 3 }` |
@@ -610,8 +629,9 @@ The generator refuses only on arithmetic impossibility and dangling references, 
 | `SYN-E021` | the parsed domain model comes from a `specy-domain` older than 1.1.0, or from an unknown tool |
 | `SYN-E022` | a JSON or YAML document is malformed: an unknown key, a wrong type, a form `.synth` cannot write, YAML outside the core schema |
 | `SYN-E023` | a given does not fit the model: a cell of the wrong type, out of a bound, length or pattern, not a member, empty where required, repeated where unique, breaking an invariant, a state the machine lacks, a value that is not a valid instance of its column's kind; a mapped column or file column that does not exist; an enum given whose value type has no code field |
-| `SYN-E024` | the vocabulary names an unknown locale or a malformed pack; a word list does not fit its field (not text, too long, against the pattern, too few words for a unique field); a binding names an unknown kind, a target it cannot apply to, or a kind whose values cannot fit the field's lengths or pattern |
-| `SYN-E025` | a distribution does not fit its field, has a parameter out of range or a median outside the bounds, or shapes text that has no word list |
+| `SYN-E024` | the vocabulary names an unknown locale or a malformed pack; a word list does not fit its field (not text, too long, against the pattern, too few words for a unique field); a grammar is given to a field that is not text or already has a word list, is not a grammar (a symbol without texts, an undefined `#symbol#`, an unknown modifier), or cannot start (no origin, no symbol for a value of `by`); a binding names an unknown kind, a target it cannot apply to, or a kind whose values cannot fit the field's lengths or pattern |
+| `SYN-E025` | a distribution does not fit its field, has a parameter out of range or a median outside the bounds, shapes text that has no word list, lists `among` values the field cannot hold or weights that do not sum to 1, reads in its condition what a condition cannot (another entity than the row's own or its per parent, a reference, a derived column, a date or decimal, a value the field cannot hold, a field inside the value it decides), or repeats a field and condition |
+| `SYN-E026` | the conditional rules and grammars of one entity read each other in a cycle, so no order draws each field after the ones it reads |
 
 Warnings (`SYN-Wxxx`) report what the generator decided for the author:
 
@@ -629,7 +649,7 @@ Warnings (`SYN-Wxxx`) report what the generator decided for the author:
 | `SYN-W010` | a `$schema` naming a format version it does not read |
 | `SYN-W011` | a reaction or temporal event it does not carry out |
 | `SYN-W012` | a rejection-level invariant it only checks |
-| `SYN-W013` | a declaration that never applies: a distribution or a word list on a column an outcome sets, a given supplies or an invariant computes; a median on a summed column; `since` on an entity without a clock |
+| `SYN-W013` | a declaration that never applies: a distribution rule, a word list or a grammar on a column an outcome sets, a given supplies or an invariant computes; a median or an `among` on a summed column; `since` on an entity without a clock |
 | `SYN-W014` | a column of a given file that matches no field: it is ignored |
 | `SYN-W015` | an enum of a value type with no given instance for some members |
 | `SYN-W016` | a pattern synthy cannot generate from (lookaround, backreference, `\b`, `\p{…}`): its values may not match, and no question asks about it |
@@ -681,4 +701,4 @@ Conformance is not the whole picture: data can satisfy every declaration and sti
 
 - **Referenced rows exist first.** A row reached through a plain reference was created before the row that names it: a customer before the orders that name it. synthy picks among the rows that exist at the referencing row's start, moves a referenced row's free clock back, or the referencing row's free clock forward, when none does. An optional reference whose target points back (a loan's escalation) names a follow-up, created after. Rows whose clocks a walk or an outcome fixes cannot always be ordered; the check counts them.
 - **No crowding before as-of.** A machine's transitions in the reaction latency before as-of, against what an even spread would put there. A walk that needs an effect still in flight at the snapshot is used only when the mix cannot be met without it.
-- **Shapes, observed.** For each distribution: a lognormal field's median, or the spread of its 10th and 90th percentiles; the share of a Zipf field's most frequent value.
+- **Shapes, observed.** For each distribution rule: a lognormal field's median, or the spread of its 10th and 90th percentiles; the share of a Zipf field's most frequent value; that an `among` field holds only the listed values, and the share of the heaviest when weighted. A conditional rule is observed over the rows its condition selects (through the per parent when it reads one), the default rule over the rows no condition selects. Rows where the model set the field instead (a walked precondition pinned it, an invariant's repair changed it) are counted, and the question's tolerance allows them.

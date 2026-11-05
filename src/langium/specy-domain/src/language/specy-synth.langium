@@ -290,8 +290,18 @@ VocabularyBlock:
     'vocabulary' '{'
         ('locale' locale=LocaleName)?
         ('pack' pack=STRING)?
-        (words+=WordListDecl | bindings+=BindingDecl)*
+        (words+=WordListDecl | grammars+=GrammarDecl | bindings+=BindingDecl)*
     '}';
+
+// A generative grammar for one text field: a JSON file next to the scenario,
+// each key a symbol, each value a list of texts in which `#symbol#` names
+// another symbol (`#noun.capitalize#` applies a modifier). synthy expands
+// `origin`, or the symbol the row's value of `by` names (`fantasy`, `scifi`):
+//
+//   Book.title grammar "vocab/titles.json" by Book.genre
+GrammarDecl:
+    field=SynthPath 'grammar' file=STRING ('by' by=SynthPath)?
+    description=Description?;
 
 LocaleName returns string:
     ID | STRING;
@@ -315,19 +325,39 @@ BindingDecl:
 //       OrderLine.quantity    zipf 1.6              a bounded int, an enum, a word list
 //       Order.customer        zipf 0.8              a reference: the regulars order more
 //       Customer.createdAt    uniform
+//       Product.price.amount when Product.rating = 5  lognormal median 120 sigma 0.4
+//       Order.totalAmount.currency when Order.shippingAddress.country = GB  among [ GBP ]
+//       Payment.method when Order.status = cancelled  among [ bankTransfer: 80%, paypal: 20% ]
 //   }
+//
+// A rule with `when` holds on the rows where one field of the same entity (or
+// of its per parent) equals a value; the rule without `when` on the others. The
+// field a rule reads is drawn before the field it shapes. `among` draws one of
+// the listed values, equally likely or by weight.
 // -----------------------------------------------------------------------------
 
 DistributionsBlock:
     'distributions' '{' (distributions+=DistributionDecl)* '}';
 
 DistributionDecl:
-    field=SynthPath
+    field=SynthPath ('when' when=WhenClause)?
     (   shape='uniform'
       | shape='lognormal' ('median' median=NUMBER)? ('sigma' sigma=NUMBER)?
       | shape='zipf' exponent=NUMBER?
+      | shape='among' '[' (values+=AmongValue (','? values+=AmongValue)*)? ']'
     )
     description=Description?;
+
+WhenClause:
+    field=SynthPath '=' value=ScalarValue;
+
+AmongValue:
+    value=ScalarValue (':' weight=Fraction)?;
+
+// An enum member or a text as an identifier, a quoted text, a number, a boolean.
+// A member is read as an identifier: the validator checks it against the field.
+ScalarValue:
+    text=STRING | bool=BooleanKw | number=NUMBER | member=SynthIdent;
 
 // -----------------------------------------------------------------------------
 // Options — knobs of the generator, never facts about the data.
@@ -411,7 +441,7 @@ SynthKeywordAsIdent returns string:
     | 'curve' | 'total' | 'share' | 'mix' | 'rate' | 'rollup' | 'exactly' | 'from'
     | 'day' | 'week' | 'month' | 'quarter' | 'year' | 'given' | 'rejections'
     | 'vocabulary' | 'locale' | 'pack' | 'words' | 'distributions' | 'uniform' | 'lognormal' | 'median' | 'sigma' | 'zipf'
-    | 'since' | 'as';
+    | 'since' | 'as' | 'when' | 'among' | 'grammar';
 
 SynthIdent returns string:
     ID | TYPE_NAME | SynthKeywordAsIdent;

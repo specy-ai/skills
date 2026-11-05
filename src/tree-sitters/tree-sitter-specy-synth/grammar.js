@@ -14,7 +14,7 @@ const KEYWORDS_AS_IDENT = [
   'curve', 'total', 'share', 'mix', 'rate', 'rollup', 'exactly', 'from',
   'day', 'week', 'month', 'quarter', 'year', 'given', 'rejections',
   'vocabulary', 'locale', 'pack', 'words', 'distributions', 'uniform', 'lognormal', 'median', 'sigma', 'zipf',
-  'since', 'as',
+  'since', 'as', 'when', 'among', 'grammar',
 ];
 
 module.exports = grammar({
@@ -240,8 +240,17 @@ module.exports = grammar({
       'vocabulary', '{',
       optional(seq('locale', field('locale', choice($.identifier, $.string_literal)))),
       optional(seq('pack', field('pack', $.string_literal))),
-      repeat(choice($.word_list, $.binding)),
+      repeat(choice($.word_list, $.grammar_decl, $.binding)),
       '}',
+    ),
+
+    // A generative grammar for one text field: `Book.title grammar "titles.json" by Book.genre`.
+    grammar_decl: $ => seq(
+      field('field', $.path),
+      'grammar',
+      field('file', $.string_literal),
+      optional(seq('by', field('by', $.path))),
+      optional($.description),
     ),
 
     word_list: $ => seq(
@@ -269,13 +278,22 @@ module.exports = grammar({
 
     distribution: $ => seq(
       field('field', $.path),
+      optional(seq('when', field('when', $.condition))),
       choice(
         field('shape', 'uniform'),
         seq(field('shape', 'lognormal'), optional(seq('median', field('median', $.number))), optional(seq('sigma', field('sigma', $.number)))),
         seq(field('shape', 'zipf'), optional(field('exponent', $.number))),
+        seq(field('shape', 'among'), '[', optional(seq($.among_value, repeat(seq(optional(','), $.among_value)))), ']'),
       ),
       optional($.description),
     ),
+
+    // `when Product.rating = 5`: a field of the same entity (or its per parent) equal to a value.
+    condition: $ => seq(field('field', $.path), '=', field('value', $.scalar_value)),
+
+    among_value: $ => seq(field('value', $.scalar_value), optional(seq(':', field('weight', $.fraction)))),
+
+    scalar_value: $ => choice($.string_literal, $.boolean, $.number, $.member_name),
 
     options_block: $ => seq('options', '{', repeat($._option_entry), '}'),
 

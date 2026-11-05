@@ -77,6 +77,7 @@ export type SpecyDomainKeywordNames =
     | "agreement"
     | "alert"
     | "alpha"
+    | "among"
     | "analytics"
     | "and"
     | "anxious"
@@ -226,6 +227,7 @@ export type SpecyDomainKeywordNames =
     | "givens"
     | "goal"
     | "goals"
+    | "grammar"
     | "guard"
     | "h"
     | "handles"
@@ -1206,10 +1208,10 @@ export function isSynthIdent(item: unknown): item is SynthIdent {
     return isSynthKeywordAsIdent(item) || (typeof item === 'string' && (/[a-zA-Z_][a-zA-Z0-9_]*/.test(item) || /[A-Z][a-zA-Z0-9]*(?!\w)/.test(item)));
 }
 
-export type SynthKeywordAsIdent = 'alpha' | 'as' | 'by' | 'clock' | 'count' | 'csv' | 'curve' | 'day' | 'decimals' | 'distributions' | 'dwell' | 'exactly' | 'from' | 'given' | 'givens' | 'horizon' | 'json' | 'locale' | 'lognormal' | 'median' | 'mix' | 'month' | 'options' | 'outcomes' | 'over' | 'pack' | 'per' | 'populations' | 'quarter' | 'rate' | 'rejections' | 'rollup' | 'rows' | 'scenario' | 'seed' | 'share' | 'sigma' | 'since' | 'total' | 'uniform' | 'vocabulary' | 'week' | 'words' | 'year' | 'zipf';
+export type SynthKeywordAsIdent = 'alpha' | 'among' | 'as' | 'by' | 'clock' | 'count' | 'csv' | 'curve' | 'day' | 'decimals' | 'distributions' | 'dwell' | 'exactly' | 'from' | 'given' | 'givens' | 'grammar' | 'horizon' | 'json' | 'locale' | 'lognormal' | 'median' | 'mix' | 'month' | 'options' | 'outcomes' | 'over' | 'pack' | 'per' | 'populations' | 'quarter' | 'rate' | 'rejections' | 'rollup' | 'rows' | 'scenario' | 'seed' | 'share' | 'sigma' | 'since' | 'total' | 'uniform' | 'vocabulary' | 'week' | 'when' | 'words' | 'year' | 'zipf';
 
 export function isSynthKeywordAsIdent(item: unknown): item is SynthKeywordAsIdent {
-    return item === 'count' || item === 'per' || item === 'by' || item === 'rows' || item === 'over' || item === 'csv' || item === 'json' || item === 'alpha' || item === 'decimals' || item === 'dwell' || item === 'clock' || item === 'seed' || item === 'horizon' || item === 'scenario' || item === 'populations' || item === 'outcomes' || item === 'givens' || item === 'options' || item === 'curve' || item === 'total' || item === 'share' || item === 'mix' || item === 'rate' || item === 'rollup' || item === 'exactly' || item === 'from' || item === 'day' || item === 'week' || item === 'month' || item === 'quarter' || item === 'year' || item === 'given' || item === 'rejections' || item === 'vocabulary' || item === 'locale' || item === 'pack' || item === 'words' || item === 'distributions' || item === 'uniform' || item === 'lognormal' || item === 'median' || item === 'sigma' || item === 'zipf' || item === 'since' || item === 'as';
+    return item === 'count' || item === 'per' || item === 'by' || item === 'rows' || item === 'over' || item === 'csv' || item === 'json' || item === 'alpha' || item === 'decimals' || item === 'dwell' || item === 'clock' || item === 'seed' || item === 'horizon' || item === 'scenario' || item === 'populations' || item === 'outcomes' || item === 'givens' || item === 'options' || item === 'curve' || item === 'total' || item === 'share' || item === 'mix' || item === 'rate' || item === 'rollup' || item === 'exactly' || item === 'from' || item === 'day' || item === 'week' || item === 'month' || item === 'quarter' || item === 'year' || item === 'given' || item === 'rejections' || item === 'vocabulary' || item === 'locale' || item === 'pack' || item === 'words' || item === 'distributions' || item === 'uniform' || item === 'lognormal' || item === 'median' || item === 'sigma' || item === 'zipf' || item === 'since' || item === 'as' || item === 'when' || item === 'among' || item === 'grammar';
 }
 
 export type SynthPeriod = 'day' | 'month' | 'quarter' | 'week' | 'year';
@@ -1347,6 +1349,19 @@ export const AlphaOption = 'AlphaOption';
 
 export function isAlphaOption(item: unknown): item is AlphaOption {
     return reflection.isInstance(item, AlphaOption);
+}
+
+export interface AmongValue extends langium.AstNode {
+    readonly $container: DistributionDecl;
+    readonly $type: 'AmongValue';
+    value: ScalarValue;
+    weight?: Fraction;
+}
+
+export const AmongValue = 'AmongValue';
+
+export function isAmongValue(item: unknown): item is AmongValue {
+    return reflection.isInstance(item, AmongValue);
 }
 
 export interface ApplicationServiceDef extends langium.AstNode {
@@ -2672,7 +2687,7 @@ export function isDescribesClause(item: unknown): item is DescribesClause {
 }
 
 export interface Description extends langium.AstNode {
-    readonly $container: AggregateDef | AgreementDef | ApplicationServiceDef | ArchArchitectureDef | ArchAreaDef | ArchBoundedContextDecl | ArchChannelDef | ArchComponentDef | ArchConnectorDef | ArchContainerDef | ArchDependencyDef | ArchEnumDef | ArchEnvironmentDef | ArchExceptionDef | ArchExternalSystemDef | ArchFieldDef | ArchFlowDef | ArchHotspotDef | ArchInterfaceDef | ArchNodeDef | ArchOperationDef | ArchOrgExternalSystemDef | ArchOrgSystemDef | ArchOrganizationDef | ArchPersonDef | ArchPhaseDef | ArchResourceDef | ArchStructDef | ArchSystemDef | ArchUnionDef | BindingDecl | CommandDef | CommandTriggeredOp | ContextDef | CurveOutcome | DistributionDecl | DomainServiceDef | EntityDef | EnumDef | EnumValue | ErrorEventDef | EscalationChainDef | EscalationStep | EventDef | ExternalEventDef | FieldDecl | GivenDecl | InfrastructureServiceDef | InterfaceDef | InternalOp | InvariantDef | MixOutcome | ModuleDef | OperationSignature | OrganizationDef | PopulationDecl | PostconditionClause | PreconditionClause | QueryDef | RateOutcome | ReactionDef | ReadOnlyEntityDef | ReconciliationDef | ReferenceDecl | RepositoryDef | RollupOutcome | SafeOpDef | ScenarioDef | ScopedInvariantDef | ServiceCallClause | ShareOutcome | StateDef | StateMachineDef | SubdomainDecl | TemporalEventDef | TotalOutcome | TransitionDef | ValueDef | ValueOpDef | WordListDecl;
+    readonly $container: AggregateDef | AgreementDef | ApplicationServiceDef | ArchArchitectureDef | ArchAreaDef | ArchBoundedContextDecl | ArchChannelDef | ArchComponentDef | ArchConnectorDef | ArchContainerDef | ArchDependencyDef | ArchEnumDef | ArchEnvironmentDef | ArchExceptionDef | ArchExternalSystemDef | ArchFieldDef | ArchFlowDef | ArchHotspotDef | ArchInterfaceDef | ArchNodeDef | ArchOperationDef | ArchOrgExternalSystemDef | ArchOrgSystemDef | ArchOrganizationDef | ArchPersonDef | ArchPhaseDef | ArchResourceDef | ArchStructDef | ArchSystemDef | ArchUnionDef | BindingDecl | CommandDef | CommandTriggeredOp | ContextDef | CurveOutcome | DistributionDecl | DomainServiceDef | EntityDef | EnumDef | EnumValue | ErrorEventDef | EscalationChainDef | EscalationStep | EventDef | ExternalEventDef | FieldDecl | GivenDecl | GrammarDecl | InfrastructureServiceDef | InterfaceDef | InternalOp | InvariantDef | MixOutcome | ModuleDef | OperationSignature | OrganizationDef | PopulationDecl | PostconditionClause | PreconditionClause | QueryDef | RateOutcome | ReactionDef | ReadOnlyEntityDef | ReconciliationDef | ReferenceDecl | RepositoryDef | RollupOutcome | SafeOpDef | ScenarioDef | ScopedInvariantDef | ServiceCallClause | ShareOutcome | StateDef | StateMachineDef | SubdomainDecl | TemporalEventDef | TotalOutcome | TransitionDef | ValueDef | ValueOpDef | WordListDecl;
     readonly $type: 'Description';
     text: string;
 }
@@ -2690,8 +2705,10 @@ export interface DistributionDecl extends langium.AstNode {
     exponent?: string;
     field: SynthPath;
     median?: string;
-    shape: 'lognormal' | 'uniform' | 'zipf';
+    shape: 'among' | 'lognormal' | 'uniform' | 'zipf';
     sigma?: string;
+    values: Array<AmongValue>;
+    when?: WhenClause;
 }
 
 export const DistributionDecl = 'DistributionDecl';
@@ -3137,7 +3154,7 @@ export function isForeachClause(item: unknown): item is ForeachClause {
 }
 
 export interface Fraction extends langium.AstNode {
-    readonly $container: MixEntry | NullRateOption | RateOutcome | RatePoint | ShareEntry;
+    readonly $container: AmongValue | MixEntry | NullRateOption | RateOutcome | RatePoint | ShareEntry;
     readonly $type: 'Fraction';
     percent: boolean;
     value: string;
@@ -3189,6 +3206,21 @@ export const GivensBlock = 'GivensBlock';
 
 export function isGivensBlock(item: unknown): item is GivensBlock {
     return reflection.isInstance(item, GivensBlock);
+}
+
+export interface GrammarDecl extends langium.AstNode {
+    readonly $container: VocabularyBlock;
+    readonly $type: 'GrammarDecl';
+    by?: SynthPath;
+    description?: Description;
+    field: SynthPath;
+    file: string;
+}
+
+export const GrammarDecl = 'GrammarDecl';
+
+export function isGrammarDecl(item: unknown): item is GrammarDecl {
+    return reflection.isInstance(item, GrammarDecl);
 }
 
 export interface GuardBlock extends langium.AstNode {
@@ -5055,6 +5087,21 @@ export function isSatisfiesDecl(item: unknown): item is SatisfiesDecl {
     return reflection.isInstance(item, SatisfiesDecl);
 }
 
+export interface ScalarValue extends langium.AstNode {
+    readonly $container: AmongValue | WhenClause;
+    readonly $type: 'ScalarValue';
+    bool?: BooleanKw;
+    member?: SynthIdent;
+    number?: string;
+    text?: string;
+}
+
+export const ScalarValue = 'ScalarValue';
+
+export function isScalarValue(item: unknown): item is ScalarValue {
+    return reflection.isInstance(item, ScalarValue);
+}
+
 export interface ScenarioDef extends langium.AstNode {
     readonly $container: SynthFile;
     readonly $type: 'ScenarioDef';
@@ -5341,7 +5388,7 @@ export function isSynthFile(item: unknown): item is SynthFile {
 }
 
 export interface SynthPath extends langium.AstNode {
-    readonly $container: BindingDecl | CurveOutcome | DistributionDecl | MixOutcome | RateOutcome | RatePredicate | RollupOutcome | ShareOutcome | TotalOutcome | WordListDecl;
+    readonly $container: BindingDecl | CurveOutcome | DistributionDecl | GrammarDecl | MixOutcome | RateOutcome | RatePredicate | RollupOutcome | ShareOutcome | TotalOutcome | WhenClause | WordListDecl;
     readonly $type: 'SynthPath';
     root: langium.Reference<DomainRef>;
     steps: Array<SynthPathStep>;
@@ -5520,6 +5567,7 @@ export interface VocabularyBlock extends langium.AstNode {
     readonly $container: ScenarioDef;
     readonly $type: 'VocabularyBlock';
     bindings: Array<BindingDecl>;
+    grammars: Array<GrammarDecl>;
     locale?: LocaleName;
     pack?: string;
     words: Array<WordListDecl>;
@@ -5529,6 +5577,19 @@ export const VocabularyBlock = 'VocabularyBlock';
 
 export function isVocabularyBlock(item: unknown): item is VocabularyBlock {
     return reflection.isInstance(item, VocabularyBlock);
+}
+
+export interface WhenClause extends langium.AstNode {
+    readonly $container: DistributionDecl;
+    readonly $type: 'WhenClause';
+    field: SynthPath;
+    value: ScalarValue;
+}
+
+export const WhenClause = 'WhenClause';
+
+export function isWhenClause(item: unknown): item is WhenClause {
+    return reflection.isInstance(item, WhenClause);
 }
 
 export interface WordListDecl extends langium.AstNode {
@@ -5590,6 +5651,7 @@ export type SpecyDomainAstType = {
     AggregateEntitiesDecl: AggregateEntitiesDecl
     AgreementDef: AgreementDef
     AlphaOption: AlphaOption
+    AmongValue: AmongValue
     ApplicationServiceDef: ApplicationServiceDef
     ArchArchitectureDef: ArchArchitectureDef
     ArchArchitectureMember: ArchArchitectureMember
@@ -5745,6 +5807,7 @@ export type SpecyDomainAstType = {
     GivenDecl: GivenDecl
     GivenTarget: GivenTarget
     GivensBlock: GivensBlock
+    GrammarDecl: GrammarDecl
     GuardBlock: GuardBlock
     HorizonDecl: HorizonDecl
     IdentityDecl: IdentityDecl
@@ -5896,6 +5959,7 @@ export type SpecyDomainAstType = {
     SafeOperationClause: SafeOperationClause
     SafeOperationsBlock: SafeOperationsBlock
     SatisfiesDecl: SatisfiesDecl
+    ScalarValue: ScalarValue
     ScenarioDef: ScenarioDef
     ScopedInvariantDef: ScopedInvariantDef
     SeedDecl: SeedDecl
@@ -5932,13 +5996,14 @@ export type SpecyDomainAstType = {
     ValueOpDef: ValueOpDef
     ValueOperationsBlock: ValueOperationsBlock
     VocabularyBlock: VocabularyBlock
+    WhenClause: WhenClause
     WordListDecl: WordListDecl
 }
 
 export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
 
     getAllTypes(): string[] {
-        return [AboutClause, AbsoluteAnchor, AggregateDef, AggregateEntitiesDecl, AgreementDef, AlphaOption, ApplicationServiceDef, ArchArchitectureDef, ArchArchitectureMember, ArchAreaDef, ArchAreaRef, ArchArgDecl, ArchBooleanLiteral, ArchBoundedContextDecl, ArchBoundedContextRef, ArchCarriedConcept, ArchChannelDef, ArchCollectionType, ArchComponentClause, ArchComponentDef, ArchConceptRef, ArchConcernRef, ArchConnectorDef, ArchConnectorRef, ArchConsumesClause, ArchContainerClause, ArchContainerDef, ArchDependencyDef, ArchDeployClause, ArchDetailedInDecl, ArchDomainSourceDecl, ArchEnumDef, ArchEnumMember, ArchEnvironmentDef, ArchEnvironmentMember, ArchExceptionDef, ArchExternalSystemClause, ArchExternalSystemDef, ArchFieldDef, ArchFieldType, ArchFile, ArchFlowConcern, ArchFlowDef, ArchHandlesClause, ArchHotspotDef, ArchImportDecl, ArchInterfaceDef, ArchLevel0Clause, ArchLiteral, ArchMastersClause, ArchMechanism, ArchMetadataBlock, ArchMetadataEntry, ArchNamedType, ArchNamedTypeDef, ArchNodeAttribute, ArchNodeDef, ArchNodeMember, ArchNullLiteral, ArchNumberLiteral, ArchOperationDef, ArchOrgExternalSystemClause, ArchOrgExternalSystemDef, ArchOrgSystemDef, ArchOrganizationDef, ArchOrganizationMember, ArchPersonDef, ArchPhaseDef, ArchPhasedMechanism, ArchPrimitiveType, ArchProvidesClause, ArchPublishesClause, ArchRealizesDecl, ArchRealizesRef, ArchRequirementsSourceDecl, ArchRequiresClause, ArchResourceDef, ArchRoot, ArchStringLiteral, ArchStructDef, ArchSubscribesClause, ArchSystemDef, ArchSystemMember, ArchTechnologyDecl, ArchTypedefDef, ArchUnionDef, ArchUnionMember, ArchUsedByClause, ArgList, ArrayIndex, ArrayLiteral, AsOfDecl, AssignmentClause, BinaryExpr, BindingDecl, BooleanLiteral, BooleanLiteralExpr, CallExpr, CallsBlock, CausedByClause, CollectionType, CommandDef, CommandTriggeredOp, CompensationClause, ConditionClause, ConditionalExpr, Constraint, ContainsExpr, ContextDef, ContextMapBlock, ContextRelation, CreatesClause, CurveOutcome, CurvePoint, DecimalsOption, DefaultDwellOption, Definition, DependsBlock, DescribedByClause, DescribesClause, Description, DistributionDecl, DistributionsBlock, DomainFile, DomainRef, DomainServiceDef, DomainSourceDecl, DotPath, DotPathExpr, DownstreamRelation, DuplicateDetection, DurationLiteral, DwellBlock, DwellEntry, EffectsClause, EmitsClause, EnforcementStrategy, EntityDef, EnumDef, EnumValue, ErrorEventDef, EscalationAction, EscalationChainDef, EscalationStep, EventDef, EveryExpr, ExposedByClause, ExposesBlock, ExposesClause, Expression, ExternalEventDef, FieldDecl, FieldType, FieldsBlock, ForeachClause, Fraction, GenericType, GivenColumn, GivenDecl, GivenTarget, GivensBlock, GuardBlock, HorizonDecl, IdentityDecl, IfExpr, InExpr, InfrastructureServiceDef, InterfaceDef, InterfaceMember, InternalOp, InvariantDef, InvariantsBlock, IsDefinedExpr, IsNotDefinedExpr, IsNotNullExpr, IsNullExpr, LiteralValue, MatchPattern, MatchesExpr, MetadataBlock, MetadataEntry, MixEntry, MixOutcome, ModelsClause, ModuleDef, MustBlock, NamedArg, NamedArgList, NotInExpr, NullLiteralExpr, NullRateOption, NumberLiteral, NumberLiteralExpr, OperationBody, OperationClause, OperationDef, OperationSignature, OperationsBlock, OptionEntry, OptionsBlock, OrganizationDef, OutcomeDecl, OutcomesBlock, ParamDecl, ParamList, ParenExpr, ParticipantsClause, PathSegment, PopulationDecl, PopulationsBlock, PostconditionClause, PrdAcceptanceCriterion, PrdAssumptionDef, PrdConstraintDef, PrdDependsOnDecl, PrdDesignReference, PrdDesignReferencesBlock, PrdDesiredOutcome, PrdDesiredOutcomesBlock, PrdEntryCriteriaBlock, PrdEvidenceDef, PrdExitCriteriaBlock, PrdFeatureDef, PrdFile, PrdGoalDef, PrdHypothesisDef, PrdIncludesBlock, PrdJobDef, PrdJourneyDef, PrdMember, PrdMetricBlock, PrdNonGoalsBlock, PrdOpenQuestionDef, PrdPersonaDef, PrdProblemBlock, PrdProductDef, PrdReleaseDef, PrdReleaseMember, PrdReleaseStatusDecl, PrdRiskDef, PrdScopeBlock, PrdStepActionDecl, PrdStepChannelDecl, PrdStepDef, PrdStepMember, PrdStepOrderDecl, PrdStepSystemResponseDecl, PrdStepToneDecl, PrdStepsBlock, PrdStoriesBlock, PrdStoryDef, PrdTargetDateDecl, PrdThemeDecl, PrdVisionDecl, PreconditionClause, PredicateBlock, PrimitiveType, ProjectedByClause, QuantifierExpr, QueryDef, RateBinary, RateExpr, RateNot, RateOutcome, RatePoint, RatePredicate, ReactionDef, ReactionLatencyOption, ReadOnlyEntityDef, ReadsFromClause, ReconciliationDef, ReconciliationTrigger, RecurringAnchor, ReferenceDecl, ReferencesBlock, RejectionsOption, RelativeAnchor, RepositoryDef, ReqClause, ReqConflictsWith, ReqDecomposedInto, ReqDependsOn, ReqDomainRef, ReqFile, ReqModuleBlock, ReqPrdSourceDecl, ReqRationale, ReqRequirementDef, ReqSatisfactionLink, ReqSatisfiedBy, ReqSetDef, ReqSetMember, ReqSourceDecl, ReqTraceClause, RequirementsSourceDecl, RequiresBlock, ResolvesClause, ReturnsClause, RollupOutcome, RowArray, RowBoolean, RowEntry, RowLiteral, RowNull, RowNumber, RowString, RowValue, SafeForeachClause, SafeOpDef, SafeOperationClause, SafeOperationsBlock, SatisfiesDecl, ScenarioDef, ScopedInvariantDef, SeedDecl, ServiceCallClause, SetsClause, ShareEntry, ShareGroup, ShareOutcome, Shortname, SignatureOperationsBlock, SourcedFromClause, StateDef, StateMachineDef, StatesBlock, StringLiteral, StringLiteralExpr, SubdomainDecl, SymmetricRelation, SyncedViaClause, SynthFile, SynthPath, SynthPathStep, TemporalAnchor, TemporalEventDef, TopLevelElement, TotalOutcome, TransitionDef, TriggeredByClause, UnaryExpr, UpstreamRelation, ValueDef, ValueExpr, ValueList, ValueOpDef, ValueOperationsBlock, VocabularyBlock, WordListDecl];
+        return [AboutClause, AbsoluteAnchor, AggregateDef, AggregateEntitiesDecl, AgreementDef, AlphaOption, AmongValue, ApplicationServiceDef, ArchArchitectureDef, ArchArchitectureMember, ArchAreaDef, ArchAreaRef, ArchArgDecl, ArchBooleanLiteral, ArchBoundedContextDecl, ArchBoundedContextRef, ArchCarriedConcept, ArchChannelDef, ArchCollectionType, ArchComponentClause, ArchComponentDef, ArchConceptRef, ArchConcernRef, ArchConnectorDef, ArchConnectorRef, ArchConsumesClause, ArchContainerClause, ArchContainerDef, ArchDependencyDef, ArchDeployClause, ArchDetailedInDecl, ArchDomainSourceDecl, ArchEnumDef, ArchEnumMember, ArchEnvironmentDef, ArchEnvironmentMember, ArchExceptionDef, ArchExternalSystemClause, ArchExternalSystemDef, ArchFieldDef, ArchFieldType, ArchFile, ArchFlowConcern, ArchFlowDef, ArchHandlesClause, ArchHotspotDef, ArchImportDecl, ArchInterfaceDef, ArchLevel0Clause, ArchLiteral, ArchMastersClause, ArchMechanism, ArchMetadataBlock, ArchMetadataEntry, ArchNamedType, ArchNamedTypeDef, ArchNodeAttribute, ArchNodeDef, ArchNodeMember, ArchNullLiteral, ArchNumberLiteral, ArchOperationDef, ArchOrgExternalSystemClause, ArchOrgExternalSystemDef, ArchOrgSystemDef, ArchOrganizationDef, ArchOrganizationMember, ArchPersonDef, ArchPhaseDef, ArchPhasedMechanism, ArchPrimitiveType, ArchProvidesClause, ArchPublishesClause, ArchRealizesDecl, ArchRealizesRef, ArchRequirementsSourceDecl, ArchRequiresClause, ArchResourceDef, ArchRoot, ArchStringLiteral, ArchStructDef, ArchSubscribesClause, ArchSystemDef, ArchSystemMember, ArchTechnologyDecl, ArchTypedefDef, ArchUnionDef, ArchUnionMember, ArchUsedByClause, ArgList, ArrayIndex, ArrayLiteral, AsOfDecl, AssignmentClause, BinaryExpr, BindingDecl, BooleanLiteral, BooleanLiteralExpr, CallExpr, CallsBlock, CausedByClause, CollectionType, CommandDef, CommandTriggeredOp, CompensationClause, ConditionClause, ConditionalExpr, Constraint, ContainsExpr, ContextDef, ContextMapBlock, ContextRelation, CreatesClause, CurveOutcome, CurvePoint, DecimalsOption, DefaultDwellOption, Definition, DependsBlock, DescribedByClause, DescribesClause, Description, DistributionDecl, DistributionsBlock, DomainFile, DomainRef, DomainServiceDef, DomainSourceDecl, DotPath, DotPathExpr, DownstreamRelation, DuplicateDetection, DurationLiteral, DwellBlock, DwellEntry, EffectsClause, EmitsClause, EnforcementStrategy, EntityDef, EnumDef, EnumValue, ErrorEventDef, EscalationAction, EscalationChainDef, EscalationStep, EventDef, EveryExpr, ExposedByClause, ExposesBlock, ExposesClause, Expression, ExternalEventDef, FieldDecl, FieldType, FieldsBlock, ForeachClause, Fraction, GenericType, GivenColumn, GivenDecl, GivenTarget, GivensBlock, GrammarDecl, GuardBlock, HorizonDecl, IdentityDecl, IfExpr, InExpr, InfrastructureServiceDef, InterfaceDef, InterfaceMember, InternalOp, InvariantDef, InvariantsBlock, IsDefinedExpr, IsNotDefinedExpr, IsNotNullExpr, IsNullExpr, LiteralValue, MatchPattern, MatchesExpr, MetadataBlock, MetadataEntry, MixEntry, MixOutcome, ModelsClause, ModuleDef, MustBlock, NamedArg, NamedArgList, NotInExpr, NullLiteralExpr, NullRateOption, NumberLiteral, NumberLiteralExpr, OperationBody, OperationClause, OperationDef, OperationSignature, OperationsBlock, OptionEntry, OptionsBlock, OrganizationDef, OutcomeDecl, OutcomesBlock, ParamDecl, ParamList, ParenExpr, ParticipantsClause, PathSegment, PopulationDecl, PopulationsBlock, PostconditionClause, PrdAcceptanceCriterion, PrdAssumptionDef, PrdConstraintDef, PrdDependsOnDecl, PrdDesignReference, PrdDesignReferencesBlock, PrdDesiredOutcome, PrdDesiredOutcomesBlock, PrdEntryCriteriaBlock, PrdEvidenceDef, PrdExitCriteriaBlock, PrdFeatureDef, PrdFile, PrdGoalDef, PrdHypothesisDef, PrdIncludesBlock, PrdJobDef, PrdJourneyDef, PrdMember, PrdMetricBlock, PrdNonGoalsBlock, PrdOpenQuestionDef, PrdPersonaDef, PrdProblemBlock, PrdProductDef, PrdReleaseDef, PrdReleaseMember, PrdReleaseStatusDecl, PrdRiskDef, PrdScopeBlock, PrdStepActionDecl, PrdStepChannelDecl, PrdStepDef, PrdStepMember, PrdStepOrderDecl, PrdStepSystemResponseDecl, PrdStepToneDecl, PrdStepsBlock, PrdStoriesBlock, PrdStoryDef, PrdTargetDateDecl, PrdThemeDecl, PrdVisionDecl, PreconditionClause, PredicateBlock, PrimitiveType, ProjectedByClause, QuantifierExpr, QueryDef, RateBinary, RateExpr, RateNot, RateOutcome, RatePoint, RatePredicate, ReactionDef, ReactionLatencyOption, ReadOnlyEntityDef, ReadsFromClause, ReconciliationDef, ReconciliationTrigger, RecurringAnchor, ReferenceDecl, ReferencesBlock, RejectionsOption, RelativeAnchor, RepositoryDef, ReqClause, ReqConflictsWith, ReqDecomposedInto, ReqDependsOn, ReqDomainRef, ReqFile, ReqModuleBlock, ReqPrdSourceDecl, ReqRationale, ReqRequirementDef, ReqSatisfactionLink, ReqSatisfiedBy, ReqSetDef, ReqSetMember, ReqSourceDecl, ReqTraceClause, RequirementsSourceDecl, RequiresBlock, ResolvesClause, ReturnsClause, RollupOutcome, RowArray, RowBoolean, RowEntry, RowLiteral, RowNull, RowNumber, RowString, RowValue, SafeForeachClause, SafeOpDef, SafeOperationClause, SafeOperationsBlock, SatisfiesDecl, ScalarValue, ScenarioDef, ScopedInvariantDef, SeedDecl, ServiceCallClause, SetsClause, ShareEntry, ShareGroup, ShareOutcome, Shortname, SignatureOperationsBlock, SourcedFromClause, StateDef, StateMachineDef, StatesBlock, StringLiteral, StringLiteralExpr, SubdomainDecl, SymmetricRelation, SyncedViaClause, SynthFile, SynthPath, SynthPathStep, TemporalAnchor, TemporalEventDef, TopLevelElement, TotalOutcome, TransitionDef, TriggeredByClause, UnaryExpr, UpstreamRelation, ValueDef, ValueExpr, ValueList, ValueOpDef, ValueOperationsBlock, VocabularyBlock, WhenClause, WordListDecl];
     }
 
     protected override computeIsSubtype(subtype: string, supertype: string): boolean {
@@ -6318,6 +6383,15 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     name: AlphaOption,
                     properties: [
                         { name: 'value' }
+                    ]
+                };
+            }
+            case AmongValue: {
+                return {
+                    name: AmongValue,
+                    properties: [
+                        { name: 'value' },
+                        { name: 'weight' }
                     ]
                 };
             }
@@ -7281,7 +7355,9 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                         { name: 'field' },
                         { name: 'median' },
                         { name: 'shape' },
-                        { name: 'sigma' }
+                        { name: 'sigma' },
+                        { name: 'values', defaultValue: [] },
+                        { name: 'when' }
                     ]
                 };
             }
@@ -7635,6 +7711,17 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     name: GivensBlock,
                     properties: [
                         { name: 'givens', defaultValue: [] }
+                    ]
+                };
+            }
+            case GrammarDecl: {
+                return {
+                    name: GrammarDecl,
+                    properties: [
+                        { name: 'by' },
+                        { name: 'description' },
+                        { name: 'field' },
+                        { name: 'file' }
                     ]
                 };
             }
@@ -8964,6 +9051,17 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     ]
                 };
             }
+            case ScalarValue: {
+                return {
+                    name: ScalarValue,
+                    properties: [
+                        { name: 'bool' },
+                        { name: 'member' },
+                        { name: 'number' },
+                        { name: 'text' }
+                    ]
+                };
+            }
             case ScenarioDef: {
                 return {
                     name: ScenarioDef,
@@ -9303,9 +9401,19 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                     name: VocabularyBlock,
                     properties: [
                         { name: 'bindings', defaultValue: [] },
+                        { name: 'grammars', defaultValue: [] },
                         { name: 'locale' },
                         { name: 'pack' },
                         { name: 'words', defaultValue: [] }
+                    ]
+                };
+            }
+            case WhenClause: {
+                return {
+                    name: WhenClause,
+                    properties: [
+                        { name: 'field' },
+                        { name: 'value' }
                     ]
                 };
             }

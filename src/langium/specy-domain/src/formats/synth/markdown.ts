@@ -44,7 +44,7 @@ import {
     type MarkdownReadResult,
     type Section,
 } from '../kit/markdown-reader.js';
-import { dateToken, distributionShape, durationToken, instantToken, num, pct, rowLiteral } from './printer.js';
+import { dateToken, distributionShape, durationToken, instantToken, num, pct, rowLiteral, scalarToken } from './printer.js';
 
 type Rec = Record<string, unknown>;
 
@@ -107,9 +107,21 @@ export function scenarioToMarkdown(doc: ScenarioJson): string {
     }
     if (d.distributions?.length) {
         w.heading(2, 'Distributions');
+        const ds = d.distributions as Rec[];
+        const conditional = ds.some(x => x.when);
+        const among = ds.some(x => x.shape === 'among');
         w.table(
-            ['field', 'shape', 'median', 'sigma', 'exponent', 'description'],
-            (d.distributions as Rec[]).map(x => [code(String(x.field)), String(x.shape), optNum(x.median), optNum(x.sigma), optNum(x.exponent), (x.description as string) ?? '']),
+            ['field', ...(conditional ? ['when'] : []), 'shape', 'median', 'sigma', 'exponent', ...(among ? ['values'] : []), 'description'],
+            ds.map(x => [
+                code(String(x.field)),
+                ...(conditional ? [x.when ? code(`${(x.when as Rec).field} = ${scalarToken((x.when as Rec).value)}`) : ''] : []),
+                String(x.shape),
+                optNum(x.median),
+                optNum(x.sigma),
+                optNum(x.exponent),
+                ...(among ? [x.shape === 'among' ? code(distributionShape(x).replace(/^among /, '')) : ''] : []),
+                (x.description as string) ?? '',
+            ]),
         );
     }
     if (d.options && Object.keys(d.options).length) {
@@ -269,6 +281,13 @@ function writeVocabulary(w: MarkdownWriter, v: Rec): void {
                 const values = x.file !== undefined ? `file ${code(String(x.file))}` : ((x.values as string[]) ?? []).map(s => JSON.stringify(s)).join(', ');
                 return `${code(String(x.field))}: ${values}${x.description ? ` — ${x.description}` : ''}`;
             }),
+        );
+    }
+    const grammars = (v.grammars as Rec[]) ?? [];
+    if (grammars.length) {
+        w.labelList(
+            'Grammars',
+            grammars.map(g => `${code(String(g.field))}: file ${code(String(g.file ?? `${String(g.field).replace(/\./g, '-')}.grammar.json`))}${g.by ? ` by ${code(String(g.by))}` : ''}${g.description ? ` — ${g.description}` : ''}`),
         );
     }
     const bindings = (v.bindings as Rec[]) ?? [];
@@ -977,7 +996,7 @@ class SynthReader {
                 const rest: ListItem[] = [];
                 for (const i of list.items) {
                     const l = itemLabel(i);
-                    if (l && ['locale', 'language', 'lang', 'pack', 'locale pack', 'pack file', 'words', 'word lists', 'lists', 'bindings', 'kinds'].includes(l.label)) parts.labels.push({ label: l.label, value: l.value, line: i.line, list: i.children.length ? i.children : undefined });
+                    if (l && ['locale', 'language', 'lang', 'pack', 'locale pack', 'pack file', 'words', 'word lists', 'lists', 'grammars', 'grammar', 'bindings', 'kinds'].includes(l.label)) parts.labels.push({ label: l.label, value: l.value, line: i.line, list: i.children.length ? i.children : undefined });
                     else rest.push(i);
                 }
                 if (rest.length) parts.lists.push({ items: rest, line: rest[0].line });
@@ -991,6 +1010,8 @@ class SynthReader {
             if (pack) this.b.line(`pack ${quote(pathToken(pack.value).replace(/^"|"$/g, ''))}`, pack.line);
             const words = this.take(parts, 'words', 'word lists', 'lists');
             const wordItems = words?.list ?? [];
+            const grammars = this.take(parts, 'grammars', 'grammar');
+            for (const i of grammars?.list ?? []) this.grammar(i, grammars?.line ?? i.line);
             const bindings = this.take(parts, 'bindings', 'kinds', 'as');
             const bindingItems = bindings?.list ?? [];
             // A bare list mixes word lists (`path: …`) and bindings (`path as kind`).
@@ -1008,6 +1029,8 @@ class SynthReader {
             if (table) {
                 const fi = columnOf(table, 'field', 'path', 'target');
                 const wi = columnOf(table, 'words', 'values', 'file', 'list');
+                const gi = columnOf(table, 'grammar');
+                const bi = columnOf(table, 'by');
                 const ki = columnOf(table, 'kind', 'as');
                 const di = columnOf(table, 'description', 'notes');
                 table.rows.forEach((row, n) => {
@@ -1016,6 +1039,7 @@ class SynthReader {
                     const d = di !== -1 && row[di] ? ` :: ${quote(stripInline(row[di]))}` : '';
                     if (!field) return;
                     if (ki !== -1 && row[ki]?.trim()) this.b.line(`${field} as ${row[ki].trim()}${d}`, at);
+                    else if (gi !== -1 && row[gi]?.trim()) this.b.line(`${field} grammar ${quote(unquoteCode(row[gi]).trim().replace(/^(?:file|from)\s+/, '').replace(/^"|"$/g, ''))}${bi !== -1 && row[bi]?.trim() ? ` by ${unquoteCode(row[bi]).trim()}` : ''}${d}`, at);
                     else if (wi !== -1 && row[wi]?.trim()) this.b.line(`${field} words ${this.wordValues(row[wi])}${d}`, at);
                     else this.b.unmapped({ line: at }, `row "${row.join(' | ')}"`, 'expected words/file or kind');
                 });
@@ -1026,7 +1050,7 @@ class SynthReader {
         this.b.close(line);
     }
 
-    /** `- Product.name: file "wines.txt" — description` or `- Product.name: "a", "b"`. */
+    /** `- Product.name: file "wines.txt" — description` or `- Product.name: "a", "b"`; `- Book.title: grammar "titles.json" by Book.genre` is a grammar. */
     private wordList(item: ListItem, line: number): void {
         const { head, tail } = splitDash(item.text);
         const m = /^`?([A-Za-z_][\w.]*)`?\s*[:：]\s*(.+)$/.exec(stripInline(head).replace(/^`|`$/g, ''));
@@ -1034,7 +1058,22 @@ class SynthReader {
             this.b.unmapped({ line: item.line }, `word list "${item.text}"`, 'expected "path: values" or "path: file name"');
             return;
         }
+        if (/^grammar\b/i.test(m[2].trim().replace(/`/g, ''))) {
+            this.grammar(item, line);
+            return;
+        }
         this.b.line(`${m[1]} words ${this.wordValues(m[2])}${tail ? ` :: ${quote(stripInline(tail))}` : ''}`, item.line || line);
+    }
+
+    /** `- Book.title: grammar "titles.json" by Book.genre — description`, or `- Book.title: file "titles.json" by Book.genre` under Grammars. */
+    private grammar(item: ListItem, line: number): void {
+        const { head, tail } = splitDash(item.text);
+        const m = /^`?([A-Za-z_][\w.]*)`?\s*[:：]\s*(?:grammar|file|from)?\s*"?([^"\s]+?)"?(?:\s+by\s+`?([A-Za-z_][\w.]*)`?)?\s*$/.exec(stripInline(head).replace(/`/g, ''));
+        if (!m) {
+            this.b.unmapped({ line: item.line }, `grammar "${item.text}"`, 'expected "path: grammar file name [by path]"');
+            return;
+        }
+        this.b.line(`${m[1]} grammar ${quote(m[2])}${m[3] ? ` by ${m[3]}` : ''}${tail ? ` :: ${quote(stripInline(tail))}` : ''}`, item.line || line);
     }
 
     private wordValues(text: string): string {
@@ -1071,16 +1110,20 @@ class SynthReader {
                     if (median) d.median = Number(median);
                     if (sigma) d.sigma = Number(sigma);
                     if (exponent) d.exponent = Number(exponent);
+                    const when = stripInline(cell(rec, 'when', 'condition', 'if')).replace(/`/g, '').trim();
+                    const values = stripInline(cell(rec, 'values', 'among')).replace(/`/g, '').trim();
                     const desc = stripInline(cell(rec, 'description', 'notes', 'meaning'));
-                    this.b.line(`${field} ${distributionShape(d)}${desc ? ` :: ${quote(desc)}` : ''}`, table.line + 2 + n);
+                    const whenText = /^[A-Za-z_][\w.]*\s*=\s*\S+$/.test(when) ? ` when ${when.replace(/\s*=\s*/, ' = ')}` : '';
+                    const shapeText = shape === 'among' ? `among ${/^\[.*\]$/.test(values) ? values : `[ ${values} ]`}` : distributionShape(d);
+                    this.b.line(`${field}${whenText} ${shapeText}${desc ? ` :: ${quote(desc)}` : ''}`, table.line + 2 + n);
                 });
             }
             for (const list of parts.lists.splice(0, parts.lists.length)) {
                 for (const item of list.items) {
                     const { head, tail } = splitDash(item.text);
-                    const m = /^`?([A-Za-z_][\w.]*)`?\s*[:：]\s*(uniform|lognormal|zipf)\b(.*)$/i.exec(stripInline(head).replace(/`/g, ''));
-                    if (m) this.b.line(`${m[1]} ${m[2].toLowerCase()}${m[3].replace(/\s+/g, ' ').trimEnd()}${tail ? ` :: ${quote(stripInline(tail))}` : ''}`, item.line);
-                    else this.b.unmapped({ line: item.line }, `distribution "${item.text}"`, 'expected "path: uniform | lognormal [median m] [sigma s] | zipf [exponent]"');
+                    const m = /^`?([A-Za-z_][\w.]*)`?(?:\s+when\s+([A-Za-z_][\w.]*)\s*=\s*(\S+?))?\s*[:：]\s*(uniform|lognormal|zipf|among)\b(.*)$/i.exec(stripInline(head).replace(/`/g, ''));
+                    if (m) this.b.line(`${m[1]}${m[2] ? ` when ${m[2]} = ${m[3]}` : ''} ${m[4].toLowerCase()}${m[5].replace(/\s+/g, ' ').trimEnd()}${tail ? ` :: ${quote(stripInline(tail))}` : ''}`, item.line);
+                    else this.b.unmapped({ line: item.line }, `distribution "${item.text}"`, 'expected "path [when path = value]: uniform | lognormal [median m] [sigma s] | zipf [exponent] | among [ values ]"');
                 }
             }
             this.islands(parts);

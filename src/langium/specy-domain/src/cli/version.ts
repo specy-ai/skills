@@ -10,10 +10,11 @@
  * `metadata` of operations, states, transitions and scoped invariants, marks
  * `null` literals and negated `contains` with a `kind`, and collapses the line
  * breaks of multi-line strings; the `specy` CLI converts every language between
- * DSL, JSON, YAML and Markdown). Consumers such as synthy
+ * DSL, JSON, YAML and Markdown; 1.8.0: conditional distribution rules (`when`),
+ * the `among` shape and vocabulary `grammars`). Consumers such as synthy
  * pin the minimum they accept.
  */
-export const PARSER_VERSION = '1.7.0';
+export const PARSER_VERSION = '1.8.0';
 
 /**
  * The JSON Schema of the scenario document (`src/schemas/synth-scenario.schema.json`

@@ -168,12 +168,19 @@ rowArray         = "[" , [ rowValue , { [ "," ] , rowValue } ] , "]" ;
 vocabularyBlock  = "vocabulary" , "{"
                  , [ "locale" , ( identifier | stringLiteral ) ]   // intl, fr, "en-GB", …
                  , [ "pack" , stringLiteral ]                      // a pack file next to the scenario
-                 , { comment | wordList | binding }                // in any order
+                 , { comment | wordList | grammar | binding }      // in any order
                  , "}" ;
 
 wordList         = path , "words"
                  , ( stringLiteral                                 // a file: one value per line, or a JSON list
                    | "[" , [ stringLiteral , { [ "," ] , stringLiteral } ] , "]" )
+                 , [ description ] ;
+
+// A generative grammar for one text field: a JSON file next to the scenario, each
+// key a symbol, each value a list of texts in which #symbol# names another symbol
+// (#noun.capitalize# applies a modifier). synthy expands `origin`, or the symbol
+// the row's value of `by` names.
+grammar          = path , "grammar" , stringLiteral , [ "by" , path ]
                  , [ description ] ;
 
 // A typed value: the kind of value synthy generates for a value type (Iban), one
@@ -194,11 +201,19 @@ kindName         = "email" | "phone" | "url" | "slug" | "postcode" | "iban" | "b
 
 distributionsBlock = "distributions" , "{" , { comment | distribution } , "}" ;
 
-distribution     = path
+// A rule with `when` holds on the rows where one field of the same entity (or of
+// its per parent) equals a value; the rule without `when` on the others. `among`
+// draws one of the listed values, equally likely or by weight.
+distribution     = path , [ "when" , condition ]
                  , ( "uniform"
                    | "lognormal" , [ "median" , number ] , [ "sigma" , number ]
-                   | "zipf" , [ number ] )
+                   | "zipf" , [ number ]
+                   | "among" , "[" , [ amongValue , { [ "," ] , amongValue } ] , "]" )
                  , [ description ] ;
+
+condition        = path , "=" , scalarValue ;
+amongValue       = scalarValue , [ ":" , fraction ] ;
+scalarValue      = stringLiteral | booleanLiteral | number | memberName ;   // a member or a text as an identifier
 
 // -----------------------------------------------------------------------------
 // Options  (metamodel: Options)
@@ -242,7 +257,7 @@ keywordAsIdent   = "count" | "per" | "by" | "rows" | "over" | "csv" | "json" | "
                  | "curve" | "total" | "share" | "mix" | "rate" | "rollup" | "exactly" | "from"
                  | "day" | "week" | "month" | "quarter" | "year" | "given" | "rejections"
                  | "vocabulary" | "locale" | "pack" | "words" | "distributions" | "uniform" | "lognormal"
-                 | "median" | "sigma" | "zipf" | "since" | "as" ;
+                 | "median" | "sigma" | "zipf" | "since" | "as" | "when" | "among" | "grammar" ;
 
 // -----------------------------------------------------------------------------
 // Shared with the domain grammar (src/grammars/domain.ebnf)
@@ -339,10 +354,23 @@ comment          = "//" , { character - newline } , newline
 //     source with rows, once, and its values fit the field's length and pattern. (SYN-E024)
 // 16c. A distribution's shape fits its field (numbers: uniform, lognormal, zipf
 //     on whole numbers; dates: uniform; enums, word-listed text, references:
-//     uniform, zipf); sigma and exponent in (0, 5]; median > 0 and within the
-//     field's bounds; one distribution per field.                         (SYN-E025)
+//     uniform, zipf; enums, booleans, numbers, text: among); sigma and exponent in
+//     (0, 5]; median > 0 and within the field's bounds; an among lists values the
+//     field can hold, each once, within its bounds, lengths and pattern, weighted
+//     all or none and summing to 1; one distribution per field and condition. (SYN-E025)
 //     On a column a share, a rate or a mix sets, a shape never applies; on a
-//     column a curve, total or rollup sums, a median is ignored.   (warning SYN-W013)
+//     column a curve, total or rollup sums, a median is ignored and an among
+//     never applies.                                               (warning SYN-W013)
+// 16e. A condition (`when`) reads one enum, boolean, whole-number or text field
+//     of the rule's own entity or of its per parent, stored on that table (not a
+//     reference, not through one, not derived), not inside the value the rule
+//     decides, compared with a value the field can hold; a reference takes no
+//     condition.                                                           (SYN-E025)
+// 16f. A grammar names a text field of a row source with rows, once, not also
+//     listed in words; its `by` reads a field as 16e; the file is a JSON object
+//     of symbol → texts whose #symbol# references are defined (or built-in) and
+//     whose modifiers exist, with an origin or a symbol per value of `by`. (SYN-E024)
+// 16g. The rules and grammars of one entity read each other in no cycle.  (SYN-E026)
 // 16d. A binding names a known kind, once per target. Its target is a value type,
 //     one of its fields, or a path from any entity or value type (no population
 //     needed) that does not cross a reference. A text kind (email … plate, text)

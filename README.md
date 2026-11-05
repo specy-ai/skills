@@ -557,7 +557,8 @@ A `.synth` file is written *against* one `.domain` (`domain-source`) and never r
 Realism never costs conformance:
 - a given (a real catalogue, master data, the instances of an `enum X of ValueType`) maps its file's columns to the model, is checked cell by cell, and flows through unchanged while synthy generates the columns it leaves out;
 - a vocabulary picks a locale pack (`intl`, `en`, `fr`, `de`, `es`, `it`, `nl`, `"en-GB"`, or a pack file) and word lists for single text fields, and swapping packs changes text columns only;
-- distributions (`uniform`, `lognormal`, `zipf`) shape values (skewed prices, best sellers, regulars) without moving an outcome; the certificate's plausibility section compares them with the data.
+- distributions (`uniform`, `lognormal`, `zipf`, `among`) shape values (skewed prices, best sellers, regulars, fixed values) without moving an outcome; a rule with `when` holds where one field of the same entity or its per parent equals a value (`Order.totalAmount.currency when Order.shippingAddress.country = GB among [ GBP ]`), so a row is drawn attribute by attribute; the certificate's plausibility section compares them with the data;
+- a grammar composes a text field in the Tracery style (`Book.title grammar "titles.json" by Book.genre`): written once as data, expanded per row by the engine, never by a language model.
 
 Outcomes go beyond single columns:
 - a rate's predicate combines atoms with `and`, `or`, `not`;

@@ -1,0 +1,9 @@
+{
+  "origin": ["#opening.capitalize#, #feature#."],
+  "true": ["#opening.capitalize#, #feature#. In stock and ships from #city#."],
+  "false": ["#opening.capitalize#, #feature#. Temporarily sold out."],
+  "opening": ["made to last", "designed in #city#", "our best seller", "a quiet favourite", "new this season"],
+  "feature": ["with a #adj# finish", "in #adj# #material#", "light enough to carry everywhere", "built for everyday use"],
+  "adj": ["matte", "warm", "brushed", "natural", "deep"],
+  "material": ["oak", "linen", "steel", "cork", "wool"]
+}

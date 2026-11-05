@@ -21,7 +21,7 @@ export function registerSynthValidationChecks(services: SpecySynthServices): voi
     const validator = services.validation.SpecySynthValidator;
     validator.documents = services.shared.workspace.LangiumDocuments;
     const checks: ValidationChecks<ast.SpecyDomainAstType> = {
-        ScenarioDef: [validator.checkDomainLoaded, validator.checkTimeline, validator.checkPopulationsDistinct, validator.checkGivensDistinct, validator.checkOutcomesDisjoint],
+        ScenarioDef: [validator.checkDomainLoaded, validator.checkTimeline, validator.checkPopulationsDistinct, validator.checkGivensDistinct, validator.checkOutcomesDisjoint, validator.checkRuleCycles],
         PopulationDecl: validator.checkPopulation,
         CurveOutcome: validator.checkCurve,
         TotalOutcome: validator.checkTotal,
@@ -39,6 +39,7 @@ export function registerSynthValidationChecks(services: SpecySynthServices): voi
         GivenDecl: validator.checkGiven,
         VocabularyBlock: validator.checkVocabulary,
         WordListDecl: validator.checkWordList,
+        GrammarDecl: validator.checkGrammar,
         BindingDecl: validator.checkBinding,
         DistributionsBlock: validator.checkDistributionsDistinct,
         DistributionDecl: validator.checkDistribution,
@@ -531,6 +532,13 @@ export class SpecySynthValidator {
             if (seen.has(text)) accept('error', `${text} has two word lists.`, { node: w, property: 'field', code: 'SYN-E024' });
             seen.add(text);
         }
+        const grammars = new Set<string>();
+        for (const g of v.grammars) {
+            const text = pathText(g.field);
+            if (grammars.has(text)) accept('error', `${text} has two grammars.`, { node: g, property: 'field', code: 'SYN-E024' });
+            else if (seen.has(text)) accept('error', `${text} has both a word list and a grammar.`, { node: g, property: 'field', code: 'SYN-E024' });
+            grammars.add(text);
+        }
         const bound = new Set<string>();
         for (const b of v.bindings) {
             const text = pathText(b.target);
@@ -651,8 +659,9 @@ export class SpecySynthValidator {
         const seen = new Set<string>();
         for (const d of b.distributions) {
             const text = pathText(d.field);
-            if (seen.has(text)) accept('error', `${text} has two distributions.`, { node: d, property: 'field', code: 'SYN-E025' });
-            seen.add(text);
+            const key = d.when ? `${text} when ${pathText(d.when.field)} = ${scalarText(d.when.value)}` : text;
+            if (seen.has(key)) accept('error', `${text} has two distributions${d.when ? ` for ${pathText(d.when.field)} = ${scalarText(d.when.value)}` : ''}.`, { node: d, property: 'field', code: 'SYN-E025' });
+            seen.add(key);
         }
     }
 
@@ -665,17 +674,51 @@ export class SpecySynthValidator {
         const r = index.resolvePath(d.field);
         if (!r) return;
         const text = pathText(d.field);
-        const refuse = (why: string) => accept('error', `${d.shape} does not fit ${text}: ${why}.`, { node: d, property: 'shape', code: 'SYN-E025' });
+        const whenText = d.when ? ` when ${pathText(d.when.field)} = ${scalarText(d.when.value)}` : '';
+        const refuse = (why: string) => accept('error', `${d.shape} does not fit ${text}${whenText}: ${why}.`, { node: d, property: 'shape', code: 'SYN-E025' });
+        if (d.shape === 'among' && d.values.length === 0) accept('error', 'among needs the values to draw from.', { node: d, property: 'shape', code: 'SYN-E025' });
         if (!this.populationOf(d, r.root.name) && !this.givenOf(d, r.root.name)) accept('error', `"${r.root.name}" has no population or given.`, { node: d, property: 'field', code: 'SYN-E003' });
         const last = r.last;
         const isReference = (ast.isReferenceDecl(last) && r.leaf.kind !== 'collection') || (ast.isFieldDecl(last) && r.leaf.kind === 'entity') || (ast.isFieldDecl(last) && r.leaf.kind === 'primitive' && r.leaf.name === 'uuid' && /Id$/.test(last.name) && this.hasRows(d, last.name.slice(0, -2)));
+        if (d.when && isReference && d.field.steps.length === 1) return refuse('a reference takes a shape without a condition');
+        if (d.when) {
+            const read = this.readField(d, d.when.field, r, `The rule on ${text}`, accept, 'when');
+            if (!read) return;
+            const why = literalProblem(read.r, d.when.value);
+            if (why) return void accept('error', `The rule on ${text} compares ${pathText(d.when.field)} with ${scalarText(d.when.value)}: ${why}.`, { node: d.when, property: 'value', code: 'SYN-E025' });
+        }
         if (isReference && d.field.steps.length === 1) {
-            if (d.shape === 'lognormal') refuse('a reference takes uniform or zipf (some rows are referenced far more often)');
+            if (d.shape === 'lognormal' || d.shape === 'among') refuse('a reference takes uniform or zipf (some rows are referenced far more often)');
             return;
         }
         if (r.viaReference || !r.column) return refuse('the path crosses a reference; declare the shape on the entity that owns the column');
         const owner = this.outcomeOn(d, r);
         const leaf = r.leaf;
+        if (d.shape === 'among') {
+            const okType = leaf.kind === 'enum' || (leaf.kind === 'primitive' && (leaf.name === 'boolean' || NUMERIC_PRIMITIVES.has(leaf.name) || leaf.name === 'string' || leaf.name === 'text'));
+            if (!okType) return refuse(`it is ${leaf.name}; among draws enum members, booleans, numbers or texts`);
+            const weighted = d.values.filter(v => v.weight).length;
+            if (weighted && weighted !== d.values.length) accept('error', `among on ${text}: give every value a weight, or none.`, { node: d, property: 'values', code: 'SYN-E025' });
+            const field = ast.isFieldDecl(last) ? last : undefined;
+            const c = (kind: string) => field?.constraints.find(x => x.kind === kind);
+            const min = c('min')?.numValue ?? c('range')?.low;
+            const max = c('max')?.numValue ?? c('range')?.high;
+            const seen = new Set<string>();
+            let sum = 0;
+            d.values.forEach((v, i) => {
+                const why = literalProblem(r, v.value);
+                const key = scalarText(v.value);
+                if (why) accept('error', `among on ${text}: ${why}.`, { node: d, property: 'values', index: i, code: 'SYN-E025' });
+                else if (v.value.number !== undefined && ((min !== undefined && Number(v.value.number) < Number(min)) || (max !== undefined && Number(v.value.number) > Number(max)))) accept('error', `among on ${text}: ${key} lies outside its bounds [${min ?? '-∞'}, ${max ?? '∞'}].`, { node: d, property: 'values', index: i, code: 'SYN-E025' });
+                if (seen.has(key)) accept('error', `among on ${text} lists ${key} twice.`, { node: d, property: 'values', index: i, code: 'SYN-E025' });
+                seen.add(key);
+                if (v.weight) sum += Number(v.weight.value) / (v.weight.percent ? 100 : 1);
+            });
+            if (weighted === d.values.length && weighted && Math.abs(sum - 1) > 1e-6) accept('error', `among on ${text}: the weights sum to ${Math.round(sum * 1e6) / 1e6}, not 1.`, { node: d, property: 'values', code: 'SYN-E025' });
+            if (owner?.exact) accept('warning', `The among shape of ${text}${whenText} never applies: ${owner.exact} sets the column.`, { node: d, code: 'SYN-W013' });
+            else if (owner?.sum) accept('warning', `The among shape of ${text}${whenText} never applies: ${owner.sum} fixes the column's sum, which fixed values cannot meet.`, { node: d, code: 'SYN-W013' });
+            return;
+        }
         if (leaf.kind === 'primitive' && NUMERIC_PRIMITIVES.has(leaf.name)) {
             if (d.shape === 'zipf' && !(leaf.name === 'int' || leaf.name === 'integer' || leaf.name === 'long')) return refuse('zipf ranks whole numbers; this is a decimal (use lognormal for skewed amounts)');
             const field = ast.isFieldDecl(last) ? last : undefined;
@@ -683,8 +726,8 @@ export class SpecySynthValidator {
             const min = c('min')?.numValue ?? c('range')?.low;
             const max = c('max')?.numValue ?? c('range')?.high;
             if (d.median !== undefined && ((min !== undefined && Number(d.median) < Number(min)) || (max !== undefined && Number(d.median) > Number(max)))) accept('error', `The median ${d.median} of ${text} lies outside its bounds [${min ?? '-∞'}, ${max ?? '∞'}].`, { node: d, property: 'median', code: 'SYN-E025' });
-            if (owner?.exact) accept('warning', `The ${d.shape} shape of ${text} never applies: ${owner.exact} sets the column.`, { node: d, code: 'SYN-W013' });
-            else if (owner?.sum && d.median !== undefined) accept('warning', `The median of ${text} is ignored: ${owner.sum} fixes the column's sum, so only the shape of the split (sigma) applies.`, { node: d, property: 'median', code: 'SYN-W013' });
+            if (owner?.exact) accept('warning', `The ${d.shape} shape of ${text}${whenText} never applies: ${owner.exact} sets the column.`, { node: d, code: 'SYN-W013' });
+            else if (owner?.sum && d.median !== undefined) accept('warning', `The median of ${text}${whenText} is ignored: ${owner.sum} fixes the column's sum, so only the shape of the split (sigma) applies.`, { node: d, property: 'median', code: 'SYN-W013' });
             return;
         }
         if (leaf.kind === 'primitive' && TEMPORAL_PRIMITIVES.has(leaf.name)) {
@@ -692,17 +735,126 @@ export class SpecySynthValidator {
             return;
         }
         if (leaf.kind === 'enum') {
-            if (d.shape === 'lognormal') refuse('an enum takes zipf (over its members in declared order) or uniform');
-            else if (owner?.exact) accept('warning', `The ${d.shape} shape of ${text} never applies: ${owner.exact} sets the split exactly.`, { node: d, code: 'SYN-W013' });
+            if (d.shape === 'lognormal') refuse('an enum takes zipf (over its members in declared order), uniform, or among');
+            else if (owner?.exact) accept('warning', `The ${d.shape} shape of ${text}${whenText} never applies: ${owner.exact} sets the split exactly.`, { node: d, code: 'SYN-W013' });
             return;
         }
         if (leaf.kind === 'primitive' && (leaf.name === 'string' || leaf.name === 'text')) {
-            if (d.shape === 'lognormal') return refuse('text takes zipf (over its word list, first word most frequent) or uniform');
+            if (d.shape === 'lognormal') return refuse('text takes zipf (over its word list, first word most frequent), uniform, or among');
             const listed = (scenarioOf(d)?.vocabulary?.words ?? []).some(w => pathText(w.field) === text);
             if (!listed) refuse(`a text field has a shape only over its word list; add \`${text} words …\` to the vocabulary`);
             return;
         }
         refuse(`it is ${leaf.name}; shapes apply to numbers, dates, enums, word-listed text and references`);
+    }
+
+    /**
+     * `Book.title grammar "titles.json" by Book.genre`: a text field of a row source
+     * with rows; `by` a field the row (or its per parent) stores, read before the
+     * title is drawn. The file's symbols are synthy's to check (SYN-E024 at check).
+     */
+    checkGrammar(g: ast.GrammarDecl, accept: ValidationAcceptor): void {
+        const index = this.indexOf(g);
+        if (!index || !g.field) return;
+        const r = index.resolvePath(g.field);
+        if (!r) return;
+        const text = pathText(g.field);
+        if (!this.populationOf(g, r.root.name) && !this.givenOf(g, r.root.name)) accept('error', `"${r.root.name}" has no population or given.`, { node: g, property: 'field', code: 'SYN-E003' });
+        const leaf = r.leaf.kind === 'collection' && r.leaf.element ? r.leaf.element : r.leaf;
+        if (r.viaReference || !(leaf.kind === 'primitive' && (leaf.name === 'string' || leaf.name === 'text'))) {
+            accept('error', `A grammar applies to a text field; ${text} is ${r.viaReference ? 'reached through a reference' : r.leaf.name}.`, { node: g, property: 'field', code: 'SYN-E024' });
+            return;
+        }
+        if (g.by) this.readField(g, g.by, r, `The grammar of ${text}`, accept, 'by');
+    }
+
+    /**
+     * The conditional rules and grammars of one entity read each other in a cycle
+     * (A reads B, B reads A): no order draws each field after the ones it reads.
+     */
+    checkRuleCycles(s: ast.ScenarioDef, accept: ValidationAcceptor): void {
+        const index = this.indexOf(s);
+        if (!index) return;
+        const edges = new Map<string, { from: string; to: string; node: AstNode }[]>();
+        const add = (field: ast.SynthPath | undefined, read: ast.SynthPath | undefined, node: AstNode) => {
+            const t = index.resolvePath(field);
+            const r = index.resolvePath(read);
+            // segments carry the root first: the top-level field is the second; a rule reading its own value is refused elsewhere
+            if (!t || !r || t.root !== r.root || t.segments.length < 2 || r.segments.length < 2 || t.segments[1] === r.segments[1]) return;
+            const list = edges.get(t.root.name) ?? [];
+            list.push({ from: r.segments[1], to: t.segments[1], node });
+            edges.set(t.root.name, list);
+        };
+        for (const d of s.distributions?.distributions ?? []) if (d.when) add(d.field, d.when.field, d);
+        for (const g of s.vocabulary?.grammars ?? []) if (g.by) add(g.field, g.by, g);
+        for (const [entity, list] of edges) {
+            const nodes = [...new Set(list.flatMap(e => [e.from, e.to]))];
+            const after = new Map<string, Set<string>>();
+            for (const e of list) {
+                if (e.from === e.to) continue;
+                const set = after.get(e.to) ?? new Set<string>();
+                set.add(e.from);
+                after.set(e.to, set);
+            }
+            const placed = new Set<string>();
+            let progress = true;
+            while (placed.size < nodes.length && progress) {
+                progress = false;
+                for (const n of nodes) {
+                    if (placed.has(n)) continue;
+                    const deps = after.get(n);
+                    if (deps && [...deps].some(x => !placed.has(x))) continue;
+                    placed.add(n);
+                    progress = true;
+                }
+            }
+            if (placed.size === nodes.length) continue;
+            const stuck = list.filter(e => !placed.has(e.from) && !placed.has(e.to));
+            const why = stuck.map(e => `${e.to} reads ${e.from}`).join(', ');
+            for (const e of stuck) accept('error', `The rules on ${entity} read each other in a cycle: ${why}.`, { node: e.node, code: 'SYN-E026' });
+        }
+    }
+
+    /**
+     * A field a rule or a grammar reads: of the row's own entity or of its per
+     * parent, an enum, boolean, whole-number or text column of that table, and not
+     * inside the very value the rule decides (the fields of one value are drawn
+     * together). Reports with SYN-E025.
+     */
+    private readField(node: AstNode, path: ast.SynthPath, target: ResolvedSynthPath, what: string, accept: ValidationAcceptor, property: string): { r: ResolvedSynthPath; parent: boolean } | undefined {
+        const index = this.indexOf(node);
+        if (!index) return undefined;
+        const r = index.resolvePath(path);
+        if (!r) return undefined;
+        const text = pathText(path);
+        const parentName = this.populationOf(node, target.root.name)?.parent?.$refText;
+        const parent = r.root !== target.root && !!parentName && r.root.name === parentName;
+        const at = { node, property, code: 'SYN-E025' };
+        if (r.root !== target.root && !parent) {
+            accept('error', `${what} reads ${text}, which is not a field of ${target.root.name}${parentName ? ` nor of its parent ${parentName}` : ''}.`, at);
+            return undefined;
+        }
+        const last = r.last;
+        if ((ast.isReferenceDecl(last) && r.leaf.kind !== 'collection') || (ast.isFieldDecl(last) && r.leaf.kind === 'entity')) {
+            accept('error', `${what} reads ${text}, a reference.`, at);
+            return undefined;
+        }
+        if (r.viaReference || !r.column) {
+            accept('error', `${what} reads ${text}, which crosses a reference.`, at);
+            return undefined;
+        }
+        const leaf = r.leaf;
+        const readable = leaf.kind === 'enum' || (leaf.kind === 'primitive' && ['boolean', 'string', 'text', 'int', 'integer', 'long'].includes(leaf.name));
+        if (!readable) {
+            accept('error', `${what} reads ${text}, a ${leaf.name}: conditions read enums, booleans, whole numbers and text.`, at);
+            return undefined;
+        }
+        // segments carry the root first: the top-level field is the second
+        if (!parent && r.segments[1] !== undefined && r.segments[1] === target.segments[1]) {
+            accept('error', `${what} reads ${text}, inside the value it decides.`, at);
+            return undefined;
+        }
+        return { r, parent };
     }
 
     /** The outcome that fixes a column: exactly (share, rate, mix) or by its sum (curve, total, rollup). */
@@ -851,6 +1003,36 @@ export function fraction(f: ast.Fraction): number {
 
 function round(x: number): number {
     return Math.round(x * 1e6) / 1e6;
+}
+
+/** A condition's or an among's value as written: the member, the text, the number or the boolean. */
+export function scalarText(v: ast.ScalarValue | undefined): string {
+    if (!v) return '';
+    if (v.text !== undefined) return v.text;
+    if (v.bool !== undefined) return v.bool;
+    if (v.number !== undefined) return v.number;
+    return v.member ?? '';
+}
+
+/** Why a value is not one the field can hold, or undefined when it is. */
+function literalProblem(r: ResolvedSynthPath, v: ast.ScalarValue | undefined): string | undefined {
+    const leaf = r.leaf;
+    const text = scalarText(v);
+    if (leaf.kind === 'enum' && ast.isEnumDef(leaf.def)) {
+        const members = leaf.def.values.map(m => m.name);
+        return members.includes(text) ? undefined : `${text} is not a member of ${leaf.def.name} (${members.join(', ')})`;
+    }
+    if (leaf.kind === 'primitive') {
+        if (leaf.name === 'boolean') return v?.bool !== undefined || text === 'true' || text === 'false' ? undefined : `${JSON.stringify(text)} is not a boolean`;
+        if (NUMERIC_PRIMITIVES.has(leaf.name)) {
+            const n = Number(text);
+            if (text.trim() === '' || !Number.isFinite(n)) return `${JSON.stringify(text)} is not a number`;
+            if ((leaf.name === 'int' || leaf.name === 'integer' || leaf.name === 'long') && !Number.isInteger(n)) return `${n} is not a whole number`;
+            return undefined;
+        }
+        if (leaf.name === 'string' || leaf.name === 'text') return undefined;
+    }
+    return `${leaf.name} is neither an enum, a boolean, a number nor text`;
 }
 
 function scenarioOf(node: AstNode): ast.ScenarioDef | undefined {

@@ -271,6 +271,51 @@ describe("the planner's rules at edit time", () => {
         expect(messages(bad.diagnostics.filter(d => d.severity === 'warning')).filter(m => m.startsWith('SYN-W013'))).toEqual(['SYN-W013 The zipf shape of Payment.method never applies: share Payment.method sets the split exactly.']);
     });
 
+    it('reads conditional rules, among and grammars, and refuses what a condition cannot read (SYN-E025, SYN-E026, SYN-E024)', async () => {
+        const body = 'populations { Customer count 10\n Product count 5\n Order count 20\n OrderLine per Order 1..3\n Payment per Order exactly 1 }\n vocabulary {\n Product.name grammar "vocab/names.json"\n Product.description grammar "vocab/blurbs.json" by Product.available :: "stock"\n }\n distributions {\n Product.price.amount lognormal median 30 sigma 0.6\n Product.price.amount when Product.rating = 5 lognormal median 120 sigma 0.4\n Order.totalAmount.currency when Order.shippingAddress.country = GB among [ GBP ]\n Order.totalAmount.currency when Order.shippingAddress.country = "CH" among [ CHF: 80%, EUR: 20% ] :: "Swiss"\n Payment.method when Order.status = cancelled among [ bankTransfer ]\n Product.stockQuantity when Product.available = false among [ 0 ]\n }';
+        const ok = await parseSynth(scenario(body), domainText);
+        expect(messages(errors(ok.diagnostics))).toEqual([]);
+        expect(ok.scenario.vocabulary).toEqual({ grammars: [{ field: 'Product.name', file: 'vocab/names.json' }, { field: 'Product.description', file: 'vocab/blurbs.json', by: 'Product.available', description: 'stock' }] });
+        expect(ok.scenario.distributions).toEqual([
+            { field: 'Product.price.amount', shape: 'lognormal', median: 30, sigma: 0.6 },
+            { field: 'Product.price.amount', when: { field: 'Product.rating', value: 5 }, shape: 'lognormal', median: 120, sigma: 0.4 },
+            { field: 'Order.totalAmount.currency', when: { field: 'Order.shippingAddress.country', value: 'GB' }, shape: 'among', values: ['GBP'] },
+            { field: 'Order.totalAmount.currency', when: { field: 'Order.shippingAddress.country', value: 'CH' }, shape: 'among', values: { CHF: 0.8, EUR: 0.2 }, description: 'Swiss' },
+            { field: 'Payment.method', when: { field: 'Order.status', value: 'cancelled' }, shape: 'among', values: ['bankTransfer'] },
+            { field: 'Product.stockQuantity', when: { field: 'Product.available', value: false }, shape: 'among', values: [0] },
+        ]);
+        const bad = await parseSynth(
+            scenario('populations { Customer count 10\n Product count 5\n Order count 20\n OrderLine per Order 1..3\n Payment per Order exactly 1 }\n outcomes { share Payment.method { creditCard: 100% } }\n vocabulary {\n Product.name words [ "Lamp" ]\n Product.name grammar "n.json"\n Product.rating grammar "r.json"\n }\n distributions {\n OrderLine.quantity when Product.rating = 5 among [ 1 ]\n Order.totalAmount.currency when Order.customer = x among [ EUR ]\n Order.totalAmount.currency when Order.placedAt = "2025-01-01" among [ EUR ]\n Order.shippingAddress.city when Order.shippingAddress.country = GB among [ London ]\n Payment.method when Payment.status = sent among [ paypal ]\n Payment.method among [ cash ]\n Payment.method among [ creditCard: 50%, paypal: 30% ]\n Product.rating among [ 0, 6 ]\n Order.customer when Order.status = draft zipf\n Order.placedAt among [ "2025-01-01" ]\n Payment.method when Order.status = draft among [ paypal ]\n Payment.method when Order.status = draft uniform\n Payment.method when Order.status = cancelled among [ bankTransfer ]\n Order.totalAmount.currency when Order.shippingAddress.country = GB among [ GBP ]\n Order.shippingAddress.country when Order.totalAmount.currency = GBP among [ GB ]\n }'),
+            domainText,
+        );
+        expect(messages(errors(bad.diagnostics))).toEqual([
+            'SYN-E024 Product.name has both a word list and a grammar.',
+            'SYN-E024 A grammar applies to a text field; Product.rating is int.',
+            'SYN-E025 Payment.method has two distributions.',
+            'SYN-E025 Payment.method has two distributions for Order.status = draft.',
+            'SYN-E025 The rule on OrderLine.quantity reads Product.rating, which is not a field of OrderLine nor of its parent Order.',
+            'SYN-E025 The rule on Order.totalAmount.currency reads Order.customer, a reference.',
+            'SYN-E025 The rule on Order.totalAmount.currency reads Order.placedAt, a datetime: conditions read enums, booleans, whole numbers and text.',
+            'SYN-E025 The rule on Order.shippingAddress.city reads Order.shippingAddress.country, inside the value it decides.',
+            'SYN-E025 The rule on Payment.method compares Payment.status with sent: sent is not a member of PaymentStatus (pending, captured, failed, refunded).',
+            'SYN-E025 among on Payment.method: cash is not a member of PaymentMethod (creditCard, bankTransfer, paypal).',
+            'SYN-E025 among on Payment.method: the weights sum to 0.8, not 1.',
+            'SYN-E025 among on Product.rating: 0 lies outside its bounds [1, 5].',
+            'SYN-E025 among on Product.rating: 6 lies outside its bounds [1, 5].',
+            'SYN-E025 zipf does not fit Order.customer when Order.status = draft: a reference takes a shape without a condition.',
+            'SYN-E025 among does not fit Order.placedAt: it is datetime; among draws enum members, booleans, numbers or texts.',
+            'SYN-E026 The rules on Order read each other in a cycle: totalAmount reads shippingAddress, shippingAddress reads totalAmount.',
+            'SYN-E026 The rules on Order read each other in a cycle: totalAmount reads shippingAddress, shippingAddress reads totalAmount.',
+        ]);
+        expect(messages(bad.diagnostics.filter(d => d.severity === 'warning')).filter(m => m.startsWith('SYN-W013'))).toEqual([
+            'SYN-W013 The among shape of Payment.method never applies: share Payment.method sets the column.',
+            'SYN-W013 The among shape of Payment.method never applies: share Payment.method sets the column.',
+            'SYN-W013 The among shape of Payment.method when Order.status = draft never applies: share Payment.method sets the column.',
+            'SYN-W013 The uniform shape of Payment.method when Order.status = draft never applies: share Payment.method sets the split exactly.',
+            'SYN-W013 The among shape of Payment.method when Order.status = cancelled never applies: share Payment.method sets the column.',
+        ]);
+    });
+
     it('places count populations from a since date before the horizon end (SYN-E010)', async () => {
         const ok = await parseSynth(scenario('populations { Customer count 300 since 2023-01-01 clock createdAt :: "the customer base" }'), domainText);
         expect(errors(ok.diagnostics)).toEqual([]);

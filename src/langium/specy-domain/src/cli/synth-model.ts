@@ -123,6 +123,7 @@ function vocabulary(v: ast.VocabularyBlock): Record<string, unknown> | undefined
         words: v.words.length
             ? v.words.map(w => compact({ field: path(w.field), file: w.file, values: w.file === undefined ? [...w.values] : undefined, description: w.description?.text }))
             : undefined,
+        grammars: v.grammars.length ? v.grammars.map(g => compact({ field: path(g.field), file: g.file, by: g.by ? path(g.by) : undefined, description: g.description?.text })) : undefined,
         // after words, so a document without bindings keeps its bytes
         bindings: v.bindings.length ? v.bindings.map(b => compact({ target: path(b.target), kind: b.kind, description: b.description?.text })) : undefined,
     });
@@ -130,7 +131,31 @@ function vocabulary(v: ast.VocabularyBlock): Record<string, unknown> | undefined
 }
 
 function distribution(d: ast.DistributionDecl): Record<string, unknown> {
-    return compact({ field: path(d.field), shape: d.shape, median: opt(d.median), sigma: opt(d.sigma), exponent: opt(d.exponent), description: d.description?.text });
+    return compact({
+        field: path(d.field),
+        when: d.when ? { field: path(d.when.field), value: scalar(d.when.value) } : undefined,
+        shape: d.shape,
+        median: opt(d.median),
+        sigma: opt(d.sigma),
+        exponent: opt(d.exponent),
+        values: d.shape === 'among' ? amongValues(d.values) : undefined,
+        description: d.description?.text,
+    });
+}
+
+/** A condition's or an among's value: a text (quoted, or an identifier naming a member), a number, a boolean. */
+export function scalar(v: ast.ScalarValue | undefined): string | number | boolean {
+    if (!v) return '';
+    if (v.text !== undefined) return v.text;
+    if (v.bool !== undefined) return v.bool === 'true';
+    if (v.number !== undefined) return numberOf(v.number);
+    return v.member ?? '';
+}
+
+/** `among [ a, b ]` is a list; `among [ a: 70%, b: 30% ]` a map of value -> fraction. */
+function amongValues(values: ast.AmongValue[]): unknown {
+    if (values.some(x => x.weight)) return Object.fromEntries(values.map(x => [String(scalar(x.value)), x.weight ? fraction(x.weight) : undefined]));
+    return values.map(x => scalar(x.value));
 }
 
 function row(r: ast.RowLiteral): Record<string, unknown> {
