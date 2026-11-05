@@ -2705,8 +2705,9 @@ export interface DistributionDecl extends langium.AstNode {
     exponent?: string;
     field: SynthPath;
     median?: string;
-    shape: 'among' | 'lognormal' | 'uniform' | 'zipf';
+    shape: 'among' | 'from' | 'lognormal' | 'uniform' | 'zipf';
     sigma?: string;
+    source?: SynthPath;
     values: Array<AmongValue>;
     when?: WhenClause;
 }
@@ -7356,6 +7357,7 @@ export class SpecyDomainAstReflection extends langium.AbstractAstReflection {
                         { name: 'median' },
                         { name: 'shape' },
                         { name: 'sigma' },
+                        { name: 'source' },
                         { name: 'values', defaultValue: [] },
                         { name: 'when' }
                     ]

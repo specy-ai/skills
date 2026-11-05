@@ -4107,7 +4107,7 @@ export const SCHEMAS: Record<string, Record<string, unknown>> = {
             },
             "distribution": {
                 "type": "object",
-                "description": "One field's rule: uniform; lognormal (median, sigma); zipf (exponent); among (values). Numbers, dates (uniform), enums, booleans (among), word-listed text, references. With `when`, the rule holds on the rows the condition selects; the rule without `when` on the others.",
+                "description": "One field's rule: uniform; lognormal (median, sigma); zipf (exponent); among (values); from (source: a copy through one declared reference). Numbers, dates (uniform), enums, booleans (among), word-listed text, references. With `when`, the rule holds on the rows the condition selects; the rule without `when` on the others.",
                 "required": [
                     "field",
                     "shape"
@@ -4125,7 +4125,8 @@ export const SCHEMAS: Record<string, Record<string, unknown>> = {
                             "uniform",
                             "lognormal",
                             "zipf",
-                            "among"
+                            "among",
+                            "from"
                         ]
                     },
                     "median": {
@@ -4141,6 +4142,10 @@ export const SCHEMAS: Record<string, Record<string, unknown>> = {
                         "type": "number",
                         "exclusiveMinimum": 0,
                         "description": "How fast popularity falls with rank; 1 is the classic law; check refuses more than 5."
+                    },
+                    "source": {
+                        "$ref": "#/$defs/fieldPath",
+                        "description": "from: the path the value is copied from, from the same entity through exactly one declared reference to a field of the same type (Order.customer.shippingAddress)."
                     },
                     "values": {
                         "description": "among: the values the field draws from, equally likely (a list) or weighted (a map of value → fraction summing to 1).",
@@ -4196,6 +4201,11 @@ export const SCHEMAS: Record<string, Record<string, unknown>> = {
                                         "required": [
                                             "values"
                                         ]
+                                    },
+                                    {
+                                        "required": [
+                                            "source"
+                                        ]
                                     }
                                 ]
                             }
@@ -4220,6 +4230,11 @@ export const SCHEMAS: Record<string, Record<string, unknown>> = {
                                     {
                                         "required": [
                                             "values"
+                                        ]
+                                    },
+                                    {
+                                        "required": [
+                                            "source"
                                         ]
                                     }
                                 ]
@@ -4250,6 +4265,11 @@ export const SCHEMAS: Record<string, Record<string, unknown>> = {
                                     {
                                         "required": [
                                             "values"
+                                        ]
+                                    },
+                                    {
+                                        "required": [
+                                            "source"
                                         ]
                                     }
                                 ]
@@ -4284,6 +4304,49 @@ export const SCHEMAS: Record<string, Record<string, unknown>> = {
                                         "required": [
                                             "exponent"
                                         ]
+                                    },
+                                    {
+                                        "required": [
+                                            "source"
+                                        ]
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "if": {
+                            "properties": {
+                                "shape": {
+                                    "const": "from"
+                                }
+                            }
+                        },
+                        "then": {
+                            "required": [
+                                "source"
+                            ],
+                            "not": {
+                                "anyOf": [
+                                    {
+                                        "required": [
+                                            "median"
+                                        ]
+                                    },
+                                    {
+                                        "required": [
+                                            "sigma"
+                                        ]
+                                    },
+                                    {
+                                        "required": [
+                                            "exponent"
+                                        ]
+                                    },
+                                    {
+                                        "required": [
+                                            "values"
+                                        ]
                                     }
                                 ]
                             }
@@ -4293,7 +4356,7 @@ export const SCHEMAS: Record<string, Record<string, unknown>> = {
             },
             "condition": {
                 "type": "object",
-                "description": "The rows a rule applies to: a field of the same entity or of its per parent (an enum, boolean, whole-number or text field) equal to a value.",
+                "description": "The rows a rule applies to: a field of the same entity or of its per parent, directly or through one declared reference (an enum, boolean, whole-number or text field), equal to a value.",
                 "required": [
                     "field",
                     "value"

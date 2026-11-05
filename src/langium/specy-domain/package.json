@@ -1,6 +1,6 @@
 {
   "name": "specy-domain-langium",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "Langium-based parsers, format converters and LSP server for the Specy DSLs: .domain, .prd, .sysreq, .arch and .synth",
   "type": "module",
   "main": "out/language/specy-domain-module.js",

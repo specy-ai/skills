@@ -147,6 +147,9 @@ const RULES = `scenario Rules :: "Conditional rules, among and grammars" {
         Payment.method when Order.status = cancelled among [ bankTransfer ]
         Product.stockQuantity when Product.available = false among [ 0 ]
         Product.rating among [ 3, 4, 5 ]
+        Order.shippingAddress from Order.customer.shippingAddress :: "the customer's address"
+        Order.shippingAddress when Order.status = draft from Order.customer.shippingAddress
+        Order.totalAmount.currency when Order.customer.status = suspended among [ EUR ]
     }
 }
 `;

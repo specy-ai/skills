@@ -688,12 +688,20 @@ export class SpecySynthValidator {
             if (why) return void accept('error', `The rule on ${text} compares ${pathText(d.when.field)} with ${scalarText(d.when.value)}: ${why}.`, { node: d.when, property: 'value', code: 'SYN-E025' });
         }
         if (isReference && d.field.steps.length === 1) {
-            if (d.shape === 'lognormal' || d.shape === 'among') refuse('a reference takes uniform or zipf (some rows are referenced far more often)');
+            if (d.shape === 'from') refuse('a reference takes uniform or zipf');
+            else if (d.shape === 'lognormal' || d.shape === 'among') refuse('a reference takes uniform or zipf (some rows are referenced far more often)');
             return;
         }
         if (r.viaReference || !r.column) return refuse('the path crosses a reference; declare the shape on the entity that owns the column');
         const owner = this.outcomeOn(d, r);
         const leaf = r.leaf;
+        if (d.shape === 'from') {
+            const why = this.copyProblem(d, r, index);
+            if (why) return refuse(why);
+            if (owner?.exact) accept('warning', `The from shape of ${text}${whenText} never applies: ${owner.exact} sets the column.`, { node: d, code: 'SYN-W013' });
+            else if (owner?.sum) accept('warning', `The from shape of ${text}${whenText} never applies: ${owner.sum} fixes the column's sum, which a copy cannot meet.`, { node: d, code: 'SYN-W013' });
+            return;
+        }
         if (d.shape === 'among') {
             const okType = leaf.kind === 'enum' || (leaf.kind === 'primitive' && (leaf.name === 'boolean' || NUMERIC_PRIMITIVES.has(leaf.name) || leaf.name === 'string' || leaf.name === 'text'));
             if (!okType) return refuse(`it is ${leaf.name}; among draws enum members, booleans, numbers or texts`);
@@ -749,6 +757,28 @@ export class SpecySynthValidator {
     }
 
     /**
+     * `Order.shippingAddress from Order.customer.shippingAddress`: the source is a
+     * path from the same entity through exactly one declared reference (a reference
+     * or an entity-typed field, not a key synthy infers, not a collection) to a
+     * field of the target whose type is the field's own: the same primitive, the
+     * same value type (copied whole), the same enum. Why a copy is refused, or
+     * undefined when it fits.
+     */
+    private copyProblem(d: ast.DistributionDecl, r: ResolvedSynthPath, index: DomainAstIndex): string | undefined {
+        if (ast.isIdentityDecl(r.last)) return 'the identity is not copied';
+        const s = index.resolvePath(d.source);
+        if (!s) return undefined; // a linking error already marks the unknown segment
+        if (s.root !== r.root) return `the source is a path from ${s.root.name}, not from ${r.root.name}`;
+        if (s.hops.length === 0) return 'the source stays on the row; a copy reads through a reference (Order.customer.shippingAddress)';
+        if (s.hops.length > 1) return 'the source crosses two references; one is read';
+        if (s.hops[0].inferred) return 'the source is an inferred key; a declared reference is read';
+        if (s.hops[0].collection || s.leaf.kind === 'collection') return 'a collection is not copied';
+        const same = s.leaf.kind === r.leaf.kind && (s.leaf.kind === 'primitive' ? s.leaf.name === r.leaf.name : s.leaf.def !== undefined && s.leaf.def === r.leaf.def);
+        if (!same) return `the source is a ${s.leaf.name} while the field is a ${r.leaf.name}`;
+        return undefined;
+    }
+
+    /**
      * `Book.title grammar "titles.json" by Book.genre`: a text field of a row source
      * with rows; `by` a field the row (or its per parent) stores, read before the
      * title is drawn. The file's symbols are synthy's to check (SYN-E024 at check).
@@ -779,8 +809,9 @@ export class SpecySynthValidator {
         const add = (field: ast.SynthPath | undefined, read: ast.SynthPath | undefined, node: AstNode) => {
             const t = index.resolvePath(field);
             const r = index.resolvePath(read);
-            // segments carry the root first: the top-level field is the second; a rule reading its own value is refused elsewhere
-            if (!t || !r || t.root !== r.root || t.segments.length < 2 || r.segments.length < 2 || t.segments[1] === r.segments[1]) return;
+            // segments carry the root first: the top-level field is the second; a rule reading its own value is refused elsewhere;
+            // a read through a reference (and a copy) is no edge inside the entity: the referenced row is complete when it is read
+            if (!t || !r || t.root !== r.root || r.viaReference || t.segments.length < 2 || r.segments.length < 2 || t.segments[1] === r.segments[1]) return;
             const list = edges.get(t.root.name) ?? [];
             list.push({ from: r.segments[1], to: t.segments[1], node });
             edges.set(t.root.name, list);
@@ -817,9 +848,10 @@ export class SpecySynthValidator {
 
     /**
      * A field a rule or a grammar reads: of the row's own entity or of its per
-     * parent, an enum, boolean, whole-number or text column of that table, and not
-     * inside the very value the rule decides (the fields of one value are drawn
-     * together). Reports with SYN-E025.
+     * parent, directly or through one declared reference (never an inferred key,
+     * never two), an enum, boolean, whole-number or text column of that table, and
+     * not inside the very value the rule decides (the fields of one value are
+     * drawn together). Reports with SYN-E025.
      */
     private readField(node: AstNode, path: ast.SynthPath, target: ResolvedSynthPath, what: string, accept: ValidationAcceptor, property: string): { r: ResolvedSynthPath; parent: boolean } | undefined {
         const index = this.indexOf(node);
@@ -839,7 +871,20 @@ export class SpecySynthValidator {
             accept('error', `${what} reads ${text}, a reference.`, at);
             return undefined;
         }
-        if (r.viaReference || !r.column) {
+        // one declared reference may be crossed: the referenced row's value is read after the reference is chosen
+        if (r.hops.length > 1) {
+            accept('error', `${what} reads ${text}, which crosses two references.`, at);
+            return undefined;
+        }
+        if (r.hops.some(h => h.inferred)) {
+            accept('error', `${what} reads ${text}, through an inferred key; a declared reference is read.`, at);
+            return undefined;
+        }
+        if (r.hops.some(h => h.collection)) {
+            accept('error', `${what} reads ${text}, through a collection.`, at);
+            return undefined;
+        }
+        if (!r.viaReference && !r.column) {
             accept('error', `${what} reads ${text}, which crosses a reference.`, at);
             return undefined;
         }

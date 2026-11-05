@@ -110,8 +110,9 @@ export function scenarioToMarkdown(doc: ScenarioJson): string {
         const ds = d.distributions as Rec[];
         const conditional = ds.some(x => x.when);
         const among = ds.some(x => x.shape === 'among');
+        const from = ds.some(x => x.shape === 'from');
         w.table(
-            ['field', ...(conditional ? ['when'] : []), 'shape', 'median', 'sigma', 'exponent', ...(among ? ['values'] : []), 'description'],
+            ['field', ...(conditional ? ['when'] : []), 'shape', 'median', 'sigma', 'exponent', ...(from ? ['source'] : []), ...(among ? ['values'] : []), 'description'],
             ds.map(x => [
                 code(String(x.field)),
                 ...(conditional ? [x.when ? code(`${(x.when as Rec).field} = ${scalarToken((x.when as Rec).value)}`) : ''] : []),
@@ -119,6 +120,7 @@ export function scenarioToMarkdown(doc: ScenarioJson): string {
                 optNum(x.median),
                 optNum(x.sigma),
                 optNum(x.exponent),
+                ...(from ? [x.shape === 'from' && x.source !== undefined ? code(String(x.source)) : ''] : []),
                 ...(among ? [x.shape === 'among' ? code(distributionShape(x).replace(/^among /, '')) : ''] : []),
                 (x.description as string) ?? '',
             ]),
@@ -1112,18 +1114,19 @@ class SynthReader {
                     if (exponent) d.exponent = Number(exponent);
                     const when = stripInline(cell(rec, 'when', 'condition', 'if')).replace(/`/g, '').trim();
                     const values = stripInline(cell(rec, 'values', 'among')).replace(/`/g, '').trim();
+                    const source = stripInline(cell(rec, 'source', 'from')).replace(/`/g, '').trim();
                     const desc = stripInline(cell(rec, 'description', 'notes', 'meaning'));
                     const whenText = /^[A-Za-z_][\w.]*\s*=\s*\S+$/.test(when) ? ` when ${when.replace(/\s*=\s*/, ' = ')}` : '';
-                    const shapeText = shape === 'among' ? `among ${/^\[.*\]$/.test(values) ? values : `[ ${values} ]`}` : distributionShape(d);
+                    const shapeText = shape === 'among' ? `among ${/^\[.*\]$/.test(values) ? values : `[ ${values} ]`}` : shape === 'from' ? `from ${source}` : distributionShape(d);
                     this.b.line(`${field}${whenText} ${shapeText}${desc ? ` :: ${quote(desc)}` : ''}`, table.line + 2 + n);
                 });
             }
             for (const list of parts.lists.splice(0, parts.lists.length)) {
                 for (const item of list.items) {
                     const { head, tail } = splitDash(item.text);
-                    const m = /^`?([A-Za-z_][\w.]*)`?(?:\s+when\s+([A-Za-z_][\w.]*)\s*=\s*(\S+?))?\s*[:：]\s*(uniform|lognormal|zipf|among)\b(.*)$/i.exec(stripInline(head).replace(/`/g, ''));
+                    const m = /^`?([A-Za-z_][\w.]*)`?(?:\s+when\s+([A-Za-z_][\w.]*)\s*=\s*(\S+?))?\s*[:：]\s*(uniform|lognormal|zipf|among|from)\b(.*)$/i.exec(stripInline(head).replace(/`/g, ''));
                     if (m) this.b.line(`${m[1]}${m[2] ? ` when ${m[2]} = ${m[3]}` : ''} ${m[4].toLowerCase()}${m[5].replace(/\s+/g, ' ').trimEnd()}${tail ? ` :: ${quote(stripInline(tail))}` : ''}`, item.line);
-                    else this.b.unmapped({ line: item.line }, `distribution "${item.text}"`, 'expected "path [when path = value]: uniform | lognormal [median m] [sigma s] | zipf [exponent] | among [ values ]"');
+                    else this.b.unmapped({ line: item.line }, `distribution "${item.text}"`, 'expected "path [when path = value]: uniform | lognormal [median m] [sigma s] | zipf [exponent] | among [ values ] | from path"');
                 }
             }
             this.islands(parts);

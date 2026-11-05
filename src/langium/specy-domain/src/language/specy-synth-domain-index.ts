@@ -21,6 +21,15 @@ export interface LeafType {
     element?: LeafType;
 }
 
+/** A step that leaves the table: a declared reference, an entity- or value-collection field, or an inferred key the path continues through. */
+export interface PathHop {
+    node: AstNode;
+    /** A uuid `xxxId` field whose stem names an entity: synthy infers the reference, the model declares none. */
+    inferred: boolean;
+    /** A `1..N` reference or a collection-typed field: many rows, not one. */
+    collection: boolean;
+}
+
 export interface ResolvedSynthPath {
     root: RowSource;
     /** The node the last segment resolved to (the root itself for a bare entity path). */
@@ -28,6 +37,8 @@ export interface ResolvedSynthPath {
     leaf: LeafType;
     /** True when the path crosses a reference or an entity-typed field: it leaves the root's table. */
     viaReference: boolean;
+    /** The references the path crosses before its leaf, in order; empty when it stays on the table. */
+    hops: PathHop[];
     /** Flattened column on the root's table, when the path stays within it and names a field. */
     column?: string;
     segments: string[];
@@ -138,7 +149,7 @@ export class DomainAstIndex {
         if (ast.isValueDef(node)) return [...node.fields.fields];
         if (ast.isFieldDecl(node) || ast.isIdentityDecl(node)) {
             const t = this.typeOf(node.type);
-            const def = t.kind === 'collection' ? t.element?.def : t.def;
+            const def = (t.kind === 'collection' ? t.element?.def : t.def) ?? this.inferredTarget(node);
             return isRowSource(def) ? this.membersOf(def) : [];
         }
         if (ast.isReferenceDecl(node)) {
@@ -146,6 +157,19 @@ export class DomainAstIndex {
             return isRowSource(def) ? this.membersOf(def) : [];
         }
         return [];
+    }
+
+    /**
+     * The entity a uuid field named `xxxId` points at (`productId` → `Product`), when
+     * the model has one: synthy infers the reference, the model declares none. A
+     * path may continue through it, so the validator can say why that is refused.
+     */
+    inferredTarget(node: AstNode | undefined): EntityLike | undefined {
+        if (!ast.isFieldDecl(node) || !/.Id$/.test(node.name)) return undefined;
+        const t = this.typeOf(node.type);
+        if (t.kind !== 'primitive' || t.name !== 'uuid') return undefined;
+        const stem = node.name.slice(0, -2).toLowerCase();
+        return [...this.byName.values()].find((c): c is EntityLike => isEntityLike(c) && c.name.toLowerCase() === stem);
     }
 
     typeOf(t: ast.FieldType | undefined): LeafType {
@@ -180,25 +204,30 @@ export class DomainAstIndex {
     resolvePath(path: ast.SynthPath | undefined): ResolvedSynthPath | undefined {
         const root = path?.root?.ref;
         if (!path || !isRowSource(root)) return undefined;
-        let viaReference = false;
+        const hops: PathHop[] = [];
         const column: string[] = [];
         let last: AstNode = root;
-        for (const step of path.steps) {
+        for (const [i, step] of path.steps.entries()) {
             const t = step.target?.ref;
             if (!t) return undefined;
-            if (ast.isReferenceDecl(t)) viaReference = true;
+            if (ast.isReferenceDecl(t)) hops.push({ node: t, inferred: false, collection: !isSingleCardinality(t.cardinality) });
             else if (ast.isFieldDecl(t) || ast.isIdentityDecl(t)) {
                 const lt = this.typeOf(t.type);
-                if (lt.kind === 'entity' || (lt.kind === 'collection' && (lt.element?.kind === 'entity' || lt.element?.kind === 'value'))) viaReference = true;
+                if (lt.kind === 'entity') hops.push({ node: t, inferred: false, collection: false });
+                else if (lt.kind === 'collection' && (lt.element?.kind === 'entity' || lt.element?.kind === 'value')) hops.push({ node: t, inferred: false, collection: true });
+                // a uuid key the path continues through: the editor resolves it, the validator says why it is refused
+                else if (i < path.steps.length - 1 && this.inferredTarget(t)) hops.push({ node: t, inferred: true, collection: false });
                 column.push(t.name);
             }
             last = t;
         }
+        const viaReference = hops.length > 0;
         return {
             root,
             last,
             leaf: this.leafOf(last),
             viaReference,
+            hops,
             column: viaReference || column.length === 0 ? undefined : column.join('_'),
             segments: [root.name, ...path.steps.map(s => s.target?.$refText ?? '?')],
         };

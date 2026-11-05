@@ -74,6 +74,25 @@ describe('the scenario schema', () => {
         expect(errorsOf({ ...base, vocabulary: { grammars: [{ field: 'Product.name', rules: { 'bad symbol': ['x'] } }] } })).not.toEqual([]);
     });
 
+    it('accepts a copy through a reference (from with source) and refuses source elsewhere', async () => {
+        const doc = await orders();
+        const base = { ...doc, distributions: [
+            { field: 'Order.shippingAddress', shape: 'from', source: 'Order.customer.shippingAddress' },
+            { field: 'Order.shippingAddress', when: { field: 'Order.status', value: 'draft' }, shape: 'from', source: 'Order.customer.shippingAddress', description: 'drafts too' },
+            { field: 'Order.totalAmount.currency', when: { field: 'Order.customer.status', value: 'suspended' }, shape: 'among', values: ['EUR'] },
+        ] };
+        expect(errorsOf(base)).toEqual([]);
+        expect(errorsOf({ ...base, distributions: [{ field: 'Order.shippingAddress', shape: 'from' }] })).not.toEqual([]);
+        expect(errorsOf({ ...base, distributions: [{ field: 'Order.shippingAddress', shape: 'from', source: 'Order' }] })).not.toEqual([]);
+        for (const extra of [{ median: 3 }, { sigma: 0.5 }, { exponent: 1 }, { values: ['x'] }]) {
+            expect(errorsOf({ ...base, distributions: [{ field: 'Order.shippingAddress', shape: 'from', source: 'Order.customer.shippingAddress', ...extra }] })).not.toEqual([]);
+        }
+        for (const shape of ['uniform', 'lognormal', 'zipf']) {
+            expect(errorsOf({ ...base, distributions: [{ field: 'Order.shippingAddress', shape, source: 'Order.customer.shippingAddress' }] })).not.toEqual([]);
+        }
+        expect(errorsOf({ ...base, distributions: [{ field: 'Payment.method', shape: 'among', values: ['paypal'], source: 'Payment.order.status' }] })).not.toEqual([]);
+    });
+
     it('accepts every outcome kind, givens and options as the parser writes them', async () => {
         const text = `scenario Full :: "all of it" {
     satisfies [REQ-ORD-001]

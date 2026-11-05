@@ -138,6 +138,7 @@ function distribution(d: ast.DistributionDecl): Record<string, unknown> {
         median: opt(d.median),
         sigma: opt(d.sigma),
         exponent: opt(d.exponent),
+        source: d.shape === 'from' && d.source ? path(d.source) : undefined,
         values: d.shape === 'among' ? amongValues(d.values) : undefined,
         description: d.description?.text,
     });

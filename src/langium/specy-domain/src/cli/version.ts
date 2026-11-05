@@ -11,10 +11,12 @@
  * `null` literals and negated `contains` with a `kind`, and collapses the line
  * breaks of multi-line strings; the `specy` CLI converts every language between
  * DSL, JSON, YAML and Markdown; 1.8.0: conditional distribution rules (`when`),
- * the `among` shape and vocabulary `grammars`). Consumers such as synthy
- * pin the minimum they accept.
+ * the `among` shape and vocabulary `grammars`; 1.9.0: the `from` shape (a copy
+ * through one declared reference, `source` in the JSON), and conditions and
+ * grammar `by` that read through one declared reference). Consumers such as
+ * synthy pin the minimum they accept.
  */
-export const PARSER_VERSION = '1.8.0';
+export const PARSER_VERSION = '1.9.0';
 
 /**
  * The JSON Schema of the scenario document (`src/schemas/synth-scenario.schema.json`
