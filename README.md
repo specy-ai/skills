@@ -16,7 +16,7 @@ Specy is a Domain-Driven Design toolkit that ships as a **Claude Code plugin** (
 - **`.domain`** — the domain model in DDD notation (the *how*)
 - **`.arch`** — the software architecture in a C4-inspired notation (the *with what*: systems, containers, components, contracts)
 
-A companion parser/CLI additionally renders a `.domain` model to **JSON, YAML, or Markdown**.
+The languages themselves — metamodels, grammars, JSON Schemas, the Langium parsers and the `specy` CLI that converts any model between DSL, JSON, YAML and Markdown — live in the sibling [metamodels](https://github.com/specy-ai/metamodels) repository. The [Specy app](https://github.com/specy-ai/app) navigates a model instance and renders its diagrams.
 
 ## Why Specy?
 
@@ -25,7 +25,7 @@ Domain knowledge — concepts, their relationships, their structure, behavior, l
 
 ![Domain concept mindmap](./domain-concept.png)
 
-Specy fixes this by making domain knowledge **explicit, comprehensive, traceable, and executable.** Engineered for scale and carefully crafted by humans, [Specy’s meta-model](https://github.com/specy-ai/skills/blob/main/src/metamodels/DOMAIN-METAMODEL.md) provides the structural depth required to seamlessly map large, highly complex, and reactive software systems.
+Specy fixes this by making domain knowledge **explicit, comprehensive, traceable, and executable.** Engineered for scale and carefully crafted by humans, [Specy’s meta-model](https://github.com/specy-ai/metamodels/blob/main/src/metamodels/DOMAIN-METAMODEL.md) provides the structural depth required to seamlessly map large, highly complex, and reactive software systems.
 
 ### The Bi-Directional Chain of Truth
 Specy captures the structure, behavior, and interactions of your software in a unified model. Define it once, and every element stays linked along a continuous, bi-directional pipeline:
@@ -41,10 +41,13 @@ Why not just prompt your way through development? Because prompts are ephemeral 
 ## Quick start
 
 ```bash
-git clone https://github.com/specy-ai/skills.git specy && cd specy
-./src/skills/build.sh          # build the `specy` plugin → dist/
+git clone https://github.com/specy-ai/metamodels.git   # the languages: the build copies grammars, metamodels, schemas and examples from it
+git clone https://github.com/specy-ai/skills.git && cd skills
+./src/skills/build.sh          # build the `specy` plugin → dist/ (reads ../metamodels, or $SPECY_METAMODELS)
 ./install-skills-for-user.sh   # install into ~/.claude/skills/specy
 ```
+
+The built plugin is committed in `dist/`, so installing it needs neither clone: `claude plugin marketplace add specy-ai/skills && claude plugin install specy`.
 
 Then, in Claude Code:
 
@@ -58,7 +61,7 @@ specy:synth-design        # a synthetic-data scenario (.synth) from prose: "give
 specy:domain-build-fixtures      # certified synthetic data in a project's tests (dbt, Java, TS, Clojure)
 ```
 
-Full options in [Setup](#setup); browse complete models in [`examples/`](./examples).
+Full options in [Setup](#setup); browse complete models in the metamodels repo's [`examples/`](https://github.com/specy-ai/metamodels/tree/main/examples).
 
 ## See it work
 
@@ -106,7 +109,7 @@ The same model can also be rendered to JSON/YAML/Markdown, explored conversation
 - [Prerequisites](#prerequisites)
 - [Setup](#setup)
 - [Usage](#usage)
-- [LSP Server](#lsp-server)
+- [Parsers, formats and LSP](#parsers-formats-and-lsp)
 - [Contributing](#contributing)
 
 ## Skills
@@ -312,7 +315,7 @@ This is the **brownfield** path — code already exists. Knowledge flows from im
 
 Specy organizes business knowledge into four layers, each with its own metamodel, file format, and grammar. Together they form a **traceability chain** from product vision down to the domain model and the software architecture that realizes it.
 
-![Specy metamodels comparison](./metamodel-comparison.svg)
+![Specy metamodels comparison](https://raw.githubusercontent.com/specy-ai/metamodels/main/metamodel-comparison.svg)
 
 ### Product Requirements (`.prd`)
 
@@ -322,7 +325,7 @@ A `.prd` file structures product thinking into traceable concepts: problem state
 
 **Traceability:** each feature traces to goals and personas; each user story traces to a feature; each release groups features. The PRD feeds into system requirements via feature-to-requirement coverage.
 
-![Specy PRD metamodel](./specy-PRD-metamodel.svg)
+![Specy PRD metamodel](https://raw.githubusercontent.com/specy-ai/metamodels/main/specy-PRD-metamodel.svg)
 
 <details>
 <summary><b>PRD key concepts</b></summary>
@@ -350,7 +353,7 @@ A `.sysreq` file contains requirement sets grouped by feature or capability, usi
 
 **Traceability:** each requirement set links to a PRD feature via `feature-ref`; each requirement has a unique ID (e.g., `REQ-ORD-001`) that domain model constructs reference via `satisfies`.
 
-![Specy system requirement metamodel](./specy-SysReq-metamodel.svg)
+![Specy system requirement metamodel](https://raw.githubusercontent.com/specy-ai/metamodels/main/specy-SysReq-metamodel.svg)
 
 <details>
 <summary><b>EARS patterns &amp; key concepts</b></summary>
@@ -413,7 +416,7 @@ A `.arch` file has one of two roots. **`architecture`** describes one system in 
 
 **Traceability:** `requirements-source` links to the `.sysreq` file and any element can `satisfies [REQ-XXX-001]` (NFRs drive architecture); `domain-source` links to the `.domain` file(s): a system `realizes context`, a component `realizes module "…"`, value types and events are imported with `import value type X from domain` / `import event X from domain`, and level-0 concept references (`masters`, `handles`, `carries`) resolve to domain elements.
 
-![Specy software architecture metamodel](./specy-Arch-metamodel.svg)
+![Specy software architecture metamodel](https://raw.githubusercontent.com/specy-ai/metamodels/main/specy-Arch-metamodel.svg)
 
 <details>
 <summary><b>Architecture key concepts</b></summary>
@@ -442,7 +445,7 @@ A `.arch` file has one of two roots. **`architecture`** describes one system in 
 
 </details>
 
-One system in focus (`architecture` root), trimmed from [`examples/url-shortener/url-shortener.arch`](./examples/url-shortener/url-shortener.arch):
+One system in focus (`architecture` root), trimmed from [`examples/url-shortener/url-shortener.arch`](https://github.com/specy-ai/metamodels/blob/main/examples/url-shortener/url-shortener.arch):
 
 ```
 architecture Sniplink :: "Sniplink URL-shortening platform — software architecture" {
@@ -503,7 +506,7 @@ architecture Sniplink :: "Sniplink URL-shortening platform — software architec
 }
 ```
 
-A system landscape (`organization` root), trimmed from [`examples/retail-media/retail-media.arch`](./examples/retail-media/retail-media.arch), whose concept names resolve against [`retail-media.domain`](./examples/retail-media/retail-media.domain):
+A system landscape (`organization` root), trimmed from [`examples/retail-media/retail-media.arch`](https://github.com/specy-ai/metamodels/blob/main/examples/retail-media/retail-media.arch), whose concept names resolve against [`retail-media.domain`](https://github.com/specy-ai/metamodels/blob/main/examples/retail-media/retail-media.domain):
 
 ```
 organization RetailMediaCo
@@ -546,7 +549,7 @@ organization RetailMediaCo
 }
 ```
 
-The Navigator in [`ui/`](./ui/README.md) renders an `architecture` file as a foldable C4 diagram and an `organization` file as a landscape of its systems — see `ui/README.md`.
+The [Specy app](https://github.com/specy-ai/app) renders an `architecture` file as a foldable C4 diagram and an `organization` file as a landscape of its systems.
 
 ### Synthetic-data scenarios (`.synth`)
 
@@ -605,112 +608,54 @@ scenario OrdersH1_2025 :: "Six months of e-commerce orders" {
 
 </details>
 
-The metamodel is [`src/metamodels/SYNTH-METAMODEL.md`](./src/metamodels/SYNTH-METAMODEL.md), the grammar [`src/grammars/synth.ebnf`](./src/grammars/synth.ebnf). The same scenario is also stored as **JSON or YAML**, for programs and language models: one document in three encodings, described by the JSON Schema [`src/schemas/synth-scenario.schema.json`](./src/schemas/synth-scenario.schema.json) and converted between them without loss (metamodel, [Storage formats](./src/metamodels/SYNTH-METAMODEL.md#storage-formats)). `specy-synth parse -f json|yaml` writes that document from a `.synth` (see [LSP Server](#lsp-server)).
+The metamodel is [`SYNTH-METAMODEL.md`](https://github.com/specy-ai/metamodels/blob/main/src/metamodels/SYNTH-METAMODEL.md), the grammar [`synth.ebnf`](https://github.com/specy-ai/metamodels/blob/main/src/grammars/synth.ebnf). The same scenario is also stored as **JSON or YAML**, for programs and language models: one document in three encodings, described by the JSON Schema [`synth-scenario.schema.json`](https://github.com/specy-ai/metamodels/blob/main/src/schemas/synth-scenario.schema.json) and converted between them without loss (metamodel, [Storage formats](https://github.com/specy-ai/metamodels/blob/main/src/metamodels/SYNTH-METAMODEL.md#storage-formats)). `specy-synth parse -f json|yaml` writes that document from a `.synth` (see [Parsers, formats and LSP](#parsers-formats-and-lsp)).
 
 ## Folder Structure
 
 ```
-specy-skill/
-├── src/                          # All source material (humans edit here)
-│   ├── skills/                   # Skill templates and build system
-│   │   ├── build.sh              # Assembles dist/ plugin (skills + manifest) from templates
-│   │   ├── plugin/               # Plugin manifest template (plugin.json)
-│   │   ├── prd-design/           # specy:prd-design source
-│   │   ├── sysreq-design/        # specy:sysreq-design source
-│   │   ├── sysreq-extract-from-code/   # specy:sysreq-extract-from-code source
-│   │   ├── domain-design/        # specy:domain-design source
-│   │   ├── domain-build-code/    # specy:domain-build-code source (main.md + heuristics/)
-│   │   ├── domain-extract-from-code/   # specy:domain-extract-from-code source (main.md + heuristics/)
-│   │   ├── domain-refactor/      # specy:domain-refactor source
-│   │   ├── architecture-design/  # specy:architecture-design source
-│   │   ├── architecture-build-code/    # specy:architecture-build-code source (main.md + heuristics/)
-│   │   ├── architecture-extract-from-code/   # specy:architecture-extract-from-code source (main.md + heuristics/)
-│   │   ├── synth-design/         # specy:synth-design source
-│   │   ├── domain-build-fixtures/      # specy:domain-build-fixtures source (main.md + heuristics/)
-│   │   └── domain-dialogue/      # specy:domain-dialogue source (auxiliary)
-│   ├── grammars/                 # Canonical EBNF grammars (source of truth)
-│   │   ├── domain.ebnf           # Domain model grammar (.domain)
-│   │   ├── architecture.ebnf     # Software architecture grammar (.arch)
-│   │   ├── prd.ebnf              # Product requirements grammar (.prd)
-│   │   ├── sysreq.ebnf           # System requirements grammar (.sysreq)
-│   │   └── synth.ebnf            # Synthetic-data scenario grammar (.synth)
-│   ├── metamodels/               # Metamodel documentation
-│   │   ├── DOMAIN-METAMODEL.md
-│   │   ├── SOFTWARE-ARCHITECTURE-METAMODEL.md
-│   │   ├── PRODUCT-REQ-METAMODEL.md
-│   │   ├── SYSTEM-REQ-METAMODEL.md
-│   │   └── SYNTH-METAMODEL.md    # .synth scenarios written against a .domain
-│   ├── schemas/                  # JSON Schemas of the documents stored as JSON or YAML
-│   │   └── synth-scenario.schema.json  # a scenario as JSON or YAML (the .synth document)
-│   ├── tree-sitters/             # Tree-sitter parser generators + build script
-│   │   ├── build.sh
-│   │   ├── tree-sitter-specy-domain/
-│   │   ├── tree-sitter-specy-architecture/
-│   │   ├── tree-sitter-specy-prd/
-│   │   ├── tree-sitter-specy-sysreq/
-│   │   └── tree-sitter-specy-synth/
-│   └── langium/                  # Langium-based LSP server + parser CLIs
-│       └── specy-domain/         # .domain and .synth languages (specy-domain, specy-synth)
+skills/
+├── src/skills/                   # Skill templates and build system (humans edit here)
+│   ├── build.sh                  # Assembles dist/ (skills + manifest) from templates; copies grammars, metamodels,
+│   │                             # schemas and examples from ../metamodels (or $SPECY_METAMODELS) into each skill
+│   ├── plugin/                   # Plugin manifest template (plugin.json)
+│   ├── prd-design/               # specy:prd-design source
+│   ├── sysreq-design/            # specy:sysreq-design source
+│   ├── sysreq-extract-from-code/ # specy:sysreq-extract-from-code source
+│   ├── domain-design/            # specy:domain-design source
+│   ├── domain-build-code/        # specy:domain-build-code source (main.md + heuristics/)
+│   ├── domain-extract-from-code/ # specy:domain-extract-from-code source (main.md + heuristics/)
+│   ├── domain-refactor/          # specy:domain-refactor source
+│   ├── architecture-design/      # specy:architecture-design source
+│   ├── architecture-build-code/  # specy:architecture-build-code source (main.md + heuristics/)
+│   ├── architecture-extract-from-code/   # specy:architecture-extract-from-code source (main.md + heuristics/)
+│   ├── synth-design/             # specy:synth-design source
+│   ├── domain-build-fixtures/    # specy:domain-build-fixtures source (main.md + heuristics/)
+│   ├── domain-dialogue/          # specy:domain-dialogue source (auxiliary)
+│   └── model-formats/            # specy:model-formats source (auxiliary)
 │
-├── dist/                         # Built `specy` plugin (generated — do not edit)
+├── dist/                         # Built `specy` plugin (generated — do not edit, do commit)
 │   ├── .claude-plugin/
 │   │   └── plugin.json           # Plugin manifest
 │   └── skills/
 │       ├── prd-design/           # SKILL.md + grammar/ + references/
-│       ├── sysreq-design/        # SKILL.md + grammar/ + references/
-│       ├── sysreq-extract-from-code/   # SKILL.md + grammar/ + references/
-│       ├── domain-design/        # SKILL.md + grammar/ + references/
-│       ├── domain-build-code/    # SKILL.md + heuristics/ + grammar/ + references/
-│       ├── domain-extract-from-code/   # SKILL.md + heuristics/ + grammars/
-│       ├── domain-refactor/      # SKILL.md + grammar/ + references/
-│       ├── architecture-design/  # SKILL.md + grammar/ + references/
-│       ├── architecture-build-code/    # SKILL.md + heuristics/ + grammar/ + references/
-│       ├── architecture-extract-from-code/   # SKILL.md + heuristics/ + grammars/ + references/
-│       ├── synth-design/         # SKILL.md + grammar/ + references/ + examples/
-│       ├── domain-build-fixtures/      # SKILL.md + heuristics/ + references/
-│       └── domain-dialogue/      # SKILL.md (auxiliary)
+│       ├── …                     # one directory per skill: SKILL.md + heuristics/, grammar(s)/, references/, examples/ as needed
+│       └── model-formats/        # SKILL.md + references/ (MODEL-FORMATS.md + the five JSON Schemas)
 │
-├── examples/                     # Example Specy projects
-│   ├── business-loan/            # .prd, .sysreq, .domain
-│   ├── url-shortener/            # .prd, .sysreq, .domain, .arch (one system in focus)
-│   ├── retail-media/             # Organization landscape: .domain + level-0 .arch
-│   ├── ride-now/                 # Multi-context ride-sharing (.prd, .sysreq, .domain)
-│   ├── ecommerce/                # Orders example (.domain, v2 format)
-│   └── uber-old/                 # Legacy ride-sharing example (superseded by ride-now)
-│
-├── ui/                           # Navigator: browses .domain / .sysreq files, renders .arch diagrams (see ui/README.md)
-│
-├── hooks/                        # Git hooks
+├── .claude-plugin/
+│   └── marketplace.json          # Local marketplace pointing at dist/
+├── hooks/
 │   └── pre-commit                # Ensures dist/ stays in sync with src/
-│
 ├── install-skills-for-user.sh    # Symlinks the built plugin (dist/) to ~/.claude/skills/specy
-├── specy.sh                      # Convert / validate any model between DSL, JSON, YAML and Markdown
-├── parse-domain.sh               # Render a .domain to JSON / YAML / Markdown
-├── LICENSE                       # MIT
-├── VISION.md                     # Specy thesis and design philosophy
-├── CORE_TEAM.md                  # Core review panel
-└── VISION_TEAM.md                # Vision review panel
+└── LICENSE                       # MIT
 ```
+
+The languages live next door, in [metamodels](https://github.com/specy-ai/metamodels): `src/grammars/` (EBNF), `src/metamodels/` (the metamodel of each language and `MODEL-FORMATS.md`), `src/schemas/` (JSON Schemas), `src/langium/` (parsers, converters, LSP and the `specy` CLI), `src/tree-sitters/`, `examples/`, and the thesis and review panels (`VISION.md`, `CORE_TEAM.md`, `VISION_TEAM.md`). The navigator is the [app](https://github.com/specy-ai/app) repository.
 
 ### Key directories
 
-**`src/`** — Everything humans edit. Skill templates, grammars, metamodels, and tree-sitter sources. The `src/skills/build.sh` script assembles the final `SKILL.md` files from templates using `<!-- include: path -->` and `<!-- include-code: lang path -->` markers.
+**`src/skills/`** — Everything humans edit here: skill templates, reusable fragments and stack heuristics. The `src/skills/build.sh` script assembles the final `SKILL.md` files from templates using `<!-- include: path -->` and `<!-- include-code: lang path -->` markers, then copies each skill's runtime files into its `dist/` directory.
 
-**`dist/`** — Build output produced by `src/skills/build.sh`: the `specy` plugin (`.claude-plugin/plugin.json` + `skills/<name>/SKILL.md`) plus runtime files (heuristics, grammars, metamodel references) bundled inside each skill. Never edit files here directly — they are overwritten on each build.
-
-**`src/grammars/`** — Canonical EBNF grammars for each file format. The build script copies them into the relevant `dist/skills/` directories.
-
-**`src/metamodels/`** — Prose documentation of each metamodel. These describe the concepts, relationships, and constraints that the grammars formalize. Copied to `dist/` as runtime references for skills that need them. `MODEL-FORMATS.md` is the contract of the four encodings of every model and of the Markdown conventions.
-
-**`src/schemas/`** — The JSON Schemas of the five model documents (`domain-model`, `prd`, `sysreq`, `architecture`, `synth-scenario`), the shape of a model stored as JSON or YAML.
-
-**`src/tree-sitters/`** — Tree-sitter parser generators for Specy file formats. Used for syntax highlighting, parsing validation, and tooling integration.
-
-**`src/langium/`** — [Langium](https://langium.org/)-based parsers, format converters and LSP server for the five DSLs (`.domain`, `.prd`, `.sysreq`, `.arch`, `.synth`), on one shared service set so a scenario's references resolve into its domain model. Provides editor diagnostics, AST access, the `specy` CLI (any model between DSL, JSON, YAML and Markdown), `specy-domain parse` and `specy-synth parse`. See [Parsers, formats and LSP](#parsers-formats-and-lsp) below.
-
-**`examples/`** — Complete example projects demonstrating Specy files across different domains. `url-shortener/` carries a single-system `.arch`; `retail-media/` an `organization` landscape with its `.domain`.
-
-**`ui/`** — The Specy Navigator, a static HTML prototype that browses `.domain` and `.sysreq` files and renders a `.arch` file as a foldable C4 diagram (or, for an `organization` file, as a landscape of its systems). See [`ui/README.md`](./ui/README.md).
+**`dist/`** — Build output produced by `src/skills/build.sh`: the `specy` plugin (`.claude-plugin/plugin.json` + `skills/<name>/SKILL.md`) plus runtime files (heuristics from this repo; grammars, metamodel references, schemas and example files from `../metamodels`) bundled inside each skill. Never edit files here directly — they are overwritten on each build — but they are committed: the plugin installs from `dist/` without a metamodels checkout.
 
 ## Prerequisites
 
@@ -791,133 +736,17 @@ In your target project, Specy files live under `specy/` at the project root.
 
 ## Parsers, formats and LSP
 
-Specy ships [Langium](https://langium.org/)-based parsers for the five languages — `.domain`, `.prd`, `.sysreq`, `.arch`, `.synth` — on one shared service set (so a `.synth` scenario resolves its dot-paths into the `.domain` it names with `domain-source`), a language server, and format converters, all in `src/langium/specy-domain/`. It provides:
-
-- **One document, four encodings** — every model is read and written as **DSL, JSON, YAML or Markdown** (`specy convert`, `specy validate`). JSON and YAML are described by the JSON Schemas in `src/schemas/`; Markdown follows the conventions of [`src/metamodels/MODEL-FORMATS.md`](./src/metamodels/MODEL-FORMATS.md), which a person or a language model can write loosely: the reader transpiles what it recognizes to the DSL, the parser validates it, and what it could not place is reported line by line. The `specy:model-formats` skill drives the loop.
-- **Editor integration** — diagnostics, syntax validation, and AST navigation via LSP (VS Code extension entrypoint in `src/extension/main.ts`; neovim through `vim.lsp.config`). In a `.synth` file, an unknown entity, field, state or enum member is an error naming what was expected and the closest candidate; completion after `Order.totalAmount.` offers the fields of `Money`; editing the `.domain` revalidates the scenarios written against it.
-- **Parser CLI** (`specy-domain`) — parses a `.domain` file into **JSON, YAML, or Markdown**, or validates it from the command line. Since 1.1.0 the JSON output opens with a `parser: { name, version }` header, so consumers such as synthy can pin the shape they understand; since 1.7.0 it also opens with `$schema` and keeps every `meta` block and literal kind, so the DSL can be printed back from it.
-- **Scenario CLI** (`specy-synth`) — parses a `.synth` file against its `domain-source` into the scenario document synthy reads, as JSON or YAML (`specy-synth parse orders.synth -f yaml`), or validates it (`specy-synth validate`). Semantic rules carry the conflict code synthy would raise (`SYN-E006`, …), so a scenario clean in the editor is one the generator accepts.
-
-### Build
+The [metamodels](https://github.com/specy-ai/metamodels) repository ships [Langium](https://langium.org/)-based parsers for the five languages — `.domain`, `.prd`, `.sysreq`, `.arch`, `.synth` — on one shared service set (so a `.synth` scenario resolves its dot-paths into the `.domain` it names with `domain-source`), a language server, and format converters. Its `specy` CLI reads and writes every model as **DSL, JSON, YAML or Markdown** (`specy convert`, `specy validate`, `specy detect`); the `specy:model-formats` skill drives that loop from Claude Code. `specy-domain parse` renders a `.domain` to JSON, YAML or Markdown; `specy-synth parse` writes the scenario document synthy reads.
 
 ```bash
-./src/langium/specy-domain/build.sh
-```
-
-The script runs `npm install`, generates the Langium artifacts for the five languages, embeds the JSON Schemas, compiles TypeScript to `out/`, validates every example file of `examples/` with the `specy` CLI, converts one file per language to the four encodings, runs the test suite (which round-trips every example through DSL, JSON, YAML and Markdown and expects the same model back) and bundles the parsers for the browser.
-
-### Convert and validate any model: `specy`
-
-The `specy.sh` wrapper at the repository root builds the CLI on first use and works from any directory:
-
-```bash
-./specy.sh convert examples/ecommerce/v2/orders.domain --to markdown -o      # writes orders.domain.md next to it
-./specy.sh convert examples/url-shortener/url-shortener.prd --to yaml
-./specy.sh convert sniplink.sysreq.md --to dsl -o sniplink.sysreq            # Markdown -> DSL, through the parser
-./specy.sh validate catalogue.synth.yaml                                     # schema + grammar + references into the domain
-./specy.sh detect notes.md                                                   # which language and encoding it is read as
-./specy.sh formats
-```
-
-| Command | Description |
-|---|---|
-| `convert <file> --to dsl\|json\|yaml\|markdown` | Convert between encodings; `-o [file]` writes `<name>.<language>.<ext>` next to the input, `--pretty` indents JSON, `--strict` writes nothing on an error, `--language` / `--from` override the detection |
-| `validate <file>` | Any encoding: JSON Schema for json/yaml, the Markdown mapping for md, then grammar, semantic rules and references; `--dsl` prints the DSL a document was checked as |
-| `detect <file>` | The language and encoding a file is read as |
-
-File names carry the encoding: `<name>.domain`, `<name>.domain.json`, `<name>.domain.yaml`, `<name>.domain.md` (same for `.prd`, `.sysreq`, `.arch`, `.synth`). Reading JSON, YAML or Markdown always ends in the parser, so a document in any encoding is judged by the same grammar and rules as the DSL, and the output is the canonical model. Diagnostics are `file:line:col [severity] (stage) message`, with Markdown line numbers for a Markdown input.
-
-### Parse a `.domain` file
-
-The easiest entry point is the `parse-domain.sh` wrapper at the repository root. It builds the parser on first use and works from any directory:
-
-```bash
-# Markdown documentation
-./parse-domain.sh examples/ecommerce/v2/orders.domain -f markdown
-
-# Clean YAML model
+cd ../metamodels
+./src/langium/specy-domain/build.sh                                      # build, validate every example, test, bundle
+./specy.sh convert examples/ecommerce/v2/orders.domain --to markdown -o  # writes orders.domain.md next to it
+./specy.sh validate catalogue.synth.yaml                                 # schema + grammar + references into the domain
 ./parse-domain.sh examples/ecommerce/v2/orders.domain -f yaml > orders.yaml
-
-# Pretty-printed JSON (default format is json)
-./parse-domain.sh examples/ecommerce/v2/orders.domain --pretty
 ```
 
-| Flag | Description |
-|------|-------------|
-| `-f, --format <fmt>` | `json` (default), `yaml`, or `markdown` |
-| `--pretty` | Pretty-print JSON output |
-| `--raw` | Emit the faithful Langium AST (with `$type` discriminators) instead of the clean domain model — `json`/`yaml` only |
-
-`json` and `yaml` share a **clean domain model**: Langium internals are stripped and definitions are grouped by kind (`entities`, `values`, `enums`, `commands`, `queries`, `events`, `services`, `reactions`, …) under their owning context/module. `markdown` renders the same model as a documentation-style document (heading hierarchy, field tables, operation summaries). Pass `--raw` when you need the verbatim AST.
-
-Under the hood the wrapper calls the CLI directly, which you can also invoke from `src/langium/specy-domain/`:
-
-```bash
-node out/cli/index.js parse ../../../examples/ecommerce/v2/orders.domain -f markdown
-node out/cli/index.js parse ../../../examples/ecommerce/v2/orders.domain -f json | jq '.definitions.entities[].name'
-```
-
-Example JSON output (truncated) for `examples/ecommerce/v2/orders.domain`:
-
-```json
-{
-  "modules": [
-    { "name": "Order", "dependencies": ["Shipping"] }
-  ],
-  "definitions": {
-    "enums": [
-      { "kind": "enum", "name": "OrderStatus", "values": ["draft", "confirmed", "shipped", "delivered", "cancelled"] }
-    ],
-    "entities": [
-      {
-        "kind": "entity",
-        "name": "Customer",
-        "description": "A customer who places orders",
-        "identity": { "name": "id", "type": "UUID" },
-        "fields": [
-          { "name": "name", "type": "string", "constraints": ["minLength(1)", "maxLength(100)"] },
-          { "name": "email", "type": "EmailAddress", "constraints": ["unique"] }
-        ]
-      }
-    ]
-  }
-}
-```
-
-Parse errors are written to `stderr` with `line:column` locations, and the process exits non-zero.
-
-### Parse a `.synth` scenario
-
-```bash
-cd src/langium/specy-domain
-node out/cli/synth.js validate ../../../examples/ecommerce/v2/orders.synth
-node out/cli/synth.js parse ../../../examples/ecommerce/v2/orders.synth --pretty > orders.synth.json
-node out/cli/synth.js parse ../../../examples/ecommerce/v2/orders.synth -f yaml > orders.synth.yaml
-```
-
-| Flag | Description |
-|------|-------------|
-| `-f, --format <fmt>` | `json` (default) or `yaml`: the same document, valid against `src/schemas/synth-scenario.schema.json` |
-| `--pretty` | Pretty-print JSON output |
-| `--strict` | Exit 1 on any error instead of emitting best-effort output |
-
-The scenario names its model with `domain-source "orders.domain"`, resolved relative to the `.synth` file; the CLI loads both and links every reference. `parse` emits best-effort output on errors unless `--strict` is given. The output opens with `$schema` and `parser: { name: "specy-synth", version }` and carries `domain`, so synthy can run `synthy check orders.synth.yaml` without a second argument. YAML follows the 1.2 core schema and quotes every scalar a YAML 1.1 reader would retype (dates, `yes`, `on`); keys come in the canonical order synthy's writer also uses, so both tools write the same bytes.
-
-A broken scenario reads like compiler output:
-
-```
-orders.synth:12:21 [error SYN-E005] 'totalAmout' is not a member of entity Order. Did you mean 'totalAmount'?
-orders.synth:19:9  [error SYN-E008] Mix of Order.OrderLifecycle sum to 0.9, not 1. Make them sum to 1, or omit a member to leave it at 0.
-orders.synth:23:46 [error SYN-E013] Payment must be declared per Order for the rollup to hold.
-```
-
-### Validate a `.domain` file
-
-```bash
-node out/cli/index.js validate ../../../examples/ecommerce/v2/orders.domain
-```
-
-Emits one `path:line:col [severity] message` line per diagnostic. Exits `0` when there are no errors (warnings allowed), `1` otherwise — suitable for CI gates.
+The full reference — every command and flag, the JSON output, the diagnostics — is in that repository's [README](https://github.com/specy-ai/metamodels#readme).
 
 ## Contributing
 
@@ -942,12 +771,8 @@ src/skills/build.sh                          # Build all skills
 src/skills/build.sh domain-extract-from-code # Build a single skill
 ```
 
-The pre-commit hook blocks commits if `dist/` is out of date with `src/`.
+The pre-commit hook blocks commits if `dist/` is out of date with `src/`. The build reads the sibling [metamodels](https://github.com/specy-ai/metamodels) checkout (`../metamodels`, or `$SPECY_METAMODELS`).
 
-### Building tree-sitter parsers
+### Changing a language
 
-```bash
-./src/tree-sitters/build.sh
-```
-
-Requires `tree-sitter` CLI. Builds all four grammars (`prd`, `sysreq`, `domain`, `architecture`) and runs smoke tests against every example file in `examples/`, including the two `.arch` files.
+Grammars, metamodels, schemas and examples live in [metamodels](https://github.com/specy-ai/metamodels). Change them there — the EBNF, the Langium and tree-sitter grammars and the metamodel prose together, every example still validating — then rebuild the plugin here and commit the regenerated `dist/`.

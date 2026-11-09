@@ -19,6 +19,16 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 DIST_DIR="$REPO_ROOT/dist"
 
+# The grammars, metamodels, JSON Schemas and examples live in the sibling metamodels repo
+# (https://github.com/specy-ai/metamodels), checked out next to this one; SPECY_METAMODELS
+# overrides its location. The build copies from there into each skill, so dist/ stays self-contained.
+METAMODELS_DIR="${SPECY_METAMODELS:-$REPO_ROOT/../metamodels}"
+if [[ ! -d "$METAMODELS_DIR/src/metamodels" ]]; then
+  echo "ERROR: metamodels checkout not found at $METAMODELS_DIR" >&2
+  echo "       clone https://github.com/specy-ai/metamodels next to this repo, or set SPECY_METAMODELS" >&2
+  exit 1
+fi
+
 HEADER="<!-- GENERATED FILE — DO NOT EDIT. Source: src/skills/%s/main.md — Run src/skills/build.sh to regenerate. -->"
 
 # -----------------------------------------------------------------------------
@@ -111,7 +121,7 @@ copy_runtime_files() {
   done
   local dxc_grammars="$SKILLS_OUT/domain-extract-from-code/grammars"
   mkdir -p "$dxc_grammars"
-  cp "$REPO_ROOT/src/grammars/domain.ebnf" "$dxc_grammars/domain.ebnf"
+  cp "$METAMODELS_DIR/src/grammars/domain.ebnf" "$dxc_grammars/domain.ebnf"
   echo "  domain-extract-from-code/: 4 heuristics + 1 grammar copied"
 
   # domain-build-code: stack-specific heuristics + domain grammar + metamodel
@@ -123,61 +133,61 @@ copy_runtime_files() {
   local dbc_grammar="$SKILLS_OUT/domain-build-code/grammar"
   local dbc_refs="$SKILLS_OUT/domain-build-code/references"
   mkdir -p "$dbc_grammar" "$dbc_refs"
-  cp "$REPO_ROOT/src/grammars/domain.ebnf" "$dbc_grammar/domain.ebnf"
-  cp "$REPO_ROOT/src/metamodels/DOMAIN-METAMODEL.md" "$dbc_refs/DOMAIN-METAMODEL.md"
+  cp "$METAMODELS_DIR/src/grammars/domain.ebnf" "$dbc_grammar/domain.ebnf"
+  cp "$METAMODELS_DIR/src/metamodels/DOMAIN-METAMODEL.md" "$dbc_refs/DOMAIN-METAMODEL.md"
   echo "  domain-build-code/: 3 heuristics + 1 grammar + 1 reference copied"
 
   # domain-refactor: domain grammar + metamodel (emits a redesigned .domain)
   local dr_grammar="$SKILLS_OUT/domain-refactor/grammar"
   local dr_refs="$SKILLS_OUT/domain-refactor/references"
   mkdir -p "$dr_grammar" "$dr_refs"
-  cp "$REPO_ROOT/src/grammars/domain.ebnf" "$dr_grammar/domain.ebnf"
-  cp "$REPO_ROOT/src/metamodels/DOMAIN-METAMODEL.md" "$dr_refs/DOMAIN-METAMODEL.md"
+  cp "$METAMODELS_DIR/src/grammars/domain.ebnf" "$dr_grammar/domain.ebnf"
+  cp "$METAMODELS_DIR/src/metamodels/DOMAIN-METAMODEL.md" "$dr_refs/DOMAIN-METAMODEL.md"
   echo "  domain-refactor/: 1 grammar + 1 reference copied"
 
   # sysreq-extract-from-code: sysreq grammar + metamodel reference
   local sxc_refs="$SKILLS_OUT/sysreq-extract-from-code/references"
   local sxc_grammar="$SKILLS_OUT/sysreq-extract-from-code/grammar"
   mkdir -p "$sxc_refs" "$sxc_grammar"
-  cp "$REPO_ROOT/src/metamodels/SYSTEM-REQ-METAMODEL.md" "$sxc_refs/SYSTEM-REQ-METAMODEL.md"
-  cp "$REPO_ROOT/src/grammars/sysreq.ebnf" "$sxc_grammar/sysreq.ebnf"
+  cp "$METAMODELS_DIR/src/metamodels/SYSTEM-REQ-METAMODEL.md" "$sxc_refs/SYSTEM-REQ-METAMODEL.md"
+  cp "$METAMODELS_DIR/src/grammars/sysreq.ebnf" "$sxc_grammar/sysreq.ebnf"
   echo "  sysreq-extract-from-code/: 1 reference + 1 grammar copied"
 
   # prd-design: grammar + references
   local prd_grammar="$SKILLS_OUT/prd-design/grammar"
   local prd_refs="$SKILLS_OUT/prd-design/references"
   mkdir -p "$prd_grammar" "$prd_refs"
-  cp "$REPO_ROOT/src/grammars/prd.ebnf" "$prd_grammar/prd.ebnf"
-  cp "$REPO_ROOT/src/metamodels/PRODUCT-REQ-METAMODEL.md" "$prd_refs/PRODUCT-REQ-METAMODEL.md"
+  cp "$METAMODELS_DIR/src/grammars/prd.ebnf" "$prd_grammar/prd.ebnf"
+  cp "$METAMODELS_DIR/src/metamodels/PRODUCT-REQ-METAMODEL.md" "$prd_refs/PRODUCT-REQ-METAMODEL.md"
   echo "  prd-design/: 1 grammar + 1 reference copied"
 
   # sysreq-design: grammar + references
   local sysreq_grammar="$SKILLS_OUT/sysreq-design/grammar"
   local sysreq_refs="$SKILLS_OUT/sysreq-design/references"
   mkdir -p "$sysreq_grammar" "$sysreq_refs"
-  cp "$REPO_ROOT/src/grammars/sysreq.ebnf" "$sysreq_grammar/sysreq.ebnf"
-  cp "$REPO_ROOT/src/metamodels/SYSTEM-REQ-METAMODEL.md" "$sysreq_refs/SYSTEM-REQ-METAMODEL.md"
-  cp "$REPO_ROOT/src/metamodels/PRODUCT-REQ-METAMODEL.md" "$sysreq_refs/PRODUCT-REQ-METAMODEL.md"
+  cp "$METAMODELS_DIR/src/grammars/sysreq.ebnf" "$sysreq_grammar/sysreq.ebnf"
+  cp "$METAMODELS_DIR/src/metamodels/SYSTEM-REQ-METAMODEL.md" "$sysreq_refs/SYSTEM-REQ-METAMODEL.md"
+  cp "$METAMODELS_DIR/src/metamodels/PRODUCT-REQ-METAMODEL.md" "$sysreq_refs/PRODUCT-REQ-METAMODEL.md"
   echo "  sysreq-design/: 1 grammar + 2 references copied"
 
   # domain-design: grammar + references
   local domain_grammar="$SKILLS_OUT/domain-design/grammar"
   local domain_refs="$SKILLS_OUT/domain-design/references"
   mkdir -p "$domain_grammar" "$domain_refs"
-  cp "$REPO_ROOT/src/grammars/domain.ebnf" "$domain_grammar/domain.ebnf"
-  cp "$REPO_ROOT/src/metamodels/DOMAIN-METAMODEL.md" "$domain_refs/DOMAIN-METAMODEL.md"
-  cp "$REPO_ROOT/src/metamodels/SYSTEM-REQ-METAMODEL.md" "$domain_refs/SYSTEM-REQ-METAMODEL.md"
-  cp "$REPO_ROOT/src/metamodels/PRODUCT-REQ-METAMODEL.md" "$domain_refs/PRODUCT-REQ-METAMODEL.md"
+  cp "$METAMODELS_DIR/src/grammars/domain.ebnf" "$domain_grammar/domain.ebnf"
+  cp "$METAMODELS_DIR/src/metamodels/DOMAIN-METAMODEL.md" "$domain_refs/DOMAIN-METAMODEL.md"
+  cp "$METAMODELS_DIR/src/metamodels/SYSTEM-REQ-METAMODEL.md" "$domain_refs/SYSTEM-REQ-METAMODEL.md"
+  cp "$METAMODELS_DIR/src/metamodels/PRODUCT-REQ-METAMODEL.md" "$domain_refs/PRODUCT-REQ-METAMODEL.md"
   echo "  domain-design/: 1 grammar + 3 references copied"
 
   # architecture-design: grammar + references (arch metamodel + domain/sysreq for cross-links)
   local archd_grammar="$SKILLS_OUT/architecture-design/grammar"
   local archd_refs="$SKILLS_OUT/architecture-design/references"
   mkdir -p "$archd_grammar" "$archd_refs"
-  cp "$REPO_ROOT/src/grammars/architecture.ebnf" "$archd_grammar/architecture.ebnf"
-  cp "$REPO_ROOT/src/metamodels/SOFTWARE-ARCHITECTURE-METAMODEL.md" "$archd_refs/SOFTWARE-ARCHITECTURE-METAMODEL.md"
-  cp "$REPO_ROOT/src/metamodels/DOMAIN-METAMODEL.md" "$archd_refs/DOMAIN-METAMODEL.md"
-  cp "$REPO_ROOT/src/metamodels/SYSTEM-REQ-METAMODEL.md" "$archd_refs/SYSTEM-REQ-METAMODEL.md"
+  cp "$METAMODELS_DIR/src/grammars/architecture.ebnf" "$archd_grammar/architecture.ebnf"
+  cp "$METAMODELS_DIR/src/metamodels/SOFTWARE-ARCHITECTURE-METAMODEL.md" "$archd_refs/SOFTWARE-ARCHITECTURE-METAMODEL.md"
+  cp "$METAMODELS_DIR/src/metamodels/DOMAIN-METAMODEL.md" "$archd_refs/DOMAIN-METAMODEL.md"
+  cp "$METAMODELS_DIR/src/metamodels/SYSTEM-REQ-METAMODEL.md" "$archd_refs/SYSTEM-REQ-METAMODEL.md"
   echo "  architecture-design/: 1 grammar + 3 references copied"
 
   # architecture-extract-from-code: stack heuristics + arch grammar + metamodel
@@ -189,8 +199,8 @@ copy_runtime_files() {
   local axc_grammars="$SKILLS_OUT/architecture-extract-from-code/grammars"
   local axc_refs="$SKILLS_OUT/architecture-extract-from-code/references"
   mkdir -p "$axc_grammars" "$axc_refs"
-  cp "$REPO_ROOT/src/grammars/architecture.ebnf" "$axc_grammars/architecture.ebnf"
-  cp "$REPO_ROOT/src/metamodels/SOFTWARE-ARCHITECTURE-METAMODEL.md" "$axc_refs/SOFTWARE-ARCHITECTURE-METAMODEL.md"
+  cp "$METAMODELS_DIR/src/grammars/architecture.ebnf" "$axc_grammars/architecture.ebnf"
+  cp "$METAMODELS_DIR/src/metamodels/SOFTWARE-ARCHITECTURE-METAMODEL.md" "$axc_refs/SOFTWARE-ARCHITECTURE-METAMODEL.md"
   echo "  architecture-extract-from-code/: 3 heuristics + 1 grammar + 1 reference copied"
 
   # architecture-build-code: stack heuristics + arch grammar + metamodel
@@ -202,8 +212,8 @@ copy_runtime_files() {
   local abc_grammar="$SKILLS_OUT/architecture-build-code/grammar"
   local abc_refs="$SKILLS_OUT/architecture-build-code/references"
   mkdir -p "$abc_grammar" "$abc_refs"
-  cp "$REPO_ROOT/src/grammars/architecture.ebnf" "$abc_grammar/architecture.ebnf"
-  cp "$REPO_ROOT/src/metamodels/SOFTWARE-ARCHITECTURE-METAMODEL.md" "$abc_refs/SOFTWARE-ARCHITECTURE-METAMODEL.md"
+  cp "$METAMODELS_DIR/src/grammars/architecture.ebnf" "$abc_grammar/architecture.ebnf"
+  cp "$METAMODELS_DIR/src/metamodels/SOFTWARE-ARCHITECTURE-METAMODEL.md" "$abc_refs/SOFTWARE-ARCHITECTURE-METAMODEL.md"
   echo "  architecture-build-code/: 3 heuristics + 1 grammar + 1 reference copied"
 
   # synth-design: synth grammar + metamodels + scenario schema + a sound example pair
@@ -211,14 +221,14 @@ copy_runtime_files() {
   local sd_refs="$SKILLS_OUT/synth-design/references"
   local sd_examples="$SKILLS_OUT/synth-design/examples"
   mkdir -p "$sd_grammar" "$sd_refs" "$sd_examples"
-  cp "$REPO_ROOT/src/grammars/synth.ebnf" "$sd_grammar/synth.ebnf"
-  cp "$REPO_ROOT/src/metamodels/SYNTH-METAMODEL.md" "$sd_refs/SYNTH-METAMODEL.md"
-  cp "$REPO_ROOT/src/metamodels/DOMAIN-METAMODEL.md" "$sd_refs/DOMAIN-METAMODEL.md"
-  cp "$REPO_ROOT/src/schemas/synth-scenario.schema.json" "$sd_refs/synth-scenario.schema.json"
-  cp "$REPO_ROOT/examples/ecommerce/v2/orders.domain" "$sd_examples/orders.domain"
-  cp "$REPO_ROOT/examples/ecommerce/v2/orders.synth" "$sd_examples/orders.synth"
-  cp "$REPO_ROOT/examples/ecommerce/v2/catalogue.synth" "$sd_examples/catalogue.synth"
-  cp "$REPO_ROOT/examples/ecommerce/v2/catalogue.csv" "$sd_examples/catalogue.csv"
+  cp "$METAMODELS_DIR/src/grammars/synth.ebnf" "$sd_grammar/synth.ebnf"
+  cp "$METAMODELS_DIR/src/metamodels/SYNTH-METAMODEL.md" "$sd_refs/SYNTH-METAMODEL.md"
+  cp "$METAMODELS_DIR/src/metamodels/DOMAIN-METAMODEL.md" "$sd_refs/DOMAIN-METAMODEL.md"
+  cp "$METAMODELS_DIR/src/schemas/synth-scenario.schema.json" "$sd_refs/synth-scenario.schema.json"
+  cp "$METAMODELS_DIR/examples/ecommerce/v2/orders.domain" "$sd_examples/orders.domain"
+  cp "$METAMODELS_DIR/examples/ecommerce/v2/orders.synth" "$sd_examples/orders.synth"
+  cp "$METAMODELS_DIR/examples/ecommerce/v2/catalogue.synth" "$sd_examples/catalogue.synth"
+  cp "$METAMODELS_DIR/examples/ecommerce/v2/catalogue.csv" "$sd_examples/catalogue.csv"
   echo "  synth-design/: 1 grammar + 3 references + 4 examples copied"
 
   # domain-build-fixtures: stack heuristics + synth metamodel
@@ -228,16 +238,16 @@ copy_runtime_files() {
   for f in dbt.md java-spring.md typescript-nestjs.md clojure.md; do
     cp "$SCRIPT_DIR/domain-build-fixtures/heuristics/$f" "$dbf_heuristics/$f"
   done
-  cp "$REPO_ROOT/src/metamodels/SYNTH-METAMODEL.md" "$dbf_refs/SYNTH-METAMODEL.md"
+  cp "$METAMODELS_DIR/src/metamodels/SYNTH-METAMODEL.md" "$dbf_refs/SYNTH-METAMODEL.md"
   echo "  domain-build-fixtures/: 4 heuristics + 1 reference copied"
 
   # model-formats: the format contract + the JSON Schemas of the five documents
   local mf_refs="$SKILLS_OUT/model-formats/references"
   local mf_schemas="$mf_refs/schemas"
   mkdir -p "$mf_schemas"
-  cp "$REPO_ROOT/src/metamodels/MODEL-FORMATS.md" "$mf_refs/MODEL-FORMATS.md"
+  cp "$METAMODELS_DIR/src/metamodels/MODEL-FORMATS.md" "$mf_refs/MODEL-FORMATS.md"
   for f in domain-model prd sysreq architecture synth-scenario; do
-    cp "$REPO_ROOT/src/schemas/$f.schema.json" "$mf_schemas/$f.schema.json"
+    cp "$METAMODELS_DIR/src/schemas/$f.schema.json" "$mf_schemas/$f.schema.json"
   done
   echo "  model-formats/: 1 reference + 5 schemas copied"
 }

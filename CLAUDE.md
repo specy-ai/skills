@@ -6,33 +6,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Specy is a DDD toolkit that captures business knowledge in structured DSL files (`.prd`, `.sysreq`, `.domain`, `.arch`, `.synth`). This repo contains the AI skill definitions, packaged as a single Claude Code **plugin** named `specy`. The 14 skills (invoked as `specy:<name>`) are: 7 core — `prd-design`, `sysreq-design`, `sysreq-extract-from-code`, `domain-design`, `domain-build-code`, `domain-extract-from-code`, `domain-refactor` — 3 architecture — `architecture-design`, `architecture-extract-from-code`, `architecture-build-code` — 2 synthetic data — `synth-design`, `domain-build-fixtures` — plus 2 auxiliary — `domain-dialogue` and `model-formats` (convert any model between DSL, JSON, YAML and Markdown). Skills are assembled from modular templates into self-contained `dist/skills/<name>/SKILL.md` files.
 
+The languages themselves — the metamodels in prose, the EBNF grammars, the JSON Schemas, the Langium parsers with the `specy` CLI, the tree-sitter grammars and the example corpus — live in the sibling repository [metamodels](https://github.com/specy-ai/metamodels), expected at `../metamodels` (override with `SPECY_METAMODELS`). The build copies what each skill needs from there into `dist/`, so the published plugin stays self-contained. The other Specy repositories are [app](https://github.com/specy-ai/app) (the navigator of a model instance), [website](https://github.com/specy-ai/website) (specy.ai), [synthy](https://github.com/specy-ai/synthy) (synthetic data) and [diagram-engine](https://github.com/specy-ai/diagram-engine); all are checked out next to each other.
+
 ## Build Commands
 
 ```bash
-# Build all skills (assembles src/skills/ templates → dist/)
+# Build all skills (assembles src/skills/ templates → dist/; copies grammars, metamodels,
+# schemas and examples from ../metamodels into each skill)
 ./src/skills/build.sh
 
 # Build a single skill
 ./src/skills/build.sh domain-extract-from-code
 
-# Build the Langium parsers + the specy CLI, validate every example, run the round-trip tests
-./src/langium/specy-domain/build.sh    # requires: node + npm
-
-# Convert / validate any model in any encoding (builds the CLI on first use)
-./specy.sh convert examples/ecommerce/v2/orders.domain --to markdown
-./specy.sh validate examples/url-shortener/url-shortener.prd
-
-# Build tree-sitter parsers + run smoke tests against examples/
-./src/tree-sitters/build.sh    # requires: tree-sitter CLI
-
-# Register the parsers in Neovim (writes ~/.config/nvim/plugin/specy-tree-sitter.lua, then checks it)
-./src/tree-sitters/sync-nvim.sh
-
-# Regenerate the PRD and SysReq metamodel diagrams (repo root specy-*-metamodel.svg)
-./src/diagrams/build.sh        # requires: python3 + network on first run (fonts, fontTools)
-
 # Install the `specy` plugin (symlinks dist/ → ~/.claude/skills/specy)
 ./install-skills-for-user.sh
+
+# Parsers, the specy CLI and the examples live in ../metamodels
+../metamodels/specy.sh validate ../metamodels/examples/url-shortener/url-shortener.prd
+../metamodels/src/langium/specy-domain/build.sh
 ```
 
 ## Architecture
@@ -49,22 +40,21 @@ Skills are assembled by `src/skills/build.sh` from modular templates:
 4. Output goes to `dist/skills/{skill}/SKILL.md`
 
 The build assembles the `specy` plugin into `dist/`: `dist/.claude-plugin/plugin.json` plus a
-`dist/skills/{skill}/` directory per skill. It also copies **runtime files** (heuristics, grammars,
-metamodel references) **inside each skill's dir** — loaded on demand by skill agents, not inlined into
-SKILL.md (a plugin can't reference files outside its own directory).
+`dist/skills/{skill}/` directory per skill. It also copies **runtime files** (heuristics from this repo;
+grammars, metamodel references, schemas and example files from `../metamodels`) **inside each skill's
+dir** — loaded on demand by skill agents, not inlined into SKILL.md (a plugin can't reference files
+outside its own directory). `METAMODELS_DIR` at the top of the script is the one place that knows where
+the metamodels checkout is.
 
 ### Source of Truth
 
-- **Grammars**: `src/grammars/*.ebnf` are the canonical grammars (`domain.ebnf`, `architecture.ebnf`, `prd.ebnf`, `sysreq.ebnf`, `data-operation.ebnf`, `synth.ebnf`). The build script copies each into the skills that need it (e.g. `dist/skills/domain-extract-from-code/grammars/`). The tree-sitter grammars under `src/tree-sitters/` are faithful translations of the EBNF files and must be updated with them.
-- **Metamodels**: `src/metamodels/*.md` document each layer's concepts and constraints (`DOMAIN-METAMODEL.md` for the v3 domain model, `SOFTWARE-ARCHITECTURE-METAMODEL.md` for `.arch`, incl. its level 0, `SYNTH-METAMODEL.md` for `.synth` synthetic-data scenarios written against a `.domain`). They are published verbatim on specy.ai, so their heading texts are stable anchors: add headings, do not rename them.
-- **Schemas**: `src/schemas/*.schema.json` are the JSON Schemas of the five model documents stored as JSON or YAML (`domain-model`, `prd`, `sysreq`, `architecture`, `synth-scenario`); each `$id` (`https://specy.ai/schemas/<name>/1.json`) carries the format's major version. `synth-scenario.schema.json` describes a `.synth` scenario as a document (`specy-synth parse -f json|yaml`; the metamodel's Storage formats section); synthy vendors a copy (`npm run sync:fixtures`) and its `test/schema.test.ts` pins the loader and the schema together, so change the schema, the normalizer (`src/langium/specy-domain/src/cli/synth-model.ts`) and synthy's loader together. A rate's predicate is written in one spelling by both tools (`ratePredicate` in synth-model.ts, `renderPredicate` in synthy's `src/scenario/predicate.ts`): keep them equal. The schemas are embedded into the Langium package by `scripts/embed-schemas.mjs` (`npm run schemas`, run by the build and before the tests).
-- **Model formats**: `src/metamodels/MODEL-FORMATS.md` is the contract of the four encodings of every model (DSL, JSON, YAML, Markdown) and of the Markdown conventions each language's reader understands and writer produces. The converters live in `src/langium/specy-domain/src/formats/` (one codec per language on a shared kit; see its README.md), behind the `specy` CLI (`specy convert`, `specy validate`; root wrapper `./specy.sh`) and the browser bundle. Reading JSON, YAML or Markdown always ends in the Langium parser — the Markdown reader transpiles to DSL — so there is one set of semantics. `test/formats.test.ts` round-trips every example file through the three other encodings and must stay green; `jsonDiff` in it names what differs. The JSON of `.domain` and `.synth` is consumed by synthy: additive changes only, with a `PARSER_VERSION` bump (`src/cli/version.ts`).
 - **Skill templates**: `src/skills/{skill}/main.md` — always edit here, never in `dist/`.
-- **Synthetic-data skills**: `synth-design` and `domain-build-fixtures` drive synthy (`../specy-synthy`, npm `specy-synthy`) through its CLI or its MCP server (`synthy mcp`) and never write rows themselves. The certificate harnesses in `src/skills/domain-build-fixtures/heuristics/` (JUnit, vitest, clojure.test; dbt needs none) were run against synthy's exports: keep them in step with synthy's `load.sql` and `questions.json` formats. The worked example and the phrasebook of `synth-design` are checked against `examples/ecommerce/v2/orders.domain`; re-check them when the language changes.
+- **Grammars, metamodels, schemas, examples**: owned by `../metamodels` (`src/grammars/*.ebnf`, `src/metamodels/*.md`, `src/schemas/*.schema.json`, `examples/`). Never edit the copies under `dist/`; change the source there, rebuild here and commit the regenerated `dist/`. The rules that matter from this side: a grammar change comes with its EBNF, its Langium and tree-sitter grammars and the metamodel prose; the metamodel headings are stable anchors (the website links to them); the JSON of `.domain` and `.synth` is consumed by synthy, so schema changes are additive.
+- **Synthetic-data skills**: `synth-design` and `domain-build-fixtures` drive synthy (`../synthy`, npm `specy-synthy`) through its CLI or its MCP server (`synthy mcp`) and never write rows themselves. The certificate harnesses in `src/skills/domain-build-fixtures/heuristics/` (JUnit, vitest, clojure.test; dbt needs none) were run against synthy's exports: keep them in step with synthy's `load.sql` and `questions.json` formats. The worked example and the phrasebook of `synth-design` are checked against `../metamodels/examples/ecommerce/v2/orders.domain`; re-check them when the language changes.
 
 ### Key Distinction: src/ vs dist/
 
-- `src/` = human-edited source (templates, fragments, grammars, metamodels, tree-sitters)
+- `src/skills/` = human-edited source (templates, fragments, heuristics)
 - `dist/` = generated output (assembled SKILL.md + copied runtime files) — **never edit directly**
 
 ### Skill Source Layout
@@ -76,7 +66,7 @@ src/skills/{skill}/
 └── heuristics/          # Stack-specific extraction patterns (copied as runtime files)
 ```
 
-Shared resources live at the `src/skills/` level (e.g., `src/skills/grammars/` for v1 grammars).
+Shared resources live at the `src/skills/` level (e.g., `src/skills/grammars/` for v1 grammars, `src/skills/plugin/plugin.json` for the plugin manifest).
 
 ### Specy v3 Domain DSL
 
@@ -97,31 +87,16 @@ architecture  > system (one, in focus) > container > component     // C4 levels 
 organization  > area / phase / person / externalSystem / system / dependency > flow   // level 0: the system landscape
 ```
 
-Level 0: a `system` states its purpose (`::`), product (`technology`), `area`, `used-by`, the concepts it `masters` (source of truth) and `handles`, and its `hotspot`s. `dependency A -> B` reads "A depends on B" — the direction of the need, not of the call — with context-map patterns (`CS | Conformist | ACL` downstream, `OHS` upstream, `SharedKernel | PublishedLanguage | Partnership` both; `Partnership` is written on both dependencies of a mutual pair) and a `criticality`. A `flow` carries numbered domain concepts (`carries X as Y`, `to` when data goes to the upstream side) with a mechanism `over "…" manual | automated`, once or per `phase`. Concept names resolve against the `domain-source`(s) (`Context.Concept` when ambiguous; `// NOTE:` acknowledges a name with no domain element yet). The worked example is `examples/retail-media/`; the Navigator in `ui/` renders both roots (see `ui/README.md`).
+Level 0: a `system` states its purpose (`::`), product (`technology`), `area`, `used-by`, the concepts it `masters` (source of truth) and `handles`, and its `hotspot`s. `dependency A -> B` reads "A depends on B" — the direction of the need, not of the call — with context-map patterns (`CS | Conformist | ACL` downstream, `OHS` upstream, `SharedKernel | PublishedLanguage | Partnership` both; `Partnership` is written on both dependencies of a mutual pair) and a `criticality`. A `flow` carries numbered domain concepts (`carries X as Y`, `to` when data goes to the upstream side) with a mechanism `over "…" manual | automated`, once or per `phase`. Concept names resolve against the `domain-source`(s) (`Context.Concept` when ambiguous; `// NOTE:` acknowledges a name with no domain element yet). The worked example is `../metamodels/examples/retail-media/`; the Specy app (`../app`) renders both roots.
 
 ## Development Workflow
 
 1. Edit templates and fragments in `src/skills/`
 2. Run `./src/skills/build.sh` to regenerate `dist/`
 3. The pre-commit hook (`hooks/pre-commit`) blocks commits if `dist/` is out of sync with `src/`
+4. After a grammar, metamodel, schema or example change in `../metamodels`, rebuild here too and commit the regenerated `dist/`
 
 Setup hooks after clone: `git config core.hooksPath hooks/`
-
-## Metamodel Diagrams
-
-`specy-DDD-metamodel.svg` is hand-built. `specy-PRD-metamodel.svg`, `specy-SysReq-metamodel.svg`, `specy-Arch-metamodel.svg`, `specy-DataOp-metamodel.svg` and `EA-metamodel.svg` are generated by `src/diagrams/build.sh` from declarative specs (`src/diagrams/prd_metamodel.py`, `sysreq_metamodel.py`, `arch_metamodel.py`, `dataop_metamodel.py`, `ea_metamodel.py`) rendered by `metamodel_diagram.py` in the DDD diagram's style; every node carries a `data-anchor` naming the heading of the matching metamodel section (used by the specy.ai site to make nodes clickable). Edit the specs, not the SVGs.
-
-## Tree-Sitter Parsers
-
-Five parsers in `src/tree-sitters/`: specy-domain, specy-prd, specy-sysreq, specy-architecture, specy-synth. `src/tree-sitters/build.sh` generates, builds, and smoke-tests them against files in `examples/`. `src/tree-sitters/sync-nvim.sh` registers them in Neovim (see `TREE-SITTER.md`); re-run it when a parser is added.
-
-## Langium Parsers
-
-Five Langium grammars in `src/langium/specy-domain/src/language/` (`specy-domain`, `specy-synth`, `specy-prd`, `specy-sysreq`, `specy-architecture`) on one shared service set (`specy-module.ts`), so a `.synth` resolves into its `.domain`. The new grammars import the domain grammar for the shared terminals and prefix their rules (`Prd…`, `Req…`, `Arch…`): the five generate one `src/generated/ast.ts`. A grammar change goes with the EBNF in `src/grammars/` and the tree-sitter grammar; `npm run langium:generate` then `npx tsc`; every example must validate (`./specy.sh validate <file>`) and the round-trip tests must pass.
-
-## Examples
-
-`examples/` contains complete Specy projects (business-loan, url-shortener, ride-now, ecommerce, retail-media — an organization-level `.arch` landscape with its `.domain`) used both as documentation and as tree-sitter smoke test inputs. Examples are fictional: no client names, no people, no e-mail addresses.
 
 ## DSL Conventions
 
@@ -133,9 +108,7 @@ Five Langium grammars in `src/langium/specy-domain/src/language/` (`specy-domain
 
 ## Design Review Panels
 
-- `CORE_TEAM.md` — 7-panellist review for language/grammar/skill changes (Simplicity, DDD Fidelity, Readability, Machine Reasoning, Cross-File Coherence, Skill Experience, Provocateur)
-- `UX_TEAM.md` — 6-panellist review for interface/visualization changes (not in the repo yet)
-- Both follow: Present → Respond → Rebut → Synthesise → Verdict
+The panels live in `../metamodels`: `CORE_TEAM.md` (7-panellist review for language/grammar/skill changes — Simplicity, DDD Fidelity, Readability, Machine Reasoning, Cross-File Coherence, Skill Experience, Provocateur) and `VISION_TEAM.md` (vision brainstorm), with the `/review` and `/vision` commands that apply them. Both follow: Present → Respond → Rebut → Synthesise → Verdict. A skill change that touches how a construct is produced or read goes through the core panel too.
 
 ## Grammar Gaps
 
@@ -148,4 +121,3 @@ When the user asks to analyze Specy artifacts (`.prd`, `.domain`, `.sysreq`, `ga
 1. **Read all files** in the target `specy/` directory
 2. **Produce the analysis** — cover: extraction statistics, model quality (well-modeled parts, suspicious types, missing fields), UNCLEAR markers, unresolved dot-paths, and actionable recommendations
 3. **Update the gaps backlog** — for each new grammar gap or modeling issue found, append a `GAP-0xx` entry to `proposals/grammar-gaps-backlog.md` following the existing format (severity, desired syntax, occurrences table, discussion). Also update the Summary table, the priority order, the Panel Resolution Monitor table (add the project row and update totals), and the coverage-by-pattern-family table if new pattern families are identified
-

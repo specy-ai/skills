@@ -1,7 +1,0 @@
-{
-  "origin": ["#issue.capitalize#; #next#."],
-  "cancelled": ["#issue.capitalize#; the order was cancelled."],
-  "draft": ["#issue.capitalize#; the order is still a draft."],
-  "issue": ["card declined", "insufficient funds", "bank rejected the transfer", "3-D Secure challenge failed", "card expired"],
-  "next": ["customer asked to retry", "a new payment method was requested", "support was notified"]
-}
